@@ -41,8 +41,6 @@
 #include <asm/unaligned.h>
 #include <asm/io.h>
 
-#include <asm/mach-types.h>
-
 #include <power/regulator.h>
 
 #include "dwc2_udc_otg_regs.h"
@@ -455,12 +453,13 @@ static void reconfig_usbd(struct dwc2_udc *dev)
 {
 	/* 2. Soft-reset OTG Core and then unreset again. */
 	int i;
-	unsigned int uTemp = writel(CORE_SOFT_RESET, &reg->grstctl);
+	unsigned int uTemp;
 	uint32_t dflt_gusbcfg;
 	uint32_t rx_fifo_sz, tx_fifo_sz, np_tx_fifo_sz;
 	u32 max_hw_ep;
 	int pdata_hw_ep;
 
+    writel(CORE_SOFT_RESET, &reg->grstctl);
 	debug("Resetting OTG controller\n");
 
 	dflt_gusbcfg =
