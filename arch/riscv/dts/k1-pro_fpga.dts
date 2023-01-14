@@ -9,12 +9,11 @@
 
 	memory@0 {
 		device_type = "memory";
-		reg = <0x0 0x20000000 0x0 0x10000000>;
+		reg = <0x0 0x40000000 0x0 0x10000000>;
 	};
 
 	chosen {
-		bootargs = "earlycon=sbi console=ttyS0,115200n8 debug loglevel=8,initcall_debug=1 rdinit=/init.tmp";
-		stdout-path = "serial0:115200n8";
+		stdout-path = &uart0;
 	};
 };
 
