@@ -68,4 +68,24 @@ config BOARD_SPECIFIC_OPTIONS # dummy
 	imply CFI_FLASH
 	imply OF_HAS_PRIOR_STAGE
 
+choice
+	prompt "product board"
+	default K1_PRO_BOARD_QEMU
+
+config K1_PRO_BOARD_QEMU
+	bool "k1-pro board qemu"
+	help
+	  k1-pro board is qemu.
+
+config K1_PRO_BOARD_FPGA
+	bool "k1-pro board fpga"
+	help
+	  k1-pro board is fpga.
+
+config K1_PRO_BOARD_SIMULATION
+	bool "k1-pro board simulation"
+	help
+	  k1-pro board is simulation.
+endchoice
+
 endif
