@@ -8,6 +8,23 @@
 
 #include <linux/sizes.h>
 
+
+#ifdef CONFIG_K1_PRO_BOARD_QEMU
+    #ifdef CONFIG_SPL_BUILD
+        #define RISCV_MMODE_TIMERBASE		0x2000000
+        #define RISCV_MMODE_TIMER_FREQ		1000000
+    #endif
+    #define RISCV_SMODE_TIMER_FREQ		1000000
+#elif defined(CONFIG_K1_PRO_BOARD_FPGA) || defined(CONFIG_K1_PRO_BOARD_SIMULATION)
+    #ifdef CONFIG_SPL_BUILD
+        #define RISCV_MMODE_TIMERBASE		0x2000000
+        #define RISCV_MMODE_TIMER_FREQ		1000000
+    #endif
+    #define RISCV_SMODE_TIMER_FREQ		1000000
+#else
+    #error "unknown k1-pro board defined"
+#endif
+
 /* Environment options */
 
 #define BOOT_TARGET_DEVICES(func) \
