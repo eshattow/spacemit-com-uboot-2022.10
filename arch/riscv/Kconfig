@@ -33,6 +33,7 @@ config TARGET_OPENPITON_RISCV64
 
 config TARGET_SPACEMIT_K1PRO
 	bool "Support Spacemit K1-Pro SoC"
+	select SYS_CACHE_SHIFT_6
 
 endchoice
 
