@@ -37,6 +37,14 @@ config TARGET_SPACEMIT_K1PRO
 
 endchoice
 
+config NOT_RELOC_TEXT_SECTION
+	bool "Don't relocate text section for u-boot debug!!!"
+	depends on TARGET_SPACEMIT_K1PRO
+	default n
+	help
+	  Attention: this feture is just used for u-boot debug,
+	  it will make fatal error when boot kernel.
+
 config SYS_ICACHE_OFF
 	bool "Do not enable icache"
 	help
