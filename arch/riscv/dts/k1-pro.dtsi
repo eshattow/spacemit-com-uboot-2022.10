@@ -121,6 +121,27 @@
 			hw-flow-control = "unsupport";
 			status = "disabled";
 		};
+
+		gmac0: ethernet@2cc00000 {
+			compatible = "snps,dwmac";
+			reg = <0x0 0x2cc00000 0x0 0x10000>;
+			snps,pbl = <32>;
+			snps,fixed-burst;
+			max-speed = <100>;
+
+			phy-mode = "rmii";
+			phy-handle = <&phy_88E1111_0>;
+			status = "okay";
+			mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				compatible = "snps,dwmac-mdio";
+
+				phy_88E1111_0: ethernet-phy@1 {
+					reg = <0x7>;
+				};
+			};
+		};
 	};
 };
 

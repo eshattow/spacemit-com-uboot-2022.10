@@ -21,6 +21,11 @@
     #error "unknown k1-pro board defined"
 #endif
 
+#define CONFIG_IPADDR    192.168.31.253
+#define CONFIG_SERVERIP  192.168.31.1
+#define CONFIG_GATEWAYIP 192.168.31.1
+#define CONFIG_NETMASK   255.255.255.0
+
 /* Environment options */
 
 #define BOOT_TARGET_DEVICES(func) \
@@ -47,6 +52,7 @@
 	"scriptaddr=0x8c100000\0" \
 	"pxefile_addr_r=0x8c200000\0" \
 	"ramdisk_addr_r=0x8c300000\0" \
+	"ethaddr=02:f6:c3:67:27:55\0" \
 	BOOTENV
 
 #endif /* __CONFIG_H */
