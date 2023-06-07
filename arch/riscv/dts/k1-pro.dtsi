@@ -110,12 +110,12 @@
 			riscv,ndev = <159>;
 		};
 
-		uart0: uart@10010000 {
+		uart0: serial@2cea0000 {
 			compatible = "snps,dw-apb-uart";
-			reg = <0x0 0x10010000 0x0 0x1000>;
-			clock-frequency = <100000000>;
+			reg = <0x0 0x2cea0000 0x0 0x1000>;
+			clock-frequency = <50000000>;
 			interrupt-parent = <&intc>;
-			interrupts = <16>;
+			interrupts = <56>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
 			hw-flow-control = "unsupport";
