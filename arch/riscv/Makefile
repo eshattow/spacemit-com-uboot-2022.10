@@ -17,6 +17,9 @@ endif
 ifeq ($(CONFIG_RISCV_ISA_C),y)
 	ARCH_C = c
 endif
+ifeq ($(CONFIG_RISCV_ISA_ZICBOM),y)
+	ARCH_EXTENTION = _zicbom
+endif
 ifeq ($(CONFIG_CMODEL_MEDLOW),y)
 	CMODEL = medlow
 endif
@@ -24,8 +27,8 @@ ifeq ($(CONFIG_CMODEL_MEDANY),y)
 	CMODEL = medany
 endif
 
-ARCH_FLAGS = -march=$(ARCH_BASE)$(ARCH_A)$(ARCH_C) -mabi=$(ABI) \
-	     -mcmodel=$(CMODEL)
+ARCH_FLAGS = -march=$(ARCH_BASE)$(ARCH_A)$(ARCH_C)$(ARCH_EXTENTION) -mabi=$(ABI) \
+		-mcmodel=$(CMODEL)
 
 PLATFORM_CPPFLAGS	+= $(ARCH_FLAGS)
 CFLAGS_EFI		+= $(ARCH_FLAGS)

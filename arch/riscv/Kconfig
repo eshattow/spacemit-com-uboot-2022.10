@@ -169,6 +169,24 @@ config RISCV_ISA_C
 config RISCV_ISA_A
 	def_bool y
 
+config RISCV_ISA_ZICBOM
+	bool "Zicbom extension support for non-coherent DMA operation"
+	default y
+	help
+	   Adds support to dynamically detect the presence of the ZICBOM
+	   extension (Cache Block Management Operations) and enable its
+	   usage.
+
+	   The Zicbom extension can be used to handle for example
+	   non-coherent DMA support on devices that need it.
+
+	   If you don't know what to do here, say Y.
+
+config RISCV_CBOM_BLOCK_SIZE
+	int
+	depends on RISCV_ISA_ZICBOM
+	default SYS_CACHELINE_SIZE
+
 config 32BIT
 	bool
 
