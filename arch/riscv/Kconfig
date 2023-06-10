@@ -84,7 +84,7 @@ source "arch/riscv/cpu/ax25/Kconfig"
 source "arch/riscv/cpu/fu540/Kconfig"
 source "arch/riscv/cpu/fu740/Kconfig"
 source "arch/riscv/cpu/generic/Kconfig"
-source "arch/riscv/cpu/baize/Kconfig"
+source "arch/riscv/cpu/x60/Kconfig"
 
 # architecture-specific options below
 

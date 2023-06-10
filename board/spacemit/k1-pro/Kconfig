@@ -7,7 +7,7 @@ config SYS_VENDOR
 	default "spacemit"
 
 config SYS_CPU
-	default "baize"
+	default "x60"
 
 config SYS_CONFIG_NAME
 	default "k1-pro"
@@ -27,7 +27,7 @@ config SPL_OPENSBI_LOAD_ADDR
 
 config BOARD_SPECIFIC_OPTIONS # dummy
 	def_bool y
-	select SPACEMIT_BAIZE
+	select SPACEMIT_X60
 	imply AHCI
 	imply SMP
 	imply BOARD_LATE_INIT

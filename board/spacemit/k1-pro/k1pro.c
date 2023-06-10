@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2018, Bin Meng <bmeng.cn@gmail.com>
+ * Copyright (C) 2023, kevin.z.m <zhangmeng.kevin@spacemit.com>
  */
 
 #include <common.h>
