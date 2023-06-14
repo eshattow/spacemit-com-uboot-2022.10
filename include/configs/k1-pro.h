@@ -21,9 +21,9 @@
     #error "unknown k1-pro board defined"
 #endif
 
-#define CONFIG_IPADDR    192.168.31.253
-#define CONFIG_SERVERIP  192.168.31.1
-#define CONFIG_GATEWAYIP 192.168.31.1
+#define CONFIG_IPADDR    10.0.92.253
+#define CONFIG_SERVERIP  10.0.92.134
+#define CONFIG_GATEWAYIP 10.0.92.1
 #define CONFIG_NETMASK   255.255.255.0
 
 /* Environment options */
