@@ -154,6 +154,26 @@
 			status = "disabled";
 		};
 
+		usbdrd3: usb3@0 {
+			compatible = "spacemit,k1-pro-dwc3";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			ranges;
+			status = "disabled";
+
+			dwc3@2cb00000 {
+				compatible = "snps,dwc3";
+				reg = <0x0 0x2cb00000 0x0 0x10000>;
+				interrupt-parent = <&intc>;
+				interrupts = <90>;
+				maximum-speed = "high-speed";
+				phy_type = "ulpi";
+				dr_mode = "otg";
+				snps,dis_u2_susphy_quirk;
+				snps,dis_u3_susphy_quirk;
+			};
+		};
+
 		gmac0: ethernet@2cc00000 {
 			compatible = "snps,dwmac";
 			reg = <0x0 0x2cc00000 0x0 0x10000>;
