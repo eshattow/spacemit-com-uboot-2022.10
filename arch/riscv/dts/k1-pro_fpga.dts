@@ -25,3 +25,11 @@
 &usbdrd3 {
 	status = "okay";
 };
+
+&mmc0 {
+	status = "disabled";
+};
+
+&mmc1 {
+	status = "okay";
+};
