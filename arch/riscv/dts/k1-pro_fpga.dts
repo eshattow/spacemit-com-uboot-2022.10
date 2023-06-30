@@ -27,7 +27,7 @@
 };
 
 &mmc0 {
-	status = "disabled";
+	status = "okay";
 };
 
 &mmc1 {

@@ -49,6 +49,8 @@ static void sdhci_do_enable_v4_mode(struct udevice *dev)
 	sdhci_writew(host, ctrl2, SDHCI_HOST_CONTROL2);
 }
 
+static struct dm_mmc_ops spacemit_mmc_ops;
+
 static int spacemit_sdhci_probe(struct udevice *dev)
 {
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
@@ -103,6 +105,8 @@ static int spacemit_sdhci_probe(struct udevice *dev)
 	host->max_clk = max_clk;
 	host->mmc = &plat->mmc;
 	host->mmc->dev = dev;
+	spacemit_mmc_ops = sdhci_ops;
+	spacemit_mmc_ops.reinit = sdhci_probe;
 
 	ret = sdhci_setup_cfg(&plat->cfg, host, max_clk, SPACEMIT_SDHC_MIN_FREQ);
 	if (ret)
@@ -141,7 +145,7 @@ U_BOOT_DRIVER(spacemit_sdhci_drv) = {
 	.name		= "spacemit_sdhci",
 	.id		= UCLASS_MMC,
 	.of_match	= spacemit_sdhci_ids,
-	.ops		= &sdhci_ops,
+	.ops		= &spacemit_mmc_ops,
 	.bind		= spacemit_sdhci_bind,
 	.probe		= spacemit_sdhci_probe,
 	.priv_auto	= sizeof(struct sdhci_host),
