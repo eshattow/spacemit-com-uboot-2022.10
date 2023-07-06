@@ -174,8 +174,8 @@
 			};
 		};
 
-		gmac0: ethernet@2cc00000 {
-			compatible = "snps,dwmac";
+		eqos: ethernet@2cc00000 {
+			compatible = "spacemit,k1pro-dwmac-eqos";
 			reg = <0x0 0x2cc00000 0x0 0x10000>;
 			snps,pbl = <32>;
 			snps,fixed-burst;
