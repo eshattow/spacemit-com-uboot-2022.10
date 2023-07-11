@@ -154,6 +154,20 @@
 			status = "disabled";
 		};
 
+		dma: dma@2ce40000 {
+			compatible = "dw_axi_dma";
+			reg = <0x0 0x2ce40000 0x0 0x1000>;
+			max_block_ts = "0x400000";
+			dma-channels = "8";
+			dma-cells = <2>;
+			status = "okay";
+		};
+
+		dmatest: dmatest@00000000 {
+			compatible = "dmatest_drv";
+			status = "okay";
+		};
+
 		usbdrd3: usb3@0 {
 			compatible = "spacemit,k1-pro-dwc3";
 			#address-cells = <2>;
