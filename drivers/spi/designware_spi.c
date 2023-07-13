@@ -365,12 +365,13 @@ static int dw_spi_probe(struct udevice *bus)
 	priv->freq = plat->frequency;
 
 	ret = dw_spi_get_clk(bus, &priv->bus_clk_rate);
-	if (ret)
-		return ret;
+	//if (ret)
+	//	return ret;
+	priv->bus_clk_rate =  50000000;
 
 	ret = dw_spi_reset(bus);
-	if (ret)
-		return ret;
+	//if (ret)
+	//	return ret;
 
 	if (!init)
 		return -EINVAL;

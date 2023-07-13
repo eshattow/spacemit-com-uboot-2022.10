@@ -235,6 +235,32 @@
 			non-removable;
 			status = "disabled";
 		};
+
+		spi0: spi@2ce00000 {
+			compatible = "snps,dwc-ssi-1.01a";
+			reg = <0x0 0x2ce00000 0x0 0x4000>;
+
+			interrupt-parent = <&intc>;
+			interrupts = <96>;
+			//clocks = <&ccu CLK_QSPI0>;
+			//resets = <&reset RESET_QSPI0>;
+			spi-max-frequency = <6250000>;
+			num-cs = <4>;
+			reg-io-width = <4>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			flash@0 {
+				compatible = "jedec,spi-nor";
+				reg = <0>;
+				m25p,fast-read;
+				spi-tx-bus-width = <1>;
+				spi-rx-bus-width = <4>;
+				broken-flash-reset;
+				status = "okay";
+			};
+                };
 	};
 
 	pmu {

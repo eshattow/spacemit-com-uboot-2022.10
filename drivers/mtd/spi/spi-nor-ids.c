@@ -331,6 +331,7 @@ const struct flash_info spi_nor_ids[] = {
 	{ INFO("m25pe16", 0x208015,  0, 64 * 1024, 32, SECT_4K) },
 	{ INFO("m25px16",    0x207115,  0, 64 * 1024, 32, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
 	{ INFO("m25px64",    0x207117,  0, 64 * 1024, 128, 0) },
+	{ INFO("m45pe16",    0x204015,  0, 64 * 1024, 32,  0) },
 #endif
 #ifdef CONFIG_SPI_FLASH_WINBOND		/* WINBOND */
 	/* Winbond -- w25x "blocks" are 64K, "sectors" are 4KiB */
