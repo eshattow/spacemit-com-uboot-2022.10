@@ -256,11 +256,37 @@
 				reg = <0>;
 				m25p,fast-read;
 				spi-tx-bus-width = <1>;
-				spi-rx-bus-width = <4>;
+				spi-rx-bus-width = <1>;
+				spi-max-frequency = <6250000>;
 				broken-flash-reset;
 				status = "okay";
 			};
                 };
+
+		spi1: spi@2ce04000 {
+			compatible = "snps,dwc-ssi-1.01a";
+			reg = <0x0 0x2ce04000 0x0 0x4000>;
+
+			interrupt-parent = <&intc>;
+			interrupts = <97>;
+			//clocks = <&ccu CLK_QSPI1>;
+			//resets = <&reset RESET_QSPI1>;
+			spi-max-frequency = <6250000>;
+			num-cs = <4>;
+			reg-io-width = <4>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			spi-nand@0 {
+				compatible = "spi-nand";
+				reg = <0>;
+				spi-tx-bus-width = <1>;
+				spi-rx-bus-width = <1>;
+				spi-max-frequency = <6250000>;
+				status = "okay";
+			};
+		};
 	};
 
 	pmu {

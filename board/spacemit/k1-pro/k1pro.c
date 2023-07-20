@@ -95,4 +95,15 @@ void k1pro_spi_init(void)
 	val = readl(reg);
 	val |= BIT(0);
 	writel(val, reg);
+
+	//qspi1
+	val = readl(reg);
+	val &= ~BIT(1);
+	writel(val, reg);
+
+	udelay(2000);
+
+	val = readl(reg);
+	val |= BIT(1);
+	writel(val, reg);
 }
