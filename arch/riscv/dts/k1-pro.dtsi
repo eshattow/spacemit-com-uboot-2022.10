@@ -2,7 +2,7 @@
 /* Copyright (c) 2022 Spacemit, Inc */
 
 /dts-v1/;
-
+#include <dt-bindings/reset/reset-k1pro.h>
 /dts-v1/;
 / {
 	compatible = "spacemit,k1-pro", "riscv";
