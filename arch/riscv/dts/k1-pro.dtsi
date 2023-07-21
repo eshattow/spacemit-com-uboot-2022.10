@@ -141,6 +141,15 @@
 			riscv,ndev = <159>;
 		};
 
+		reset: reset-controller@2f024000 {
+			#address-cells = <0x1>;
+			#size-cells = <0x1>;
+			compatible = "spacemit,k1pro-reset";
+			reg = <0x0 0x2f024000 0x0 0x4000>, <0x0 0x2f804000 0x0 0xc000>;
+			#reset-cells = <1>;
+			status = "okay";
+		};
+
 		/* Normal serial, log */
 		uart0: serial@2cea0000 {
 			compatible = "snps,dw-apb-uart";
