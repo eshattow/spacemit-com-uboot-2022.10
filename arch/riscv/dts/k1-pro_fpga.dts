@@ -4,6 +4,7 @@
 /dts-v1/;
 
 #include "k1-pro.dtsi"
+#include "k1-pro_pinctrl.dtsi"
 / {
 	model = "spacemit k1-pro fpga board";
 
@@ -32,4 +33,14 @@
 
 &mmc1 {
 	status = "okay";
+};
+
+&spi0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_qspi0>;
+};
+
+&eth0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_gmac>;
 };

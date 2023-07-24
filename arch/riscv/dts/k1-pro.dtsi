@@ -177,6 +177,13 @@
 			status = "okay";
 		};
 
+		pinctrl: pinctrl@2f02c000 {
+			compatible = "spacemit,k1pro-pinctrl";
+			reg = <0x0 0x2f02c000 0x0 0x4000>;
+			resets = <&reset RESET_SYSREG>;
+			status = "okay";
+		};
+
 		usbdrd3: usb3@0 {
 			compatible = "spacemit,k1-pro-dwc3";
 			#address-cells = <2>;
@@ -270,7 +277,7 @@
 				broken-flash-reset;
 				status = "okay";
 			};
-                };
+		};
 
 		spi1: spi@2ce04000 {
 			compatible = "snps,dwc-ssi-1.01a";
