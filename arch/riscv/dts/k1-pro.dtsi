@@ -207,6 +207,8 @@
 		eth0: ethernet@2cc00000 {
 			compatible = "spacemit,k1pro-dwmac-eqos";
 			reg = <0x0 0x2cc00000 0x0 0x10000>;
+			resets = <&reset RESET_GMAC_CSR>, <&reset RESET_GMAC_DMA>;
+			reset-names = "gmac_csr", "gmac_dma";
 			snps,pbl = <32>;
 			snps,fixed-burst;
 			max-speed = <100>;

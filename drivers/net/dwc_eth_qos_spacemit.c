@@ -58,6 +58,33 @@ static int eqos_probe_resources_spacemit(struct udevice *dev)
 	return 0;
 }
 
+static int eqos_stop_resets_spacemit(struct udevice *dev)
+{
+	struct reset_ctl_bulk reset_bulk;
+	int ret;
+
+	ret = reset_get_bulk(dev, &reset_bulk);
+	if (ret)
+		printf("%s, Can't get reset: %d\n", __func__, ret);
+	else
+		reset_assert_bulk(&reset_bulk);
+	return 0;
+}
+
+static int eqos_start_resets_spacemit(struct udevice *dev)
+{
+	struct reset_ctl_bulk reset_bulk;
+	int ret;
+
+	ret = reset_get_bulk(dev, &reset_bulk);
+	if (ret)
+		printf("%s, Can't get reset: %d\n", __func__, ret);
+	else
+		reset_deassert_bulk(&reset_bulk);
+
+	return 0;
+}
+
 static int eqos_set_tx_clk_speed_spacemit(struct udevice *dev)
 {
 	struct eqos_priv *eqos = dev_get_priv(dev);
@@ -104,8 +131,8 @@ static struct eqos_ops eqos_spacemit_ops = {
 	.eqos_flush_buffer = eqos_flush_buffer_generic,
 	.eqos_probe_resources = eqos_probe_resources_spacemit,
 	.eqos_remove_resources = eqos_null_ops,
-	.eqos_stop_resets = eqos_null_ops,
-	.eqos_start_resets = eqos_null_ops,
+	.eqos_stop_resets = eqos_stop_resets_spacemit,
+	.eqos_start_resets = eqos_start_resets_spacemit,
 	.eqos_stop_clks = eqos_null_ops,
 	.eqos_start_clks = eqos_null_ops,
 	.eqos_calibrate_pads = eqos_null_ops,

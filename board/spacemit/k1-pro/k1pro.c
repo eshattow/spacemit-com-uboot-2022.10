@@ -70,11 +70,8 @@ void k1pro_gmac_init(void)
 {
 	volatile unsigned int val;
 
-    //enable rmii
-    val = readl((const volatile void *)SYS_GMAC_CFG);
+	//enable rmii
+	val = readl((const volatile void *)SYS_GMAC_CFG);
 	val |= BIT(0);
 	writel(val, (volatile void __iomem *)SYS_GMAC_CFG);
-
-    //set software rst
-	writel(0xffffffff, (volatile void __iomem *)0x2f024600);
 }
