@@ -177,6 +177,27 @@
 			status = "okay";
 		};
 
+		gpio0: gpio@2ce80000 {
+			compatible = "snps,dw-apb-gpio";
+			reg = <0x0 0x2ce80000 0x0 0x4000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			resets = <&reset RESET_GPIO>;
+
+			porta: gpio-port@0 {
+				compatible = "snps,dw-apb-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <30>;
+				reg = <0>;
+
+				interrupt-controller;
+				#interrupt-cells = <2>;
+				interrupt-parent = <&intc>;
+				interrupts = <72>;
+			};
+		};
+
 		pinctrl: pinctrl@2f02c000 {
 			compatible = "spacemit,k1pro-pinctrl";
 			reg = <0x0 0x2f02c000 0x0 0x4000>;
