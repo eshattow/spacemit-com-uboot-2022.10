@@ -20,7 +20,6 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 void k1pro_gmac_init(void);
-void k1pro_spi_init(void);
 
 int board_init(void)
 {
@@ -34,7 +33,6 @@ int board_late_init(void)
 	int ret;
 
 	k1pro_gmac_init();
-	k1pro_spi_init();
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
 		debug("No chosen node found, can't get kernel start address\n");
@@ -79,31 +77,4 @@ void k1pro_gmac_init(void)
 
     //set software rst
 	writel(0xffffffff, (volatile void __iomem *)0x2f024600);
-}
-
-void k1pro_spi_init(void)
-{
-	volatile unsigned int val;
-	u64 reg = 0x2f024000 + 0x104;
-
-	val = readl(reg);
-	val &= ~BIT(0);
-	writel(val, reg);
-
-	udelay(2000);
-
-	val = readl(reg);
-	val |= BIT(0);
-	writel(val, reg);
-
-	//qspi1
-	val = readl(reg);
-	val &= ~BIT(1);
-	writel(val, reg);
-
-	udelay(2000);
-
-	val = readl(reg);
-	val |= BIT(1);
-	writel(val, reg);
 }
