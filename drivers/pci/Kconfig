@@ -133,6 +133,14 @@ config PCIE_DW_SIFIVE
 	  Say Y here if you want to enable PCIe controller support on
 	  FU740.
 
+config PCIE_DW_SPACEMIT
+	bool "Enable Spacemit PCIe"
+	depends on RESET_SPACEMIT
+	select PCIE_DW_COMMON
+	help
+	  Say Y here if you want to enable PCIe controller support on
+	  Spacemit SoCs.
+
 config SYS_FSL_PCI_VER_3_X
 	bool
 

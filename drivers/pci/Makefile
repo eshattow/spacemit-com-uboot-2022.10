@@ -48,4 +48,5 @@ obj-$(CONFIG_PCI_BRCMSTB) += pcie_brcmstb.o
 obj-$(CONFIG_PCI_OCTEONTX) += pci_octeontx.o
 obj-$(CONFIG_PCIE_OCTEON) += pcie_octeon.o
 obj-$(CONFIG_PCIE_DW_SIFIVE) += pcie_dw_sifive.o
+obj-$(CONFIG_PCIE_DW_SPACEMIT) += pcie_dw_spacemit.o
 obj-$(CONFIG_PCIE_UNIPHIER) += pcie_uniphier.o

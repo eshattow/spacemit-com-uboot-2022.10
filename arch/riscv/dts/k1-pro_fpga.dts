@@ -43,4 +43,9 @@
 &eth0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_gmac>;
+	status = "okay";
+};
+
+&pcie5 {
+	status = "disabled";
 };
