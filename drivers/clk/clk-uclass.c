@@ -471,7 +471,6 @@ void clk_free(struct clk *clk)
 ulong clk_get_rate(struct clk *clk)
 {
 	const struct clk_ops *ops;
-	int ret;
 
 	debug("%s(clk=%p)\n", __func__, clk);
 	if (!clk_valid(clk))
@@ -481,11 +480,7 @@ ulong clk_get_rate(struct clk *clk)
 	if (!ops->get_rate)
 		return -ENOSYS;
 
-	ret = ops->get_rate(clk);
-	if (ret)
-		return log_ret(ret);
-
-	return 0;
+	return ops->get_rate(clk);
 }
 
 struct clk *clk_get_parent(struct clk *clk)
@@ -599,6 +594,8 @@ ulong clk_set_rate(struct clk *clk, ulong rate)
 int clk_set_parent(struct clk *clk, struct clk *parent)
 {
 	const struct clk_ops *ops;
+	struct clk *clkp;
+	struct clk *parentp;
 	int ret;
 
 	debug("%s(clk=%p, parent=%p)\n", __func__, clk, parent);
@@ -613,8 +610,15 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
 	if (ret)
 		return ret;
 
+	/* get private clock struct used for cache */
+	clk_get_priv(clk, &clkp);
+	clk_get_priv(parent, &parentp);
+
 	if (CONFIG_IS_ENABLED(CLK_CCF))
-		ret = device_reparent(clk->dev, parent->dev);
+		ret = device_reparent(clkp->dev, parentp->dev);
+
+	/* Clean up cached rates for us and all child clocks */
+	clk_clean_rate_cache(clkp);
 
 	return ret;
 }
