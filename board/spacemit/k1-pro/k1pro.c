@@ -10,11 +10,13 @@
 #include <fdtdec.h>
 #include <image.h>
 #include <log.h>
+#include <mapmem.h>
 #include <spl.h>
 #include <init.h>
 #include <virtio_types.h>
 #include <virtio.h>
 #include <asm/io.h>
+#include <asm/sections.h>
 
 #define SYS_GMAC_CFG	(0x2f028004)
 
@@ -54,16 +56,51 @@ int board_late_init(void)
 #ifdef CONFIG_SPL
 u32 spl_boot_device(void)
 {
+#ifdef CONFIG_K1_PRO_BOARD_QEMU
 	/* RISC-V QEMU only supports RAM as SPL boot device */
 	return BOOT_DEVICE_RAM;
+#endif
+
+	int boot_mode = 0;
+
+	/*select spl boot device*/
+
+	/*select sd as default. later it can select diff boot type by
+	 *obtaining pin info.
+	 * */
+	boot_mode = 0x2;
+
+	switch (boot_mode) {
+	case 0:
+		return BOOT_DEVICE_SPI;
+	case 1:
+		return BOOT_DEVICE_MMC2;
+	case 2:
+		return BOOT_DEVICE_MMC1;//sd
+	case 3:
+		return BOOT_DEVICE_UART;
+	default:
+		debug("Unsupported boot device 0x%x.\n",
+			  boot_mode);
+		return BOOT_DEVICE_NONE;
+	}
 }
+
 #endif
 
 void *board_fdt_blob_setup(int *err)
 {
 	*err = 0;
+
 	/* Stored the DTB address there during our init */
-	return (void *)(ulong)gd->arch.firmware_fdt_addr;
+	if (IS_ENABLED(CONFIG_OF_SEPARATE) || IS_ENABLED(CONFIG_OF_BOARD)) {
+		if (gd->arch.firmware_fdt_addr){
+			if (!fdt_check_header((void *)(ulong)gd->arch.firmware_fdt_addr)){
+				return (void *)(ulong)gd->arch.firmware_fdt_addr;
+			}
+		}
+	}
+	return (ulong *)&_end;
 }
 
 void k1pro_gmac_init(void)
@@ -74,4 +111,9 @@ void k1pro_gmac_init(void)
 	val = readl((const volatile void *)SYS_GMAC_CFG);
 	val |= BIT(0);
 	writel(val, (volatile void __iomem *)SYS_GMAC_CFG);
+}
+
+void *board_spl_fit_buffer_addr(ulong fit_size, int sectors, int bl_len)
+{
+	return map_sysmem(K1PRO_SPL_BOOT_LOAD_ADDR, 0);
 }

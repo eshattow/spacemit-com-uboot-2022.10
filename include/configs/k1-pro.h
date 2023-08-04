@@ -26,6 +26,8 @@
 #define CONFIG_GATEWAYIP 10.0.92.1
 #define CONFIG_NETMASK   255.255.255.0
 
+#define K1PRO_SPL_BOOT_LOAD_ADDR (0xa000000000)
+
 /* Environment options */
 
 #define BOOT_TARGET_DEVICES(func) \

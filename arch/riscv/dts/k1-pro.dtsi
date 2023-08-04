@@ -17,6 +17,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		timebase-frequency = <50000000>;
+		u-boot,dm-spl;
 		cpu_0: cpu@0 {
 			device_type = "cpu";
 			reg = <0>;
@@ -32,11 +33,12 @@
 			cpu-tlb = "1024 4-ways";
 			cpu-cacheline = "64Bytes";
 			cpu-vector = "0.7.1";
-
+			u-boot,dm-spl;
 			cpu0_intc: interrupt-controller {
 				#interrupt-cells = <1>;
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
+				u-boot,dm-spl;
 			};
 		};
 		cpu_1: cpu@1 {
@@ -54,11 +56,13 @@
 			cpu-tlb = "1024 4-ways";
 			cpu-cacheline = "64Bytes";
 			cpu-vector = "0.7.1";
+			u-boot,dm-spl;
 
 			cpu1_intc: interrupt-controller {
 				#interrupt-cells = <1>;
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
+				u-boot,dm-spl;
 			};
 		};
 		cpu_2: cpu@2 {
@@ -76,11 +80,13 @@
 			cpu-tlb = "1024 4-ways";
 			cpu-cacheline = "64Bytes";
 			cpu-vector = "0.7.1";
+			u-boot,dm-spl;
 
 			cpu2_intc: interrupt-controller {
 				#interrupt-cells = <1>;
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
+				u-boot,dm-spl;
 			};
 		};
 		cpu_3: cpu@3 {
@@ -98,11 +104,13 @@
 			cpu-tlb = "1024 4-ways";
 			cpu-cacheline = "64Bytes";
 			cpu-vector = "0.7.1";
+			u-boot,dm-spl;
 
 			cpu3_intc: interrupt-controller {
 				#interrupt-cells = <1>;
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
+				u-boot,dm-spl;
 			};
 		};
 	};
@@ -112,6 +120,7 @@
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
+		u-boot,dm-spl;
 
 		clint0: clint@14000000 {
 			compatible = "riscv,clint0";
@@ -123,6 +132,7 @@
 			>;
 			reg = <0x0 0x14000000 0x0 0x00010000>;
 			clint,has-no-64bit-mmio;
+			u-boot,dm-spl;
 		};
 
 		intc: interrupt-controller@10000000 {
@@ -147,6 +157,7 @@
 			compatible = "spacemit,k1pro-reset";
 			reg = <0x0 0x2f024000 0x0 0x4000>, <0x0 0x2f804000 0x0 0xc000>;
 			#reset-cells = <1>;
+			u-boot,dm-spl;
 			status = "okay";
 		};
 
@@ -160,6 +171,7 @@
 			reg-shift = <2>;
 			reg-io-width = <4>;
 			hw-flow-control = "unsupport";
+			u-boot,dm-spl;
 			status = "disabled";
 		};
 
@@ -183,6 +195,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			resets = <&reset RESET_GPIO>;
+			u-boot,dm-spl;
 
 			porta: gpio-port@0 {
 				compatible = "snps,dw-apb-gpio-port";
@@ -195,6 +208,7 @@
 				#interrupt-cells = <2>;
 				interrupt-parent = <&intc>;
 				interrupts = <72>;
+				u-boot,dm-spl;
 			};
 		};
 
@@ -202,6 +216,7 @@
 			compatible = "spacemit,k1pro-pinctrl";
 			reg = <0x0 0x2f02c000 0x0 0x4000>;
 			resets = <&reset RESET_SYSREG>;
+			u-boot,dm-spl;
 			status = "okay";
 		};
 
@@ -254,6 +269,7 @@
 			interrupts = <84>;
 			max-frequency = <400000000>;
 			bus-width = <4>;
+			u-boot,dm-spl;
 			status = "disabled";
 		};
 		mmc0: emmc@2ca00000 {
@@ -272,6 +288,7 @@
 			no-sdio;
 			disable-wp;
 			non-removable;
+			u-boot,dm-spl;
 			status = "disabled";
 		};
 
@@ -314,6 +331,7 @@
 			reg-io-width = <4>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			u-boot,dm-spl;
 			status = "okay";
 
 			flash@0 {
@@ -324,6 +342,7 @@
 				spi-rx-bus-width = <1>;
 				spi-max-frequency = <6250000>;
 				broken-flash-reset;
+				u-boot,dm-spl;
 				status = "okay";
 			};
 		};
@@ -341,6 +360,7 @@
 			reg-io-width = <4>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			u-boot,dm-spl;
 			status = "okay";
 
 			spi-nand@0 {
@@ -349,6 +369,7 @@
 				spi-tx-bus-width = <1>;
 				spi-rx-bus-width = <1>;
 				spi-max-frequency = <6250000>;
+				u-boot,dm-spl;
 				status = "okay";
 			};
 		};
