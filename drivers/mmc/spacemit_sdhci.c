@@ -12,7 +12,7 @@
 #include <dm.h>
 #include <malloc.h>
 #include <sdhci.h>
-/* #include <asm/arch/clk.h> */
+#include <reset-uclass.h>
 #include <asm/global_data.h>
 
 #define SPACEMIT_SDHC_MIN_FREQ    (400000)
@@ -29,6 +29,7 @@ DECLARE_GLOBAL_DATA_PTR;
 struct spacemit_sdhci_plat {
 	struct mmc_config cfg;
 	struct mmc mmc;
+	struct reset_ctl *reset;
 };
 
 static const struct sdhci_ops spacemit_ops = {
@@ -59,7 +60,6 @@ static int spacemit_sdhci_probe(struct udevice *dev)
 	u32 max_clk;
 	int ret;
 
-#ifdef SPACEMIT_CLK_ENABLE
 	struct clk clk;
 	ret = clk_get_by_index(dev, 0, &clk);
 	if (ret)
@@ -69,25 +69,18 @@ static int spacemit_sdhci_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	ret = clk_get_by_index(dev, 1, &clk);
-	if (ret)
-		return ret;
-
-	clk_set_rate(&clk, ATMEL_SDHC_GCK_RATE);
-
-	max_clk = clk_get_rate(&clk);
-	if (!max_clk)
+	plat->reset = devm_reset_control_get_by_index(dev, 0);
+	if (IS_ERR(plat->reset)) {
+		pr_err("get optional reset failed\n");
 		return -EINVAL;
+	}
 
-	ret = clk_enable(&clk);
-	/* return error only if the clock really has a clock enable func */
-	if (ret && ret != -ENOSYS)
+	ret = reset_deassert(plat->reset);
+	if (ret < 0) {
+		pr_err("MMC1 deassert failed: %d", ret);
 		return ret;
-#else
-	/*open clk and reset directly*/
-	writel(0xffffffff, (volatile void __iomem *)0x2f020304);
-	writel(0xffffffff, (volatile void __iomem *)0x2f024200);
-#endif
+	}
+
 	max_clk = fdtdec_get_int(gd->fdt_blob, dev_of_offset(dev),
 					"max-frequency", 50000000);
 
