@@ -135,6 +135,12 @@
 			clock-output-names = "in_clk_32k";
 		};
 
+		pll_clk_qspi: clock-pll_spi {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <50000000>;
+			clock-output-names = "pll_qspi";
+		};
 	};
 
 	soc {
@@ -356,7 +362,7 @@
 
 			interrupt-parent = <&intc>;
 			interrupts = <96>;
-			//clocks = <&ccu CLK_QSPI0>;
+			clocks = <&pll_clk_qspi>;
 			resets = <&reset RESET_QSPI0>;
 			spi-max-frequency = <6250000>;
 			num-cs = <4>;
@@ -385,7 +391,7 @@
 
 			interrupt-parent = <&intc>;
 			interrupts = <97>;
-			//clocks = <&ccu CLK_QSPI1>;
+			clocks = <&pll_clk_qspi>;
 			resets = <&reset RESET_QSPI1>;
 			spi-max-frequency = <6250000>;
 			num-cs = <4>;
