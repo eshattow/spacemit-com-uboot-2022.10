@@ -375,6 +375,8 @@
 			interrupts = <157>;
 			interrupt-names = "msi";
 
+			clock-names = "pcie_en";
+			clocks = <&ccu CLK_PCIE5_EN>;
 			resets = <&reset RESET_PCIE5_POWERUP>,
 				 <&reset RESET_PCIE5_PERST>;
 			reset-names = "powerup", "perst";
