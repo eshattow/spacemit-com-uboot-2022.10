@@ -23,8 +23,8 @@ static int spacemit_pinctrl_set_state(struct udevice *dev, struct udevice *confi
 {
 	struct spacemit_pinctrl_priv *priv = dev_get_priv(dev);
 	struct spacemit_pinctrl_soc_info *info = priv->info;
-	struct spacemit_regs *regs = info->regs;
-	struct spacemit_pin_conf *pin_conf = info->pinconf;
+	const struct spacemit_regs *regs = info->regs;
+	const struct spacemit_pin_conf *pin_conf = info->pinconf;
 	int node = dev_of_offset(config);
 	const struct fdt_property *prop;
 	u32 *pin_data;
@@ -81,10 +81,10 @@ static int spacemit_pinctrl_set_state(struct udevice *dev, struct udevice *confi
 
 		bank = PINID_TO_BANK(pin_id);
 		offset = PINID_TO_PIN(pin_id);
-		reg = info->base + regs->cfg;
+		reg = (u64)info->base + (u64)regs->cfg;
 		reg += bank * regs->reg_len + offset * 4;
 
-		mux_config = readl(reg);
+		mux_config = readl((void __iomem *)reg);
 
 		fs = mux_sel << pin_conf->fs_shift;
 		od =  OD_DIS << pin_conf->od_shift;
@@ -95,7 +95,7 @@ static int spacemit_pinctrl_set_state(struct udevice *dev, struct udevice *confi
 		rte = RTE_EN << pin_conf->rte_shift;
 
 		mux_config |= (fs | od | pull_en | pull | ds | st | rte);
-		writel(mux_config, reg);
+		writel(mux_config, (void __iomem *)reg);
 		dev_dbg(dev, "write: bank %d 0ffset %d val 0x%lx\n",
 			bank, offset, mux_config);
 	}
@@ -113,8 +113,6 @@ int spacemit_pinctrl_probe(struct udevice *dev,
 		struct spacemit_pinctrl_soc_info *info)
 {
 	struct spacemit_pinctrl_priv *priv = dev_get_priv(dev);
-	int node = dev_of_offset(dev), ret;
-	struct fdtdec_phandle_args arg;
 	fdt_addr_t addr;
 	fdt_size_t size;
 

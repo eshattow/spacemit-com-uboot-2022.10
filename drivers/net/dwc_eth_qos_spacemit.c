@@ -119,8 +119,6 @@ static int eqos_set_tx_clk_speed_spacemit(struct udevice *dev)
 
 static int eqos_get_enetaddr_spacemit(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_plat(dev);
-
 	return 0;
 }
 
