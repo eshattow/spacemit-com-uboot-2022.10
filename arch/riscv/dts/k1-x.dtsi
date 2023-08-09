@@ -14,7 +14,7 @@
 	cpus: cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
-		timebase-frequency = <50000000>;
+		timebase-frequency = <10000000>;
 		u-boot,dm-spl;
 		cpu_0: cpu@0 {
 			device_type = "cpu";
@@ -155,18 +155,18 @@
 			riscv,ndev = <159>;
 		};
 
-		/* Normal serial, log */
-		uart0: serial@2cea0000 {
-			compatible = "snps,dw-apb-uart";
-			reg = <0x0 0x2cea0000 0x0 0x1000>;
-			interrupt-parent = <&intc>;
-			interrupts = <56>;
-			clock-frequency = <50000000>;
+		uart0: uart@d4017000 {
+			u-boot,dm-spl;
+			compatible = "ns16550";
+			reg = <0x00000000 0xD4017000 0x00000000 0x00000100>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
-			hw-flow-control = "unsupport";
+			clock-frequency = <14000000>;
+		};
+		ddr@3000000 {
 			u-boot,dm-spl;
-			status = "disabled";
+			compatible = "spacemit,ddr-ctl";
+			reg = <0x00000000 0xc0000000 0x00000000 0x00400000>;
 		};
 	};
 
