@@ -161,6 +161,13 @@
 			clock-output-names = "pll_emmc";
 			u-boot,dm-spl;
 		};
+
+		pll_clk_i2c: clock-pll_i2c {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <50000000>;
+			clock-output-names = "pll_i2c";
+		};
 	};
 
 	soc {
@@ -440,6 +447,24 @@
 				status = "okay";
 			};
 		};
+
+		i2c0: i2c@2cee0000 {
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                        compatible = "snps,designware-i2c";
+			clocks = <&pll_clk_i2c>;
+			resets = <&reset RESET_I2C0>;
+                        reg = <0x0 0x2cee0000 0x0 0x4000>;
+                        clock-frequency = <400000>;
+                        status = "okay";
+
+                        mcp4725@50 {
+                                compatible = "spacemit,mcp4725";
+                                reg = <0x50>;
+                                status = "okay";
+                        };
+                };
+
 	};
 
 	pmu {

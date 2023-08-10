@@ -36,6 +36,12 @@ config DM_I2C
 	  device (bus child) info is kept as parent plat. The interface
 	  is defined in include/i2c.h.
 
+config I2C_DW_SPACEMIT
+	bool "Enable Spacemit I2C drivers"
+	depends on DM_I2C
+	help
+	  Support for Spacemit I2C model on RISCV SoCs platform
+
 config SPL_DM_I2C
 	bool "Enable Driver Model for I2C drivers in SPL"
 	depends on SPL_DM && DM_I2C
