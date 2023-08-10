@@ -283,6 +283,8 @@
 			compatible = "spacemit,k1-pro-dwc3";
 			#address-cells = <2>;
 			#size-cells = <2>;
+			resets = <&reset RESET_USB31>;
+			reset-names = "ctl_rst";
 			ranges;
 			status = "disabled";
 
