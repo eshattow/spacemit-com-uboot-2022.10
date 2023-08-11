@@ -337,12 +337,29 @@ static int axi_dma_probe(struct udevice *dev)
 	struct dma_dev_priv *uc_priv = dev_get_uclass_priv(dev);
 	struct axi_dma_dev *ud = dev_get_priv(dev);
 	u32 val = 0;
-	u32 i;
+	u32 i,ret;
 
 	ud->iorebase = dev_read_addr_ptr(dev);
 	ud->max_block_ts = dev_read_u32_default(dev,"max_block_ts",0x400000);
 	ud->n_channels = dev_read_u32_default(dev,"dma-channels",8);
-	writel(0x9,(volatile void __iomem *)0x2f024100);
+
+	ret = reset_get_by_index(dev, 0, &ud->reset);
+	if (ret)
+		return ret;
+	ret = reset_deassert(&ud->reset);
+	if (ret) {
+		pr_err(dev, "Failed to de-assert reset for DMA (error %d)\n",
+			ret);
+		return ret; 
+	}
+
+	ret = clk_get_by_index(dev,0,&ud->clk);
+	if(ret)
+		return ret;
+	ret = clk_enable(&ud->clk);
+	if (ret && ret != -ENOSYS && ret != -ENOTSUPP)
+		return ret;
+
 	val = readl(ud->iorebase+DMAC_CFG);
 	val |= DMAC_EN_MASK;
 	val &= ~INT_EN_MASK;
@@ -355,6 +372,28 @@ static int axi_dma_probe(struct udevice *dev)
 	uc_priv->supported = DMA_SUPPORTS_MEM_TO_MEM |
 				 DMA_SUPPORTS_MEM_TO_DEV |
 				 DMA_SUPPORTS_DEV_TO_MEM;
+
+	return 0;
+}
+
+static int axi_dma_remove(struct udevice *dev)
+{
+	struct axi_dma_dev *ud = dev_get_priv(dev);
+	int ret;
+
+	ret = reset_assert(&ud->reset);
+	if (ret)
+		return ret;
+
+#if CONFIG_IS_ENABLED(CLK)
+	ret = clk_disable(&ud->clk);
+	if (ret)
+		return ret;
+
+	clk_free(&ud->clk);
+	if (ret)
+		return ret;
+#endif
 	return 0;
 }
 
@@ -369,6 +408,7 @@ U_BOOT_DRIVER(dw_axi_dma) = {
 	.of_match = designware_dma_ids,
 	.ops	= &axi_dma_ops,
 	.probe = axi_dma_probe,
+	.remove = axi_dma_remove,
 	.priv_auto	= sizeof(struct axi_dma_dev),
 };
 

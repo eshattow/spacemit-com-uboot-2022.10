@@ -1,3 +1,6 @@
+#include <clk.h>
+#include <reset.h>
+
 enum chan_stat{
 	UNUSED = 0,
 	USED,
@@ -37,6 +40,8 @@ struct axi_dma_dev{
 	struct udevice *dev;
 	struct axi_dma_chan *axi_chan[8];
 	void __iomem *iorebase;
+	struct clk clk;
+	struct reset_ctl reset;
 	u32 n_channels;
 	u32 max_block_ts;
 };

@@ -167,6 +167,12 @@
 			compatible = "fixed-clock";
 			clock-frequency = <50000000>;
 			clock-output-names = "pll_i2c";
+
+		pll_clk_dmac: clock-pll_dmac {
+                        #clock-cells = <0>;
+                        compatible = "fixed-clock";
+                        clock-frequency = <50000000>;
+                        clock-output-names = "pll_dmac";
 		};
 	};
 
@@ -247,11 +253,8 @@
 			max_block_ts = "0x400000";
 			dma-channels = "8";
 			dma-cells = <2>;
-			status = "okay";
-		};
-
-		dmatest: dmatest@00000000 {
-			compatible = "dmatest_drv";
+			resets = <&reset RESET_DMAC>;
+			clocks = <&pll_clk_dmac>;
 			status = "okay";
 		};
 
