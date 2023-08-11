@@ -348,8 +348,7 @@ static int axi_dma_probe(struct udevice *dev)
 		return ret;
 	ret = reset_deassert(&ud->reset);
 	if (ret) {
-		pr_err(dev, "Failed to de-assert reset for DMA (error %d)\n",
-			ret);
+		pr_err("Failed to de-assert reset for DMA (error %d)\n",ret);
 		return ret; 
 	}
 

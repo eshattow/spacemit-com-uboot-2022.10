@@ -167,6 +167,7 @@
 			compatible = "fixed-clock";
 			clock-frequency = <50000000>;
 			clock-output-names = "pll_i2c";
+		};
 
 		pll_clk_dmac: clock-pll_dmac {
                         #clock-cells = <0>;
