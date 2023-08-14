@@ -657,6 +657,7 @@ config SH_ETHER
 	  This driver supports the Ethernet for Renesas SH and ARM SoCs.
 
 source "drivers/net/ti/Kconfig"
+source "drivers/net/spacemit/Kconfig"
 
 config TULIP
 	bool "DEC Tulip DC2114x Ethernet support"
