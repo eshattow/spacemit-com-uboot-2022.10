@@ -645,4 +645,11 @@ config SL28CPLD
 	  the base driver which provides common access methods for the
 	  sub-drivers.
 
+config MCP4725
+	bool "Enable simple DAC mcp4725 driver"
+	depends on DM_I2C
+	help
+	  Support for the mcp4725 device, which is a simple DAC chip used
+	  for i2c debug.
+
 endmenu

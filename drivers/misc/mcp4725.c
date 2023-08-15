@@ -34,13 +34,13 @@ static const struct dm_i2c_ops mcp5725_i2c_ops = {
 
 
 static const struct udevice_id mcp5725_i2c_ids[] = {
-        { .compatible = "spacemit,mcp4725" },
+        { .compatible = "microchip,mcp4725" },
         { }
 };
 
 U_BOOT_DRIVER(i2c_mcp4725) = {
-        .name     = "i2c_mcp4725",
-        .id       = UCLASS_I2C,
+        .name     = "mcp4725",
+        .id       = UCLASS_I2C_GENERIC,
         .of_match = mcp5725_i2c_ids,
         .ops      = &mcp5725_i2c_ops,
 };
