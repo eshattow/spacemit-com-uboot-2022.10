@@ -11,16 +11,6 @@
 #include <log.h>
 #include <linux/delay.h>
 
-#define dcache_en() asm volatile("csrsi 0x7c0, 0x1 \n\t")
-#define dcache_dis() asm volatile("csrci 0x7c0, 0x1 \n\t")
-#define dcache_clean() asm volatile("csrwi 0x7c2, 0x1 \n\t")
-#define dcache_valid() asm volatile("csrwi 0x7c2, 0x2 \n\t")
-#define dcache_flush() asm volatile("csrwi 0x7c2, 0x3 \n\t")
-
-#define icache_en() asm volatile("csrsi 0x7c0, 0x2 \n\t")
-#define icache_dis() asm volatile("csrci 0x7c0, 0x2 \n\t")
-#define icache_valid() asm volatile("csrwi 0x7c2, 0x11\n\t")
-
 
 int spl_board_init_f(void)
 {
@@ -35,8 +25,6 @@ int spl_board_init_f(void)
 		return ret;
 	}
 
-	dcache_en();
-	icache_en();
 	return 0;
 }
 
