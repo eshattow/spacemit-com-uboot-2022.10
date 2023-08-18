@@ -686,8 +686,13 @@ static int boot_from_devices(struct spl_image_info *spl_image,
 		    CONFIG_IS_ENABLED(LIBCOMMON_SUPPORT) &&
 		    !IS_ENABLED(CONFIG_SILENT_CONSOLE)) {
 			if (loader)
+			{
 				printf("Trying to boot from %s\n",
 				       spl_loader_name(loader));
+#if IS_ENABLED(CONFIG_TARGET_SPACEMIT_K1X)
+				asm("ebreak");
+#endif
+			}
 			else if (CONFIG_IS_ENABLED(SHOW_ERRORS))
 				printf(SPL_TPL_PROMPT
 				       "Unsupported Boot Device %d\n", bootdev);
