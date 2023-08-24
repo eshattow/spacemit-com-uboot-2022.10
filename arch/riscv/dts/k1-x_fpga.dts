@@ -25,3 +25,30 @@
 	status = "okay";
 };
 
+&eth0 {
+	status = "okay";
+
+	phy-reset-pin = <40>;
+
+	clk_tuning_enable;
+	clk-tuning-by-reg;
+	tx-phase = <0x6>;
+	rx-phase = <0x4>;
+
+	phy-mode = "rmii";
+	phy-addr = <0>;
+	phy-handle = <&rgmii>;
+
+	ref-clock-from-phy;
+
+	mdio {
+		#address-cells = <0x1>;
+		#size-cells = <0x0>;
+		rgmii: phy@0 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			device_type = "ethernet-phy";
+			reg = <0x0>;
+		};
+	};
+};
+
