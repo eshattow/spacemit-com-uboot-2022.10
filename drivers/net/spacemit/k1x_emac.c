@@ -775,6 +775,7 @@ int emac_free_pkt(struct udevice *dev, uchar *packet, int length)
     struct emac_priv *priv = dev_get_priv(dev);
     uchar *packet_expected;
     struct emac_desc *rx_desc;
+    int desc_idx;
 
     debug("%s(packet=%p, length=%d)\n", __func__, packet, length);
 
@@ -786,29 +787,31 @@ int emac_free_pkt(struct udevice *dev, uchar *packet, int length)
         return -EINVAL;
     }
 
-    rx_desc = &priv->rx_descs[priv->rx_desc_idx];
-
-    memset(rx_desc, 0x0, sizeof(struct emac_desc));
-
-    rx_desc->des1 = EQOS_MAX_PACKET_SIZE & 0xFFF;
-    if (priv->rx_desc_idx == (EQOS_DESCRIPTORS_RX - 1))
-        rx_desc->des1 |= EMAC_DESC_EOR;
-
-    rx_desc->des2 = (u32)(ulong)packet;
-
     emac_inval_buffer((void *)packet, length);
 
-    /* Make sure that if HW sees the _OWN write below, it will see all the
-     * writes to the rest of the descriptor too.
-     */
-    mb();
-    rx_desc->des0 |= EMAC_DESC_OWN;
-    priv->rx_desc_idx++;
+    if (!((priv->rx_desc_idx + 1) % CACHE_FLUSH_CNT)) {
+        for (desc_idx = (priv->rx_desc_idx + 1 - CACHE_FLUSH_CNT); desc_idx <= priv->rx_desc_idx; desc_idx++) {
+            rx_desc = &priv->rx_descs[desc_idx];
+            memset(rx_desc, 0x0, sizeof(struct emac_desc));
 
-    if (!(priv->rx_desc_idx % CACHE_FLUSH_CNT)) {
+            rx_desc->des1 = EQOS_MAX_PACKET_SIZE & 0xFFF;
+            if (desc_idx == (EQOS_DESCRIPTORS_RX - 1))
+                rx_desc->des1 |= EMAC_DESC_EOR;
+
+            rx_desc->des2 = (u32)(ulong)(priv->rx_dma_buf +
+                    (desc_idx * EQOS_MAX_PACKET_SIZE));
+
+            /* Make sure that if HW sees the _OWN write below, it will see all the
+             * writes to the rest of the descriptor too.
+             */
+            mb();
+            rx_desc->des0 |= EMAC_DESC_OWN;
+        }
+
         emac_flush_desc(rx_desc);
         emac_wr(priv, DMA_RECEIVE_POLL_DEMAND, 0xFF);
     }
+    priv->rx_desc_idx++;
 
     priv->rx_desc_idx %= EQOS_DESCRIPTORS_RX;
     return 0;

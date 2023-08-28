@@ -33,9 +33,9 @@
 	clk_tuning_enable;
 	clk-tuning-by-reg;
 	tx-phase = <0x6>;
-	rx-phase = <0x4>;
+	rx-phase = <0x3>;
 
-	phy-mode = "rmii";
+	phy-mode = "rgmii";
 	phy-addr = <0>;
 	phy-handle = <&rgmii>;
 
