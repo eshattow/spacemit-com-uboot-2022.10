@@ -11,7 +11,7 @@
 #define SYS_DRAM_OFFS               0x0000000
 #define SZ_2GB                      0x80000000
 #define SZ_4GB                      0x100000000ULL
-#define SEC_IMG_SIZE                0x2000000
+#define SEC_IMG_SIZE                0x0000000
 #define CONFIG_SYS_SDRAM_BASE       (SYS_DRAM_OFFS + SEC_IMG_SIZE)
 
 #define RISCV_MMODE_TIMERBASE       0xE4000000
