@@ -19,9 +19,9 @@
 #include <linux/sizes.h>
 #include <dt-bindings/soc/spacemit-k1x.h>
 #ifdef CONFIG_K1_X_BOARD_FPGA
-#include "lpddr4_init_fpga.img.h"
+#include "ddr_init_fpga.h"
 #else
-#include "lpddr4_init_zebu.img.h"
+#include "ddr_init_asic.h"
 #endif
 
 #define DDR_CHECK_SIZE			(0x4000)
@@ -110,12 +110,12 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	void (*ddr_init)(void);
 
 #ifdef CONFIG_K1_X_BOARD_FPGA
-	ddr_init = (void(*)(void))(lpddr4_init_fpga_img + 0x144);
+	ddr_init = (void(*)(void))(lpddr4_init_fpga_data + 0x144);
 	ddr_init();
 #else
 	uint32_t val;
 
-	ddr_init = (void(*)(void))(lpddr4_init_zebu_img + 0x462);
+	ddr_init = (void(*)(void))(lpddr4_init_asic_data + 0x462);
 	ddr_init();
 
 	val = readl(K1X_APMU_BASE + 0x00A0);
