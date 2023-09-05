@@ -1039,6 +1039,26 @@ static void dwc2_set_stm32mp1_hsotg_params(struct dwc2_plat_otg_data *p)
 		p->usb_gusbcfg |= 1 << 30; /* FDMOD: Force device mode */
 }
 
+static void dwc2_set_spacemit_hsotg_params(struct dwc2_plat_otg_data *p)
+{
+	p->activate_stm_id_vb_detection = true;
+	p->usb_gusbcfg =
+		0<<15		/* PHY Low Power Clock sel*/
+		|1<<14		/* Non-Periodic TxFIFO Rewind Enable*/
+		|0x5<<10	/* Turnaround time*/
+		|0<<9 | 0<<8	/* [0:HNP disable,1:HNP enable][ 0:SRP disable*/
+				/* 1:SRP enable] H1= 1,1*/
+		|0<<7		/* Ulpi DDR sel*/
+		|0<<6		/* 0: high speed utmi+, 1: full speed serial*/
+		|1<<4		/* 0: utmi+, 1:ulpi*/
+#ifdef CONFIG_USB_GADGET_DWC2_OTG_PHY_BUS_WIDTH_8
+		|0<<3		/* phy i/f  0:8bit, 1:16bit*/
+#else
+		|1<<3		/* phy i/f  0:8bit, 1:16bit*/
+#endif
+		|0x7<<0;	/* HS/FS Timeout**/
+}
+
 static int dwc2_udc_otg_reset_init(struct udevice *dev,
 				   struct reset_ctl_bulk *resets)
 {
@@ -1173,6 +1193,8 @@ static int dwc2_udc_otg_remove(struct udevice *dev)
 
 static const struct udevice_id dwc2_udc_otg_ids[] = {
 	{ .compatible = "snps,dwc2" },
+	{ .compatible = "spacemit,k1-pro-usb",
+	  .data = (ulong)dwc2_set_spacemit_hsotg_params },
 	{ .compatible = "brcm,bcm2835-usb" },
 	{ .compatible = "st,stm32mp15-hsotg",
 	  .data = (ulong)dwc2_set_stm32mp1_hsotg_params },

@@ -26,6 +26,11 @@
 };
 
 &usbdrd3 {
+	status = "disabled";
+};
+
+&usbotg {
+	dr_mode = "peripheral";
 	status = "okay";
 };
 
