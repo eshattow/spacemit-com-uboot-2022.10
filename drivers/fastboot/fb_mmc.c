@@ -704,3 +704,61 @@ void fastboot_mmc_erase(const char *cmd, char *response)
 	       blks_size * info.blksz, cmd);
 	fastboot_okay(NULL, response);
 }
+
+#ifdef CONFIG_SPACEMIT_RECOVER
+/**
+ * fastboot_mmc_flash_fsbl() - Write image to eMMC for fastboot
+ *
+ * @cmd: Named partition to write image to
+ * @download_buffer: Pointer to image data
+ * @download_bytes: Size of image data
+ * @response: Pointer to fastboot response buffer
+ */
+void fastboot_mmc_flash_fsbl(const char *cmd, void *download_buffer,
+                             u32 download_bytes, char *response)
+{
+	struct blk_desc *dev_desc;
+	struct disk_partition info = {0};
+	lbaint_t blkcnt;
+	u32 offset = 0;
+	lbaint_t blks;
+
+	dev_desc = blk_get_dev("mmc", CONFIG_FASTBOOT_FLASH_MMC_DEV);
+	if (!dev_desc){
+		fastboot_fail("find mmc dev fail", response);
+		return;
+	}
+	part_get_info(dev_desc, 1, &info);
+	info.blksz = dev_desc->blksz;
+	printf("download_buffer:%p, download_bytes:%x\n", download_buffer, download_bytes);
+	if(info.blksz == 0)
+		return;
+	if (!download_bytes){
+		printf("it should run command 'fastboot stage fsbl.bin' before run flash fsbl\n");
+		fastboot_fail("should download fsbl.bin befor", response);
+		return;
+	}
+
+	offset = simple_strtoul(cmd, NULL, 0);
+	if (offset % info.blksz){
+		fastboot_fail("offset need %x align", response);
+		return;
+	}
+	info.start = offset / info.blksz;
+	printf("info.start:%lx, info.blksz:%lx, offset:%x", info.start, info.blksz, offset);
+	/* determine number of blocks to write */
+	blkcnt = ((download_bytes + (info.blksz - 1)) & ~(info.blksz - 1));
+	blkcnt = lldiv(blkcnt, info.blksz);
+
+	blks = fb_mmc_blk_write(dev_desc, info.start, blkcnt, download_buffer);
+
+	if (blks != blkcnt) {
+			pr_err("failed writing to device %d\n", dev_desc->devnum);
+			fastboot_fail("failed writing to device", response);
+			return;
+	}
+
+	printf("........ wrote " LBAFU " bytes to 'fsbl'\n", blkcnt * info.blksz);
+	fastboot_okay(NULL, response);
+}
+#endif

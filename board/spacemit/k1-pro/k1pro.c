@@ -74,7 +74,7 @@ u32 spl_boot_device(void)
 	case 0:
 		return BOOT_DEVICE_SPI;
 	case 1:
-		return BOOT_DEVICE_MMC2;
+		return BOOT_DEVICE_MMC2;//emmc
 	case 2:
 		return BOOT_DEVICE_MMC1;//sd
 	case 3:
@@ -84,6 +84,14 @@ u32 spl_boot_device(void)
 			  boot_mode);
 		return BOOT_DEVICE_NONE;
 	}
+}
+
+void board_boot_order(u32 *spl_boot_list)
+{
+	/*select one boot device*/
+	spl_boot_list[0] = BOOT_DEVICE_MMC2;
+	spl_boot_list[1] = spl_boot_device();
+	spl_boot_list[2] = BOOT_DEVICE_RAM;
 }
 
 #endif

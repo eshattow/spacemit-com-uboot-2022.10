@@ -48,10 +48,15 @@ static void oem_partconf(char *, char *);
 static void oem_bootbus(char *, char *);
 #endif
 
+#ifdef CONFIG_SPACEMIT_RECOVER
+static void oem_flash_fsbl(char *, char *);
+#endif
+
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
 static void run_ucmd(char *, char *);
 static void run_acmd(char *, char *);
 #endif
+
 
 static const struct {
 	const char *command;
@@ -120,6 +125,12 @@ static const struct {
 		.command = "oem bootbus",
 		.dispatch = oem_bootbus,
 	},
+#endif
+#ifdef CONFIG_SPACEMIT_RECOVER
+	[FASTBOOT_COMMAND_OEM_FSBL] =  {
+		.command = "oem flash_fsbl",
+		.dispatch = oem_flash_fsbl,
+	}
 #endif
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
 	[FASTBOOT_COMMAND_UCMD] = {
@@ -511,5 +522,18 @@ static void oem_bootbus(char *cmd_parameter, char *response)
 		fastboot_fail("Cannot set oem bootbus", response);
 	else
 		fastboot_okay(NULL, response);
+}
+#endif
+
+#ifdef CONFIG_SPACEMIT_RECOVER
+/**
+ * oem flash fsbl.
+ *
+ */
+static void oem_flash_fsbl(char *cmd_parameter, char *response)
+{
+       printf("%s, oem define cmd, %s\n", __func__, cmd_parameter);
+       fastboot_mmc_flash_fsbl(cmd_parameter, fastboot_buf_addr, image_size,
+                                response);
 }
 #endif
