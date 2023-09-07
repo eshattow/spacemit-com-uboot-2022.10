@@ -177,6 +177,33 @@
 			dline-reg = <0x3e8>;
 			status = "disabled";
 		};
+
+		sdhci0: sdh@d4280000 {
+			compatible = "spacemit,k1-x-sdhci";
+			reg = <0x0 0xd4280000 0x0 0x200>;
+			interrupt-parent = <&intc>;
+			interrupts = <99>;
+			sdh-pmuap-reg = <0xd4282854>;
+			status = "disabled";
+		};
+
+		sdhci1: sdh@d4280800 {
+			compatible = "spacemit,k1-x-sdhci";
+			reg = <0x0 0xd4280800 0x0 0x200>;
+			interrupt-parent = <&intc>;
+			interrupts = <100>;
+			sdh-pmuap-reg = <0xd4282858>;
+			status = "disabled";
+		};
+
+		sdhci2: sdh@d4281000 {
+			compatible = "spacemit,k1-x-sdhci";
+			reg = <0x0 0xd4281000 0x0 0x200>;
+			interrupt-parent = <&intc>;
+			interrupts = <101>;
+			sdh-pmuap-reg = <0xd42828e0>;
+			status = "disabled";
+		};
 	};
 };
 
