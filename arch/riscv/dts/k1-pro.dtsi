@@ -122,6 +122,14 @@
 		ranges;
 		u-boot,dm-spl;
 
+		clk_dummy: clk_dummy {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <0>;
+			clock-output-names = "clk_dummy";
+			u-boot,dm-spl;
+		};
+
 		osc_clk_24m: osc_clk_24m {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
@@ -225,8 +233,8 @@
 			#size-cells = <0x1>;
 			compatible = "spacemit,k1pro-ccu";
 			reg = <0x0 0x2f020000 0x0 0x4000>, <0x0 0x2f804000 0x0 0xc000>;
-			clocks = <&osc_clk_24m>, <&in_clk_32k>;
-			clock-names = "osc_clk_24m", "in_clk_32k";
+			clocks = <&osc_clk_24m>, <&in_clk_32k>, <&clk_dummy>;
+			clock-names = "osc_clk_24m", "in_clk_32k", "clk_dummy";
 			#clock-cells = <1>;
 			u-boot,dm-spl;
 			status = "okay";

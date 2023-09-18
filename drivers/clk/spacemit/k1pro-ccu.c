@@ -169,7 +169,7 @@ static struct ccu_clk_data ccu_clocks[] =  {
     {CLK_USB3_PHY_REFCLK0, CLK_TYPE_GATE, "clk_usb3_phy_refclk0", "osc_clk_24m", NULL, 1, USB_GMAC_SUB_EN_REG704, 5, 0, 0, 0, 0},
     {CLK_GMAC_CSR, CLK_TYPE_GATE, "clk_gmac_csr", "clk_usb_ahb_div2", NULL, 1, USB_GMAC_SUB_EN_REG704, 6, 0, 0, 0, 0},
     {CLK_USB2VBUS, CLK_TYPE_GATE, "clk_usb2vbus", "clk_usb_sys", NULL, 1, USB_GMAC_SUB_EN_REG704, 16, 0, 0, 0, 0},
-    {CLK_GMAC_PHYCLK_OUT, CLK_TYPE_GATE, "clk_gmac_phyclk_out", "dummy", NULL, 0, USB_GMAC_SUB_EN_REG704, 17, 0, 0, 0, 0},
+    {CLK_GMAC_PHYCLK_OUT, CLK_TYPE_GATE, "clk_gmac_phyclk_out", "clk_dummy", NULL, 0, USB_GMAC_SUB_EN_REG704, 17, 0, 0, 0, 0},
     //ddr_mbus
     {CLK_DDRC_APB, CLK_TYPE_GATE, "clk_ddrc_apb", "clk_sys_apb", NULL, 1, MBUS_DDR_SUB_EN_REG804, 2, 0, 0, 0, 0},
 	//mcu
@@ -268,7 +268,7 @@ static int ccu_clk_probe(struct udevice *dev)
 {
 	void __iomem *reg_base;
 	void __iomem *mcu_reg_base;
-	struct clk osc_24m, clk_32k;
+	struct clk osc_24m, clk_32k, clk_dummy;
 	int i;
 
 	reg_base = (void __iomem *)dev_remap_addr_index(dev, 0);
@@ -276,7 +276,8 @@ static int ccu_clk_probe(struct udevice *dev)
 	if (!reg_base || !mcu_reg_base)
 		return -ENOMEM;
 
-	ccu_clk_dm(CLK_DUMMY, clk_register_fixed_rate(NULL, "dummy", 0));
+	clk_get_by_name(dev, "clk_dummy", &clk_dummy);
+	ccu_clk_dm(CLK_DUMMY, dev_get_clk_ptr(clk_dummy.dev));
 	clk_get_by_name(dev, "osc_clk_24m", &osc_24m);
 	ccu_clk_dm(OSC_CLK_24M, dev_get_clk_ptr(osc_24m.dev));
 	clk_get_by_name(dev, "in_clk_32k", &clk_32k);
