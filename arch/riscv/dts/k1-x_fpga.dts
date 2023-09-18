@@ -67,3 +67,6 @@
 	};
 };
 
+&pcie0_rc {
+	status = "disabled";
+};
