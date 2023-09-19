@@ -91,32 +91,37 @@
 #define RESET_EFUSE       69
 
 //600
-#define RESET_USB2_AHB       70
-#define RESET_USB2_PHY       71
-#define RESET_USB31          72
-#define RESET_USB2_PHY_POR   73
-#define RESET_USB2_PHY_PORT  74
-#define RESET_USB3_PHY_PORT  75
-#define RESET_GMAC_CSR       76
-#define RESET_GMAC_DMA       77
-//700
-#define RESET_DDR0      78
-#define RESET_DDR1      79
-#define RESET_DDR_PHY0  80
-#define RESET_DDR_PHY1  81
+#define RESET_USB20_OTG_HRESETN  70
+#define RESET_USB20_OTG_PRSTN    71
+#define RESET_USB20_OTG_POR      72
+#define RESET_USB20_OTG_PORTRST  73
+#define RESET_USB20_HOST_HRESETN 74
+#define RESET_USB20_HOST_PRSTN   75
+#define RESET_USB20_HOST_POR     76
+#define RESET_USB20_HOST_PORTRST 77
+#define RESET_USB31CTL_RSTN      78
+#define RESET_USB31_PORTRST      79
+#define RESET_GMAC_CSR       80
+#define RESET_GMAC_DMA       81
 
-#define RESET_DDR_PORT0 82
-#define RESET_DDR_PORT1 83
-#define RESET_DDR_PORT2 84
-#define RESET_DDR_PORT3 85
-#define RESET_DDR_PORT4 86
-#define RESET_DDR_PORT5 87
+//700
+#define RESET_DDR0      82
+#define RESET_DDR1      83
+#define RESET_DDR_PHY0  84
+#define RESET_DDR_PHY1  85
+
+#define RESET_DDR_PORT0 86
+#define RESET_DDR_PORT1 87
+#define RESET_DDR_PORT2 88
+#define RESET_DDR_PORT3 89
+#define RESET_DDR_PORT4 90
+#define RESET_DDR_PORT5 91
 
 //mcu
-#define RESET_MCU_CORE  88
-#define RESET_MCU_BUS   89
-#define RESET_MCU_MAILBOX   90
-#define RESET_MCU_SPINLOCK  91
+#define RESET_MCU_CORE  92
+#define RESET_MCU_BUS   93
+#define RESET_MCU_MAILBOX   94
+#define RESET_MCU_SPINLOCK  95
 
-#define RESET_NUMBER    92
+#define RESET_NUMBER    96
 
