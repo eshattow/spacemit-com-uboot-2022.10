@@ -161,11 +161,10 @@
 #define CLK_USB_AHB       139
 #define CLK_USB_AHB_DIV2  140
 #define CLK_USB_SYS_DIV2  141
-#define CLK_USB2_CTRL     142
-#define CLK_USB3_BUS_CLK_EARLY  143
-#define CLK_USB2_PHY0_REFCLK    144
-#define CLK_USB2_PHY1_REFCLK    145
-#define CLK_USB3_PHY_REFCLK0    146
+#define CLK_USB20_OTG_EN  142
+#define CLK_USB20_HOST_EN 143
+#define CLK_USB31_DRD_EN  144
+
 #define CLK_GMAC_CSR            147
 #define CLK_USB2VBUS            148
 #define CLK_GMAC_PHYCLK_OUT     149
