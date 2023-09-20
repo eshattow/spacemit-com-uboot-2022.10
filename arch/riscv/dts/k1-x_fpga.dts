@@ -25,6 +25,16 @@
 	status = "okay";
 };
 
+&usbdrd3 {
+	status = "disabled";
+	dwc3@c0a00000 {
+		maximum-speed = "high-speed";
+		dr_mode = "peripheral";
+		phy_type = "utmi_wide";
+		snps,dis_enblslpm_quirk;
+	};
+};
+
 &sdhci0 {
 	bus-width = <4>;
 	broken-cd;
