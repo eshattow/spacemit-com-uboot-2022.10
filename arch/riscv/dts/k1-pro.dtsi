@@ -146,49 +146,12 @@
 			u-boot,dm-spl;
 		};
 
-		pll_clk_qspi: clock-pll_spi {
+		clk_50m: clk_50m {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <50000000>;
-			clock-output-names = "pll_qspi";
+			clock-output-names = "clk_50m";
 			u-boot,dm-spl;
-		};
-
-		pll_clk_sdio: clock-pll-sdio {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <50000000>;
-			clock-output-names = "pll_sdio";
-			u-boot,dm-spl;
-		};
-
-		pll_clk_emmc: clock-pll-emmc {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <50000000>;
-			clock-output-names = "pll_emmc";
-			u-boot,dm-spl;
-		};
-
-		pll_clk_i2c: clock-pll_i2c {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <50000000>;
-			clock-output-names = "pll_i2c";
-		};
-
-		pll_clk_dmac: clock-pll_dmac {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <50000000>;
-			clock-output-names = "pll_dmac";
-		};
-
-		pll_clk_usb2: clock-pll_usb2 {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <50000000>;
-			clock-output-names = "pll_usb2";
 		};
 	};
 
@@ -270,7 +233,7 @@
 			dma-channels = "8";
 			dma-cells = <2>;
 			resets = <&reset RESET_DMAC>;
-			clocks = <&pll_clk_dmac>;
+			clocks = <&clk_50m>;
 			status = "okay";
 		};
 
@@ -334,7 +297,7 @@
 			interrupts = <91>;
 			resets = <&reset RESET_USB2_AHB>, <&reset RESET_USB2_PHY>;
 			reset-names = "dwc2", "dwc2-ecc";
-			clocks = <&pll_clk_usb2>;
+			clocks = <&clk_50m>;
 			dr_mode = "otg";
 			g-np-tx-fifo-size = <32>;
 			g-rx-fifo-size = <544>;
@@ -369,7 +332,7 @@
 			reg = <0x0 0x2ca40000 0x0 0x10000>;
 			interrupt-parent = <&intc>;
 			interrupts = <84>;
-			clocks = <&pll_clk_sdio>;
+			clocks = <&clk_50m>;
 			resets = <&reset RESET_SDIO0>;
 			max-frequency = <400000000>;
 			bus-width = <4>;
@@ -381,7 +344,7 @@
 			reg = <0x0 0x2ca00000 0x0 0x10000>;
 			interrupt-parent = <&intc>;
 			interrupts = <82>;
-			clocks = <&pll_clk_emmc>;
+			clocks = <&clk_50m>;
 			resets = <&reset RESET_EMMC0>;
 			max-frequency = <400000000>;
 			bus-width = <8>;
@@ -432,7 +395,7 @@
 
 			interrupt-parent = <&intc>;
 			interrupts = <96>;
-			clocks = <&pll_clk_qspi>;
+			clocks = <&clk_50m>;
 			resets = <&reset RESET_QSPI0>;
 			spi-max-frequency = <6250000>;
 			num-cs = <4>;
@@ -461,7 +424,7 @@
 
 			interrupt-parent = <&intc>;
 			interrupts = <97>;
-			clocks = <&pll_clk_qspi>;
+			clocks = <&clk_50m>;
 			resets = <&reset RESET_QSPI1>;
 			spi-max-frequency = <6250000>;
 			num-cs = <4>;
@@ -486,7 +449,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
-			clocks = <&pll_clk_i2c>;
+			clocks = <&clk_50m>;
 			resets = <&reset RESET_I2C0>;
 			reg = <0x0 0x2cee0000 0x0 0x4000>;
 			clock-frequency = <400000>;
