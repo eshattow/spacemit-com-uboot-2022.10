@@ -39,6 +39,7 @@
 	bus-width = <4>;
 	broken-cd;
 	cap-sd-highspeed;
+	sdh-phy-module = <0>;
 	status = "okay";
 };
 
@@ -47,7 +48,8 @@
 	bus-width = <8>;
 	non-removable;
 	cap-mmc-highspeed;
-	status = "disabled";
+	sdh-phy-module = <1>;
+	status = "okay";
 };
 
 &eth0 {

@@ -154,9 +154,6 @@ static void set_emmc_phy_bypass(struct sdhci_host *host)
 		value |= PHY_TEST_EN;
 		sdhci_writel (host, value, SDHC_PHY_FUNC_REG);
 
-		value = sdhci_readl (host, SDHC_PHY_CTRL_REG);
-		value |= PHY_FUNC_EN;
-		sdhci_writel (host, value, SDHC_PHY_CTRL_REG);
 		printf("%s: emmc phy bypass.\n", host->name);
 	} else {
 		/* phy func mode */
