@@ -3,25 +3,32 @@
  * Copyright (C) 2023,  chris.huang<chris.huang@spacemit.com>
  */
 
-#include <common.h>
+#include <asm/byteorder.h>
+#include <asm/unaligned.h>
+#include <blk.h>
+#include <bootstage.h>
 #include <command.h>
+#include <common.h>
+#include <console.h>
+#include <div64.h>
+#include <dm.h>
+#include <dm/uclass-internal.h>
 #include <fdt_support.h>
 #include <fs.h>
+#include <image.h>
 #include <malloc.h>
 #include <mapmem.h>
-#include <div64.h>
-#include <part.h>
-#include <blk.h>
+#include <memalign.h>
 #include <mmc.h>
+#include <part.h>
 #include <u-boot/crc.h>
-#include <image.h>
-#include <dm.h>
+#include <usb.h>
 #include "recovery.h"
 
 /*
-	load file can not use malloc memory, use a temporary addr for
-	loading file.if img file size more than 500MB, try to divide to
-	multiple times to flash.
+ load file can not use malloc memory, use a temporary addr for
+ loading file.if img file size more than 500MB, try to divide to
+ multiple times to flash.
 */
 #define LOAD_IMG_ADDR CONFIG_RECOVERY_LOAD_ADDR
 #define LOAD_IMG_SIZE CONFIG_RECOVERY_LOAD_IMAGE_SIZE
@@ -32,41 +39,153 @@
 static int dev_emmc_num = -1;
 static int dev_sdio_num = -1;
 
-int check_mmc_exist(void){
-	int mmc_dev_num = get_mmc_num();
-	if (mmc_dev_num < 2)
+/* Initialize the mmc device given its number */
+static int init_mmc_device(int dev_num)
+{
+	struct mmc *mmc = find_mmc_device(dev_num);
+
+	if (!mmc) {
+		printf("Cannot find mmc device %d\n", dev_num);
 		return RESULT_FAIL;
-
-	for (int i = 0; i < mmc_dev_num; i++){
-		struct mmc *mmc;
-		mmc = find_mmc_device(i);
-		if (!mmc){
-			printf("no mmc device can find\n");
-			return RESULT_FAIL;
-		}
-		if (mmc_init(mmc)){
-			printf("mmc init fail\n");
-			return RESULT_FAIL;
-		}
-		if (IS_SD(mmc)){
-			dev_sdio_num = mmc_get_blk_desc(mmc)->devnum;
-		}else{
-			dev_emmc_num = mmc_get_blk_desc(mmc)->devnum;
-		}
-
-		if (dev_emmc_num != -1 && dev_sdio_num != -1){
-			printf("emmc number:%d, sdio number:%d\n", dev_emmc_num, dev_sdio_num);
-			return RESULT_OK;
-		}
 	}
-	printf("it should has two mmc device to flash\n");
-	return RESULT_FAIL;
+
+	if (mmc_init(mmc)) {
+		printf("mmc init failed for device %d\n", dev_num);
+		return RESULT_FAIL;
+	}
+
+	return RESULT_OK;
 }
 
-void recovery_show_result(int ret){
-	if (ret){
+/* Detect and classify mmc device */
+static void detect_and_classify_mmc(int dev_num)
+{
+	struct mmc *mmc = find_mmc_device(dev_num);
+	if (!mmc)
+		return;
+
+	int current_dev_num = mmc_get_blk_desc(mmc)->devnum;
+	if (IS_SD(mmc)) {
+		dev_sdio_num = current_dev_num;
+		printf("SDIO detected with number: %d\n", dev_sdio_num);
+	} else {
+		dev_emmc_num = current_dev_num;
+		printf("eMMC initialized with number: %d\n", dev_emmc_num);
+	}
+}
+
+int check_mmc_exist_and_initialize(void)
+{
+	int mmc_dev_num = get_mmc_num();
+	bool has_emmc = false;
+
+	for (int i = 0; i < mmc_dev_num; i++) {
+		if (init_mmc_device(i) == RESULT_OK) {
+			detect_and_classify_mmc(i);
+			if (dev_emmc_num != -1)
+				has_emmc = true;
+		}
+	}
+
+	if (!has_emmc) {
+		printf("Failed to initialize eMMC device.\n");
+		return RESULT_FAIL;
+	}
+
+	if (dev_sdio_num == -1) {
+		printf("SDIO not detected.\n");
+	}
+
+	return RESULT_OK;
+}
+
+static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
+			struct fdt_header *blob, int device_type,
+			struct flash_dev *fdev)
+{
+	int retval = RESULT_OK;
+
+	strcpy(load_str, simple_xtoa((ulong)blob));
+	switch (device_type) {
+	case DEVICE_MMC:
+		if (check_mmc_exist_and_initialize() != RESULT_OK) {
+			retval = RESULT_FAIL;
+			break;
+		}
+		fdev->dev_desc = blk_get_dev("mmc", dev_emmc_num);
+		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
+			printf("get emmc_device faild\n");
+			retval = RESULT_FAIL;
+			break;
+		}
+		fdev->dev_str = strdup(simple_itoa((ulong)dev_sdio_num));
+		fdev->device_name = strdup("mmc");
+		break;
+
+	case DEVICE_USB:
+		/* Initialize eMMC */
+		if (check_mmc_exist_and_initialize() != RESULT_OK) {
+			printf("Failed to initialize eMMC while handling USB.\n");
+			retval = RESULT_FAIL;
+			break;
+		}
+		fdev->dev_desc = blk_get_dev("mmc", dev_emmc_num);
+		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
+			printf("Failed to get eMMC device descriptor while handling USB.\n");
+			retval = RESULT_FAIL;
+			break;
+		}
+		usb_init();
+		int device_number = usb_stor_scan(1);
+		if (device_number < 0) {
+			retval = RESULT_FAIL;
+			break;
+		}
+		fdev->dev_str = strdup(simple_itoa((ulong)device_number));
+		fdev->device_name = strdup("usb");
+		break;
+
+	case DEVICE_NET:
+		retval = RESULT_FAIL;
+		break;
+
+	default:
+		printf("Unknown device type!\n");
+		retval = RESULT_FAIL;
+		break;
+	}
+
+	/* If the above operation fails, return early */
+	if (retval != RESULT_OK) {
+		return retval;
+	}
+
+	printf("device_name: %s\n", fdev->device_name);
+	printf("dev_str: %s\n", fdev->dev_str);
+
+	char *fat_argv[] = {"fatload", fdev->device_name, fdev->dev_str, load_str, "flash_config"};
+	/* Format the command to be executed */
+	char cmd_to_execute[256];
+	snprintf(cmd_to_execute, sizeof(cmd_to_execute), "%s %s %s %s %s", fat_argv[0], fat_argv[1], fat_argv[2], fat_argv[3], fat_argv[4]);
+
+	/* Print the command */
+	printf("Executing command: %s\n", cmd_to_execute);
+
+	if (do_load(cmdtp, 0, 5, fat_argv, FS_TYPE_FAT)) {
+		printf("do_load flash_config from %s failed\n", fdev->device_name);
+		retval = RESULT_FAIL;
+	} else {
+		printf("do_load flash_config %s success\n", fdev->device_name);
+	}
+
+	return retval;
+}
+
+void recovery_show_result(int ret)
+{
+	if (ret) {
 		printf("!!!!!!!!!!!!!!!!!!! recovery flash false !!!!!!!!!!!!!!!!!!!\n");
-	}else{
+	} else {
 		printf("################### recovery flash success ###################\n");
 	}
 	/*need to add while release*/
@@ -76,7 +195,7 @@ void recovery_show_result(int ret){
 }
 
 static int get_part_info(struct blk_desc *dev_desc, const char *name,
-			    struct disk_partition *info)
+		struct disk_partition *info)
 {
 	int ret;
 
@@ -87,8 +206,7 @@ static int get_part_info(struct blk_desc *dev_desc, const char *name,
 	}
 
 	/* Then try dev.hwpart:part */
-	ret = part_get_info_by_dev_and_name_or_num("mmc", name, &dev_desc,
-						   info, true);
+	ret = part_get_info_by_dev_and_name_or_num("mmc", name, &dev_desc, info, true);
 	return ret;
 }
 
@@ -101,7 +219,7 @@ static int get_part_info(struct blk_desc *dev_desc, const char *name,
  * @buffer: Pointer to data buffer for write or NULL for erase
  */
 static lbaint_t mmc_blk_write(struct blk_desc *block_dev, lbaint_t start,
-				 lbaint_t blkcnt, const void *buffer)
+			lbaint_t blkcnt, const void *buffer)
 {
 	lbaint_t blk = start;
 	lbaint_t blks_written;
@@ -113,7 +231,7 @@ static lbaint_t mmc_blk_write(struct blk_desc *block_dev, lbaint_t start,
 		cur_blkcnt = min((int)blkcnt - i, MAX_BLK_WRITE);
 		if (buffer) {
 			blks_written = blk_dwrite(block_dev, blk, cur_blkcnt,
-						  buffer + (i * block_dev->blksz));
+					buffer + (i * block_dev->blksz));
 		} else {
 			blks_written = blk_derase(block_dev, blk, cur_blkcnt);
 		}
@@ -124,8 +242,8 @@ static lbaint_t mmc_blk_write(struct blk_desc *block_dev, lbaint_t start,
 }
 
 static int write_raw_image(struct blk_desc *dev_desc,
-			    struct disk_partition *info, const char *part_name,
-			    void *buffer, u32 download_bytes)
+		struct disk_partition *info, const char *part_name,
+		void *buffer, u32 download_bytes)
 {
 	lbaint_t blkcnt;
 	lbaint_t blks;
@@ -148,19 +266,22 @@ static int write_raw_image(struct blk_desc *dev_desc,
 		return RESULT_FAIL;
 	}
 
-	printf("........ wrote " LBAFU " bytes to '%s'\n", blkcnt * info->blksz,
-	       part_name);
+	printf("........ wrote " LBAFU " bytes to '%s'\n", \
+		blkcnt * info->blksz,part_name);
 	return RESULT_OK;
 }
 
-static int check_image_crc(ulong crc_compare, lbaint_t part_start_cnt, ulong blksz, int image_size){
+static int check_image_crc(ulong crc_compare, lbaint_t part_start_cnt,
+			ulong blksz, int image_size)
+{
 	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0);
-	u32 div_times = (image_size + LOAD_IMG_SIZE -1)/LOAD_IMG_SIZE;
+	u32 div_times = (image_size + LOAD_IMG_SIZE - 1) / LOAD_IMG_SIZE;
 	ulong crc = 0;
 	int byte_remain = image_size;
 	int download_bytes = 0;
 	u32 blk_size, n;
 	unsigned long time_start_flash = get_timer(0);
+
 	/*if crc_compare is 0, return 0 directly*/
 	if (!crc_compare)
 		return RESULT_OK;
@@ -171,13 +292,13 @@ static int check_image_crc(ulong crc_compare, lbaint_t part_start_cnt, ulong blk
 		return RESULT_FAIL;
 	}
 
-	for (int i = 0; i < div_times; i++){
+	for (int i = 0; i < div_times; i++) {
 		printf("\ndownload and flash div %d\n", i);
 		download_bytes = byte_remain > LOAD_IMG_SIZE ? LOAD_IMG_SIZE : byte_remain;
 
 		blk_size = (download_bytes + (blksz - 1)) / blksz;
 		n = blk_dread(dev_desc, part_start_cnt, blk_size, load_addr);
-		if (n != blk_size){
+		if (n != blk_size) {
 			printf("mmc read blk not equal it should be\n");
 			return RESULT_FAIL;
 		}
@@ -192,69 +313,65 @@ static int check_image_crc(ulong crc_compare, lbaint_t part_start_cnt, ulong blk
 	return (crc == crc_compare) ? RESULT_OK : RESULT_FAIL;
 }
 
-static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev){
-
-	char load_str[13] = {"\0"}; /*use to save hex to string*/
+static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
+{
+	char load_str[13] = {"\0"};
 	char addr_str[13] = {"\0"};
 	char offset_str[13] = {"\0"};
-	char mmc_str[2] = {"\0"};
 	struct disk_partition info = {0};
-
 	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0);
+
 	strcpy(load_str, simple_xtoa((ulong)load_addr));
 
-	for(int i = 0; i < MAX_PARTITION_NUM; i++){
+	for (int i = 0; i < MAX_PARTITION_NUM; i++) {
 		char *part_name = fdev->parts_info[i].part_name;
 		char *file_name = fdev->parts_info[i].file_name;
 		u32 crc_value = fdev->parts_info[i].crc;
 		unsigned long time_start_flash = get_timer(0);
-
-		printf("%ld, %ld\n", strlen(part_name), strlen(file_name));
-		if (strlen(part_name) == 0 || strlen(file_name) == 0){
+		if (strlen(part_name) == 0 || strlen(file_name) == 0) {
+			/* no more part to flash */
 			printf("part name is null\n");
-			break;/*no more part to flash*/
+			break;
 		}
-		if (!fdev->parts_info[i].flash){
+		if (!fdev->parts_info[i].flash) {
+			/* should not flash */
 			printf("should not flash\n");
-			continue;/*should not flash*/
+			continue;
 		}
 		printf("\n\nflash img %s, \n", file_name);
-		if (get_part_info(fdev->dev_desc, part_name, &info) < 0){
+		if (get_part_info(fdev->dev_desc, part_name, &info) < 0) {
 			printf("can not get partition name:%s, check your config\n", part_name);
 			return RESULT_FAIL;
 		}
-
-		strcpy(mmc_str, simple_itoa((ulong)dev_sdio_num));
-		char *const argv_image_size[] = {"fatsize", "mmc", mmc_str, file_name};
-		if (do_size(cmdtp, 0, 4, argv_image_size, FS_TYPE_FAT)){
+		char *const argv_image_size[] = {"fatsize", fdev->device_name, fdev->dev_str, file_name};
+		if (do_size(cmdtp, 0, 4, argv_image_size, FS_TYPE_FAT)) {
 			printf("can not find file :%s, \n", file_name);
 			return RESULT_FAIL;
 		}
 		printf("info->start:%lx, info->size:%lx, info->blksz:%lx\n", info.start, info.size, info.blksz);
-		lbaint_t part_start_cnt = info.start;/*save the partition start cnt*/
 
+		/* save the partition start cnt */
+		lbaint_t part_start_cnt = info.start;
 		u32 image_size = env_get_hex("filesize", 0);
 		u32 byte_remain = image_size;
-		u32 div_times = (image_size + LOAD_IMG_SIZE -1)/LOAD_IMG_SIZE;
+		u32 div_times = (image_size + LOAD_IMG_SIZE - 1) / LOAD_IMG_SIZE;
 		u32 download_bytes = 0;
 		u32 download_offset = 0;
 		printf("\n\ndev_times:%d\n", div_times);
-		for (int i = 0; i < div_times; i++){
-			printf("\ndownload and flash div %d\n", i);
+		for (int j = 0; j < div_times; j++) {
+			printf("\ndownload and flash div %d\n", j);
 			download_bytes = byte_remain > LOAD_IMG_SIZE ? LOAD_IMG_SIZE : byte_remain;
 
 			strcpy(addr_str, simple_xtoa((ulong)download_bytes));
 			strcpy(offset_str, simple_xtoa((ulong)download_offset));
-			char *const argv_image[] = {"fatload", "mmc", mmc_str,
-										load_str, file_name,
-										addr_str,
-										offset_str};
+			char *const argv_image[] = {"fatload", fdev->device_name, fdev->dev_str,
+					load_str, file_name, addr_str, offset_str};
 			printf("load from %x, bytes:%x\n", download_offset, download_bytes);
 			printf("%s, %s, \n", addr_str, offset_str);
 			if (do_load(cmdtp, 0, 7, argv_image, FS_TYPE_FAT))
 				return RESULT_FAIL;
 			u32 had_download = env_get_hex("filesize", 0);
-			if (had_download != download_bytes){
+			if (had_download != download_bytes) {
 				printf("download file size is not equal require\n");
 				return RESULT_FAIL;
 			}
@@ -262,15 +379,14 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev){
 
 			info.size = (download_bytes + (info.blksz - 1)) / info.blksz;
 			printf("write to mmc start_cnt:%lx, size:%lx\n", info.start, info.size);
-			if (write_raw_image(fdev->dev_desc, &info, part_name, load_addr, download_bytes)){
+			if (write_raw_image(fdev->dev_desc, &info, part_name, load_addr, download_bytes))
 				return RESULT_FAIL;
-			}
 			info.start += info.size;
 			download_offset += download_bytes;
 			byte_remain -= download_bytes;
 		}
-		/*read from device and check crc*/
-		if (check_image_crc(crc_value, part_start_cnt, info.blksz, image_size)){
+		/* read from device and check crc */
+		if (check_image_crc(crc_value, part_start_cnt, info.blksz, image_size)) {
 			printf("check image crc32 fail, \n");
 			return RESULT_FAIL;
 		}
@@ -280,255 +396,251 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev){
 	return RESULT_OK;
 }
 
-static int flash_gpt(struct cmd_tbl *cmdtp, struct flash_dev *fdev){
+static int flash_gpt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
+{
 	char gpt_command[250] = {"\0"};
 	sprintf(gpt_command, "gpt write mmc %x '%s'", dev_emmc_num, fdev->gptinfo.gpt_table);
 	printf("gpt table command :%s\n", gpt_command);
-
 	if (run_command(gpt_command, 0))
 		return RESULT_FAIL;
-
 	return RESULT_OK;
 }
 
 /*flash fsbl*/
-static int flash_fsbl(struct cmd_tbl *cmdtp, struct flash_dev *fdev){
-	char load_str[13] = {"\0"}; /*use to save hex to string*/
-	char mmc_str[2] = {"\0"};
+static int flash_fsbl(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
+{
+	char load_str[13] = {"\0"};
 	struct disk_partition info = {0};
 	char *flash_offset;
 	char *s;
 	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0);
-	int ret = 0;
+	int result = RESULT_OK;
 
 	info.blksz = fdev->dev_desc->blksz;
 	info.start = 0;
 	info.size = 0;
+
 	flash_offset = malloc(35);
-	printf("%x, %s, %x, \n", fdev->fsblinfo.crc, fdev->fsblinfo.offset, fdev->fsblinfo.flash);
+	if (!flash_offset) {
+		printf("Memory allocation failed for flash_offset\n");
+		return RESULT_FAIL;
+	}
+	char *original_flash_offset = flash_offset;
+
+	printf("%x, %s, \n", fdev->fsblinfo.crc, fdev->fsblinfo.offset);
 	strcpy(load_str, simple_xtoa((ulong)load_addr));
-	strcpy(mmc_str, simple_itoa((ulong)dev_sdio_num));
 	strcpy(flash_offset, fdev->fsblinfo.offset);
 
-	char *const argv_fsbl[] = {"fatload", "mmc", mmc_str, load_str, "FSBL_REL.bin"};
-	if (do_load(cmdtp, 0, 5, argv_fsbl, FS_TYPE_FAT)){
-		ret = RESULT_FAIL;
-		goto out;
+	char *const argv_fsbl[] = {"fatload", fdev->device_name, fdev->dev_str, load_str, "FSBL_REL.bin"};
+	if (do_load(cmdtp, 0, 5, argv_fsbl, FS_TYPE_FAT)) {
+		result = RESULT_FAIL;
+		goto cleanup;
 	}
 
 	u32 download_bytes = env_get_hex("filesize", 0);
 	printf("download_bytes:%x, info->blksz:%lx\n", download_bytes, info.blksz);
 	info.size = (download_bytes + (info.blksz - 1)) / info.blksz;
 
-	for(int i = 0; i < 6; i++){
+	for (int i = 0; i < 6; i++) {
 		s = strsep(&flash_offset, ";");
 		if (s == NULL)
 			break;
 		if (simple_strtoul(s, NULL, 0))
 			info.start = simple_strtoul(s, NULL, 0) / info.blksz;
-		else{
+		else
 			info.start = 0;
-		}
 
-		printf("flash fsbl offset :%s, %lx, %lx\n", s, info.start, info.size);
-		if (write_raw_image(fdev->dev_desc, &info, "fsbl", load_addr, download_bytes)){
+		printf("flash fsbl offset :%s, %lx\n", s, info.start);
+		if (write_raw_image(fdev->dev_desc, &info, "fsbl", load_addr, download_bytes)) {
 			printf("write fsbl to %lx fail\n", info.start * info.blksz);
-			ret = RESULT_FAIL;
-			goto out;
+			result = RESULT_FAIL;
+			goto cleanup; /*jump to cleanup before exiting*/
 		}
 	}
 
-	/*only check the first fsbl.bin*/
-	if (check_image_crc(fdev->fsblinfo.crc, 0x100, info.blksz, download_bytes)){
+	// only check the first fsbl.bin
+	if (check_image_crc(fdev->fsblinfo.crc, 0x100, info.blksz, download_bytes)) {
 		printf("check image crc32 fail, \n");
-		ret = RESULT_FAIL;
-		goto out;
+		result = RESULT_FAIL;
 	}
-	ret = RESULT_OK;
-out:
-	free(flash_offset);
-	return ret;
+
+cleanup:
+	/* Always free the original allocated memory */
+	free(original_flash_offset); 
+	return result;
 }
 
-static int parse_flash_info(struct cmd_tbl *cmdtp, int flag, struct flash_dev *fdev)
+static int parse_fdt(struct flash_dev *fdev)
 {
-	int  nodeoffset;	/* node offset from libfdt */
-	int  nextoffset;	/* next node offset from libfdt */
-	uint32_t tag;		/* tag */
-	const char root[2] = "/";
-	int  len = 0;		/* new length of the property */
-	char load_str[13] = {"\0"}; /*use to save hex to string*/
-	char mmc_str[2] = {"\0"};
+	char root[2] = "/";
+	int nodeoffset; /* node offset from libfdt */
+	int nextoffset; /* next node offset from libfdt */
+	int len = 0;	/* new length of the property */
+	uint32_t tag;
+	u32 part_index = 0;
 	char gpt_table[256] = {"\0"};
-
-	struct blk_desc *dev_desc;
-	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0);
-	/* use to save fdt */
+	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0); /*use to save hex to string*/
 	struct fdt_header *blob = (struct fdt_header *)load_addr;
 
-	/*try to get emmc/sdio dev number*/
-	if (check_mmc_exist())
-		return 1;
-
-	dev_desc = blk_get_dev("mmc", dev_emmc_num);
-	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
-		printf("invalid mmc device\n");
-		return RESULT_FAIL;
-	}
-	fdev->dev_desc = dev_desc;
-
-	strcpy(load_str, simple_xtoa((ulong)blob));
-	strcpy(mmc_str, simple_itoa((ulong)dev_sdio_num));
-	char *const fat_argv[] = {"fatload", "mmc", mmc_str, load_str, "flash_config"};
-	if (do_load(cmdtp, flag, 5, fat_argv, FS_TYPE_FAT))
-		return RESULT_FAIL;
-
-	if (fdt_check_header(blob) || !fdt_valid(&blob)){
-		printf("not a valid fdt\n");
-		return RESULT_FAIL;
-	}
-	nodeoffset = fdt_path_offset (blob, root);
+	nodeoffset = fdt_path_offset(blob, root);
 	if (nodeoffset < 0) {
 		/*
 		 * Not found or something else bad happened.
 		 */
-		printf ("libfdt fdt_path_offset() returned %s\n",
-			fdt_strerror(nodeoffset));
+		printf("libfdt fdt_path_offset() returned %s\n", fdt_strerror(nodeoffset));
 		return RESULT_FAIL;
 	}
-
 	fdt_next_tag(blob, nodeoffset, &nextoffset);
 	nodeoffset = nextoffset;
-
-	u32 part_index = 0;
 	bool find_next_tag = true;
-	while(find_next_tag) {
+	while (find_next_tag) {
 		tag = fdt_next_tag(blob, nodeoffset, &nextoffset);
-		switch(tag) {
-			case FDT_BEGIN_NODE:
-				const char *node_name = fdt_get_name(blob, nodeoffset, NULL);
-				const char *flash_mark = fdt_getprop(blob, nodeoffset, "flash", &len);
-				const char *node_crc = fdt_getprop(blob, nodeoffset, "crc", &len);
+		switch (tag) {
+		case FDT_BEGIN_NODE:
+			const char *node_name = fdt_get_name(blob, nodeoffset, NULL);
+			const char *flash_mark = fdt_getprop(blob, nodeoffset, "flash", &len);
+			const char *node_crc = fdt_getprop(blob, nodeoffset, "crc", &len);
 
-				if (node_name[0] == 'g'){
-					fdev->gptinfo.flash = (flash_mark[0] == 't') ? true : false;
-					break;
-				}else if(node_name[0] == 'f'){
-					fdev->fsblinfo.flash = (flash_mark[0] == 't') ? true : false;
-					fdev->fsblinfo.crc = simple_strtoul(node_crc, NULL, 0);
-					const char *fsbl_offset = fdt_getprop(blob, nodeoffset, "mmc-offset", &len);
-					const char *fsbl_offset_start = fdt_getprop(blob, nodeoffset, "size", &len);
-					strcpy(fdev->fsblinfo.offset, fsbl_offset);
-					strcpy(fdev->gptinfo.gpt_start, fsbl_offset_start);
-					printf("fdev->gpt_info->gpt_start:%s\n", fdev->gptinfo.gpt_start);
-					break;
-				}
-
-				const char *node_part = fdt_getprop(blob, nodeoffset, "partition", &len);
-				const char *node_file = fdt_getprop(blob, nodeoffset, "filename", &len);
-				const char *node_size = fdt_getprop(blob, nodeoffset, "size", &len);
-
-				/*save gpt info to a string*/
-				printf("save gpt_table\n");
-				if (part_index == 0)
-					sprintf(gpt_table, "name=%s,start=%s,size=%s;", node_part, fdev->gptinfo.gpt_start, node_size);
-				else
-					sprintf(gpt_table, "%sname=%s,size=%s;", gpt_table, node_part, node_size);
-
-				fdev->parts_info[part_index].flash = (flash_mark[0] == 't') ? true : false;
-				strcpy(fdev->parts_info[part_index].part_name, node_part);
-				strcpy(fdev->parts_info[part_index].file_name, node_file);
-				strcpy(fdev->parts_info[part_index].size, node_size);
-				fdev->parts_info[part_index].crc = simple_strtoul(node_crc, NULL, 0);
-
-				printf("fdt_get_name:%s, %s, %s, %x\n", node_name
-													, fdev->parts_info[part_index].part_name
-													, fdev->parts_info[part_index].file_name
-													, fdev->parts_info[part_index].crc);
-				part_index++;
+			if (node_name[0] == 'g') {
+				fdev->gptinfo.flash = (flash_mark[0] == 't') ? true : false;
 				break;
-
-			case FDT_END:
-				find_next_tag = false;
+			} else if (node_name[0] == 'f') {
+				fdev->fsblinfo.flash = (flash_mark[0] == 't') ? true : false;
+				fdev->fsblinfo.crc = simple_strtoul(node_crc, NULL, 0);
+				const char *fsbl_offset = fdt_getprop(blob, nodeoffset, "mmc-offset", &len);
+				const char *fsbl_offset_start = fdt_getprop(blob, nodeoffset, "size", &len);
+				strcpy(fdev->fsblinfo.offset, fsbl_offset);
+				strcpy(fdev->gptinfo.gpt_start, fsbl_offset_start);
+				printf("fdev->gpt_info->gpt_start:%s\n", fdev->gptinfo.gpt_start);
 				break;
+			}
+
+			const char *node_part = fdt_getprop(blob, nodeoffset, "partition", &len);
+			const char *node_file = fdt_getprop(blob, nodeoffset, "filename", &len);
+			const char *node_size = fdt_getprop(blob, nodeoffset, "size", &len);
+
+			/*save gpt info to a string*/
+			printf("save gpt_table\n");
+			if (part_index == 0)
+				sprintf(gpt_table, "name=%s,start=%s,size=%s;", node_part, fdev->gptinfo.gpt_start, node_size);
+			else
+				sprintf(gpt_table, "%sname=%s,size=%s;", gpt_table, node_part, node_size);
+
+			fdev->parts_info[part_index].flash = (flash_mark[0] == 't') ? true : false;
+			strcpy(fdev->parts_info[part_index].part_name, node_part);
+			strcpy(fdev->parts_info[part_index].file_name, node_file);
+			strcpy(fdev->parts_info[part_index].size, node_size);
+			fdev->parts_info[part_index].crc = simple_strtoul(node_crc, NULL, 0);
+
+			printf("fdt_get_name:%s, %s, %s, %x\n", node_name, \
+				fdev->parts_info[part_index].part_name, \
+				fdev->parts_info[part_index].file_name, \
+				fdev->parts_info[part_index].crc);
+			part_index++;
+			break;
+
+		case FDT_END:
+			find_next_tag = false;
+			break;
 		}
 		nodeoffset = nextoffset;
 	}
-
 	strcpy(fdev->gptinfo.gpt_table, gpt_table);
 	return 0;
 }
 
-static int mmc_recovery(struct cmd_tbl *cmdtp, int flag, int argc,
-		   char *const argv[], struct flash_dev *fdev)
+/*Attempt to load recovery files from all possible sources*/
+static int load_recovery_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev,
+			int argc, char *const argv[])
+{
+	char load_str[13] = {"\0"};
+	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0);
+	struct fdt_header *blob = (struct fdt_header *)load_addr;
+	int device_type, result;
+
+	if (argc < 2) {
+		printf("Error: Missing source argument. Expected 'mmc', 'usb', or 'net'.\n");
+		return CMD_RET_USAGE;
+	}
+	if (strcmp(argv[1], "mmc") == 0) {
+		device_type = DEVICE_MMC;
+	} else if (strcmp(argv[1], "usb") == 0) {
+		device_type = DEVICE_USB;
+	} else if (strcmp(argv[1], "net") == 0) {
+		device_type = DEVICE_NET;
+	} else {
+		printf("Error: Invalid source '%s'. Expected 'mmc', 'usb', or 'net'.\n", argv[1]);
+		return CMD_RET_USAGE;
+	}
+
+	result = load_from_device(cmdtp, load_str, blob, device_type, fdev);
+
+	return result;
+}
+
+static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
+{
+	if (fdev->gptinfo.flash && flash_gpt(cmdtp, fdev)) {
+		return RESULT_FAIL;
+	}
+	if (flash_image(cmdtp, fdev)) {
+		return RESULT_FAIL;
+	}
+	if (fdev->fsblinfo.flash && flash_fsbl(cmdtp, fdev)) {
+		return RESULT_FAIL;
+	}
+
+	/* all flash operations successed */
+	return RESULT_OK;
+}
+
+static int do_recovery(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	printf("%s, \n", __func__);
-
-	if (parse_flash_info(cmdtp, flag, fdev))
-		return RESULT_FAIL;
-
-	/*flash gpt.img*/
-	if (fdev->gptinfo.flash){
-		if (flash_gpt(cmdtp, fdev))
-			return RESULT_FAIL;
-	}
-
-	if (flash_image(cmdtp, fdev))
-		return RESULT_FAIL;
-
-	if (fdev->fsblinfo.flash){
-		if (flash_fsbl(cmdtp, fdev))
-			return RESULT_FAIL;
-	}
-
-	return RESULT_OK;
-	return 0;
-}
-
-static int net_recovery(struct cmd_tbl *cmdtp, int flag, int argc,
-		   char *const argv[], struct flash_dev *fdev)
-{
-	/*
-	TODO:
-		net boot
-	*/
-	return 0;
-}
-
-static int do_recovery(struct cmd_tbl *cmdtp, int flag, int argc,
-		   char *const argv[])
-{
 	struct flash_dev *fdev;
-	int ret = 0;
+
 	fdev = malloc(sizeof(struct flash_dev));
-	if (!fdev){
-		ret = RESULT_FAIL;
+	if (!fdev) {
+		printf("Memory allocation failed!\n");
+		return RESULT_FAIL;
+	}
+	memset(fdev, 0, sizeof(struct flash_dev));
+	unsigned long time_start_flash = get_timer(0);
+
+	/*Load flash_config.cfg file*/
+	int result = load_recovery_file(cmdtp, fdev, argc, argv);
+	if (result != RESULT_OK) {
+		free(fdev);
+		recovery_show_result(RESULT_FAIL);
+		return RESULT_FAIL;
 	}
 
-	ulong time_start_flash = get_timer(0);
-	printf("time_start_flash:%ld\n", time_start_flash);
-
-	if (argc == 1){
-		ret = mmc_recovery(cmdtp, flag, argc, argv, fdev);
-	}else{
-		ret = net_recovery(cmdtp, flag, argc, argv, fdev);
+	/*Parse FDT and fill in relevant data structures*/
+	if (parse_fdt(fdev)) {
+		printf("Failed to parse FDT.\n");
+		free(fdev);
+		recovery_show_result(RESULT_FAIL);
+		return RESULT_FAIL;
 	}
 
+	/*Perform programming operation based on the provided information*/
+	if (perform_flash_operations(cmdtp, fdev)) {
+		printf("Failed to flash the device.\n");
+		free(fdev);
+		recovery_show_result(RESULT_FAIL);
+		return RESULT_FAIL;
+	}
 
-	printf("recover test end\n");
 	ulong time_enc_flash = get_timer(0);
 	printf("flashing over, use time:%lu ms\n", time_enc_flash - time_start_flash);
 	free(fdev);
-
-	recovery_show_result(ret);
+	recovery_show_result(RESULT_OK);
 	return 0;
 }
 
 U_BOOT_CMD(
-	recovery,	3,	0,	do_recovery,
-	"use to flash image to emmc/nor/nand from sd/usb/net",
-	"\n"
-	"	- flash image from sd card\n"
-	"help command ...\n"
-	"	- flash image from sd card to emmc/nand/nor"
-);
+	recovery, 2, 1, do_recovery,
+	"flash image from specified source",
+	"<source>\n"
+	"    - <source>: mmc | usb | net\n"
+	"      flash image from the specified source (e.g., mmc, usb, or net) to emmc/nand/nor.");
