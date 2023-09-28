@@ -2634,18 +2634,6 @@ config SPACEMIT_RECOVER
 	help
 	  enable spacemit recovery command, use for recovery function.
 
-config RECOVERY_LOAD_ADDR
-	hex "recovery load address"
-	default 0xA040000000
-	help
-	  The address in memory that load image.
-
-config RECOVERY_LOAD_IMAGE_SIZE
-	hex "recovery load image size"
-	default 0x1F400000
-	help
-	  The size would limit each time to load image, default 500MB.
-
 endmenu
 
 endmenu

@@ -28,6 +28,17 @@
 
 #define K1PRO_SPL_BOOT_LOAD_ADDR (0xa000000000)
 
+/*
+ use (ram_base+4MB offset) as the address to loading image.
+ use ram_size-32MB as the max size to loading image, if
+ (ram_size-32MB) more than 500MB, set load image size as
+ 500MB.
+*/
+#define RECOVERY_RAM_SIZE (gd->ram_size - 0x2000000)
+#define RECOVERY_LOAD_IMG_SIZE_MAX (RECOVERY_RAM_SIZE > 0x1f400000 ? 0x1f400000 : RECOVERY_RAM_SIZE)
+#define RECOVERY_LOAD_IMG_ADDR (gd->ram_base + 0x400000)
+#define RECOVERY_LOAD_IMG_SIZE (RECOVERY_LOAD_IMG_SIZE_MAX)
+
 /* Environment options */
 
 #define BOOT_TARGET_DEVICES(func) \

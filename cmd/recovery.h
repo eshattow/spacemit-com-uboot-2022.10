@@ -6,8 +6,14 @@
 #ifndef _SPACEMIT_RECOVERY_H
 #define _SPACEMIT_RECOVERY_H
 
+DECLARE_GLOBAL_DATA_PTR;
+
 /*define max partition number*/
 #define MAX_PARTITION_NUM (10)
+
+#define MAX_BLK_WRITE (16384)
+#define RESULT_OK (0)
+#define RESULT_FAIL (1)
 
 typedef enum{
 	DEVICE_MMC,

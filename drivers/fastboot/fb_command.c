@@ -533,7 +533,10 @@ static void oem_bootbus(char *cmd_parameter, char *response)
 static void oem_flash_fsbl(char *cmd_parameter, char *response)
 {
        printf("%s, oem define cmd, %s\n", __func__, cmd_parameter);
+
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
        fastboot_mmc_flash_fsbl(cmd_parameter, fastboot_buf_addr, image_size,
                                 response);
+#endif
 }
 #endif

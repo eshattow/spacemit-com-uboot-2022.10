@@ -25,17 +25,6 @@
 #include <usb.h>
 #include "recovery.h"
 
-/*
- load file can not use malloc memory, use a temporary addr for
- loading file.if img file size more than 500MB, try to divide to
- multiple times to flash.
-*/
-#define LOAD_IMG_ADDR CONFIG_RECOVERY_LOAD_ADDR
-#define LOAD_IMG_SIZE CONFIG_RECOVERY_LOAD_IMAGE_SIZE
-#define MAX_BLK_WRITE (16384)
-#define RESULT_OK (0)
-#define RESULT_FAIL (1)
-
 static int dev_emmc_num = -1;
 static int dev_sdio_num = -1;
 
@@ -60,11 +49,12 @@ static int init_mmc_device(int dev_num)
 /* Detect and classify mmc device */
 static void detect_and_classify_mmc(int dev_num)
 {
+	int current_dev_num;
 	struct mmc *mmc = find_mmc_device(dev_num);
 	if (!mmc)
 		return;
 
-	int current_dev_num = mmc_get_blk_desc(mmc)->devnum;
+	current_dev_num = mmc_get_blk_desc(mmc)->devnum;
 	if (IS_SD(mmc)) {
 		dev_sdio_num = current_dev_num;
 		printf("SDIO detected with number: %d\n", dev_sdio_num);
@@ -104,6 +94,7 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 			struct flash_dev *fdev)
 {
 	int retval = RESULT_OK;
+	char cmd_to_execute[256];
 
 	strcpy(load_str, simple_xtoa((ulong)blob));
 	switch (device_type) {
@@ -165,7 +156,6 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 
 	char *fat_argv[] = {"fatload", fdev->device_name, fdev->dev_str, load_str, "flash_config"};
 	/* Format the command to be executed */
-	char cmd_to_execute[256];
 	snprintf(cmd_to_execute, sizeof(cmd_to_execute), "%s %s %s %s %s", fat_argv[0], fat_argv[1], fat_argv[2], fat_argv[3], fat_argv[4]);
 
 	/* Print the command */
@@ -189,9 +179,9 @@ void recovery_show_result(int ret)
 		printf("################### recovery flash success ###################\n");
 	}
 	/*need to add while release*/
-	// while(1){
-	// 	/*do not retrun while flashing over!*/
-	// }
+	while(1){
+		/*do not retrun while flashing over!*/
+	}
 }
 
 static int get_part_info(struct blk_desc *dev_desc, const char *name,
@@ -274,8 +264,8 @@ static int write_raw_image(struct blk_desc *dev_desc,
 static int check_image_crc(ulong crc_compare, lbaint_t part_start_cnt,
 			ulong blksz, int image_size)
 {
-	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0);
-	u32 div_times = (image_size + LOAD_IMG_SIZE - 1) / LOAD_IMG_SIZE;
+	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
+	u32 div_times = (image_size + RECOVERY_LOAD_IMG_SIZE - 1) / RECOVERY_LOAD_IMG_SIZE;
 	ulong crc = 0;
 	int byte_remain = image_size;
 	int download_bytes = 0;
@@ -294,7 +284,7 @@ static int check_image_crc(ulong crc_compare, lbaint_t part_start_cnt,
 
 	for (int i = 0; i < div_times; i++) {
 		printf("\ndownload and flash div %d\n", i);
-		download_bytes = byte_remain > LOAD_IMG_SIZE ? LOAD_IMG_SIZE : byte_remain;
+		download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
 
 		blk_size = (download_bytes + (blksz - 1)) / blksz;
 		n = blk_dread(dev_desc, part_start_cnt, blk_size, load_addr);
@@ -319,7 +309,14 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	char addr_str[13] = {"\0"};
 	char offset_str[13] = {"\0"};
 	struct disk_partition info = {0};
-	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0);
+	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
+	lbaint_t part_start_cnt;
+	u32 image_size = 0;
+	u32 byte_remain = 0;
+	u32 div_times = 0;
+	u32 download_bytes = 0;
+	u32 download_offset = 0;
+	u32 had_download = 0;
 
 	strcpy(load_str, simple_xtoa((ulong)load_addr));
 
@@ -328,6 +325,7 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 		char *file_name = fdev->parts_info[i].file_name;
 		u32 crc_value = fdev->parts_info[i].crc;
 		unsigned long time_start_flash = get_timer(0);
+
 		if (strlen(part_name) == 0 || strlen(file_name) == 0) {
 			/* no more part to flash */
 			printf("part name is null\n");
@@ -351,16 +349,14 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 		printf("info->start:%lx, info->size:%lx, info->blksz:%lx\n", info.start, info.size, info.blksz);
 
 		/* save the partition start cnt */
-		lbaint_t part_start_cnt = info.start;
-		u32 image_size = env_get_hex("filesize", 0);
-		u32 byte_remain = image_size;
-		u32 div_times = (image_size + LOAD_IMG_SIZE - 1) / LOAD_IMG_SIZE;
-		u32 download_bytes = 0;
-		u32 download_offset = 0;
+		part_start_cnt = info.start;
+		image_size = env_get_hex("filesize", 0);
+		byte_remain = image_size;
+		div_times = (image_size + RECOVERY_LOAD_IMG_SIZE - 1) / RECOVERY_LOAD_IMG_SIZE;
 		printf("\n\ndev_times:%d\n", div_times);
 		for (int j = 0; j < div_times; j++) {
 			printf("\ndownload and flash div %d\n", j);
-			download_bytes = byte_remain > LOAD_IMG_SIZE ? LOAD_IMG_SIZE : byte_remain;
+			download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
 
 			strcpy(addr_str, simple_xtoa((ulong)download_bytes));
 			strcpy(offset_str, simple_xtoa((ulong)download_offset));
@@ -370,7 +366,7 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 			printf("%s, %s, \n", addr_str, offset_str);
 			if (do_load(cmdtp, 0, 7, argv_image, FS_TYPE_FAT))
 				return RESULT_FAIL;
-			u32 had_download = env_get_hex("filesize", 0);
+			had_download = env_get_hex("filesize", 0);
 			if (had_download != download_bytes) {
 				printf("download file size is not equal require\n");
 				return RESULT_FAIL;
@@ -413,8 +409,9 @@ static int flash_fsbl(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	struct disk_partition info = {0};
 	char *flash_offset;
 	char *s;
-	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0);
+	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
 	int result = RESULT_OK;
+	u32 download_bytes = 0;
 
 	info.blksz = fdev->dev_desc->blksz;
 	info.start = 0;
@@ -437,7 +434,7 @@ static int flash_fsbl(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 		goto cleanup;
 	}
 
-	u32 download_bytes = env_get_hex("filesize", 0);
+	download_bytes = env_get_hex("filesize", 0);
 	printf("download_bytes:%x, info->blksz:%lx\n", download_bytes, info.blksz);
 	info.size = (download_bytes + (info.blksz - 1)) / info.blksz;
 
@@ -466,7 +463,7 @@ static int flash_fsbl(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 
 cleanup:
 	/* Always free the original allocated memory */
-	free(original_flash_offset); 
+	free(original_flash_offset);
 	return result;
 }
 
@@ -479,7 +476,7 @@ static int parse_fdt(struct flash_dev *fdev)
 	uint32_t tag;
 	u32 part_index = 0;
 	char gpt_table[256] = {"\0"};
-	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0); /*use to save hex to string*/
+	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0); /*use to save hex to string*/
 	struct fdt_header *blob = (struct fdt_header *)load_addr;
 
 	nodeoffset = fdt_path_offset(blob, root);
@@ -554,7 +551,7 @@ static int load_recovery_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev,
 			int argc, char *const argv[])
 {
 	char load_str[13] = {"\0"};
-	void *load_addr = (void *)map_sysmem(LOAD_IMG_ADDR, 0);
+	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
 	struct fdt_header *blob = (struct fdt_header *)load_addr;
 	int device_type, result;
 
@@ -596,15 +593,15 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 
 static int do_recovery(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
-	printf("%s, \n", __func__);
+	printf("RECOVERY_LOAD_IMG_ADDR:%lx, RECOVERY_LOAD_IMG_SIZE:%llx\n", RECOVERY_LOAD_IMG_ADDR, RECOVERY_LOAD_IMG_SIZE);
 	struct flash_dev *fdev;
-
 	fdev = malloc(sizeof(struct flash_dev));
 	if (!fdev) {
 		printf("Memory allocation failed!\n");
 		return RESULT_FAIL;
 	}
 	memset(fdev, 0, sizeof(struct flash_dev));
+
 	unsigned long time_start_flash = get_timer(0);
 
 	/*Load flash_config.cfg file*/
