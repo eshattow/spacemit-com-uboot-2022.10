@@ -59,6 +59,11 @@ static int test_pattern(fdt_addr_t base, fdt_size_t size)
 			writel((uint32_t)(addr + offset), (void*)addr + offset);
 		}
 	}
+
+	/* writeback and invalid cache */
+	flush_dcache_range(base,base+size);
+	invalidate_dcache_range(base,base+size);
+
 	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
 		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
 			if (readl((void*)addr + offset) != (uint32_t)(addr + offset)) {
@@ -75,6 +80,11 @@ static int test_pattern(fdt_addr_t base, fdt_size_t size)
 			writel((~(uint32_t)(addr + offset)), (void*)addr + offset);
 		}
 	}
+
+	/* writeback and invalid cache */
+	flush_dcache_range(base,base+size);
+        invalidate_dcache_range(base,base+size);
+
 	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
 		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
 			if (readl((void*)addr + offset) != (~(uint32_t)(addr + offset))) {
