@@ -121,7 +121,3 @@ void k1pro_gmac_init(void)
 	writel(val, (volatile void __iomem *)SYS_GMAC_CFG);
 }
 
-void *board_spl_fit_buffer_addr(ulong fit_size, int sectors, int bl_len)
-{
-	return map_sysmem(K1PRO_SPL_BOOT_LOAD_ADDR, 0);
-}

@@ -26,8 +26,6 @@
 #define CONFIG_GATEWAYIP 10.0.92.1
 #define CONFIG_NETMASK   255.255.255.0
 
-#define K1PRO_SPL_BOOT_LOAD_ADDR (0xa000000000)
-
 /*
  use (ram_base+4MB offset) as the address to loading image.
  use ram_size-32MB as the max size to loading image, if
