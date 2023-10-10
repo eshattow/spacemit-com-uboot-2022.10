@@ -15,6 +15,9 @@ DECLARE_GLOBAL_DATA_PTR;
 #define RESULT_OK (0)
 #define RESULT_FAIL (1)
 
+/*recovery folder name*/
+#define RECOVERY_FOLDER "recovery"
+
 typedef enum{
 	DEVICE_MMC,
 	DEVICE_USB,
@@ -23,11 +26,11 @@ typedef enum{
 
 struct part_info
 {
-	char part_name[16];
-	char file_name[20];
+	char *part_name;
+	char *file_name;
 	uint32_t crc;
 	/*partition size info, such as 128MiB*/
-	char size[10];
+	char *size;
 	bool flash;
 };
 
@@ -53,6 +56,16 @@ struct flash_dev {
 	struct fsbl_info fsblinfo;
 	struct disk_partition *d_info;
 	struct blk_desc *dev_desc;
+};
+
+enum file_image_t {
+	FLASH_CONFIG,
+	FSBL_BIN,
+	FILES_COUNT,
+};
+static char *file_image[FILES_COUNT] = {
+	"flash_config",
+	"FSBL.bin",
 };
 
 #endif /* _SPACEMIT_RECOVERY_H */

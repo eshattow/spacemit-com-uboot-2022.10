@@ -46,6 +46,20 @@ static int init_mmc_device(int dev_num)
 	return RESULT_OK;
 }
 
+static void free_flash_dev(struct flash_dev *fdev)
+{
+	for (int i = 0; i < MAX_PARTITION_NUM; i++){
+		if (fdev->parts_info[i].part_name != NULL){
+			free(fdev->parts_info[i].part_name);
+			free(fdev->parts_info[i].file_name);
+			free(fdev->parts_info[i].size);
+		}else{
+			break;
+		}
+	}
+	free(fdev);
+}
+
 /* Detect and classify mmc device */
 static void detect_and_classify_mmc(int dev_num)
 {
@@ -94,7 +108,6 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 			struct flash_dev *fdev)
 {
 	int retval = RESULT_OK;
-	char cmd_to_execute[256];
 
 	strcpy(load_str, simple_xtoa((ulong)blob));
 	switch (device_type) {
@@ -154,12 +167,17 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 	printf("device_name: %s\n", fdev->device_name);
 	printf("dev_str: %s\n", fdev->dev_str);
 
-	char *fat_argv[] = {"fatload", fdev->device_name, fdev->dev_str, load_str, "flash_config"};
-	/* Format the command to be executed */
-	snprintf(cmd_to_execute, sizeof(cmd_to_execute), "%s %s %s %s %s", fat_argv[0], fat_argv[1], fat_argv[2], fat_argv[3], fat_argv[4]);
 
-	/* Print the command */
-	printf("Executing command: %s\n", cmd_to_execute);
+	char *temp_fname = malloc(strlen(file_image[FLASH_CONFIG]) + strlen(RECOVERY_FOLDER) + 2);
+	if (!temp_fname){
+		printf("malloc file_name fail\n");
+		return RESULT_FAIL;
+	}
+	strcpy(temp_fname, RECOVERY_FOLDER);
+	strcat(temp_fname, "/");
+	strcat(temp_fname, file_image[FLASH_CONFIG]);
+
+	char *fat_argv[] = {"fatload", fdev->device_name, fdev->dev_str, load_str, temp_fname};
 
 	if (do_load(cmdtp, 0, 5, fat_argv, FS_TYPE_FAT)) {
 		printf("do_load flash_config from %s failed\n", fdev->device_name);
@@ -168,17 +186,21 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 		printf("do_load flash_config %s success\n", fdev->device_name);
 	}
 
+	free(temp_fname);
 	return retval;
 }
 
-void recovery_show_result(int ret)
+void recovery_show_result(struct flash_dev *fdev, int ret)
 {
 	if (ret) {
 		printf("!!!!!!!!!!!!!!!!!!! recovery flash false !!!!!!!!!!!!!!!!!!!\n");
 	} else {
 		printf("################### recovery flash success ###################\n");
 	}
-	/*need to add while release*/
+
+	/*free the malloc paramenter*/
+	free_flash_dev(fdev);
+
 	while(1){
 		/*do not retrun while flashing over!*/
 	}
@@ -326,17 +348,18 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 		u32 crc_value = fdev->parts_info[i].crc;
 		unsigned long time_start_flash = get_timer(0);
 
-		if (strlen(part_name) == 0 || strlen(file_name) == 0) {
+		if (fdev->parts_info[i].file_name == NULL || strlen(fdev->parts_info[i].file_name) == 0) {
 			/* no more part to flash */
 			printf("part name is null\n");
 			break;
 		}
 		if (!fdev->parts_info[i].flash) {
 			/* should not flash */
-			printf("should not flash\n");
+			printf("should not flash part:%s\n", fdev->parts_info[i].part_name);
 			continue;
 		}
-		printf("\n\nflash img %s, \n", file_name);
+		printf("\n\nflash img %s, part_name:%s\n", file_name, part_name);
+
 		if (get_part_info(fdev->dev_desc, part_name, &info) < 0) {
 			printf("can not get partition name:%s, check your config\n", part_name);
 			return RESULT_FAIL;
@@ -428,15 +451,25 @@ static int flash_fsbl(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	strcpy(load_str, simple_xtoa((ulong)load_addr));
 	strcpy(flash_offset, fdev->fsblinfo.offset);
 
-	char *const argv_fsbl[] = {"fatload", fdev->device_name, fdev->dev_str, load_str, "FSBL_REL.bin"};
+
+	char *temp_fname = malloc(strlen(file_image[FSBL_BIN]) + strlen(RECOVERY_FOLDER) + 2);
+	if (!temp_fname){
+		printf("malloc temp_fname fail\n");
+		return RESULT_FAIL;
+	}
+	strcpy(temp_fname, RECOVERY_FOLDER);
+	strcat(temp_fname, "/");
+	strcat(temp_fname, file_image[FSBL_BIN]);
+
+	char *const argv_fsbl[] = {"fatload", fdev->device_name, fdev->dev_str, load_str, temp_fname};
 	if (do_load(cmdtp, 0, 5, argv_fsbl, FS_TYPE_FAT)) {
 		result = RESULT_FAIL;
 		goto cleanup;
 	}
 
 	download_bytes = env_get_hex("filesize", 0);
-	printf("download_bytes:%x, info->blksz:%lx\n", download_bytes, info.blksz);
 	info.size = (download_bytes + (info.blksz - 1)) / info.blksz;
+	printf("download_bytes:%x, info->blksz:%lx, info->size:%lx\n", download_bytes, info.blksz, info.size);
 
 	for (int i = 0; i < 6; i++) {
 		s = strsep(&flash_offset, ";");
@@ -464,6 +497,7 @@ static int flash_fsbl(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 cleanup:
 	/* Always free the original allocated memory */
 	free(original_flash_offset);
+	free(temp_fname);
 	return result;
 }
 
@@ -524,11 +558,32 @@ static int parse_fdt(struct flash_dev *fdev)
 				sprintf(gpt_table, "%sname=%s,size=%s;", gpt_table, node_part, node_size);
 
 			fdev->parts_info[part_index].flash = (flash_mark[0] == 't') ? true : false;
-			strcpy(fdev->parts_info[part_index].part_name, node_part);
-			strcpy(fdev->parts_info[part_index].file_name, node_file);
-			strcpy(fdev->parts_info[part_index].size, node_size);
-			fdev->parts_info[part_index].crc = simple_strtoul(node_crc, NULL, 0);
 
+			/*after finish recovery, it would free the malloc paramenter at func recovery_show_result*/
+			fdev->parts_info[part_index].part_name = malloc(strlen(node_part));
+			if (!fdev->parts_info[part_index].part_name){
+				printf("malloc part_name fail\n");
+				return RESULT_FAIL;
+			}
+			strcpy(fdev->parts_info[part_index].part_name, node_part);
+
+			fdev->parts_info[part_index].size = malloc(strlen(node_size));
+			if (!fdev->parts_info[part_index].size){
+				printf("malloc size fail\n");
+				return RESULT_FAIL;
+			}
+			strcpy(fdev->parts_info[part_index].size, node_size);
+
+			fdev->parts_info[part_index].file_name = malloc(strlen(node_file) + strlen(RECOVERY_FOLDER) + 2);
+			if (!fdev->parts_info[part_index].file_name){
+				printf("malloc file_name fail\n");
+				return RESULT_FAIL;
+			}
+			strcpy(fdev->parts_info[part_index].file_name, RECOVERY_FOLDER);
+			strcat(fdev->parts_info[part_index].file_name, "/");
+			strcat(fdev->parts_info[part_index].file_name, node_file);
+
+			fdev->parts_info[part_index].crc = simple_strtoul(node_crc, NULL, 0);
 			printf("fdt_get_name:%s, %s, %s, %x\n", node_name, \
 				fdev->parts_info[part_index].part_name, \
 				fdev->parts_info[part_index].file_name, \
@@ -595,6 +650,8 @@ static int do_recovery(struct cmd_tbl *cmdtp, int flag, int argc, char *const ar
 {
 	printf("RECOVERY_LOAD_IMG_ADDR:%lx, RECOVERY_LOAD_IMG_SIZE:%llx\n", RECOVERY_LOAD_IMG_ADDR, RECOVERY_LOAD_IMG_SIZE);
 	struct flash_dev *fdev;
+
+	/*fdev would free after finish revocery at func recovery_show_result*/
 	fdev = malloc(sizeof(struct flash_dev));
 	if (!fdev) {
 		printf("Memory allocation failed!\n");
@@ -607,31 +664,27 @@ static int do_recovery(struct cmd_tbl *cmdtp, int flag, int argc, char *const ar
 	/*Load flash_config.cfg file*/
 	int result = load_recovery_file(cmdtp, fdev, argc, argv);
 	if (result != RESULT_OK) {
-		free(fdev);
-		recovery_show_result(RESULT_FAIL);
+		recovery_show_result(fdev, RESULT_FAIL);
 		return RESULT_FAIL;
 	}
 
 	/*Parse FDT and fill in relevant data structures*/
 	if (parse_fdt(fdev)) {
 		printf("Failed to parse FDT.\n");
-		free(fdev);
-		recovery_show_result(RESULT_FAIL);
+		recovery_show_result(fdev, RESULT_FAIL);
 		return RESULT_FAIL;
 	}
 
 	/*Perform programming operation based on the provided information*/
 	if (perform_flash_operations(cmdtp, fdev)) {
 		printf("Failed to flash the device.\n");
-		free(fdev);
-		recovery_show_result(RESULT_FAIL);
+		recovery_show_result(fdev, RESULT_FAIL);
 		return RESULT_FAIL;
 	}
 
 	ulong time_enc_flash = get_timer(0);
 	printf("flashing over, use time:%lu ms\n", time_enc_flash - time_start_flash);
-	free(fdev);
-	recovery_show_result(RESULT_OK);
+	recovery_show_result(fdev, RESULT_OK);
 	return 0;
 }
 
