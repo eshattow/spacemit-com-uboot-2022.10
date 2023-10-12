@@ -178,6 +178,14 @@
 			status = "disabled";
 		};
 
+		udc: udc@c0900100 {
+			compatible = "spacemit,mv-udc";
+			reg = <0x0 0xc0900100 0x0 0x4000>;
+			interrupts = <105>;
+			interrupt-parent = <&intc>;
+			status = "disabled";
+		};
+
 		usbdrd3: usb3@0 {
 			compatible = "spacemit,k1-x-dwc3";
 			#address-cells = <2>;

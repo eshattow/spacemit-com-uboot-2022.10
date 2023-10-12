@@ -25,6 +25,10 @@
 	status = "okay";
 };
 
+&udc {
+	status = "okay";
+};
+
 &usbdrd3 {
 	status = "disabled";
 	dwc3@c0a00000 {
