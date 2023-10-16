@@ -37,7 +37,7 @@ static int do_fastboot_udp(int argc, char *const argv[],
 static int do_fastboot_usb(int argc, char *const argv[],
 			   uintptr_t buf_addr, size_t buf_size)
 {
-#if CONFIG_IS_ENABLED(USB_FUNCTION_FASTBOOT)
+#ifdef CONFIG_USB_FUNCTION_FASTBOOT
 	int controller_index;
 	char *usb_controller;
 	char *endp;
@@ -157,6 +157,10 @@ static char fastboot_help_text[] =
 	__stringify(CONFIG_FASTBOOT_BUF_SIZE) ")"
 	;
 #endif
+
+int do_fastboot_spl(char *const argv[], int argc, uintptr_t buf_addr, size_t buf_size) {
+    return do_fastboot(NULL, 0, argc, argv);
+}
 
 U_BOOT_CMD(
 	fastboot, CONFIG_SYS_MAXARGS, 1, do_fastboot,

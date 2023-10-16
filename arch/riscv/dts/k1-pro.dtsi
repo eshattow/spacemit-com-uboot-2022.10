@@ -153,6 +153,14 @@
 			clock-output-names = "clk_50m";
 			u-boot,dm-spl;
 		};
+
+		pll_clk_usb2: clock-pll_usb2 {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <50000000>;
+			clock-output-names = "pll_usb2";
+			u-boot,dm-spl;
+		};
 	};
 
 	soc {
@@ -302,6 +310,7 @@
 			g-np-tx-fifo-size = <32>;
 			g-rx-fifo-size = <544>;
 			g-tx-fifo-size = <768 256 256 64 64>;
+			u-boot,dm-spl;
 			status = "disabled";
 		};
 

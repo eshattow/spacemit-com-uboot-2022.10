@@ -79,6 +79,7 @@ void fastboot_okay(const char *reason, char *response)
 		fastboot_response("OKAY", response, NULL);
 }
 
+#if !defined(CONFIG_SPL_BUILD)
 /**
  * fastboot_set_reboot_flag() - Set flag to indicate reboot-bootloader
  *
@@ -154,6 +155,7 @@ void fastboot_boot(void)
 		do_reset(NULL, 0, 0, NULL);
 	}
 }
+#endif /*#!defined(CONFIG_SPL_BUILD)*/
 
 /**
  * fastboot_set_progress_callback() - set progress callback

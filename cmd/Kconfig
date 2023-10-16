@@ -2634,6 +2634,12 @@ config SPACEMIT_RECOVER
 	help
 	  enable spacemit recovery command, use for recovery function.
 
+config SPL_FASTBOOT
+	bool "Enable SPL Fastboot Mode"
+	default n
+	help
+	  Enable this option to enable fastboot in spl
+
 endmenu
 
 endmenu

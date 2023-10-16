@@ -12,7 +12,8 @@
 #include <fb_nand.h>
 #include <part.h>
 #include <stdlib.h>
-#include <fdt_support.h>
+#include <spl.h>
+#include <image.h>
 
 /**
  * image_size - final fastboot image size
@@ -32,6 +33,11 @@ static u32 fastboot_bytes_expected;
 static void okay(char *, char *);
 static void getvar(char *, char *);
 static void download(char *, char *);
+#if defined(CONFIG_SPL_FASTBOOT) && defined(CONFIG_SPL_BUILD)
+static void spl_cmd_continue(char *, char *);
+#endif /*defined(CONFIG_SPL_FASTBOOT) && defined(CONFIG_SPL_BUILD)*/
+void __noreturn jump_to_image_no_args(struct spl_image_info *spl_image);
+#if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void flash(char *, char *);
 static void erase(char *, char *);
@@ -52,6 +58,7 @@ static void oem_bootbus(char *, char *);
 static void run_ucmd(char *, char *);
 static void run_acmd(char *, char *);
 #endif
+#endif /*!defined(CONFIG_SPL_BUILD)*/
 
 
 static const struct {
@@ -66,6 +73,7 @@ static const struct {
 		.command = "download",
 		.dispatch = download
 	},
+#if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 	[FASTBOOT_COMMAND_FLASH] =  {
 		.command = "flash",
@@ -80,10 +88,16 @@ static const struct {
 		.command = "boot",
 		.dispatch = okay
 	},
+#endif /*!defined(CONFIG_SPL_BUILD)*/
 	[FASTBOOT_COMMAND_CONTINUE] =  {
 		.command = "continue",
+	#if defined(CONFIG_SPL_FASTBOOT) && defined(CONFIG_SPL_BUILD)
+		.dispatch = spl_cmd_continue
+	#else
 		.dispatch = okay
+	#endif
 	},
+#if !defined(CONFIG_SPL_BUILD)
 	[FASTBOOT_COMMAND_REBOOT] =  {
 		.command = "reboot",
 		.dispatch = okay
@@ -122,6 +136,12 @@ static const struct {
 		.dispatch = oem_bootbus,
 	},
 #endif
+#ifdef CONFIG_SPACEMIT_RECOVER
+	[FASTBOOT_COMMAND_OEM_FSBL] =  {
+		.command = "oem flash_fsbl",
+		.dispatch = oem_flash_fsbl,
+	},
+#endif
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
 	[FASTBOOT_COMMAND_UCMD] = {
 		.command = "UCmd",
@@ -132,6 +152,7 @@ static const struct {
 		.dispatch = run_acmd,
 	},
 #endif
+#endif /*!defined(CONFIG_SPL_BUILD)*/
 };
 
 /**
@@ -181,6 +202,27 @@ static void okay(char *cmd_parameter, char *response)
 {
 	fastboot_okay(NULL, response);
 }
+
+#if defined(CONFIG_SPL_FASTBOOT) && defined(CONFIG_SPL_BUILD)
+static void spl_cmd_continue(char *cmd_parameter, char *response)
+{
+	printf("Entering spl_cmd_continue\n");
+	okay(NULL, response);
+
+	struct spl_image_info spl_image;
+	struct spl_boot_device bootdev;
+
+	bootdev.boot_device = BOOT_DEVICE_RAM;
+	int ret = load_image_from_ram(&spl_image, &bootdev);
+	if (ret) {
+		printf("Failed to load image from RAM: %d\n", ret);
+		return;
+	}
+
+	printf("About to jump to image with entry_point: 0x%lx\n", spl_image.entry_point);
+	spl_invoke_opensbi(&spl_image);
+}
+#endif
 
 /**
  * getvar() - Read a config/version variable
@@ -300,6 +342,7 @@ void fastboot_data_complete(char *response)
 	fastboot_bytes_received = 0;
 }
 
+#if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 /**
  * flash() - write the downloaded image to the indicated partition.
@@ -520,3 +563,5 @@ static void oem_bootbus(char *cmd_parameter, char *response)
 		fastboot_okay(NULL, response);
 }
 #endif
+
+#endif /*#!defined(CONFIG_SPL_BUILD)*/

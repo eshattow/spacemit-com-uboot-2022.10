@@ -804,6 +804,24 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 #ifdef CONFIG_SYS_SPL_ARGS_ADDR
 	spl_image.arg = (void *)CONFIG_SYS_SPL_ARGS_ADDR;
 #endif
+
+#ifdef CONFIG_SPL_FASTBOOT
+	int do_fastboot_spl(char *const argv[], int argc, uintptr_t buf_addr, size_t buf_size);
+
+	uintptr_t buf_addr = (uintptr_t)NULL;
+	size_t buf_size = 0;
+	char *const argv[] = {"fastboot", "usb", "0"};
+	int argc = 3;
+
+	ret = do_fastboot_spl(argv, argc, buf_addr, buf_size);
+	if (ret) {
+		printf("Error: do_fastboot_spl() failed with code %d\n", ret);
+		hang();
+	} else {
+		printf("Exiting function: do_fastboot_spl\n");
+	}
+#endif
+
 	spl_image.boot_device = BOOT_DEVICE_NONE;
 	board_boot_order(spl_boot_list);
 

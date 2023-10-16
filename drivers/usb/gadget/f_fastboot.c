@@ -419,10 +419,12 @@ static int fastboot_tx_write_str(const char *buffer)
 	return fastboot_tx_write(buffer, strlen(buffer));
 }
 
+#if !defined(CONFIG_SPL_BUILD)
 static void compl_do_reset(struct usb_ep *ep, struct usb_request *req)
 {
 	do_reset(NULL, 0, 0, NULL);
 }
+#endif /* !defined(CONFIG_SPL_BUILD) */
 
 static unsigned int rx_bytes_expected(struct usb_ep *ep)
 {
@@ -489,6 +491,7 @@ static void do_exit_on_complete(struct usb_ep *ep, struct usb_request *req)
 	g_dnl_trigger_detach();
 }
 
+#if !defined(CONFIG_SPL_BUILD)
 static void do_bootm_on_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	fastboot_boot();
@@ -506,6 +509,7 @@ static void do_acmd_complete(struct usb_ep *ep, struct usb_request *req)
 		fastboot_acmd_complete();
 }
 #endif
+#endif /* !defined(CONFIG_SPL_BUILD) */
 
 static void rx_handler_command(struct usb_ep *ep, struct usb_request *req)
 {
@@ -531,14 +535,17 @@ static void rx_handler_command(struct usb_ep *ep, struct usb_request *req)
 
 	if (!strncmp("OKAY", response, 4)) {
 		switch (cmd) {
+#if !defined(CONFIG_SPL_BUILD)
 		case FASTBOOT_COMMAND_BOOT:
 			fastboot_func->in_req->complete = do_bootm_on_complete;
 			break;
+#endif /* !defined(CONFIG_SPL_BUILD) */
 
 		case FASTBOOT_COMMAND_CONTINUE:
 			fastboot_func->in_req->complete = do_exit_on_complete;
 			break;
 
+#if !defined(CONFIG_SPL_BUILD)
 		case FASTBOOT_COMMAND_REBOOT:
 		case FASTBOOT_COMMAND_REBOOT_BOOTLOADER:
 		case FASTBOOT_COMMAND_REBOOT_FASTBOOTD:
@@ -550,6 +557,7 @@ static void rx_handler_command(struct usb_ep *ep, struct usb_request *req)
 			fastboot_func->in_req->complete = do_acmd_complete;
 			break;
 #endif
+#endif /* !defined(CONFIG_SPL_BUILD) */
 		}
 	}
 
