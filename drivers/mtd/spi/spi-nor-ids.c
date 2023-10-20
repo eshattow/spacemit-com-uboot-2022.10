@@ -173,6 +173,7 @@ const struct flash_info spi_nor_ids[] = {
 	{ INFO("mx25l4005a",  0xc22013, 0, 64 * 1024,   8, SECT_4K) },
 	{ INFO("mx25l8005",   0xc22014, 0, 64 * 1024,  16, 0) },
 	{ INFO("mx25l1606e",  0xc22015, 0, 64 * 1024,  32, SECT_4K) },
+	{ INFO("mx25l16xxx",  0xc22515, 0, 64 * 1024,  32, SECT_4K) },
 	{ INFO("mx25l3205d",  0xc22016, 0, 64 * 1024,  64, SECT_4K) },
 	{ INFO("mx25l6405d",  0xc22017, 0, 64 * 1024, 128, SECT_4K) },
 	{ INFO("mx25u2033e",  0xc22532, 0, 64 * 1024,   4, SECT_4K) },

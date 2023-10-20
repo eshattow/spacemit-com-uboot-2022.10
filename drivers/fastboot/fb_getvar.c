@@ -12,9 +12,13 @@
 #include <fs.h>
 #include <part.h>
 #include <version.h>
+#include <asm/global_data.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 static void getvar_version(char *var_parameter, char *response);
 static void getvar_version_bootloader(char *var_parameter, char *response);
+static void getvar_version_IC(char *var_parameter, char *response);
 static void getvar_downloadsize(char *var_parameter, char *response);
 static void getvar_serialno(char *var_parameter, char *response);
 static void getvar_version_baseband(char *var_parameter, char *response);
@@ -42,6 +46,9 @@ static const struct {
 	}, {
 		.variable = "version-bootloader",
 		.dispatch = getvar_version_bootloader
+	}, {
+		.variable = "version-IC",
+		.dispatch = getvar_version_IC
 	}, {
 		.variable = "downloadsize",
 		.dispatch = getvar_downloadsize
@@ -133,6 +140,19 @@ static void getvar_version(char *var_parameter, char *response)
 static void getvar_version_bootloader(char *var_parameter, char *response)
 {
 	fastboot_okay(U_BOOT_VERSION, response);
+}
+
+static void getvar_version_IC(char *var_parameter, char *response)
+{
+	struct fdt_header *working_fdt = (struct fdt_header *)gd->fdt_blob;
+	int len_fdt_size;
+	int  nodeoffset = fdt_path_offset(working_fdt, "/");
+	const char *nodep = fdt_getprop(working_fdt, nodeoffset, "compatible", &len_fdt_size);
+
+	if (nodep && len_fdt_size > 0) {
+		fastboot_okay(nodep, response);
+	}else
+		fastboot_okay("", response);
 }
 
 static void getvar_downloadsize(char *var_parameter, char *response)

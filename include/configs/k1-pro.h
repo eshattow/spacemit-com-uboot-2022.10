@@ -66,4 +66,6 @@
 	"ethaddr=02:f6:c3:67:27:55\0" \
 	BOOTENV
 
+#define SPL_SPI_BOOT_MTD_NAME "uboot"
+
 #endif /* __CONFIG_H */

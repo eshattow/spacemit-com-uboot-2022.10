@@ -513,6 +513,10 @@ static int parse_fdt(struct flash_dev *fdev)
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0); /*use to save hex to string*/
 	struct fdt_header *blob = (struct fdt_header *)load_addr;
 
+	if (fdt_check_header(blob) || !fdt_valid(&blob)){
+		printf("not a valid fdt\n");
+		return RESULT_FAIL;
+	}
 	nodeoffset = fdt_path_offset(blob, root);
 	if (nodeoffset < 0) {
 		/*

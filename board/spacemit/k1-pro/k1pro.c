@@ -68,7 +68,7 @@ u32 spl_boot_device(void)
 	/*select sd as default. later it can select diff boot type by
 	 *obtaining pin info.
 	 * */
-	boot_mode = 0x2;
+	boot_mode = 0x1;
 
 	switch (boot_mode) {
 	case 0:
@@ -89,7 +89,7 @@ u32 spl_boot_device(void)
 void board_boot_order(u32 *spl_boot_list)
 {
 	/*select one boot device*/
-	spl_boot_list[0] = BOOT_DEVICE_MMC2;
+	spl_boot_list[0] = BOOT_DEVICE_MMC1;
 	spl_boot_list[1] = spl_boot_device();
 	spl_boot_list[2] = BOOT_DEVICE_RAM;
 }

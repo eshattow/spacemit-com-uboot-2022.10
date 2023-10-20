@@ -12,6 +12,7 @@
 #include <fb_nand.h>
 #include <part.h>
 #include <stdlib.h>
+#include <fdt_support.h>
 
 /**
  * image_size - final fastboot image size
@@ -50,6 +51,7 @@ static void oem_bootbus(char *, char *);
 
 #ifdef CONFIG_SPACEMIT_RECOVER
 static void oem_flash_fsbl(char *, char *);
+static void oem_flash_gpt(char *, char *);
 #endif
 
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
@@ -126,12 +128,6 @@ static const struct {
 		.dispatch = oem_bootbus,
 	},
 #endif
-#ifdef CONFIG_SPACEMIT_RECOVER
-	[FASTBOOT_COMMAND_OEM_FSBL] =  {
-		.command = "oem flash_fsbl",
-		.dispatch = oem_flash_fsbl,
-	}
-#endif
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
 	[FASTBOOT_COMMAND_UCMD] = {
 		.command = "UCmd",
@@ -140,6 +136,16 @@ static const struct {
 	[FASTBOOT_COMMAND_ACMD] = {
 		.command = "ACmd",
 		.dispatch = run_acmd,
+	},
+#endif
+#ifdef CONFIG_SPACEMIT_RECOVER
+	[FASTBOOT_COMMAND_OEM_FSBL] =  {
+		.command = "oem flash_fsbl",
+		.dispatch = oem_flash_fsbl,
+	},
+	[FASTBOOT_COMMAND_OEM_GPT] =  {
+		.command = "oem flash_gpt",
+		.dispatch = oem_flash_gpt,
 	},
 #endif
 };
@@ -538,5 +544,71 @@ static void oem_flash_fsbl(char *cmd_parameter, char *response)
        fastboot_mmc_flash_fsbl(cmd_parameter, fastboot_buf_addr, image_size,
                                 response);
 #endif
+}
+
+/**
+ * oem flash gpt. it should download the flash_config at first.
+ *
+ */
+static void oem_flash_gpt(char *cmd_parameter, char *response)
+{
+	int  nodeoffset;	/* node offset from libfdt */
+	int  nextoffset;	/* next node offset from libfdt */
+	int len = 0;	/* new length of the property */
+	uint32_t tag;
+	u32 part_index = 0;
+
+	/*limit partition to 10, so that the gpt_table would no more than 256 byte*/
+	static char gpt_table[256];
+	static char gpt_command[300];
+	const char *fsbl_offset_start;
+
+	struct fdt_header *blob = (struct fdt_header *)fastboot_buf_addr;
+	if (fdt_check_header(blob) || !fdt_valid(&blob)){
+		printf("not a valid fdt, need download flash_config at first\n");
+		return;
+	}
+
+	nodeoffset = fdt_path_offset (blob, "/");
+	fdt_next_tag(blob, nodeoffset, &nextoffset);
+	nodeoffset = nextoffset;
+	bool find_next_tag = true;
+	while (find_next_tag) {
+		tag = fdt_next_tag(blob, nodeoffset, &nextoffset);
+		switch (tag) {
+		case FDT_BEGIN_NODE:
+			const char *node_name = fdt_get_name(blob, nodeoffset, NULL);
+			if (node_name[0] == 'g')
+				break;
+			else if (node_name[0] == 'f'){
+				fsbl_offset_start = fdt_getprop(blob, nodeoffset, "size", &len);
+				break;
+			}
+			const char *node_part = fdt_getprop(blob, nodeoffset, "partition", &len);
+			const char *node_size = fdt_getprop(blob, nodeoffset, "size", &len);
+			if (part_index == 0)
+				sprintf(gpt_table, "name=%s,start=%s,size=%s;", node_part, fsbl_offset_start, node_size);
+			else
+				sprintf(gpt_table, "%sname=%s,size=%s;", gpt_table, node_part, node_size);
+			part_index++;
+			break;
+		case FDT_END:
+			find_next_tag = false;
+			break;
+		}
+		nodeoffset = nextoffset;
+	}
+
+	if (strlen(gpt_table) == 0) {
+		fastboot_fail("miss gpt table parameter", response);
+	} else {
+		sprintf(gpt_command, "gpt write mmc %x %s",
+			CONFIG_FASTBOOT_FLASH_MMC_DEV, gpt_table);
+		printf("cmd:%s\n", gpt_command);
+		if (run_command(gpt_command, 0))
+			fastboot_fail("write gpt fail", response);
+		else
+			fastboot_okay(gpt_command, response);
+	}
 }
 #endif
