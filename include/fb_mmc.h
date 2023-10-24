@@ -40,18 +40,4 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
  */
 void fastboot_mmc_erase(const char *cmd, char *response);
 
-#ifdef CONFIG_SPACEMIT_RECOVER
-/**
- * fastboot_mmc_flash_fsbl() - Write image to eMMC for fastboot
- *
- * @cmd: Named partition to write image to
- * @download_buffer: Pointer to image data
- * @download_bytes: Size of image data
- * @response: Pointer to fastboot response buffer
- */
-void fastboot_mmc_flash_fsbl(const char *cmd, void *download_buffer,
-                             u32 download_bytes, char *response);
-
-#endif
-
 #endif

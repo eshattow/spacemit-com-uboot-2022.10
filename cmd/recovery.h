@@ -17,6 +17,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 /*recovery folder name*/
 #define RECOVERY_FOLDER "recovery"
+#define FLASH_CONFIG_NAME "flash_config"
 
 typedef enum{
 	DEVICE_MMC,
@@ -31,21 +32,16 @@ struct part_info
 	uint32_t crc;
 	/*partition size info, such as 128MiB*/
 	char *size;
-	bool flash;
+	/*use for fsbl, if hidden that gpt would reserve a raw memeory
+	  for fsbl and the partition is not available.
+	*/
+	bool hidden;
 };
 
 struct gpt_info {
 	char gpt_table[256];
-	/*save gpt start info such as 4MiB*/
-	char gpt_start[6];
-	bool flash;
-};
-
-struct fsbl_info {
-	uint32_t crc;
-	/*save all fsbl offset string, such as '0x0;0x10000'*/
-	char offset[36];
-	bool flash;
+	/*save gpt start offset*/
+	u32 gpt_start_offset;
 };
 
 struct flash_dev {
@@ -53,19 +49,8 @@ struct flash_dev {
 	char *dev_str;
 	struct part_info parts_info[MAX_PARTITION_NUM];
 	struct gpt_info gptinfo;
-	struct fsbl_info fsblinfo;
 	struct disk_partition *d_info;
 	struct blk_desc *dev_desc;
-};
-
-enum file_image_t {
-	FLASH_CONFIG,
-	FSBL_BIN,
-	FILES_COUNT,
-};
-static char *file_image[FILES_COUNT] = {
-	"flash_config",
-	"FSBL.bin",
 };
 
 #endif /* _SPACEMIT_RECOVERY_H */

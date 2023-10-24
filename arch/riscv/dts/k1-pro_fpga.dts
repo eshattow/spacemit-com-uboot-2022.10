@@ -47,6 +47,11 @@
 	pinctrl-0 = <&pinctrl_qspi0>;
 };
 
+&spi1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_qspi1>;
+};
+
 &eth0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_gmac>;
