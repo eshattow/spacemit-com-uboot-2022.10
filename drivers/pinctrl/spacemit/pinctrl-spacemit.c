@@ -84,8 +84,6 @@ static int spacemit_pinctrl_set_state(struct udevice *dev, struct udevice *confi
 		reg = (u64)info->base + (u64)regs->cfg;
 		reg += bank * regs->reg_len + offset * 4;
 
-		mux_config = readl((void __iomem *)reg);
-
 		fs = mux_sel << pin_conf->fs_shift;
 		od =  OD_DIS << pin_conf->od_shift;
 		pull_en = PE_EN << pin_conf->pe_shift;
@@ -94,7 +92,7 @@ static int spacemit_pinctrl_set_state(struct udevice *dev, struct udevice *confi
 		st = ST_DIS << pin_conf->st_shift;
 		rte = RTE_EN << pin_conf->rte_shift;
 
-		mux_config |= (fs | od | pull_en | pull | ds | st | rte);
+		mux_config = (fs | od | pull_en | pull | ds | st | rte);
 		writel(mux_config, (void __iomem *)reg);
 		dev_dbg(dev, "write: bank %d 0ffset %d val 0x%lx\n",
 			bank, offset, mux_config);
