@@ -12,7 +12,6 @@
 #include <fastboot-internal.h>
 #include <image-sparse.h>
 #include <image.h>
-#include <fdt_support.h>
 #include <part.h>
 #include <mmc.h>
 #include <div64.h>
@@ -22,8 +21,85 @@
 #include <u-boot/crc.h>
 #include <dm.h>
 #include <dm/uclass-internal.h>
+#include <cJSON.h>
 
 #define EMMC_MAX_BLK_WRITE 16384
+
+static __maybe_unused void _write_gpt_partition(char gpt_table[256], char *response)
+{
+	char gpt_command[300] = {"\0"};
+
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
+		sprintf(gpt_command, "gpt write mmc %x '%s'",
+			CONFIG_FASTBOOT_FLASH_MMC_DEV, gpt_table);
+		printf("cmd:%s\n", gpt_command);
+		if (run_command(gpt_command, 0)){
+			fastboot_fail("write gpt fail", response);
+			return;
+		}
+#elif CONFIG_IS_ENABLED(FASTBOOT_MTD_SUPPORT_BLK_DEV)
+		printf("mtd write gpt to dev:%s\n", CONFIG_FASTBOOT_MTD_SUPPORT_BLK_DEV_NAME);
+		sprintf(gpt_command, "gpt write %s %x '%s'",
+			CONFIG_FASTBOOT_MTD_SUPPORT_BLK_DEV_NAME, 0,
+			gpt_table);
+		printf("cmd:%s\n", gpt_command);
+		if (run_command(gpt_command, 0)){
+			fastboot_fail("write gpt fail", response);
+			return;
+		}
+#endif
+	fastboot_okay("parse gpt/mtd table okay", response);
+	return;
+}
+
+static __maybe_unused void _write_mtd_partitino(char mtd_table[128], char *response)
+{
+	printf("mtd tabel:%s\n", mtd_table);
+	return;
+}
+
+
+
+
+
+/**
+ * @brief transfer the string of size 'KiB' or 'MiB' to u32 type.
+ * 
+ * @param reserve_size , the string of size 'xiB'
+ * @return int , return the transfer result.
+ */
+int transfer_string_to_ul(const char *reserve_size)
+{
+	char *ret, *token;
+	char ch;
+	char strnum[10] = {"\0"};
+	u32 get_size = 0;
+
+	if (reserve_size == NULL || strlen(reserve_size) == 0)
+		return 0;
+
+	printf("reserve_size:%s\n", reserve_size);
+	ret = strpbrk(reserve_size, "KMG");
+	ch = ret[0];
+	if (ch == 'K' || ch == 'M' || ch == 'G'){
+		strcpy(strnum, reserve_size);
+		token = strtok(strnum, &ch);
+		get_size = simple_strtoul(token, NULL, 0);
+	}else{
+		pr_err("not support size %s, should use KiB/MiB/GiB\n", reserve_size);
+		return 0;
+	}
+
+	switch(ch){
+	case 'K':
+		return get_size;
+	case 'M':
+		return get_size * 1024;
+	case 'G':
+		return get_size * 1024 * 1024;
+	}
+	return 0;
+}
 
 /**
  * fastboot_oem_flash_gpt() - parse flash_config and write gpt table.
@@ -36,102 +112,101 @@
 void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download_bytes,
 							char *response, u32 *start_offset)
 {
-	int  nodeoffset;	/* node offset from libfdt */
-	int  nextoffset;	/* next node offset from libfdt */
-	int len = 0;	/* new length of the property */
-	uint32_t tag;
 	u32 part_index = 0;
 	u32 get_size = 0;
+	u32 reserve_part_size = 0;
 
 	/*limit partition to 10, so that the gpt_table would no more than 256 byte*/
 	char gpt_table[256] = {"\0"};
-	char gpt_command[300] = {"\0"};
 	char fsbl_offset_start[36] = {"\0"} ;
-	u32 reserve_part_size = 0;
-	char strnum[10] = {"\0"};
-	char *token;
+	char mtd_table[128] = {"\0"};
 
+	cJSON *json_root;
+	int array_size;
 
-	struct fdt_header *blob = (struct fdt_header *)fastboot_buf_addr;
-	if (fdt_check_header(blob) || !fdt_valid(&blob)){
-		printf("not a valid fdt, need download flash_config at first\n");
+	json_root = cJSON_Parse((void *)fastboot_buf_addr);
+	if (!json_root){
+		printf("can not parse json, check your flash_config.cfg is json format or not\n");
 		return;
 	}
 
-	nodeoffset = fdt_path_offset (blob, "/");
-	fdt_next_tag(blob, nodeoffset, &nextoffset);
-	nodeoffset = nextoffset;
-	bool find_next_tag = true;
-	while (find_next_tag) {
-		tag = fdt_next_tag(blob, nodeoffset, &nextoffset);
-		switch (tag) {
-		case FDT_BEGIN_NODE:
-			const char *node_name = fdt_get_name(blob, nodeoffset, NULL);
-			if (node_name[0] == 'g' || node_name[0] == 'r'){
-				const char *reserve_size = fdt_getprop(blob, nodeoffset, "size", &len);
-				const char *hidden = fdt_getprop(blob, nodeoffset, "hidden", &len);
+	array_size = cJSON_GetArraySize(json_root);
+	for (int i = 0; i < array_size; i++){
+		cJSON *item = cJSON_GetArrayItem(json_root, i);
+		/*only matche the level 2*/
+		if(item->type == cJSON_Object){
 
-				if(node_name[0] == 'g' || hidden[0] == 't'){
-					char *ret = strpbrk(reserve_size, "KM");
-					if (ret[0] == 'K'){
-						strcpy(strnum, reserve_size);
-						token = strtok(strnum, "K");
-						get_size = simple_strtoul(token, NULL, 0);
-					}else if(ret[0] == 'M'){
-						strcpy(strnum, reserve_size);
-						token = strtok(strnum, "M");
-						get_size = simple_strtoul(token, NULL, 0);
-						get_size = get_size * 1024;
-					}else{
-						pr_err("not support size %s, should use KiB/MiB\n", reserve_size);
-						fastboot_fail("not support size, should use KiB/MiB", response);
-						return;
-					}
-					reserve_part_size += simple_strtoul(token, NULL, 0);
-					if (node_name[0] == 'g')/*if hidden, it need to save the start offset*/
+			const char *node_name = item->string;
+			const char *reserve_size = NULL;
+			const char *hidden = NULL;
+
+			if (!strncmp(node_name, "gpt", 3) || !strncmp(node_name, "reserve", 7)){
+				cJSON *cj_size = cJSON_GetObjectItem(item, "size");
+				if (cj_size && cj_size->type == cJSON_String)
+					reserve_size = cj_size->valuestring;
+				else
+					continue;
+
+				cJSON *cj_hidden = cJSON_GetObjectItem(item, "hidden");
+				if (cj_hidden && cj_hidden->type == cJSON_String)
+					hidden = cj_hidden->valuestring;
+				else
+					hidden = "false";
+
+				if(!strncmp(node_name, "gpt", 3) || hidden[0] == 't'){
+					get_size = transfer_string_to_ul(reserve_size);
+					reserve_part_size += get_size;
+					/*if hidden, it need to save the start offset*/
+					if (!strncmp(node_name, "gpt", 3))
 						*start_offset = (reserve_part_size * 1024);
 
 					debug("reserve_part_size:%d, *start_offset:%d\n", reserve_part_size, *start_offset);
-
-					break;
+					continue;
 				}else{
 					debug("not hidden part\n");
 				}
-
-			}else if (node_name[0] == 'm'){
-				debug("parse %s config, which should not be a gpt partion\n", node_name);
-				break;
-			}
-			const char *node_part = fdt_getprop(blob, nodeoffset, "partition", &len);
-			const char *node_size = fdt_getprop(blob, nodeoffset, "size", &len);
-			if (part_index == 0){
-				sprintf(fsbl_offset_start, "%dKiB", reserve_part_size);
-				sprintf(gpt_table, "name=%s,start=%s,size=%s;", node_part, fsbl_offset_start, node_size);
-			}
-			else{
-				sprintf(gpt_table, "%sname=%s,size=%s;", gpt_table, node_part, node_size);
 			}
 
-			part_index++;
-			break;
-		case FDT_END:
-			find_next_tag = false;
-			break;
+			const char *node_part = NULL;
+			const char *node_size = NULL;
+			cJSON *cj_partition = cJSON_GetObjectItem(item, "partition");
+			if (cj_partition && cj_partition->type == cJSON_String)
+				node_part = cj_partition->valuestring;
+			cJSON *cj_size = cJSON_GetObjectItem(item, "size");
+			if (cj_size && cj_size->type == cJSON_String)
+				node_size = cj_size->valuestring;
+
+			if (!strncmp(node_name, "mtd", 3)){
+				printf("parse mtd config, %sn\n", node_name);
+				sprintf(mtd_table, "%s%s(%s),", mtd_table, node_size, node_part);
+
+			}else{
+				if (part_index == 0){
+					sprintf(fsbl_offset_start, "%dKiB", reserve_part_size);
+					sprintf(gpt_table, "name=%s,start=%s,size=%s;", node_part, fsbl_offset_start, node_size);
+				}
+				else{
+					sprintf(gpt_table, "%sname=%s,size=%s;", gpt_table, node_part, node_size);
+				}
+				part_index++;
+			}
 		}
-		nodeoffset = nextoffset;
 	}
 
-	if (strlen(gpt_table) == 0) {
-		fastboot_fail("miss gpt table parameter", response);
-	} else {
-		sprintf(gpt_command, "gpt write mmc %x '%s'",
-			CONFIG_FASTBOOT_FLASH_MMC_DEV, gpt_table);
-		printf("cmd:%s\n", gpt_command);
-		if (run_command(gpt_command, 0))
-			fastboot_fail("write gpt fail", response);
-		else
-			fastboot_okay(gpt_command, response);
+	if (strlen(gpt_table) > 0) {
+		_write_gpt_partition(gpt_table, response);
+		goto free_cjson;
 	}
+	if (strlen(mtd_table) > 0){
+		printf("mtd table:%s\n", mtd_table);
+		_write_mtd_partitino(mtd_table, response);
+		goto free_cjson;
+	}
+
+	/*maybe there doesn't have gpt/mtd partition, should not return fail*/
+	fastboot_okay("parse gpt/mtd table okay", response);
+free_cjson:
+	cJSON_free(json_root);
 	return;
 }
 

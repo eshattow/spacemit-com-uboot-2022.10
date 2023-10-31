@@ -17,7 +17,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 /*recovery folder name*/
 #define RECOVERY_FOLDER "recovery"
-#define FLASH_CONFIG_NAME "flash_config"
+#define FLASH_CONFIG_NAME "flash_config.cfg"
 
 typedef enum{
 	DEVICE_MMC,

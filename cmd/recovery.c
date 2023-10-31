@@ -13,7 +13,6 @@
 #include <div64.h>
 #include <dm.h>
 #include <dm/uclass-internal.h>
-#include <fdt_support.h>
 #include <fs.h>
 #include <image.h>
 #include <malloc.h>
@@ -25,6 +24,7 @@
 #include <usb.h>
 #include "recovery.h"
 #include <fb_spacemit.h>
+#include <cJSON.h>
 
 static int dev_emmc_num = -1;
 static int dev_sdio_num = -1;
@@ -106,12 +106,10 @@ int check_mmc_exist_and_initialize(void)
 }
 
 static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
-			struct fdt_header *blob, int device_type,
-			struct flash_dev *fdev)
+			int device_type, struct flash_dev *fdev)
 {
 	int retval = RESULT_OK;
 
-	strcpy(load_str, simple_xtoa((ulong)blob));
 	switch (device_type) {
 	case DEVICE_MMC:
 		if (check_mmc_exist_and_initialize() != RESULT_OK) {
@@ -411,13 +409,8 @@ static int flash_gpt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	return RESULT_OK;
 }
 
-static int parse_fdt(struct flash_dev *fdev)
+static int parse_flash_config(struct flash_dev *fdev)
 {
-	char root[2] = "/";
-	int nodeoffset; /* node offset from libfdt */
-	int nextoffset; /* next node offset from libfdt */
-	int len = 0;	/* new length of the property */
-	uint32_t tag;
 	u32 part_index = 0;
 	u32 get_size = 0;
 	bool add_part_name = true;
@@ -425,77 +418,78 @@ static int parse_fdt(struct flash_dev *fdev)
 	char gpt_table[256] = {"\0"};
 	char fsbl_offset_start[36] = {"\0"} ;
 	u32 reserve_part_size = 0;
-	char strnum[10] = {"\0"};
-	char *token;
+	cJSON *json_root;
+	int array_size;
 
-	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0); /*use to save hex to string*/
-	struct fdt_header *blob = (struct fdt_header *)load_addr;
+	/*use to save hex to string*/
+	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
+	json_root = cJSON_Parse(load_addr);
+	if (!json_root){
+		printf("can not parse json, check your flash_config.cfg is json format or not\n");
+		return -1;
+	}
 
-	if (fdt_check_header(blob) || !fdt_valid(&blob)){
-		printf("not a valid fdt\n");
-		return RESULT_FAIL;
-	}
-	nodeoffset = fdt_path_offset(blob, root);
-	if (nodeoffset < 0) {
-		/*
-		 * Not found or something else bad happened.
-		 */
-		printf("libfdt fdt_path_offset() returned %s\n", fdt_strerror(nodeoffset));
-		return RESULT_FAIL;
-	}
-	fdt_next_tag(blob, nodeoffset, &nextoffset);
-	nodeoffset = nextoffset;
-	bool find_next_tag = true;
-	while (find_next_tag) {
-		tag = fdt_next_tag(blob, nodeoffset, &nextoffset);
-		switch (tag) {
-		case FDT_BEGIN_NODE:
-			const char *node_name = fdt_get_name(blob, nodeoffset, NULL);
+	array_size = cJSON_GetArraySize(json_root);
+	for (int i = 0; i < array_size; i++){
+		cJSON *item = cJSON_GetArrayItem(json_root, i);
+		/*only matche the level 2 item object*/
+		if(item->type == cJSON_Object){
+			const char *node_name = item->string;
 			add_part_name = true;
-			if (node_name[0] == 'g' || node_name[0] == 'r') {
-				const char *reserve_size = fdt_getprop(blob, nodeoffset, "size", &len);
-				const char *hidden = fdt_getprop(blob, nodeoffset, "hidden", &len);
+			const char *reserve_size = NULL;
+			const char *hidden = NULL;
+			if (!strncmp(node_name, "gpt", 3) || !strncmp(node_name, "reserve", 7)) {
+				cJSON *cj_size = cJSON_GetObjectItem(item, "size");
+				if (cj_size && cj_size->type == cJSON_String)
+					reserve_size = cj_size->valuestring;
+				else
+					continue;
+
+				cJSON *cj_hidden = cJSON_GetObjectItem(item, "hidden");
+				if (cj_hidden && cj_hidden->type == cJSON_String)
+					hidden = cj_hidden->valuestring;
+				else
+					hidden = "false";
+
 				/*dont want to add to gpt table now*/
 				add_part_name = false;
-				if(node_name[0] == 'g' || hidden[0] == 't'){
-					char *ret = strpbrk(reserve_size, "KM");
-					if (ret[0] == 'K'){
-						strcpy(strnum, reserve_size);
-						token = strtok(strnum, "K");
-						get_size = simple_strtoul(token, NULL, 0);
-					}else if(ret[0] == 'M'){
-						strcpy(strnum, reserve_size);
-						token = strtok(strnum, "M");
-						get_size = simple_strtoul(token, NULL, 0);
-						get_size = get_size * 1024;
-					}else{
-						pr_err("not support size %s, should use KiB/MiB\n", reserve_size);
-						return -1;
-					}
-					reserve_part_size += simple_strtoul(token, NULL, 0);
+				if(!strncmp(node_name, "gpt", 3) || hidden[0] == 't'){
+					get_size = transfer_string_to_ul(reserve_size);
+					reserve_part_size += get_size;
 					/*if hidden, it need to save the start offset*/
 					if (node_name[0] == 'g'){
 						fdev->gptinfo.gpt_start_offset = (reserve_part_size * 1024);
-						break;
+						continue;
 					}
-					printf("reserve_part_size:%d, *start_offset:%d\n", reserve_part_size, fdev->gptinfo.gpt_start_offset);
+					debug("reserve_part_size:%d, *start_offset:%d\n", reserve_part_size, fdev->gptinfo.gpt_start_offset);
 				}else{
 					debug("not hidden part\n");
 				}
-
 			}else if (node_name[0] == 'm'){
-				debug("parse %s config, which should not be a gpt partion\n", node_name);
-				break;
+				debug("parse mtd config, %sn\n", node_name);
+				continue;
 			}
 
-			const char *node_part = fdt_getprop(blob, nodeoffset, "partition", &len);
-			const char *node_file = fdt_getprop(blob, nodeoffset, "filename", &len);
-			const char *node_crc = fdt_getprop(blob, nodeoffset, "crc", &len);
-			const char *node_size = fdt_getprop(blob, nodeoffset, "size", &len);
+			const char *node_part = NULL;
+			const char *node_file = NULL;
+			const char *node_crc = NULL;
+			const char *node_size = NULL;
+			cJSON *cj_partition = cJSON_GetObjectItem(item, "partition");
+			if (cj_partition && cj_partition->type == cJSON_String)
+				node_part = cj_partition->valuestring;
+			cJSON *cj_filename = cJSON_GetObjectItem(item, "filename");
+			if (cj_filename && cj_filename->type == cJSON_String)
+				node_file = cj_filename->valuestring;
+			cJSON *cj_crc = cJSON_GetObjectItem(item, "crc");
+			if (cj_crc && cj_crc->type == cJSON_String)
+				node_crc = cj_crc->valuestring;
+			cJSON *cj_size = cJSON_GetObjectItem(item, "size");
+			if (cj_size && cj_size->type == cJSON_String)
+				node_size = cj_size->valuestring;
 
 			/*after scan the gpt and reser would save gpt info to a string*/
 			if (add_part_name){
-				printf("save gpt_table, gpt_table len:%ld\n", strlen(gpt_table));
+				debug("save gpt_table, gpt_table len:%ld\n", strlen(gpt_table));
 				if (strlen(gpt_table) == 0){
 					sprintf(fsbl_offset_start, "%dKiB", reserve_part_size);
 					sprintf(gpt_table, "name=%s,start=%s,size=%s;", node_part, fsbl_offset_start, node_size);
@@ -541,13 +535,7 @@ static int parse_fdt(struct flash_dev *fdev)
 				fdev->parts_info[part_index].file_name, \
 				fdev->parts_info[part_index].crc);
 			part_index++;
-			break;
-
-		case FDT_END:
-			find_next_tag = false;
-			break;
 		}
-		nodeoffset = nextoffset;
 	}
 	strcpy(fdev->gptinfo.gpt_table, gpt_table);
 	return 0;
@@ -559,7 +547,7 @@ static int load_recovery_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev,
 {
 	char load_str[13] = {"\0"};
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
-	struct fdt_header *blob = (struct fdt_header *)load_addr;
+	strcpy(load_str, simple_xtoa((ulong)load_addr));
 	int device_type, result;
 
 	if (argc < 2) {
@@ -577,7 +565,7 @@ static int load_recovery_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev,
 		return CMD_RET_USAGE;
 	}
 
-	result = load_from_device(cmdtp, load_str, blob, device_type, fdev);
+	result = load_from_device(cmdtp, load_str, device_type, fdev);
 
 	return result;
 }
@@ -618,9 +606,9 @@ static int do_recovery(struct cmd_tbl *cmdtp, int flag, int argc, char *const ar
 		return RESULT_FAIL;
 	}
 
-	/*Parse FDT and fill in relevant data structures*/
-	if (parse_fdt(fdev)) {
-		printf("Failed to parse FDT.\n");
+	/*Parse json file and fill in relevant data structures*/
+	if (parse_flash_config(fdev)) {
+		printf("Failed to parse flash config.\n");
 		recovery_show_result(fdev, RESULT_FAIL);
 		return RESULT_FAIL;
 	}

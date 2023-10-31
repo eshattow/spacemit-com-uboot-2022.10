@@ -41,4 +41,12 @@ int fastboot_mmc_flash_fsbl(u32 start_offset, void *download_buffer, u32 downloa
 int check_mmc_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t part_start_cnt,
 			ulong blksz, int image_size);
 
+/**
+ * @brief transfer the string of size 'KiB' or 'MiB' to u32 type.
+ * 
+ * @param reserve_size , the string of size 'xiB'
+ * @return int , return the transfer result.
+ */
+int transfer_string_to_ul(const char *reserve_size);
+
 #endif
