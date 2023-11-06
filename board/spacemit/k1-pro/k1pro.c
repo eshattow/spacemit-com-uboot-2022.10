@@ -34,7 +34,9 @@ int board_late_init(void)
 	ofnode chosen_node;
 	int ret;
 
+#ifndef CONFIG_K1_PRO_BOARD_QEMU
 	k1pro_gmac_init();
+#endif
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
 		debug("No chosen node found, can't get kernel start address\n");
