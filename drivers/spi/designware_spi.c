@@ -675,7 +675,8 @@ static int dw_spi_adjust_op_size(struct spi_slave *slave, struct spi_mem_op *op)
 	}
 
 	if (op->data.dir == SPI_MEM_DATA_IN) {
-		op->data.nbytes = priv->fifo_len;
+		if (op->data.nbytes > priv->fifo_len)
+			op->data.nbytes = priv->fifo_len;
 	} else {
 		op->data.nbytes = (priv->fifo_len - op_len);
 	}
