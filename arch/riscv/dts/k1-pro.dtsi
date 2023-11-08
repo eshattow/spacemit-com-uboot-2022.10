@@ -414,7 +414,7 @@
 			u-boot,dm-spl;
 			status = "okay";
 
-			flash@0 {
+			nor0 {
 				compatible = "jedec,spi-nor";
 				reg = <0>;
 				m25p,fast-read;
