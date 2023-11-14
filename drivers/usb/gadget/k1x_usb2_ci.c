@@ -185,6 +185,7 @@ static void mv_flush_qh(int ep_num)
 	const ulong end = start + 2 * sizeof(*head);
 
 	flush_dcache_range(start, end);
+	dmb();
 }
 
 /**
@@ -215,6 +216,7 @@ static void mv_flush_qtd(int ep_num)
 	const ulong end = start + 2 * ILIST_ENT_SZ;
 
 	flush_dcache_range(start, end);
+	dmb();
 }
 
 /**
@@ -236,10 +238,11 @@ static struct usb_request *
 mv_ep_alloc_request(struct usb_ep *ep, unsigned int gfp_flags)
 {
 	struct mv_ep *mv_ep = container_of(ep, struct mv_ep, ep);
-	int num;
+	int num = -1;
 	struct mv_req *mv_req;
 
-	num = mv_ep->desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+	if (mv_ep->desc)
+		num = mv_ep->desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 	if (num == 0 && controller.ep0_req)
 		return &controller.ep0_req->req;
 
@@ -260,9 +263,10 @@ static void mv_ep_free_request(struct usb_ep *ep, struct usb_request *req)
 {
 	struct mv_ep *mv_ep = container_of(ep, struct mv_ep, ep);
 	struct mv_req *mv_req = container_of(req, struct mv_req, req);
-	int num;
+	int num = -1;
 
-	num = mv_ep->desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+	if (mv_ep->desc)
+		num = mv_ep->desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 	if (num == 0) {
 		if (!controller.ep0_req)
 			return;
@@ -302,6 +306,7 @@ static int mv_ep_enable(struct usb_ep *ep,
 	num = desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 	in = (desc->bEndpointAddress & USB_DIR_IN) != 0;
 	mv_ep->desc = desc;
+	ep->desc = desc;
 
 	if (num) {
 		int max = get_unaligned_le16(&desc->wMaxPacketSize);
@@ -324,6 +329,7 @@ static int mv_ep_disable(struct usb_ep *ep)
 	struct mv_ep *mv_ep = container_of(ep, struct mv_ep, ep);
 
 	mv_ep->desc = NULL;
+	ep->desc = NULL;
 	return 0;
 }
 
@@ -473,6 +479,7 @@ static void mv_ep_submit_next_request(struct mv_ep *mv_ep)
 	 * by explicitly sending an extra zero-length packet.
 	 */
 	/*  IN    !a     !b                              !c */
+#if 0
 	if (in && len && !(len % mv_ep->ep.maxpacket) && mv_req->req.zero) {
 		/*
 		 * Each endpoint has 2 items allocated, even though typically
@@ -482,10 +489,11 @@ static void mv_ep_submit_next_request(struct mv_ep *mv_ep)
 		 * can use the other to transmit the extra zero-length packet.
 		 */
 		struct ept_queue_item *other_item = mv_get_qtd(num, 0);
-		item->next = (unsigned long)other_item;
+		item->next = (ulong)other_item;
 		item = other_item;
 		item->info = INFO_ACTIVE;
 	}
+#endif
 
 	item->next = TERMINATE;
 	item->info |= INFO_IOC;
@@ -495,6 +503,8 @@ static void mv_ep_submit_next_request(struct mv_ep *mv_ep)
 	DBG("ept%d %s queue len %x, req %p buffer %p\n",
 	    num, in ? "in" : "out", len, mv_req, mv_req->hw_buf);
 	mv_flush_qh(num);
+
+	udelay(10);
 
 	if (in)
 		bit = EPT_TX(num);
@@ -1059,16 +1069,15 @@ void usbphy_init(void)
 	reg32_modify(PMUA_USB_CLK_RES_CTRL, PMUA_USB_CLK_RES_CTRL_USB_AXI_RST, 0);
 	reg32_modify(PMUA_USB_CLK_RES_CTRL, 0, PMUA_USB_CLK_RES_CTRL_USB_AXI_RST);
 
-	udelay(50);
-	reg32_write(USB2_PHY_REG26, 0xbec4); //select 24M ref clock
-	udelay(150);
+	udelay(200);
+
 	loops = 200;
 	do {
 		temp = reg32_read(USB2_PHY_REG01);
 		if (temp & USB2_PLL_PLLREADY)
-		break;
+			break;
 		udelay(5);
-	} while(loops--);
+	} while(--loops);
 
 	if (loops == 0)
 		printf("Wait PHY_REG01[PLLREADY] timeout \n");
