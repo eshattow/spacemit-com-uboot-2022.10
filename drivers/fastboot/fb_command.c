@@ -136,12 +136,6 @@ static const struct {
 		.dispatch = oem_bootbus,
 	},
 #endif
-#ifdef CONFIG_SPACEMIT_RECOVER
-	[FASTBOOT_COMMAND_OEM_FSBL] =  {
-		.command = "oem flash_fsbl",
-		.dispatch = oem_flash_fsbl,
-	},
-#endif
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
 	[FASTBOOT_COMMAND_UCMD] = {
 		.command = "UCmd",

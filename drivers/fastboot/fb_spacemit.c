@@ -27,7 +27,7 @@
 
 static __maybe_unused void _write_gpt_partition(char gpt_table[256], char *response)
 {
-	char gpt_command[300] = {"\0"};
+	__maybe_unused char gpt_command[300] = {"\0"};
 
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
 		sprintf(gpt_command, "gpt write mmc %x '%s'",
