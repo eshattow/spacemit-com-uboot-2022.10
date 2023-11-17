@@ -219,4 +219,11 @@ config RESET_SPACEMIT
 	help
 	  Support for SPACEMIT's K1-PRO Reset system. Basic Assert/Deassert
 	  is supported.
+
+config RESET_SPACEMIT_K1X
+	bool "Support for SPACEMIT's K1X Reset driver"
+	depends on DM_RESET
+	help
+	  Support for SPACEMIT's K1X Reset system. Basic Assert/Deassert
+	  is supported.
 endmenu
