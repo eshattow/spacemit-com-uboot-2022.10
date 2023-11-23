@@ -77,6 +77,11 @@ config K1_X_BOARD_FPGA
 	help
 	  k1-x board is fpga.
 
+config K1_X_BOARD_ASIC
+	bool "k1-x board asic"
+	help
+	  k1-x board is asic.
+
 config K1_X_BOARD_SIMULATION
 	bool "k1-x board simulation"
 	help
