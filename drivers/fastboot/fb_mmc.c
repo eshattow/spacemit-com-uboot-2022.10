@@ -510,11 +510,35 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 {
 	struct blk_desc *dev_desc;
 	struct disk_partition info = {0};
-#ifdef CONFIG_SPACEMIT_RECOVER
-	static u32 __maybe_unused start_offset = 0;
+#ifdef CONFIG_SPACEMIT_FLASH
+	static struct flash_dev *fdev = NULL;
+	u32 __maybe_unused fsbl_offset = 0;
 	/*save crc value to compare after flash image*/
 	u32 crc_val = 0;
 	crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
+
+	if (fdev == NULL){
+		fdev = malloc(sizeof(struct flash_dev));
+		if (!fdev) {
+			printf("Memory allocation failed!\n");
+		}
+		memset(fdev, 0, sizeof(struct flash_dev));
+		fdev->gptinfo.fastboot_flash_gpt = false;
+		/*would realloc the size while parsing the partition table*/
+		fdev->gptinfo.gpt_table = malloc(10);
+		fdev->mtd_table = malloc(10);
+		memset(fdev->gptinfo.gpt_table, '\0', 10);
+		memset(fdev->mtd_table, '\0', 10);
+		printf("init fdev success\n");
+	}
+
+	/*flash env*/
+	if (strcmp(cmd, "env") == 0) {
+		printf("flash env \n");
+		fastboot_oem_flash_env(cmd, fastboot_buf_addr, download_bytes,
+								response, fdev);
+		return;
+	}
 #endif
 
 #ifdef CONFIG_FASTBOOT_MMC_BOOT_SUPPORT
@@ -537,9 +561,9 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 #if CONFIG_IS_ENABLED(EFI_PARTITION)
 	if (strcmp(cmd, CONFIG_FASTBOOT_GPT_NAME) == 0) {
 
-#ifdef CONFIG_SPACEMIT_RECOVER
+#ifdef CONFIG_SPACEMIT_FLASH
 		fastboot_oem_flash_gpt(cmd, fastboot_buf_addr, download_bytes,
-								response, &start_offset);
+								response, fdev);
 		return;
 #endif
 
@@ -618,27 +642,17 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 
 	if (!info.name[0] &&
 	    fastboot_mmc_get_part_info(cmd, &dev_desc, &info, response) < 0)
-#ifdef CONFIG_SPACEMIT_RECOVER
+#ifdef CONFIG_SPACEMIT_FLASH
 		{
 			if (strncmp(cmd, "fsbl", 4) == 0){
-				char *cmd_parameter;
-				cmd_parameter = (char *)cmd;
-				strsep(&cmd_parameter, ":");
-				printf("wrtie raw fsbl, %d, cmd_parameter:%s\n", start_offset, cmd_parameter);
-				if (start_offset == 0){
-					fastboot_fail("must flash gpt before flash fsbl", response);
-					return;
-				}
-				u32 offset = start_offset;
-				offset += simple_strtoul(cmd_parameter, NULL, 0);
-
-				if (offset % info.blksz){
-					fastboot_fail("offset need to be align 0x200", response);
-					return;
+				if (strchr(cmd, '0')){
+					fsbl_offset = FLASH_FSBL0_OFFSET;
+				}else{
+					fsbl_offset = FLASH_FSBL1_OFFSET;
 				}
 
-				if (fastboot_mmc_flash_fsbl(offset, fastboot_buf_addr, download_bytes) ||
-					check_mmc_image_crc(dev_desc, crc_val, offset / info.blksz, info.blksz, download_bytes))
+				if (fastboot_mmc_flash_offset(fsbl_offset, fastboot_buf_addr, download_bytes) ||
+					check_mmc_image_crc(dev_desc, crc_val, fsbl_offset / info.blksz, info.blksz, download_bytes))
 					fastboot_fail("flash fsbl fail", response);
 				else
 					fastboot_okay(NULL, response);
@@ -674,11 +688,11 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 	} else {
 		write_raw_image(dev_desc, &info, cmd, download_buffer,
 				download_bytes, response);
-#ifdef CONFIG_SPACEMIT_RECOVER
+#ifdef CONFIG_SPACEMIT_FLASH
 		/*if download and flash div to many time, that the crc is not correct*/
 		printf("write_raw_image, \n");
 		if (check_mmc_image_crc(dev_desc, crc_val, info.start, info.blksz, download_bytes))
-			fastboot_fail("flash fsbl fail", response);
+			fastboot_fail("compare crc fail", response);
 #endif
 	}
 }

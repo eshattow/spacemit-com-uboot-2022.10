@@ -34,4 +34,5 @@ obj-$(CONFIG_$(SPL_TPL_)SPI_LOAD) += spl_spi.o
 obj-$(CONFIG_$(SPL_TPL_)RAM_SUPPORT) += spl_ram.o
 obj-$(CONFIG_$(SPL_TPL_)USB_SDP_SUPPORT) += spl_sdp.o
 obj-$(CONFIG_$(SPL_TPL_)FASTBOOT_LOAD) += spl_fastboot.o
+obj-$(CONFIG_$(SPL_TPL_)SPI_LOAD) += spl_mtd.o
 endif

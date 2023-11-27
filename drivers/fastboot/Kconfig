@@ -72,7 +72,7 @@ config FASTBOOT_USB_DEV
 config FASTBOOT_FLASH
 	bool "Enable FASTBOOT FLASH command"
 	default y if ARCH_SUNXI || ARCH_ROCKCHIP
-	depends on MMC || (MTD_RAW_NAND && CMD_MTDPARTS)
+	depends on MMC || (MTD_RAW_NAND && CMD_MTDPARTS) || MTD
 	select IMAGE_SPARSE
 	help
 	  The fastboot protocol includes a "flash" command for writing
@@ -99,6 +99,10 @@ config FASTBOOT_FLASH_NAND
 	bool "FASTBOOT on NAND"
 	depends on MTD_RAW_NAND && CMD_MTDPARTS
 
+config FASTBOOT_FLASH_MTD
+	bool "FASTBOOT on MTD"
+	depends on MTD
+
 endchoice
 
 config FASTBOOT_FLASH_MMC_DEV
@@ -118,6 +122,27 @@ config FASTBOOT_FLASH_NAND_TRIMFFS
 	help
 	  When flashing NAND enable the DROP_FFS flag to drop trailing all-0xff
 	  pages.
+
+config FASTBOOT_SUPPORT_BLOCK_DEV
+	bool "Support blk device such as mmc/nvme/usb/sata"
+	depends on FASTBOOT_FLASH_MTD
+	help
+	  If support blk dev on mtd flash, it should choice an block device such
+	  as mmc/nvme/usb/sata and combine to the boot falash.
+
+config FASTBOOT_SUPPORT_BLOCK_DEV_NAME
+	string "Target name for block device"
+	depends on FASTBOOT_SUPPORT_BLOCK_DEV
+	default "nvme"
+	help
+	  The block device name, such as mmc/nvme/usb/sata
+
+config FASTBOOT_SUPPORT_BLOCK_DEV_NUM
+	int "The block device number"
+	depends on FASTBOOT_SUPPORT_BLOCK_DEV
+	default 0
+	help
+	  The block device number.
 
 config FASTBOOT_MMC_BOOT_SUPPORT
 	bool "Enable EMMC_BOOT flash/erase"
