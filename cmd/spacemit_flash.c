@@ -22,7 +22,6 @@
 #include <part.h>
 #include <u-boot/crc.h>
 #include <usb.h>
-#include "recovery.h"
 #include <fb_spacemit.h>
 #include <cJSON.h>
 
@@ -58,6 +57,8 @@ static void free_flash_dev(struct flash_dev *fdev)
 			break;
 		}
 	}
+	free(fdev->gptinfo.gpt_table);
+	free(fdev->mtd_table);
 	free(fdev);
 }
 
@@ -140,6 +141,7 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 			break;
 		}
 		usb_init();
+#ifdef CONFIG_USB_STORAGE
 		int device_number = usb_stor_scan(1);
 		if (device_number < 0) {
 			retval = RESULT_FAIL;
@@ -147,6 +149,9 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 		}
 		fdev->dev_str = strdup(simple_itoa((ulong)device_number));
 		fdev->device_name = strdup("usb");
+#else
+		retval = RESULT_FAIL;
+#endif
 		break;
 
 	case DEVICE_NET:
@@ -304,7 +309,11 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	for (int i = 0; i < MAX_PARTITION_NUM; i++) {
 		char *part_name = fdev->parts_info[i].part_name;
 		char *file_name = fdev->parts_info[i].file_name;
-		u32 crc_value = fdev->parts_info[i].crc;
+		/*
+			TODO: need to caculate crc while load to ram.
+			would not get crc value from partition.json
+		*/
+		u32 crc_value = 0;
 		unsigned long time_start_flash = get_timer(0);
 
 		if (fdev->parts_info[i].part_name == NULL) {
@@ -349,7 +358,7 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 				}
 
 				printf("write fsbl to %x, info.start:%lx\n", f_offset, info.start);
-				fastboot_mmc_flash_fsbl(f_offset, load_addr, image_size);
+				fastboot_mmc_flash_offset(f_offset, load_addr, image_size);
 				/*has flash fsbl, */
 				div_times = 0;
 			}else{
@@ -411,134 +420,8 @@ static int flash_gpt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 
 static int parse_flash_config(struct flash_dev *fdev)
 {
-	u32 part_index = 0;
-	u32 get_size = 0;
-	bool add_part_name = true;
-
-	char gpt_table[256] = {"\0"};
-	char fsbl_offset_start[36] = {"\0"} ;
-	u32 reserve_part_size = 0;
-	cJSON *json_root;
-	int array_size;
-
-	/*use to save hex to string*/
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
-	json_root = cJSON_Parse(load_addr);
-	if (!json_root){
-		printf("can not parse json, check your flash_config.cfg is json format or not\n");
-		return -1;
-	}
-
-	array_size = cJSON_GetArraySize(json_root);
-	for (int i = 0; i < array_size; i++){
-		cJSON *item = cJSON_GetArrayItem(json_root, i);
-		/*only matche the level 2 item object*/
-		if(item->type == cJSON_Object){
-			const char *node_name = item->string;
-			add_part_name = true;
-			const char *reserve_size = NULL;
-			const char *hidden = NULL;
-			if (!strncmp(node_name, "gpt", 3) || !strncmp(node_name, "reserve", 7)) {
-				cJSON *cj_size = cJSON_GetObjectItem(item, "size");
-				if (cj_size && cj_size->type == cJSON_String)
-					reserve_size = cj_size->valuestring;
-				else
-					continue;
-
-				cJSON *cj_hidden = cJSON_GetObjectItem(item, "hidden");
-				if (cj_hidden && cj_hidden->type == cJSON_String)
-					hidden = cj_hidden->valuestring;
-				else
-					hidden = "false";
-
-				/*dont want to add to gpt table now*/
-				add_part_name = false;
-				if(!strncmp(node_name, "gpt", 3) || hidden[0] == 't'){
-					get_size = transfer_string_to_ul(reserve_size);
-					reserve_part_size += get_size;
-					/*if hidden, it need to save the start offset*/
-					if (node_name[0] == 'g'){
-						fdev->gptinfo.gpt_start_offset = (reserve_part_size * 1024);
-						continue;
-					}
-					debug("reserve_part_size:%d, *start_offset:%d\n", reserve_part_size, fdev->gptinfo.gpt_start_offset);
-				}else{
-					debug("not hidden part\n");
-				}
-			}else if (node_name[0] == 'm'){
-				debug("parse mtd config, %sn\n", node_name);
-				continue;
-			}
-
-			const char *node_part = NULL;
-			const char *node_file = NULL;
-			const char *node_crc = NULL;
-			const char *node_size = NULL;
-			cJSON *cj_partition = cJSON_GetObjectItem(item, "partition");
-			if (cj_partition && cj_partition->type == cJSON_String)
-				node_part = cj_partition->valuestring;
-			cJSON *cj_filename = cJSON_GetObjectItem(item, "filename");
-			if (cj_filename && cj_filename->type == cJSON_String)
-				node_file = cj_filename->valuestring;
-			cJSON *cj_crc = cJSON_GetObjectItem(item, "crc");
-			if (cj_crc && cj_crc->type == cJSON_String)
-				node_crc = cj_crc->valuestring;
-			cJSON *cj_size = cJSON_GetObjectItem(item, "size");
-			if (cj_size && cj_size->type == cJSON_String)
-				node_size = cj_size->valuestring;
-
-			/*after scan the gpt and reser would save gpt info to a string*/
-			if (add_part_name){
-				debug("save gpt_table, gpt_table len:%ld\n", strlen(gpt_table));
-				if (strlen(gpt_table) == 0){
-					sprintf(fsbl_offset_start, "%dKiB", reserve_part_size);
-					sprintf(gpt_table, "name=%s,start=%s,size=%s;", node_part, fsbl_offset_start, node_size);
-				}
-				else{
-					sprintf(gpt_table, "%sname=%s,size=%s;", gpt_table, node_part, node_size);
-				}
-			}
-
-			/*after finish recovery, it would free the malloc paramenter at func recovery_show_result*/
-			fdev->parts_info[part_index].part_name = malloc(strlen(node_part));
-			if (!fdev->parts_info[part_index].part_name){
-				printf("malloc part_name fail\n");
-				return RESULT_FAIL;
-			}
-			strcpy(fdev->parts_info[part_index].part_name, node_part);
-
-			fdev->parts_info[part_index].size = malloc(strlen(node_size) + 0x2000);
-			if (!fdev->parts_info[part_index].size){
-				printf("malloc size fail\n");
-				return RESULT_FAIL;
-			}
-			strcpy(fdev->parts_info[part_index].size, node_size);
-
-			if (node_file == NULL){
-				printf("not set file name, set to null\n");
-				fdev->parts_info[part_index].file_name = NULL;
-			}else{
-				printf("molloc len:%ld\n", strlen(node_file) + strlen(RECOVERY_FOLDER) + 2);
-				fdev->parts_info[part_index].file_name = malloc(strlen(node_file) + strlen(RECOVERY_FOLDER) + 2);
-				if (!fdev->parts_info[part_index].file_name){
-					printf("malloc file_name fail\n");
-					return RESULT_FAIL;
-				}
-				strcpy(fdev->parts_info[part_index].file_name, RECOVERY_FOLDER);
-				strcat(fdev->parts_info[part_index].file_name, "/");
-				strcat(fdev->parts_info[part_index].file_name, node_file);
-			}
-
-			fdev->parts_info[part_index].crc = simple_strtoul(node_crc, NULL, 0);
-			debug("fdt_get_name:%s, %s, %s, %x\n", node_name, \
-				fdev->parts_info[part_index].part_name, \
-				fdev->parts_info[part_index].file_name, \
-				fdev->parts_info[part_index].crc);
-			part_index++;
-		}
-	}
-	strcpy(fdev->gptinfo.gpt_table, gpt_table);
-	return 0;
+	return _parse_flash_config(fdev, load_addr);
 }
 
 /*Attempt to load recovery files from all possible sources*/
@@ -584,7 +467,7 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 	return RESULT_OK;
 }
 
-static int do_recovery(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+static int do_flash_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	printf("RECOVERY_LOAD_IMG_ADDR:%lx, RECOVERY_LOAD_IMG_SIZE:%llx\n", RECOVERY_LOAD_IMG_ADDR, RECOVERY_LOAD_IMG_SIZE);
 	struct flash_dev *fdev;
@@ -595,6 +478,10 @@ static int do_recovery(struct cmd_tbl *cmdtp, int flag, int argc, char *const ar
 		printf("Memory allocation failed!\n");
 		return RESULT_FAIL;
 	}
+	/*would realloc the size*/
+	fdev->gptinfo.gpt_table = malloc(1);
+	fdev->mtd_table = malloc(1);
+
 	memset(fdev, 0, sizeof(struct flash_dev));
 
 	unsigned long time_start_flash = get_timer(0);
@@ -627,7 +514,7 @@ static int do_recovery(struct cmd_tbl *cmdtp, int flag, int argc, char *const ar
 }
 
 U_BOOT_CMD(
-	recovery, 2, 1, do_recovery,
+	spacemit_flashing, 2, 1, do_flash_image,
 	"flash image from specified source",
 	"<source>\n"
 	"    - <source>: mmc | usb | net\n"

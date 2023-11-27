@@ -2628,11 +2628,11 @@ config MMC_SPEED_MODE_SET
 
 menu "spacemit commands"
 
-config SPACEMIT_RECOVER
-	bool "enable spacemit recovery command"
+config SPACEMIT_FLASH
+	bool "enable spacemit flash behavior"
 	default n
 	help
-	  enable spacemit recovery command, use for recovery function.
+	  enable spacemit flash behavior, use for flashing function.
 
 config SPL_FASTBOOT
 	bool "Enable SPL Fastboot Mode"
