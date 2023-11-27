@@ -398,6 +398,11 @@ static int env_mmc_load(void)
 	int dev = mmc_get_env_dev();
 	const char *errmsg;
 	env_t *ep = NULL;
+#if CONFIG_IS_ENABLED(DM_MMC)
+	ret = mmc_init_device(dev);
+#else
+	ret = mmc_initialize(NULL);
+#endif /* DM_MMC */
 
 	mmc = find_mmc_device(dev);
 

@@ -118,6 +118,7 @@
 		#address-cells = <0x2>;
 		#size-cells = <0x2>;
 		ranges;
+		u-boot,dm-spl;
 	};
 
 	soc {
@@ -242,6 +243,7 @@
 			interrupt-parent = <&intc>;
 			interrupts = <99>;
 			sdh-pmuap-reg = <0xd4282854>;
+			u-boot,dm-spl;
 			status = "disabled";
 		};
 
@@ -260,6 +262,7 @@
 			interrupt-parent = <&intc>;
 			interrupts = <101>;
 			sdh-pmuap-reg = <0xd42828e0>;
+			u-boot,dm-spl;
 			status = "disabled";
 		};
 
