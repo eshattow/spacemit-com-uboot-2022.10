@@ -25,6 +25,31 @@
 
 #define K1X_SPL_BOOT_LOAD_ADDR      (0x20200000)
 
+/*
+ use (ram_base+4MB offset) as the address to loading image.
+ use ram_size-32MB as the max size to loading image, if
+ (ram_size-32MB) more than 500MB, set load image size as
+ 500MB.
+*/
+#define RECOVERY_RAM_SIZE (gd->ram_size - 0x2000000)
+#define RECOVERY_LOAD_IMG_SIZE_MAX (RECOVERY_RAM_SIZE > 0x1f400000 ? 0x1f400000 : RECOVERY_RAM_SIZE)
+#define RECOVERY_LOAD_IMG_ADDR (gd->ram_base + 0x400000)
+#define RECOVERY_LOAD_IMG_SIZE (RECOVERY_LOAD_IMG_SIZE_MAX)
+
+/* boot mode configs */
+#define BOOT_DEV_FLAG_REG (0xD4282D10)
+#define BOOT_PIN_SELECT (0xD4282c20)
+#define USB_DOWNLOAD_FLAG (0x55a)
+
+#define SPL_BOOT_MODE_EMMC (0x0)
+#define SPL_BOOT_MODE_NAND (0x1)
+#define SPL_BOOT_MODE_NOR  (0x2)
+#define SPL_BOOT_MODE_SD   (0x3)
+
+#define BOOTFS_NAME ("bootfs")
+
+
+
 /* Environment options */
 
 #define BOOT_TARGET_DEVICES(func) \

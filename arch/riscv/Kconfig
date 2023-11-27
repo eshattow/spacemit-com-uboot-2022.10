@@ -43,7 +43,7 @@ endchoice
 
 config NOT_RELOC_TEXT_SECTION
 	bool "Don't relocate text section for u-boot debug!!!"
-	depends on TARGET_SPACEMIT_K1PRO
+	depends on TARGET_SPACEMIT_K1PRO || TARGET_SPACEMIT_K1X
 	default n
 	help
 	  Attention: this feture is just used for u-boot debug,
