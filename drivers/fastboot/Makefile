@@ -6,3 +6,4 @@ obj-y += fb_command.o
 obj-$(CONFIG_$(SPL_)FASTBOOT_FLASH_MMC) += fb_mmc.o
 obj-$(CONFIG_$(SPL_)FASTBOOT_FLASH_NAND) += fb_nand.o
 obj-$(CONFIG_$(SPL_)SPACEMIT_FLASH) += fb_spacemit.o
+obj-$(CONFIG_$(SPL_)FASTBOOT_FLASH_MTD) += fb_mtd.o

@@ -9,6 +9,7 @@
 #include <fastboot-internal.h>
 #include <fb_mmc.h>
 #include <fb_nand.h>
+#include <fb_mtd.h>
 #include <fs.h>
 #include <part.h>
 #include <version.h>
@@ -25,6 +26,8 @@ static void getvar_version_baseband(char *var_parameter, char *response);
 static void getvar_product(char *var_parameter, char *response);
 static void getvar_platform(char *var_parameter, char *response);
 static void getvar_current_slot(char *var_parameter, char *response);
+static void getvar_mtd_size(char *var_parameter, char *response);
+static void getvar_blk_size(char *var_parameter, char *response);
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void getvar_has_slot(char *var_parameter, char *response);
 #endif
@@ -67,6 +70,12 @@ static const struct {
 	}, {
 		.variable = "platform",
 		.dispatch = getvar_platform
+	}, {
+		.variable = "mtd-size",
+		.dispatch = getvar_mtd_size
+	}, {
+		.variable = "blk-size",
+		.dispatch = getvar_blk_size
 	}, {
 		.variable = "current-slot",
 		.dispatch = getvar_current_slot
@@ -123,6 +132,10 @@ static int getvar_get_part_info(const char *part_name, char *response,
 	r = fastboot_nand_get_part_info(part_name, &part_info, response);
 	if (r >= 0 && size)
 		*size = part_info->size;
+# elif CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD)
+	printf("get mtd partition, part_name:%s\n", part_name);
+	r = 0;
+	//TODO:return mtd part info
 # else
 	fastboot_fail("this storage is not supported in bootloader", response);
 	r = -ENODEV;
@@ -199,6 +212,18 @@ static void getvar_current_slot(char *var_parameter, char *response)
 {
 	/* A/B not implemented, for now always return "a" */
 	fastboot_okay("a", response);
+}
+
+static void getvar_mtd_size(char *var_parameter, char *response)
+{
+	/* return mtd size, if not dev exist, return NULL*/
+	fastboot_okay("NULL", response);
+}
+
+static void getvar_blk_size(char *var_parameter, char *response)
+{
+	/* return blk device size, if not dev exist, return NULL */
+	fastboot_okay("universal", response);
 }
 
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
