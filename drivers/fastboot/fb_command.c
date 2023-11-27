@@ -10,6 +10,7 @@
 #include <fastboot-internal.h>
 #include <fb_mmc.h>
 #include <fb_nand.h>
+#include <fb_mtd.h>
 #include <part.h>
 #include <stdlib.h>
 #include <spl.h>
@@ -33,10 +34,7 @@ static u32 fastboot_bytes_expected;
 static void okay(char *, char *);
 static void getvar(char *, char *);
 static void download(char *, char *);
-#if defined(CONFIG_SPL_FASTBOOT) && defined(CONFIG_SPL_BUILD)
-static void spl_cmd_continue(char *, char *);
-#endif /*defined(CONFIG_SPL_FASTBOOT) && defined(CONFIG_SPL_BUILD)*/
-void __noreturn jump_to_image_no_args(struct spl_image_info *spl_image);
+
 #if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void flash(char *, char *);
@@ -91,11 +89,7 @@ static const struct {
 #endif /*!defined(CONFIG_SPL_BUILD)*/
 	[FASTBOOT_COMMAND_CONTINUE] =  {
 		.command = "continue",
-	#if defined(CONFIG_SPL_FASTBOOT) && defined(CONFIG_SPL_BUILD)
-		.dispatch = spl_cmd_continue
-	#else
 		.dispatch = okay
-	#endif
 	},
 #if !defined(CONFIG_SPL_BUILD)
 	[FASTBOOT_COMMAND_REBOOT] =  {
@@ -196,27 +190,6 @@ static void okay(char *cmd_parameter, char *response)
 {
 	fastboot_okay(NULL, response);
 }
-
-#if defined(CONFIG_SPL_FASTBOOT) && defined(CONFIG_SPL_BUILD)
-static void spl_cmd_continue(char *cmd_parameter, char *response)
-{
-	printf("Entering spl_cmd_continue\n");
-	okay(NULL, response);
-
-	struct spl_image_info spl_image;
-	struct spl_boot_device bootdev;
-
-	bootdev.boot_device = BOOT_DEVICE_RAM;
-	int ret = load_image_from_ram(&spl_image, &bootdev);
-	if (ret) {
-		printf("Failed to load image from RAM: %d\n", ret);
-		return;
-	}
-
-	printf("About to jump to image with entry_point: 0x%lx\n", spl_image.entry_point);
-	spl_invoke_opensbi(&spl_image);
-}
-#endif
 
 /**
  * getvar() - Read a config/version variable
@@ -357,12 +330,10 @@ static void flash(char *cmd_parameter, char *response)
 	fastboot_nand_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
 				  response);
 #endif
-
-#ifdef CONFIG_SPACEMIT_RECOVER
-	printf("flash image to mtd part and gpt part\n");
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD)
+	fastboot_mtd_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
+				  response);
 #endif
-
-
 }
 
 /**

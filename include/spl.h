@@ -248,9 +248,6 @@ struct spl_image_info {
 #endif
 };
 
-int load_image_from_ram(struct spl_image_info *, struct spl_boot_device *);
-int do_fastboot_spl(char *const[], int, uintptr_t, size_t);
-
 /**
  * Information required to load data from a device
  *

@@ -216,8 +216,6 @@ obj-$(CONFIG_X86) += x86/
 obj-$(CONFIG_ARCH_MVEBU) += mvebu/
 endif # !CONFIG_SPL_BUILD
 
-obj-$(CONFIG_SPL_FASTBOOT) += fastboot.o
-
 obj-$(CONFIG_$(SPL_)CMD_TLV_EEPROM) += tlv_eeprom.o
 
 # core command
