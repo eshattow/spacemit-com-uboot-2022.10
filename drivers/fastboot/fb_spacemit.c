@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2023,  chris.huang<chris.huang@spacemit.com>
+ * Copyright (c) 2023 Spacemit, Inc
  */
 
 #include <asm/byteorder.h>
@@ -55,6 +55,71 @@ static int _write_gpt_partition(char gpt_table[256], char *response)
 	return 0;
 }
 
+static int _update_partinfo_to_env(void *download_buffer, u32 download_bytes, char *response,
+								 struct flash_dev *fdev)
+{
+	char *gpt_table_str = NULL;
+	char *mtd_table_str = NULL;
+	u32 boot_pin = spl_boot_device();
+	char cmdbuf[32];
+	memset(cmdbuf, '\0', 32);
+
+	if (strlen(fdev->mtd_table) > 0){
+		mtd_table_str = malloc(strlen(fdev->mtd_table)+32);
+
+		if (mtd_table_str == NULL){
+			fastboot_fail("updata env fail", response);
+			return -1;
+		}
+		sprintf(mtd_table_str, "env set -f mtdparts 'spi-dev:%s'", fdev->mtd_table);
+
+		run_command(mtd_table_str, 0);
+		run_command("env set -f mtdids 'nor0=spi-dev'", 0);
+		/*
+		TODO:
+			add mtdparts/mtdids, mtdparts=spi-dev:xxx, mtdids=nor0=spi-dev.
+			need to get nor/nand name.
+		*/
+	}
+
+	if (strlen(fdev->gptinfo.gpt_table) > 0){
+		gpt_table_str = malloc(strlen(fdev->gptinfo.gpt_table)+32);
+		if (gpt_table_str == NULL){
+			fastboot_fail("updata env fail", response);
+			return -1;
+		}
+
+		sprintf(gpt_table_str, "env set -f partitions '%s'", fdev->gptinfo.gpt_table);
+		run_command(gpt_table_str, 0);
+	}
+
+	memset(cmdbuf, '\0', 32);
+	sprintf(cmdbuf, "env export -c -s 0x%lx 0x%lx", (ulong)CONFIG_ENV_SIZE, (ulong)download_buffer);
+	if (run_command(cmdbuf, 0)){
+		fastboot_fail("Cannot import env.bin", response);
+		return -1;
+	}
+
+	switch(boot_pin){
+	case BOOT_DEVICE_MMC2:
+	case BOOT_DEVICE_MMC1:
+		/*write to emmc default offset*/
+		printf("write to mmc offset:%lx\n", (ulong)FLASH_ENV_OFFSET_MMC);
+		//maybe it could just use env save command
+		fastboot_mmc_flash_offset((u32)FLASH_ENV_OFFSET_MMC, download_buffer, (u32)CONFIG_ENV_SIZE);
+		break;
+	case BOOT_DEVICE_NOR:
+		/*write to nor offset*/
+		break;
+	case BOOT_DEVICE_NAND:
+		/*write to nand offset*/
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
 static int _write_mtd_partition(char mtd_table[128], char *response)
 {
 #ifdef CONFIG_MTD
@@ -92,7 +157,7 @@ static int _write_mtd_partition(char mtd_table[128], char *response)
 
 /**
  * @brief transfer the string of size 'K' or 'M' to u32 type.
- * 
+ *
  * @param reserve_size , the string of size
  * @return int , return the transfer result.
  */
@@ -102,7 +167,6 @@ int transfer_string_to_ul(const char *reserve_size)
 	char ch[2];
 	char strnum[10] = {"\0"};
 	u32 get_size = 0;
-	
 	if (reserve_size == NULL || strlen(reserve_size) == 0)
 		return 0;
 
@@ -111,6 +175,10 @@ int transfer_string_to_ul(const char *reserve_size)
 	}
 
 	ret = strpbrk(reserve_size, "KMG");
+	if (ret == NULL){
+		printf("can not get char\n");
+		return 0;
+	}
 	strncpy(ch, ret, 1);
 	if (ch[0] == 'K' || ch[0] == 'M' || ch[0] == 'G'){
 		strcpy(strnum, reserve_size);
@@ -134,16 +202,14 @@ int transfer_string_to_ul(const char *reserve_size)
 
 /**
  * @brief parse the flash_config and save partition info
- * 
+ *
  * @param fdev , struct flash_dev
  * @return u32 , return 0 if parse config success.
  */
 int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 {
 	u32 part_index = 0;
-
 	bool parse_mtd_partition = false;
-
 	cJSON *json_root;
 
 	int result = 0;
@@ -188,6 +254,10 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 				node_part = cj_name->valuestring;
 			else
 				node_part = "";
+			if (strlen(node_part) > 0 && !strncmp("bootinfo", node_part, 8)){
+				printf("boot info would not add as partitino\n");
+				continue;
+			}
 
 			cJSON *cj_filename = cJSON_GetObjectItem(arraypart, "image");
 			if (cj_filename && cj_filename->type == cJSON_String)
@@ -209,6 +279,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 
 			/*make sure that offset would not over than previous size and offset*/
 			int off = transfer_string_to_ul(node_offset);
+
 			if (off > 0 && off < combine_size){
 				printf("offset must larger then previous size and offset\n");
 				return -5;
@@ -221,7 +292,12 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 				printf("realloc combine_str fail\n");
 				return -1;
 			}
-			combine_size += off;
+
+			/*if next part has define offset, use it offset, or it would caculate front part offset and size*/
+			if (off == 0)
+				combine_size += off;
+			else
+				combine_size = off;
 
 			if (parse_mtd_partition){
 				/*parse mtd partition*/
@@ -247,12 +323,13 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			}
 			strcpy(fdev->parts_info[part_index].part_name, node_part);
 
-			fdev->parts_info[part_index].size = malloc(strlen(node_size) + 0x2000);
+			fdev->parts_info[part_index].size = malloc(strlen(node_size));
 			if (!fdev->parts_info[part_index].size){
 				printf("malloc size fail\n");
 				result = RESULT_FAIL;
 				goto free_cjson;
 			}
+
 			strcpy(fdev->parts_info[part_index].size, node_size);
 
 			if (node_file == NULL){
@@ -326,6 +403,11 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
 	if (strlen(fdev->mtd_table) > 0)
 		_write_mtd_partition(fdev->mtd_table, response);
 
+
+	/*set partition to env*/
+	if (_update_partinfo_to_env(download_buffer, download_bytes, response, fdev))
+		return;
+
 	/*maybe there doesn't have gpt/mtd partition, should not return fail*/
 	fastboot_okay("parse gpt/mtd table okay", response);
 	return;
@@ -333,76 +415,32 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
 
 /**
  * @brief flash env to reserve partition.
- * 
+ *
  * @param cmd env
  * @param download_buffer load env.bin to addr
  * @param download_bytes env.bin size
- * @param response 
- * @param fdev 
+ * @param response
+ * @param fdev
  */
 void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download_bytes,
 							char *response, struct flash_dev *fdev)
 {
 
 	char cmdbuf[32];
-	char *gpt_table_str = NULL;
-	char *mtd_table_str = NULL;
-	u32 boot_pin = readl((void *)BOOT_PIN_SELECT);
 	memset(cmdbuf, '\0', 32);
 
-	sprintf(cmdbuf, "env import -d -c 0x%lx 0x%lx", (ulong)download_buffer, (ulong)CONFIG_ENV_SIZE);
+	/*load env.txt*/
+	sprintf(cmdbuf, "env import -d -t 0x%lx", (ulong)download_buffer);
+
+	/*load env.bin*/
+	// sprintf(cmdbuf, "env import -d -c 0x%lx 0x%lx", (ulong)download_buffer, (ulong)CONFIG_ENV_SIZE);
 	if (run_command(cmdbuf, 0)){
 		fastboot_fail("Cannot import env.bin", response);
 		return;
 	}
 
-	if (strlen(fdev->mtd_table) > 0){
-		mtd_table_str = malloc(strlen(fdev->mtd_table)+32);
-
-		if (mtd_table_str == NULL)
-			return;
-		sprintf(mtd_table_str, "env set -f mtdparts 'spi-dev:%s'", fdev->mtd_table);
-
-		run_command(mtd_table_str, 0);
-		run_command("env set -f mtdids 'nor0=spi-dev'", 0);
-		/*
-		TODO: 
-			add mtdparts/mtdids, mtdparts=spi-dev:xxx, mtdids=nor0=spi-dev.
-			need to get nor/nand name.
-		*/
-	}
-
-	if (strlen(fdev->gptinfo.gpt_table) > 0){
-		gpt_table_str = malloc(strlen(fdev->gptinfo.gpt_table)+32);
-		if (gpt_table_str == NULL)
-			return;
-		sprintf(gpt_table_str, "env set -f partitions '%s'", fdev->gptinfo.gpt_table);
-		run_command(gpt_table_str, 0);
-	}
-
-	memset(cmdbuf, '\0', 32);
-	sprintf(cmdbuf, "env export -c -s 0x%lx 0x%lx", (ulong)CONFIG_ENV_SIZE, (ulong)download_buffer);
-	if (run_command(cmdbuf, 0)){
-		fastboot_fail("Cannot import env.bin", response);
+	if (_update_partinfo_to_env(download_buffer, download_bytes, response, fdev))
 		return;
-	}
-
-	switch(boot_pin){
-	case 0:
-	case 3:
-		/*write to emmc default offset*/
-		printf("write to mmc offset:%lx\n", (ulong)FLASH_ENV_OFFSET_MMC);
-		fastboot_mmc_flash_offset((u32)FLASH_ENV_OFFSET_MMC, download_buffer, (u32)CONFIG_ENV_SIZE);
-		break;
-	case 2:
-		/*write to nor offset*/
-		break;
-	case 1:
-		/*write to nand offset*/
-		break;
-	default:
-		break;
-	}
 
 	fastboot_okay("flash env partition okay", response);
 	return;

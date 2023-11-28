@@ -539,6 +539,12 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 								response, fdev);
 		return;
 	}
+	if (strcmp(cmd, "mtd") == 0) {
+		fastboot_oem_flash_gpt(cmd, fastboot_buf_addr, download_bytes,
+						response, fdev);
+		return;
+	}
+
 #endif
 
 #ifdef CONFIG_FASTBOOT_MMC_BOOT_SUPPORT

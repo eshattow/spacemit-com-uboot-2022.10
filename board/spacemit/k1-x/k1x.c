@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2023, Spacemit
+ * Copyright (c) 2023 Spacemit, Inc
  */
 
 #include <common.h>
@@ -58,7 +58,7 @@ void import_env_from_bootfs(void)
 		if (err)
 			continue;
 		if (!strcmp(BOOTFS_NAME, info.name)){
-			printf("match info.name:%s\n", info.name);
+			debug("match info.name:%s\n", info.name);
 			part = p;
 			break;
 		}
@@ -66,15 +66,17 @@ void import_env_from_bootfs(void)
 	env_set("bootfs_part", simple_itoa(part));
 
 	/*load env.txt and import to uboot*/
-	sprintf(cmd, "fatload mmc %d:%d %d env_%s.txt",
+	sprintf(cmd, "fatload mmc %d:%d 0x%x env_%s.txt",
 			dev, part, CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
+	debug("cmd:%s\n", cmd);
 	if (run_command(cmd, 0))
 		return;
 
 	memset(cmd, '\0', 128);
-	sprintf(cmd, "env import -t %d", CONFIG_SPL_LOAD_FIT_ADDRESS);
+	sprintf(cmd, "env import -t 0x%x", CONFIG_SPL_LOAD_FIT_ADDRESS);
+	debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0))
-		printf("load env.txt from bootfs successful\n");
+		printf("load env%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
 	return;
 }
 

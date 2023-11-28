@@ -1,12 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright (C) 2023,  chris.huang<chris.huang@spacemit.com>
+ * Copyright (c) 2023 Spacemit, Inc
  */
 
 #ifndef _FB_SPACEMIT_H_
 #define _FB_SPACEMIT_H_
-
-// DECLARE_GLOBAL_DATA_PTR;
 
 /*define max partition number*/
 #define MAX_PARTITION_NUM (20)
@@ -22,9 +20,10 @@
 #define FLASH_FSBL0_OFFSET (0x20000)
 #define FLASH_FSBL1_OFFSET (0x60000)
 
-#define FLASH_ENV_OFFSET_MMC (0x50000-0x8000)
-#define FLASH_ENV_OFFSET_NOR (0x30000-0x8000)
-#define FLASH_ENV_OFFSET_NAND (0x40000)
+/*if they have different addr, it can define here*/
+#define FLASH_ENV_OFFSET_MMC (CONFIG_ENV_OFFSET)
+#define FLASH_ENV_OFFSET_NOR (CONFIG_ENV_OFFSET)
+#define FLASH_ENV_OFFSET_NAND (CONFIG_ENV_OFFSET)
 
 typedef enum{
 	DEVICE_MMC,

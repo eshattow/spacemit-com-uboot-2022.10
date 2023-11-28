@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2023, Spacemit
+ * Copyright (c) 2023 Spacemit, Inc
  */
 
 #include <common.h>
@@ -38,11 +38,11 @@ int mmc_get_env_dev(void)
 {
 	u32 boot_mode = 0;
 #ifdef CONFIG_SPL_BUILD
-	printf("spl building, spl_boot_mode:%x\n", spl_boot_mode);
+	debug("spl building, spl_boot_mode:%x\n", spl_boot_mode);
 	boot_mode = spl_boot_mode;
 #else
 	boot_mode = readl((void *)BOOT_DEV_FLAG_REG);
-	printf("%s, uboot boot_mode:%x\n", __func__, boot_mode);
+	debug("%s, uboot boot_mode:%x\n", __func__, boot_mode);
 #endif
 
 	switch (boot_mode) {
@@ -74,7 +74,7 @@ int spl_board_init_f(void)
 	int ret;
 	struct udevice *dev;
 
-	printf("%s\n", __FUNCTION__);
+	debug("%s\n", __FUNCTION__);
 	/* DDR init */
 	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
 	if (ret) {
@@ -204,7 +204,7 @@ void spl_board_init(void)
 		}
 		drv = spl_env_driver_lookup(ENVOP_INIT, prio);
 		ret = drv->load();
-		printf("init other storage, spl_boot_mode:%x\n", spl_boot_mode);
+		debug("init other storage, spl_boot_mode:%x\n", spl_boot_mode);
 		if (!ret){
 			printf("has init env successful\n");
 		}else{

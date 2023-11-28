@@ -28,6 +28,7 @@ config SPL_OPENSBI_LOAD_ADDR
 config BOARD_SPECIFIC_OPTIONS # dummy
 	def_bool y
 	select SPACEMIT_X60
+	select BINMAN
 	imply AHCI
 	imply SMP
 	imply BOARD_LATE_INIT

@@ -386,5 +386,48 @@
 			};
 		};
 	};
-};
 
+	binman: binman {
+		multiple-images;
+		itb {
+			filename = "u-boot.itb";
+
+			fit {
+				description = "Configuration to load U-Boot";
+				#address-cells = <2>;
+				fit,fdt-list = "of-list";
+
+				images {
+					uboot {
+						description = "U-Boot";
+						type = "standalone";
+						os = "U-Boot";
+						arch = "riscv";
+						compression = "none";
+						load = <CONFIG_SYS_TEXT_BASE>;
+
+						uboot_blob: blob-ext {
+							filename = "u-boot-nodtb.bin";
+						};
+					};
+
+					@fdt-SEQ {
+						description = "NAME";
+						type = "flat_dt";
+						compression = "none";
+					};
+				};
+
+				configurations {
+					default = "conf-1";
+
+					@conf-SEQ {
+						description = "U-boot FIT config";
+						loadables = "uboot";
+						fdt = "fdt-SEQ";
+					};
+				};
+			};
+		};
+	};
+};
