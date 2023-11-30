@@ -26,7 +26,7 @@
 };
 
 &udc {
-	status = "okay";
+	status = "disabled";
 };
 
 &usbdrd3 {
@@ -53,7 +53,7 @@
 	non-removable;
 	cap-mmc-highspeed;
 	sdh-phy-module = <1>;
-	status = "okay";
+	status = "disabled";
 };
 
 &eth0 {
