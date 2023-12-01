@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Driver for Spacemit Mobile Storage Host Controller
- *
- * Copyright (C) 2023 Spacemit
- *
- * Author: <chris.huang@spacemit.com>
+ * Copyright (c) 2023 Spacemit, Inc
  */
 
 #include <common.h>

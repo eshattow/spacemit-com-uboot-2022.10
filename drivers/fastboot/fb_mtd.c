@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2023,  chris.huang<chris.huang@spacemit.com>
+ * Copyright (c) 2023 Spacemit, Inc
  */
 
 #include <config.h>

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright (C) 2022, Kevin.z.m <zhangmeng.kevin@spacemit.com>
+ * Copyright (c) 2023 Spacemit, Inc
  */
 
 #ifndef __CONFIG_H

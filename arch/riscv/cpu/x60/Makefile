@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0+
 #
-# Copyright (C) 2023, Spacemit
+# Copyright (c) 2023 Spacemit, Inc
 
 obj-y += cpu.o
 obj-y += cache.o

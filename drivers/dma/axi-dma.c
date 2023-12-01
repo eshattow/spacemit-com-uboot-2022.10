@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Driver for dw-axi-dma in uboot
- *
- * Copyright (C) 2023 Spacemit
- *
- * Author: <haodong.yan@spacemit.com>
+ * Copyright (c) 2023 Spacemit, Inc
  */
 
 
