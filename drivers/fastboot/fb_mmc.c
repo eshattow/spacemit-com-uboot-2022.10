@@ -544,6 +544,12 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 						response, fdev);
 		return;
 	}
+	if (strcmp(cmd, "bootinfo") == 0) {
+		printf("flash bootinfo\n");
+		fastboot_oem_flash_bootinfo(cmd, fastboot_buf_addr, download_bytes,
+									response, fdev);
+		return;
+	}
 
 #endif
 

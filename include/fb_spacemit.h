@@ -14,8 +14,10 @@
 #define RESULT_FAIL (1)
 
 /*recovery folder name*/
-#define RECOVERY_FOLDER ("recovery")
-#define FLASH_CONFIG_NAME ("flash_config.cfg")
+#define FLASH_IMG_FOLDER ("")
+#define FLASH_IMG_FACTORY_FOLDER ("factory")
+#define FLASH_CONFIG_NAME ("partition_universal.json")
+#define FLASH_IMG_PARTNAME ("bootfs")
 
 #define FLASH_FSBL0_OFFSET (0x20000)
 #define FLASH_FSBL1_OFFSET (0x60000)
@@ -25,13 +27,23 @@
 #define FLASH_ENV_OFFSET_NOR (CONFIG_ENV_OFFSET)
 #define FLASH_ENV_OFFSET_NAND (CONFIG_ENV_OFFSET)
 
+/*define bootinfo for emmc*/
+#define BOOT_INFO_EMMC_MAGICCODE (0xb00714f0)
+#define BOOT_INFO_EMMC_VERSION (0x00010001)
+#define BOOT_INFO_EMMC_PAGESIZE (0x200)
+#define BOOT_INFO_EMMC_BLKSIZE (0x10000)
+#define BOOT_INFO_EMMC_TOTALSIZE (0x10000000)
+#define BOOT_INFO_EMMC_SPL0_OFFSET (0x200)
+#define BOOT_INFO_EMMC_SPL1_OFFSET (0x0)
+#define BOOT_INFO_EMMC_LIMIT (CONFIG_SPL_SIZE_LIMIT)
+
 typedef enum{
 	DEVICE_MMC,
 	DEVICE_USB,
 	DEVICE_NET,
 } DeviceType;
 
-struct recovery_parts_info
+struct flash_parts_info
 {
 	char *part_name;
 	char *file_name;
@@ -53,12 +65,47 @@ struct gpt_info {
 struct flash_dev {
 	char *device_name;
 	char *dev_str;
-	struct recovery_parts_info parts_info[MAX_PARTITION_NUM];
+	struct flash_parts_info parts_info[MAX_PARTITION_NUM];
 	struct gpt_info gptinfo;
 	struct disk_partition *d_info;
 	struct blk_desc *dev_desc;
 	char *mtd_table;
 };
+
+/**
+ * @brief boot info struct
+ * 
+ */
+struct boot_parameter_info {
+	uint32_t magic_code;
+	uint32_t version_number;
+
+	/* flash info */
+	uint8_t flash_type[4];
+	uint8_t mfr_id;
+	uint8_t reserved1[1];
+	uint16_t dev_id;
+	uint32_t page_size;
+	uint32_t block_size;
+	uint32_t total_size;
+	uint8_t multi_plane;
+	uint8_t reserved2[3];
+
+	/* spl partition */
+	uint32_t spl0_offset;
+	uint32_t spl1_offset;
+	uint32_t spl_size_limit;
+
+	/* partitiontable offset */
+	uint32_t partitiontable0_offset;
+	uint32_t partitiontable1_offset;
+
+	uint32_t reserved[3];
+	uint32_t crc32;
+} __attribute__((packed));
+
+void set_boot_mode(u32 boot_mode);
+u32 get_boot_mode(void);
 
 /**
  * fastboot_oem_flash_gpt() - parse flash config and write gpt table.
@@ -122,6 +169,19 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr);
  * @param fdev
  */
 void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download_bytes,
+			char *response, struct flash_dev *fdev);
+
+
+/**
+ * @brief flash bootinfo to reserve partition.
+ *
+ * @param cmd 
+ * @param download_buffer load env.bin to addr
+ * @param download_bytes env.bin size
+ * @param response
+ * @param fdev
+ */
+void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 download_bytes,
 			char *response, struct flash_dev *fdev);
 
 

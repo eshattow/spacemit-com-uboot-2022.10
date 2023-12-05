@@ -27,6 +27,7 @@
 
 static int dev_emmc_num = -1;
 static int dev_sdio_num = -1;
+static u32 bootfs_part_index = 0;
 
 /* Initialize the mmc device given its number */
 static int init_mmc_device(int dev_num)
@@ -65,7 +66,9 @@ static void free_flash_dev(struct flash_dev *fdev)
 /* Detect and classify mmc device */
 static void detect_and_classify_mmc(int dev_num)
 {
-	int current_dev_num;
+	int current_dev_num, err;
+	struct disk_partition info;
+
 	struct mmc *mmc = find_mmc_device(dev_num);
 	if (!mmc)
 		return;
@@ -73,6 +76,16 @@ static void detect_and_classify_mmc(int dev_num)
 	current_dev_num = mmc_get_blk_desc(mmc)->devnum;
 	if (IS_SD(mmc)) {
 		dev_sdio_num = current_dev_num;
+		for (u32 p = 1; p <= MAX_SEARCH_PARTITIONS; p++) {
+			err = part_get_info(mmc_get_blk_desc(mmc), p, &info);
+			if (err)
+				continue;
+			if (!strcmp(FLASH_IMG_PARTNAME, info.name)){
+				debug("match info.name:%s\n", info.name);
+				bootfs_part_index = p;
+				break;
+			}
+		}
 		debug("SDIO detected with number: %d\n", dev_sdio_num);
 	} else {
 		dev_emmc_num = current_dev_num;
@@ -172,18 +185,24 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 	debug("device_name: %s\n", fdev->device_name);
 	debug("dev_str: %s\n", fdev->dev_str);
 
-
-	char *temp_fname = malloc(strlen(FLASH_CONFIG_NAME) + strlen(RECOVERY_FOLDER) + 2);
+	/*
+		TODO:should get partition.json name by searching the folder, and match
+		to the storage type.
+	*/
+	char *temp_fname = malloc(strlen(FLASH_CONFIG_NAME) + strlen(FLASH_IMG_FOLDER) + 2);
 	if (!temp_fname){
 		printf("malloc file_name fail\n");
 		return RESULT_FAIL;
 	}
-	strcpy(temp_fname, RECOVERY_FOLDER);
-	strcat(temp_fname, "/");
+
+	if (strlen(FLASH_IMG_FOLDER) > 0){
+		strcpy(temp_fname, FLASH_IMG_FOLDER);
+		strcat(temp_fname, "/");
+	}
 	strcat(temp_fname, FLASH_CONFIG_NAME);
 
-	char *fat_argv[] = {"fatload", fdev->device_name, fdev->dev_str, load_str, temp_fname};
-
+	char *fat_argv[] = {"fatload", fdev->device_name, fdev->dev_str, ":",
+						simple_itoa(bootfs_part_index), load_str, temp_fname};
 	if (do_load(cmdtp, 0, 5, fat_argv, FS_TYPE_FAT)) {
 		printf("do_load flash_config from %s failed\n", fdev->device_name);
 		retval = RESULT_FAIL;
@@ -373,6 +392,7 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 			debug("\ndownload and flash div %d\n", j);
 			download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
 
+			crc_value = crc32_wd(0, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
 			strcpy(addr_str, simple_xtoa((ulong)download_bytes));
 			strcpy(offset_str, simple_xtoa((ulong)download_offset));
 			char *const argv_image[] = {"fatload", fdev->device_name, fdev->dev_str,

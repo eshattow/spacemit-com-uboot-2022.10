@@ -39,16 +39,29 @@
 /* boot mode configs */
 #define BOOT_DEV_FLAG_REG (0xD4282D10)
 #define BOOT_PIN_SELECT (0xD4282c20)
-#define USB_DOWNLOAD_FLAG (0x55a)
 
-#define SPL_BOOT_MODE_EMMC (0x0)
-#define SPL_BOOT_MODE_NAND (0x1)
-#define SPL_BOOT_MODE_NOR  (0x2)
-#define SPL_BOOT_MODE_SD   (0x3)
+#define BOOT_STRAP_BIT_OFFSET (9)
+#define BOOT_STRAP_BIT_STORAGE_MASK (0x3 << BOOT_STRAP_BIT_OFFSET)
+#define BOOT_STRAP_BIT_EMMC (0x0)
+#define BOOT_STRAP_BIT_NAND (0x1)
+#define BOOT_STRAP_BIT_NOR  (0x2)
+#define BOOT_STRAP_BIT_SD   (0x3)
+
+#ifndef __ASSEMBLY__
+enum board_boot_mode {
+    BOOT_MODE_NONE = 0,
+    BOOT_MODE_USB = 0x55a,
+    BOOT_MODE_EMMC,
+    BOOT_MODE_NAND,
+    BOOT_MODE_NOR,
+    BOOT_MODE_SD,
+};
+#endif
+
+#define MMC_DEV_EMMC (1)
+#define MMC_DEV_SD (0)
 
 #define BOOTFS_NAME ("bootfs")
-
-
 
 /* Environment options */
 
