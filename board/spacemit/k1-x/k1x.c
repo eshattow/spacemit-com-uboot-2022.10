@@ -21,13 +21,79 @@
 #include <linux/io.h>
 #include <asm/global_data.h>
 #include <part.h>
+#include <env.h>
+#include <env_internal.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
+void set_boot_mode(enum board_boot_mode boot_mode)
+{
+	writel(boot_mode, (void *)BOOT_DEV_FLAG_REG);
+}
+
+enum board_boot_mode get_boot_mode(void)
+{
+	u32 boot_mode;
+	u32 boot_select;
+
+	/*if usb boot or has set boot mode, return boot mode*/
+	boot_mode = readl((void *)BOOT_DEV_FLAG_REG);
+	debug("%s, boot_mode:%x\n", __func__, boot_mode);
+
+	switch (boot_mode) {
+	case BOOT_MODE_USB:
+		return BOOT_MODE_USB;
+	case BOOT_MODE_EMMC:
+		return BOOT_MODE_EMMC;
+	case BOOT_MODE_NAND:
+		return BOOT_MODE_NAND;
+	case BOOT_MODE_NOR:
+		return BOOT_MODE_NOR;
+	case BOOT_MODE_SD:
+		return BOOT_MODE_SD;
+	}
+
+	/*if not set boot mode, try to return boot pin select*/
+	boot_select = readl((void *)BOOT_PIN_SELECT) & BOOT_STRAP_BIT_STORAGE_MASK;
+	boot_select = boot_select >> BOOT_STRAP_BIT_OFFSET;
+	/*select spl boot device:
+ 
+	     b'(bit1)(bit0)
+	emmc:b'00, //BOOT_STRAP_BIT_EMMC
+	nor :b'10, //BOOT_STRAP_BIT_NOR
+	nand:b'01, //BOOT_STRAP_BIT_NAND
+	sd  :b'11, //BOOT_STRAP_BIT_SD
+*/
+	switch (boot_select) {
+	case BOOT_STRAP_BIT_EMMC:
+		return BOOT_MODE_EMMC;
+	case BOOT_STRAP_BIT_NAND:
+		return BOOT_MODE_NAND;
+	case BOOT_STRAP_BIT_NOR:
+		return BOOT_MODE_NOR;
+	case BOOT_STRAP_BIT_SD:
+	default:
+		return BOOT_MODE_SD;
+	}
+}
+
+int mmc_get_env_dev(void)
+{
+	u32 boot_mode = 0;
+	boot_mode = get_boot_mode();
+	debug("%s, uboot boot_mode:%x\n", __func__, boot_mode);
+
+	if (boot_mode == BOOT_MODE_EMMC)
+		return MMC_DEV_EMMC;
+	else
+		return MMC_DEV_SD;
+}
+
+
 void run_fastboot_command(void)
 {
-	u32 read_reg = readl((void *)BOOT_DEV_FLAG_REG);
-	if (read_reg == USB_DOWNLOAD_FLAG){
+	u32 boot_mode = get_boot_mode();
+	if (boot_mode == BOOT_MODE_USB){
 		char *cmd_para = "fastboot 0";
 		run_command(cmd_para, 0);
 	}
@@ -52,7 +118,6 @@ void import_env_from_bootfs(void)
 			return;
 		}
 	}
-
 	for (u32 p = 1; p <= MAX_SEARCH_PARTITIONS; p++) {
 		err = part_get_info(mmc_get_blk_desc(mmc), p, &info);
 		if (err)
@@ -93,21 +158,21 @@ void run_cardfirmware_flash_command(void)
 
 void setenv_boot_mode(void)
 {
-	u32 read_reg = readl((void *)BOOT_DEV_FLAG_REG);
-	switch (read_reg) {
-	case SPL_BOOT_MODE_NAND:
+	u32 boot_mode = get_boot_mode();
+	switch (boot_mode) {
+	case BOOT_MODE_NAND:
 		env_set("boot_device", "nand");
 		break;
-	case SPL_BOOT_MODE_NOR:
+	case BOOT_MODE_NOR:
 		env_set("boot_device", "nor");
 		break;
-	case SPL_BOOT_MODE_EMMC:
+	case BOOT_MODE_EMMC:
 		env_set("boot_device", "mmc");
-		env_set("boot_devnum", "1");
+		env_set("boot_devnum", simple_itoa(MMC_DEV_EMMC));
 		break;
-	case SPL_BOOT_MODE_SD:
+	case BOOT_MODE_SD:
 		env_set("boot_device", "mmc");
-		env_set("boot_devnum", "0");
+		env_set("boot_devnum", simple_itoa(MMC_DEV_SD));
 		break;
 	default:
 		env_set("boot_device", "");
@@ -169,19 +234,27 @@ void *board_fdt_blob_setup(int *err)
 
 void board_boot_order(u32 *spl_boot_list)
 {
-	u32 sec_boot = spl_boot_device();
-
-	u32 read_reg = readl((void *)BOOT_DEV_FLAG_REG);
-	printf("read_reg:%x\n", read_reg);
-	if (read_reg == USB_DOWNLOAD_FLAG){
+	u32 boot_mode = get_boot_mode();
+	debug("boot_mode:%x\n", boot_mode);
+	if (boot_mode == BOOT_MODE_USB){
 		spl_boot_list[0] = BOOT_DEVICE_BOARD;
-	}
-	else if (sec_boot == BOOT_DEVICE_RAM){
-		spl_boot_list[0] = BOOT_DEVICE_RAM;
 	}else{
 		spl_boot_list[0] = BOOT_DEVICE_MMC1;
-		if (sec_boot != BOOT_DEVICE_MMC1){
-			spl_boot_list[1] = sec_boot;
+		if (boot_mode != BOOT_MODE_SD){
+			switch (boot_mode) {
+			case BOOT_MODE_EMMC:
+				spl_boot_list[1] = BOOT_DEVICE_MMC2;
+				break;
+			case BOOT_MODE_NAND:
+				spl_boot_list[1] = BOOT_DEVICE_NAND;
+				break;
+			case BOOT_MODE_NOR:
+				spl_boot_list[1] = BOOT_DEVICE_NOR;
+				break;
+			default:
+				spl_boot_list[1] = BOOT_DEVICE_RAM;
+				break;
+			}
 
 			//reserve for fpga to load/run uboot from ram.
 			spl_boot_list[2] = BOOT_DEVICE_RAM;
@@ -189,5 +262,24 @@ void board_boot_order(u32 *spl_boot_list)
 			//reserve for fpga to load/run uboot from ram.
 			spl_boot_list[1] = BOOT_DEVICE_RAM;
 		}
+	}
+}
+
+
+enum env_location env_get_location(enum env_operation op, int prio)
+{
+	if (prio >= 3)
+		return ENVL_UNKNOWN;
+
+	u32 boot_mode = get_boot_mode();
+	switch (boot_mode) {
+	case BOOT_MODE_NAND:
+		return ENVL_NAND;
+	case BOOT_MODE_NOR:
+		return ENVL_SPI_FLASH;
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+	default:
+		return ENVL_MMC;
 	}
 }
