@@ -19,20 +19,12 @@
 		timebase-frequency = <10000000>;
 		u-boot,dm-spl;
 		cpu_0: cpu@0 {
+			compatible = "riscv";
 			device_type = "cpu";
 			reg = <0>;
 			status = "okay";
-			compatible = "riscv";
-			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt";
-			riscv,cbom-block-size = <64>;
+			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt_sstc";
 			mmu-type = "riscv,sv39";
-			cpu-freq = "1.848Ghz";
-			cpu-icache = "64KB";
-			cpu-dcache = "64KB";
-			cpu-l2cache = "1MB";
-			cpu-tlb = "1024 4-ways";
-			cpu-cacheline = "64Bytes";
-			cpu-vector = "0.7.1";
 			u-boot,dm-spl;
 			cpu0_intc: interrupt-controller {
 				#interrupt-cells = <1>;
@@ -42,20 +34,12 @@
 			};
 		};
 		cpu_1: cpu@1 {
+			compatible = "riscv";
 			device_type = "cpu";
 			reg = <1>;
 			status = "okay";
-			compatible = "riscv";
-			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt";
-			riscv,cbom-block-size = <64>;
+			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt_sstc";
 			mmu-type = "riscv,sv39";
-			cpu-freq = "1.848Ghz";
-			cpu-icache = "64KB";
-			cpu-dcache = "64KB";
-			cpu-l2cache = "1MB";
-			cpu-tlb = "1024 4-ways";
-			cpu-cacheline = "64Bytes";
-			cpu-vector = "0.7.1";
 			u-boot,dm-spl;
 
 			cpu1_intc: interrupt-controller {
@@ -66,20 +50,12 @@
 			};
 		};
 		cpu_2: cpu@2 {
+			compatible = "riscv";
 			device_type = "cpu";
 			reg = <2>;
 			status = "okay";
-			compatible = "riscv";
-			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt";
-			riscv,cbom-block-size = <64>;
+			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt_sstc";
 			mmu-type = "riscv,sv39";
-			cpu-freq = "1.848Ghz";
-			cpu-icache = "64KB";
-			cpu-dcache = "64KB";
-			cpu-l2cache = "1MB";
-			cpu-tlb = "1024 4-ways";
-			cpu-cacheline = "64Bytes";
-			cpu-vector = "0.7.1";
 			u-boot,dm-spl;
 
 			cpu2_intc: interrupt-controller {
@@ -90,23 +66,79 @@
 			};
 		};
 		cpu_3: cpu@3 {
+			compatible = "riscv";
 			device_type = "cpu";
 			reg = <3>;
 			status = "okay";
-			compatible = "riscv";
-			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt";
-			riscv,cbom-block-size = <64>;
+			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt_sstc";
 			mmu-type = "riscv,sv39";
-			cpu-freq = "1.848Ghz";
-			cpu-icache = "64KB";
-			cpu-dcache = "64KB";
-			cpu-l2cache = "1MB";
-			cpu-tlb = "1024 4-ways";
-			cpu-cacheline = "64Bytes";
-			cpu-vector = "0.7.1";
 			u-boot,dm-spl;
 
 			cpu3_intc: interrupt-controller {
+				#interrupt-cells = <1>;
+				compatible = "riscv,cpu-intc";
+				interrupt-controller;
+				u-boot,dm-spl;
+			};
+		};
+		cpu_4: cpu@4 {
+			compatible = "riscv";
+			device_type = "cpu";
+			reg = <4>;
+			status = "okay";
+			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt_sstc";
+			mmu-type = "riscv,sv39";
+			u-boot,dm-spl;
+
+			cpu4_intc: interrupt-controller {
+				#interrupt-cells = <1>;
+				compatible = "riscv,cpu-intc";
+				interrupt-controller;
+				u-boot,dm-spl;
+			};
+		};
+		cpu_5: cpu@5 {
+			compatible = "riscv";
+			device_type = "cpu";
+			reg = <5>;
+			status = "okay";
+			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt_sstc";
+			mmu-type = "riscv,sv39";
+			u-boot,dm-spl;
+
+			cpu5_intc: interrupt-controller {
+				#interrupt-cells = <1>;
+				compatible = "riscv,cpu-intc";
+				interrupt-controller;
+				u-boot,dm-spl;
+			};
+		};
+		cpu_6: cpu@6 {
+			compatible = "riscv";
+			device_type = "cpu";
+			reg = <6>;
+			status = "okay";
+			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt_sstc";
+			mmu-type = "riscv,sv39";
+			u-boot,dm-spl;
+
+			cpu6_intc: interrupt-controller {
+				#interrupt-cells = <1>;
+				compatible = "riscv,cpu-intc";
+				interrupt-controller;
+				u-boot,dm-spl;
+			};
+		};
+		cpu_7: cpu@7 {
+			compatible = "riscv";
+			device_type = "cpu";
+			reg = <7>;
+			status = "okay";
+			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt_sstc";
+			mmu-type = "riscv,sv39";
+			u-boot,dm-spl;
+
+			cpu7_intc: interrupt-controller {
 				#interrupt-cells = <1>;
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
@@ -173,6 +205,10 @@
 				&cpu1_intc  3 &cpu1_intc  7
 				&cpu2_intc  3 &cpu2_intc  7
 				&cpu3_intc  3 &cpu3_intc  7
+				&cpu4_intc  3 &cpu4_intc  7
+				&cpu5_intc  3 &cpu5_intc  7
+				&cpu6_intc  3 &cpu6_intc  7
+				&cpu7_intc  3 &cpu7_intc  7
 			>;
 			reg = <0x0 0xE4000000 0x0 0x00010000>;
 			clint,has-no-64bit-mmio;
@@ -220,6 +256,10 @@
 				&cpu1_intc 0xffffffff &cpu1_intc 9
 				&cpu2_intc 0xffffffff &cpu2_intc 9
 				&cpu3_intc 0xffffffff &cpu3_intc 9
+				&cpu4_intc 0xffffffff &cpu4_intc 9
+				&cpu5_intc 0xffffffff &cpu5_intc 9
+				&cpu6_intc 0xffffffff &cpu6_intc 9
+				&cpu7_intc 0xffffffff &cpu7_intc 9
 			>;
 			reg = <0x0 0xE0000000 0x0 0x04000000>;
 			reg-names = "control";
