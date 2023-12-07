@@ -863,7 +863,7 @@ int emac_enable_clk(struct emac_priv *priv)
     val |= EMAC_AXI_CLK_RESET;
     writel(val, priv->ctrl_reg);
 
-#ifdef CONFIG_CLK   /* CLK driver is not ready on fpga platform */
+#if 0   /* CLK driver is not ready on fpga platform */
     /* enable phy clock */
     clk_enable_pll(PLL1, DIV_8);
     clk_enable_gate(CLK_104);
@@ -881,7 +881,7 @@ int emac_disable_clk(struct emac_priv *priv)
     val &= ~EMAC_AXI_CLK_RESET;
     writel(val, priv->ctrl_reg);
 
-#ifdef CONFIG_CLK   /* CLK driver is not ready on fpga platform */
+#if 0   /* CLK driver is not ready on fpga platform */
     /* disable phy clock */
     clk_disable_gate(CLK_104);
     clk_disable_pll(PLL1, DIV_8);
