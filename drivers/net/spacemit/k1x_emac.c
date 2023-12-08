@@ -148,6 +148,8 @@ enum clk_tuning_way {
 struct emac_priv {
     struct udevice *dev;
     void __iomem *io_base;
+    struct clk mac_clk;
+    struct reset_ctl reset;
     struct mii_dev *mii;
     struct phy_device *phy;
     int phy_interface;
@@ -855,13 +857,9 @@ int emac_phy_interface_select(struct emac_priv *priv)
 
 int emac_enable_clk(struct emac_priv *priv)
 {
-    u32 val;
-
     /* enable mac clock */
-    val = readl(priv->ctrl_reg);
-    val |= EMAC_AXI_CLK_ENABLE;
-    val |= EMAC_AXI_CLK_RESET;
-    writel(val, priv->ctrl_reg);
+    clk_enable(&priv->mac_clk);
+    reset_deassert(&priv->reset);
 
 #if 0   /* CLK driver is not ready on fpga platform */
     /* enable phy clock */
@@ -873,13 +871,9 @@ int emac_enable_clk(struct emac_priv *priv)
 
 int emac_disable_clk(struct emac_priv *priv)
 {
-    u32 val;
-
     /* disable mac clock */
-    val = readl(priv->ctrl_reg);
-    val &= ~EMAC_AXI_CLK_ENABLE;
-    val &= ~EMAC_AXI_CLK_RESET;
-    writel(val, priv->ctrl_reg);
+    reset_assert(&priv->reset);
+    clk_disable(&priv->mac_clk);
 
 #if 0   /* CLK driver is not ready on fpga platform */
     /* disable phy clock */
@@ -1122,6 +1116,18 @@ static int emac_probe(struct udevice *dev)
     ret = emac_probe_resources_core(dev);
     if (ret < 0) {
         pr_err("emac_probe_resources_core() failed: %d", ret);
+        return ret;
+    }
+
+    ret = clk_get_by_index(dev, 0, &priv->mac_clk);
+    if (ret) {
+        pr_err("It has no clk: %d\n", ret);
+        return ret;
+    }
+
+    ret = reset_get_by_index(dev, 0, &priv->reset);
+    if (ret) {
+        pr_err("It has no reset: %d\n", ret);
         return ret;
     }
 

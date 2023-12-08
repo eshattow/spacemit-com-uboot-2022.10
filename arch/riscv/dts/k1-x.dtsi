@@ -303,6 +303,10 @@
 			reg = <0x00000000 0xCAC80000 0x00000000 0x00000420>;
 			ctrl-reg = <0x3e4>;
 			dline-reg = <0x3e8>;
+			clocks = <&ccu CLK_EMAC0_BUS>;
+			clock-names = "emac-clk";
+			resets = <&reset RESET_EMAC0>;
+			reset-names = "emac-reset";
 			status = "disabled";
 		};
 
