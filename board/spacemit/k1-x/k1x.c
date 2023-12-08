@@ -25,6 +25,7 @@
 #include <env_internal.h>
 #include <asm/arch/ddr.h>
 #include <power/regulator.h>
+#include <fb_spacemit.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -33,31 +34,13 @@ void set_boot_mode(enum board_boot_mode boot_mode)
 	writel(boot_mode, (void *)BOOT_DEV_FLAG_REG);
 }
 
-enum board_boot_mode get_boot_mode(void)
+enum board_boot_mode get_boot_pin_select(void)
 {
-	u32 boot_mode;
-	u32 boot_select;
-
-	/*if usb boot or has set boot mode, return boot mode*/
-	boot_mode = readl((void *)BOOT_DEV_FLAG_REG);
-	debug("%s, boot_mode:%x\n", __func__, boot_mode);
-
-	switch (boot_mode) {
-	case BOOT_MODE_USB:
-		return BOOT_MODE_USB;
-	case BOOT_MODE_EMMC:
-		return BOOT_MODE_EMMC;
-	case BOOT_MODE_NAND:
-		return BOOT_MODE_NAND;
-	case BOOT_MODE_NOR:
-		return BOOT_MODE_NOR;
-	case BOOT_MODE_SD:
-		return BOOT_MODE_SD;
-	}
-
 	/*if not set boot mode, try to return boot pin select*/
-	boot_select = readl((void *)BOOT_PIN_SELECT) & BOOT_STRAP_BIT_STORAGE_MASK;
+	u32 boot_select = readl((void *)BOOT_PIN_SELECT) & BOOT_STRAP_BIT_STORAGE_MASK;
 	boot_select = boot_select >> BOOT_STRAP_BIT_OFFSET;
+	debug("boot_select:%x\n", boot_select);
+
 	/*select spl boot device:
  
 	     b'(bit1)(bit0)
@@ -78,6 +61,30 @@ enum board_boot_mode get_boot_mode(void)
 		return BOOT_MODE_SD;
 	}
 }
+
+enum board_boot_mode get_boot_mode(void)
+{
+	/*if usb boot or has set boot mode, return boot mode*/
+	u32 boot_mode = readl((void *)BOOT_DEV_FLAG_REG);
+	debug("%s, boot_mode:%x\n", __func__, boot_mode);
+
+	switch (boot_mode) {
+	case BOOT_MODE_USB:
+		return BOOT_MODE_USB;
+	case BOOT_MODE_EMMC:
+		return BOOT_MODE_EMMC;
+	case BOOT_MODE_NAND:
+		return BOOT_MODE_NAND;
+	case BOOT_MODE_NOR:
+		return BOOT_MODE_NOR;
+	case BOOT_MODE_SD:
+		return BOOT_MODE_SD;
+	}
+
+	/*else return boot pin select*/
+	return get_boot_pin_select();
+}
+
 
 int mmc_get_env_dev(void)
 {
@@ -124,16 +131,18 @@ void import_env_from_bootfs(void)
 		return;
 	}
 
-	for (u32 p = 1; p <= MAX_SEARCH_PARTITIONS; p++) {
-		err = part_get_info(mmc_get_blk_desc(mmc), p, &info);
+	for (part = 1; part <= MAX_SEARCH_PARTITIONS; part++) {
+		err = part_get_info(mmc_get_blk_desc(mmc), part, &info);
 		if (err)
 			continue;
 		if (!strcmp(BOOTFS_NAME, info.name)){
 			debug("match info.name:%s\n", info.name);
-			part = p;
 			break;
 		}
 	}
+	if (part > MAX_SEARCH_PARTITIONS)
+		return;
+
 	env_set("bootfs_part", simple_itoa(part));
 
 	/*load env.txt and import to uboot*/
@@ -154,12 +163,35 @@ void import_env_from_bootfs(void)
 
 void run_cardfirmware_flash_command(void)
 {
-	/*
-	TODO:
-		try to find partition in sd card, if it has partition name 'flashing_image',
-		it would try to excute command 'spacemit_flashing', and it would flash image
-		to emmc/nor/nand.
-	*/
+	struct mmc *mmc;
+	struct disk_partition info;
+	int part_dev, err;
+	char cmd[128] = {"\0"};
+
+	mmc = find_mmc_device(MMC_DEV_SD);
+	if (!mmc)
+		return;
+	if (mmc_init(mmc))
+		return;
+
+	for (part_dev = 1; part_dev <= MAX_SEARCH_PARTITIONS; part_dev++) {
+		err = part_get_info(mmc_get_blk_desc(mmc), part_dev, &info);
+		if (err)
+			continue;
+		if (!strcmp(BOOTFS_NAME, info.name))
+			break;
+
+	}
+
+	if (part_dev > MAX_SEARCH_PARTITIONS)
+		return;
+
+	/*check json file exist or not in sd card*/
+	sprintf(cmd, "fatsize mmc %d:%d %s", MMC_DEV_SD, part_dev, CARD_FLASH_FILE);
+	debug("cmd:%s\n", cmd);
+	if (!run_command(cmd, 0))
+		run_command("spacemit_flashing mmc", 0);
+
 	return;
 }
 
@@ -206,6 +238,8 @@ int board_late_init(void)
 	int ret;
 
 	run_fastboot_command();
+
+	run_cardfirmware_flash_command();
 
 	/*import env.txt from bootfs*/
 	import_env_from_bootfs();
@@ -282,7 +316,7 @@ void board_boot_order(u32 *spl_boot_list)
 
 enum env_location env_get_location(enum env_operation op, int prio)
 {
-	if (prio >= 3)
+	if (prio >= 1)
 		return ENVL_UNKNOWN;
 
 	u32 boot_mode = get_boot_mode();

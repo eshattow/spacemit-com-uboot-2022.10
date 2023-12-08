@@ -124,6 +124,7 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 			int device_type, struct flash_dev *fdev)
 {
 	int retval = RESULT_OK;
+	char blk_dev_str[10] = {"\0"};
 
 	switch (device_type) {
 #ifdef CONFIG_MMC
@@ -196,15 +197,18 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 		printf("malloc file_name fail\n");
 		return RESULT_FAIL;
 	}
-
+	memset(temp_fname, '\0', strlen(FLASH_CONFIG_NAME) + strlen(FLASH_IMG_FOLDER) + 2);
 	if (strlen(FLASH_IMG_FOLDER) > 0){
 		strcpy(temp_fname, FLASH_IMG_FOLDER);
 		strcat(temp_fname, "/");
+		strcat(temp_fname, FLASH_CONFIG_NAME);
+	}else{
+		strcpy(temp_fname, FLASH_CONFIG_NAME);
 	}
-	strcat(temp_fname, FLASH_CONFIG_NAME);
 
-	char *fat_argv[] = {"fatload", fdev->device_name, fdev->dev_str, ":",
-						simple_itoa(bootfs_part_index), load_str, temp_fname};
+	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+	char *fat_argv[] = {"fatload", fdev->device_name, blk_dev_str, load_str, temp_fname};
+
 	if (do_load(cmdtp, 0, 5, fat_argv, FS_TYPE_FAT)) {
 		printf("do_load flash_config from %s failed\n", fdev->device_name);
 		retval = RESULT_FAIL;
@@ -232,7 +236,7 @@ void recovery_show_result(struct flash_dev *fdev, int ret)
 	}
 }
 
-static int get_part_info(struct blk_desc *dev_desc, const char *name,
+int get_part_info(struct blk_desc *dev_desc, const char *name,
 		struct disk_partition *info)
 {
 	int ret;
@@ -317,11 +321,55 @@ static int write_raw_image(struct blk_desc *dev_desc,
 	
 }
 
+void specific_flash_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
+{
+	char blk_dev_str[10] = {"\0"};
+	char file_name[20] = {"\0"};
+	u32 image_size = 0;
+	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
+	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+
+	/*flash emmc info to boot0*/
+	fastboot_oem_flash_bootinfo(NULL, load_addr, 0, NULL, fdev);
+
+	/*flash fsbl.bin to boot1*/
+	if (strlen(FLASH_IMG_FACTORY_FOLDER) > 0){
+		strcpy(file_name, FLASH_IMG_FACTORY_FOLDER);
+		strcat(file_name, "/");
+		strcat(file_name, "FSBL.bin");
+	}else{
+		strcpy(file_name, "FSBL.bin");
+	}
+
+	struct blk_desc *dev_desc = blk_get_dev("mmc",
+					   CONFIG_FASTBOOT_FLASH_MMC_DEV);
+
+	char *const argv_image[] = {"fatload", fdev->device_name, blk_dev_str,
+			simple_xtoa((ulong)load_addr), file_name};
+
+	if (do_load(cmdtp, 0, 5, argv_image, FS_TYPE_FAT)){
+		printf("can not get file size\n");
+		return;
+	}
+	image_size = env_get_hex("filesize", 0);
+
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+		pr_err("invalid mmc device\n");
+		return;
+	}
+	if (flash_mmc_boot_op(dev_desc, load_addr, 2, image_size)){
+		printf("flash fsbl fail\n");
+		return;
+	}
+}
+
+
 static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 {
 	char load_str[13] = {"\0"};
 	char addr_str[13] = {"\0"};
 	char offset_str[13] = {"\0"};
+	char blk_dev_str[10] = {"\0"};
 	struct disk_partition info = {0};
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
 	lbaint_t part_start_cnt;
@@ -331,33 +379,31 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	u32 download_bytes = 0;
 	u32 download_offset = 0;
 	u32 had_download = 0;
-	char *fsbl_offset;
+	u32 crc_value = 0;
 
 	strcpy(load_str, simple_xtoa((ulong)load_addr));
+	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
 
 	for (int i = 0; i < MAX_PARTITION_NUM; i++) {
 		char *part_name = fdev->parts_info[i].part_name;
 		char *file_name = fdev->parts_info[i].file_name;
-		/*
-			TODO: need to caculate crc while load to ram.
-			would not get crc value from partition.json
-		*/
-		u32 crc_value = 0;
 		unsigned long time_start_flash = get_timer(0);
+		download_offset = 0;
+		crc_value = 0;
 
-		if (fdev->parts_info[i].part_name == NULL) {
+		if (fdev->parts_info[i].part_name == NULL || strlen(part_name) == 0) {
 			printf("no more partition to flash\n");
 			break;
 		}
 
-		if (fdev->parts_info[i].file_name == NULL) {
+		if (fdev->parts_info[i].file_name == NULL || strlen(file_name) == 0) {
 			/* if not file not exists, it mean not to flash */
-			printf("part name is null\n");
+			printf("file name is null, not to flashing, continue\n");
 			continue;
 		}
 		printf("\n\nflash img %s, part_name:%s\n", file_name, part_name);
 
-		char *const argv_image_size[] = {"fatsize", fdev->device_name, fdev->dev_str, file_name};
+		char *const argv_image_size[] = {"fatsize", fdev->device_name, blk_dev_str, file_name};
 		if (do_size(cmdtp, 0, 4, argv_image_size, FS_TYPE_FAT)) {
 			printf("can not find file :%s, \n", file_name);
 			return RESULT_FAIL;
@@ -370,55 +416,33 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 		debug("\n\ndev_times:%d\n", div_times);
 
 		if (get_part_info(fdev->dev_desc, part_name, &info) < 0) {
-			if (strncmp(part_name, "fsbl", 4) == 0){
-				printf("try to flash fsbl\n");
-				fsbl_offset = part_name;
-				strsep(&fsbl_offset, ":");
-				u32 f_offset = fdev->gptinfo.gpt_start_offset + simple_strtoul(fsbl_offset, NULL, 0);
-				if (f_offset % info.blksz){
-					printf("offset need to be align 0x200\n");
-					return -1;
-				}
-				info.start = f_offset / info.blksz;
-
-				char *const argv_fsbl[] = {"fatload", fdev->device_name, fdev->dev_str, load_str, file_name};
-				if (do_load(cmdtp, 0, 5, argv_fsbl, FS_TYPE_FAT)) {
-					return RESULT_FAIL;
-				}
-#ifdef FASTBOOT_FLASH_MMC
-				printf("write fsbl to %x, info.start:%lx\n", f_offset, info.start);
-				fastboot_mmc_flash_offset(f_offset, load_addr, image_size);
-#endif
-				/*has flash fsbl, */
-				div_times = 0;
-			}else{
-				printf("can not get partition name:%s, check your config\n", part_name);
-				return RESULT_FAIL;
-			}
+			printf("can not get part %s in gpt tabel\n", part_name);
+			continue;
 		}
+
 		/* save the partition start cnt */
 		part_start_cnt = info.start;
-
 		for (int j = 0; j < div_times; j++) {
 			debug("\ndownload and flash div %d\n", j);
 			download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
-
-			crc_value = crc32_wd(0, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
 			strcpy(addr_str, simple_xtoa((ulong)download_bytes));
 			strcpy(offset_str, simple_xtoa((ulong)download_offset));
-			char *const argv_image[] = {"fatload", fdev->device_name, fdev->dev_str,
+
+			char *const argv_image[] = {"fatload", fdev->device_name, blk_dev_str,
 					load_str, file_name, addr_str, offset_str};
-			debug("load from %x, bytes:%x\n", download_offset, download_bytes);
+			printf("load from %x, bytes:%x\n", download_offset, download_bytes);
 			debug("%s, %s, \n", addr_str, offset_str);
 			if (do_load(cmdtp, 0, 7, argv_image, FS_TYPE_FAT))
 				return RESULT_FAIL;
 			had_download = env_get_hex("filesize", 0);
+			printf("had_download:%d\n", had_download);
 			if (had_download != download_bytes) {
 				printf("download file size is not equal require\n");
 				return RESULT_FAIL;
 			}
 			debug("had_download:%x, download byte:%x\n", had_download, download_bytes);
 
+			crc_value = crc32_wd(crc_value, (const uchar *)load_addr, had_download, CHUNKSZ_CRC32);
 			info.size = (download_bytes + (info.blksz - 1)) / info.blksz;
 			debug("write to mmc start_cnt:%lx, size:%lx\n", info.start, info.size);
 			if (write_raw_image(fdev->dev_desc, &info, part_name, load_addr, download_bytes))
@@ -427,6 +451,7 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 			download_offset += download_bytes;
 			byte_remain -= download_bytes;
 		}
+
 		/* read from device and check crc */
 		debug("check crc, read %lx, imagesize:%d\n", part_start_cnt, image_size);
 #ifdef FASTBOOT_FLASH_MMC
@@ -448,6 +473,14 @@ static int flash_gpt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	printf("gpt table command :%s\n", gpt_command);
 	if (run_command(gpt_command, 0))
 		return RESULT_FAIL;
+
+	/*set partition to env*/
+	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
+
+	/*update partition/mtd table to env*/
+	if (_update_partinfo_to_env(load_addr, 0, fdev))
+		return RESULT_FAIL;
+
 	return RESULT_OK;
 }
 
@@ -499,6 +532,9 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 	if (flash_image(cmdtp, fdev)) {
 		return RESULT_FAIL;
 	}
+
+	/*flash other image to specific offset*/
+	specific_flash_opt(cmdtp, fdev);
 
 	/* all flash operations successed */
 	return RESULT_OK;
