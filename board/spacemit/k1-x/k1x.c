@@ -23,6 +23,7 @@
 #include <part.h>
 #include <env.h>
 #include <env_internal.h>
+#include <asm/arch/ddr.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -282,4 +283,19 @@ enum env_location env_get_location(enum env_operation op, int prio)
 	default:
 		return ENVL_MMC;
 	}
+}
+
+int misc_init_r(void)
+{
+#ifdef CONFIG_DYNAMIC_DDR_CLK_FREQ
+	int ret;
+
+	ret = ddr_freq_max();
+	if(ret < 0) {
+		debug("%s: Try to adjust ddr freq failed!\n", __func__);
+		return ret;
+	}
+#endif
+
+	return 0;
 }
