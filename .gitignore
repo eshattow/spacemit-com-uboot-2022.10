@@ -47,6 +47,10 @@ fit-dtb.blob*
 /boards.cfg
 /*.log
 
+itb.fit.fit
+itb.fit.itb
+itb.map
+
 #
 # git files that we don't want to ignore even it they are dot-files
 #
