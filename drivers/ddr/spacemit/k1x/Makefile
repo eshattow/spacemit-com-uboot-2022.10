@@ -3,4 +3,8 @@
 # Copyright (C) 2023 Spacemit
 #
 
-obj-$(CONFIG_SPL_BUILD) += ddr_init.o
+ifdef CONFIG_SPL_BUILD
+obj-y += ddr_init.o
+else
+obj-$(CONFIG_DYNAMIC_DDR_CLK_FREQ) += ddr_freq.o
+endif
