@@ -117,24 +117,37 @@ ERR_HANDLE:
 static int spacemit_ddr_probe(struct udevice *dev)
 {
 	int ret;
+	uint32_t val;
 	void (*ddr_init)(void);
+
+	val = readl((void __iomem *)(K1X_MPMU_BASE + 0x1024));
+	val |= BIT(16);
+	writel(val, (void __iomem *)(K1X_MPMU_BASE + 0x1024));
+
+	val = readl((void __iomem *)(K1X_APMU_BASE + 0x38c));
+	val &= ~0x07;
+	val |= 0x04;
+	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x38c));
+
+	val = readl((void __iomem *)(K1X_APMU_BASE + 0x38c));
+	val |= BIT(12);
+	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x38c));
+	while(readl((void __iomem *)(K1X_APMU_BASE + 0x38c)) & BIT(12));
 
 #ifdef CONFIG_K1_X_BOARD_FPGA
 	ddr_init = (void(*)(void))(lpddr4_init_fpga_data + 0x144);
 	ddr_init();
 #else
-	uint32_t val;
-
 	ddr_init = (void(*)(void))(lpddr4_init_asic_data + 0x462);
 	ddr_init();
 
-	val = readl(K1X_APMU_BASE + 0x00A0);
+	val = readl((void __iomem *)(K1X_APMU_BASE + 0x00A0));
 	val &= ~0x10;
-	writel(val, K1X_APMU_BASE + 0x00A0);
+	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x00A0));
 
-	val = readl(K1X_APMU_BASE + 0x0098);
+	val = readl((void __iomem *)(K1X_APMU_BASE + 0x0098));
 	val &= ~0x10;
-	writel(val, K1X_APMU_BASE + 0x0098);
+	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x0098));
 #endif
 
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
