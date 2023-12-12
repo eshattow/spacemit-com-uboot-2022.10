@@ -366,6 +366,78 @@
 			status = "disabled";
 		};
 
+                i2c0: twsi0@d4010800 {
+                        compatible = "spacemit,i2c";
+                        reg = <0x0 0xd4010800 0x0 0x38>;
+                        clocks = <&ccu CLK_TWSI0>;
+                        resets = <&reset RESET_TWSI0>;
+                        status = "disabled";
+                };
+
+                i2c1: twsi1@d4011000 {
+                        compatible = "spacemit,i2c";
+                        reg = <0x0 0xd4011000 0x0 0x38>;
+                        clocks = <&ccu CLK_TWSI1>;
+                        resets = <&reset RESET_TWSI1>;
+                        status = "disabled";
+                };
+
+                i2c2: twsi2@d4012000 {
+                        compatible = "spacemit,i2c";
+                        reg = <0x0 0xd4012000 0x0 0x38>;
+                        clocks = <&ccu CLK_TWSI2>;
+                        resets = <&reset RESET_TWSI2>;
+                        status = "disabled";
+                };
+
+                i2c3: twsi3@f0614000 {
+                        /* SEC_I2C */
+                        compatible = "spacemit,i2c";
+                        reg = <0x0 0xf0614000 0x0 0x38>;
+                        status = "disabled";
+                };
+
+                i2c4: twsi4@d4012800 {
+                        compatible = "spacemit,i2c";
+                        reg = <0x0 0xd4012800 0x0 0x38>;
+                        clocks = <&ccu CLK_TWSI4>;
+                        resets = <&reset RESET_TWSI4>;
+                        status = "disabled";
+                };
+
+                i2c5: twsi5@d4013800 {
+                        compatible = "spacemit,i2c";
+                        reg = <0x0 0xd4013800 0x0 0x38>;
+                        clocks = <&ccu CLK_TWSI5>;
+                        resets = <&reset RESET_TWSI5>;
+                        status = "disabled";
+                };
+
+                i2c6: twsi6@d4018800 {
+                        compatible = "asr,i2c";
+                        reg = <0x0 0xd4018800 0x0 0x38>;
+                        clocks = <&ccu CLK_TWSI6>;
+                        resets = <&reset RESET_TWSI6>;
+                        status = "disabled";
+                };
+
+                i2c7: twsi7@d401d000 {
+                        compatible = "spacemit,i2c";
+                        reg = <0x0 0xd401d000 0x0 0x38>;
+                        clocks = <&ccu CLK_TWSI7>;
+                        resets = <&reset RESET_TWSI7>;
+                        status = "disabled";
+                };
+
+                i2c8: twsi8@d401d800 {
+                        /* PWR_I2C */
+                        compatible = "spacemit,i2c";
+                        reg = <0x0 0xd401d800 0x0 0x38>;
+                        clocks = <&ccu CLK_TWSI8>;
+                        resets = <&reset RESET_TWSI8>;
+                        status = "disabled";
+                };
+
 		pcie0_rc: pcie@ca000000 {
 			compatible = "k1x,dwc-pcie";
 			reg = <0x0 0xca000000 0x0 0x00001000>, /* dbi */
