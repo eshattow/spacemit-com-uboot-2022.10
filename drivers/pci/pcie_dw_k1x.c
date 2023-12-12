@@ -156,7 +156,7 @@ struct pcie_k1x {
 
 	/* reset, clock resources */
 	struct clk clock;
-	struct reset_ctl_bulk resets;
+	struct reset_ctl reset;
 };
 
 enum pcie_k1x_devtype {
@@ -247,35 +247,15 @@ static int pcie_k1x_start_link(struct pcie_k1x *k1x)
 	return 0;
 }
 
-static void pcie_k1x_clk_enable(struct pcie_k1x *k1x, int enable)
-{
-	u32 mask = 0x13f;
-	u32 val = 0, enable_val = 0x3f, disable_val = 0x100;
-
-	val = readl(k1x->priv_base);
-	if (enable) {
-		val |= (mask & enable_val);
-		val &= ~(mask & disable_val);
-	} else {
-		val |= (mask & disable_val);
-		val &= ~(mask & enable_val);
-	}
-
-	writel(val, k1x->priv_base);
-}
-
 static int pcie_k1x_init_port(struct udevice *dev,
 				 enum pcie_k1x_devtype mode)
 {
 	struct pcie_k1x *k1x = dev_get_priv(dev);
 	u32 reg;
-    //int ret;
 
-#if 0
 	/* enable pcie clk */
 	clk_enable(&k1x->clock);
-#endif
-    pcie_k1x_clk_enable(k1x, 1);
+	reset_deassert(&k1x->reset);
 
 	/* Set desired mode while core is not operational */
 	if (mode == K1X_PCIE_HOST_TYPE) {
@@ -360,7 +340,7 @@ static void __iomem *get_fdt_addr(struct udevice *dev, const char *name)
 static int pcie_k1x_of_to_plat(struct udevice *dev)
 {
 	struct pcie_k1x *k1x = dev_get_priv(dev);
-	//int err;
+	int err;
 
 	/* get designware DBI base addr */
 	k1x->dw.dbi_base = get_fdt_addr(dev, "dbi");
@@ -387,12 +367,17 @@ static int pcie_k1x_of_to_plat(struct udevice *dev)
     if (!k1x->phy_ahb)
 		return -EINVAL;
 
-#if 0
 	err = clk_get_by_index(dev, 0, &k1x->clock);
 	if (err) {
 		dev_warn(dev, "It has no clk: %d\n", err);
+		return -EINVAL;
 	}
-#endif
+
+	err = reset_get_by_index(dev, 0, &k1x->reset);
+	if (err) {
+		pr_err("It has no reset: %d\n", err);
+		return -EINVAL;
+	}
 
 	return 0;
 }
