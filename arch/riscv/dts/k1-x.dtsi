@@ -342,7 +342,12 @@
 			reg = <0x0 0xd4280000 0x0 0x200>;
 			interrupt-parent = <&intc>;
 			interrupts = <99>;
-			sdh-pmuap-reg = <0xd4282854>;
+			resets = <&reset RESET_SDH_AXI>,
+					 <&reset RESET_SDH0>;
+			reset-names = "sdh_axi", "sdh0";
+			clocks = <&ccu CLK_SDH0>,
+					 <&ccu CLK_SDH_AXI>;
+			clock-names = "sdh-io", "sdh-core";
 			u-boot,dm-spl;
 			status = "disabled";
 		};
@@ -352,7 +357,12 @@
 			reg = <0x0 0xd4280800 0x0 0x200>;
 			interrupt-parent = <&intc>;
 			interrupts = <100>;
-			sdh-pmuap-reg = <0xd4282858>;
+			resets = <&reset RESET_SDH_AXI>,
+					 <&reset RESET_SDH1>;
+			reset-names = "sdh_axi", "sdh1";
+			clocks = <&ccu CLK_SDH1>,
+					 <&ccu CLK_SDH_AXI>;
+			clock-names = "sdh-io", "sdh-core";
 			status = "disabled";
 		};
 
@@ -361,7 +371,12 @@
 			reg = <0x0 0xd4281000 0x0 0x200>;
 			interrupt-parent = <&intc>;
 			interrupts = <101>;
-			sdh-pmuap-reg = <0xd42828e0>;
+			resets = <&reset RESET_SDH_AXI>,
+					 <&reset RESET_SDH2>;
+			reset-names = "sdh_axi", "sdh2";
+			clocks = <&ccu CLK_SDH2>,
+					 <&ccu CLK_SDH_AXI>;
+			clock-names = "sdh-io", "sdh-core";
 			u-boot,dm-spl;
 			status = "disabled";
 		};

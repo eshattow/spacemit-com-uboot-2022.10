@@ -5,25 +5,16 @@
  * Copyright (C) 2023 Spacemit Inc.
  */
 #include <common.h>
+#include <clk.h>
 #include <dm.h>
 #include <fdtdec.h>
 #include <linux/libfdt.h>
 #include <linux/delay.h>
 #include <malloc.h>
 #include <sdhci.h>
+#include <reset-uclass.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-#define K1X_MPMU_BASE		0xd4050000
-#define MPMU_ACGR			0x1024
-
-#define K1X_APMU_BASE		0xd4282800
-#define APMU_SDH0			0x54    /* SDH0 Clock/Reset Control Register */
-
-#define APMU_PERIPH_CLK_EN	(1<<4)  /* Peripheral clock enable */
-#define APMU_AXI_CLK_EN		(1<<3)  /* AXI clock enable */
-#define APMU_PERIPH_RESET	(1<<1)  /* Peripheral reset */
-#define APMU_AXI_RESET		(1<<0)  /* AXI BUS reset */
 
 /* SDH registers define */
 #define SDHC_OP_EXT_REG			0x108
@@ -113,11 +104,12 @@ DECLARE_GLOBAL_DATA_PTR;
 struct spacemit_sdhci_plat {
 	struct mmc_config cfg;
 	struct mmc mmc;
+	struct reset_ctl_bulk resets;
+	struct clk_bulk clks;
 };
 
 struct spacemit_sdhci_priv {
 	struct sdhci_host host;
-	uintptr_t pmuap_reg;
 	u32 phy_module;
 };
 
@@ -167,27 +159,6 @@ static void set_emmc_phy_bypass(struct sdhci_host *host)
 	}
 }
 
-static int spacemit_set_sdh_clock(struct spacemit_sdhci_priv *sdhci_priv)
-{
-	uintptr_t apmu_sd0;
-	uintptr_t mpmu_acgr;
-
-	/* MPMU regs */
-	mpmu_acgr = (K1X_MPMU_BASE + MPMU_ACGR);
-	writel(0xffffffff, (void *)mpmu_acgr);
-
-	apmu_sd0 = (K1X_APMU_BASE + APMU_SDH0);
-	if (sdhci_priv->pmuap_reg == (K1X_APMU_BASE + APMU_SDH0)) {
-		writel(APMU_PERIPH_CLK_EN | APMU_AXI_CLK_EN |
-			APMU_PERIPH_RESET | APMU_AXI_RESET, (void *)apmu_sd0);
-	} else {
-		writel(APMU_AXI_CLK_EN | APMU_AXI_RESET, (void *)apmu_sd0);
-		writel(APMU_PERIPH_CLK_EN | APMU_PERIPH_RESET, (void *)sdhci_priv->pmuap_reg);
-	}
-
-	return 0;
-}
-
 #define MAX_WAIT_COUNT 100
 int spacemit_set_sdh_74_clk(struct udevice *dev)
 {
@@ -231,8 +202,29 @@ static int spacemit_sdhci_probe(struct udevice *dev)
 	host->mmc->dev = dev;
 	upriv->mmc = host->mmc;
 
-	/* set sdhc clock */
-	spacemit_set_sdh_clock(priv);
+	ret = reset_get_bulk(dev, &plat->resets);
+	if (ret) {
+		pr_err("Can't get reset: %d\n", ret);
+		return ret;
+	}
+
+	ret = reset_deassert_bulk(&plat->resets);
+	if (ret) {
+		pr_err("Failed to reset: %d\n", ret);
+		return ret;
+	}
+
+	ret = clk_get_bulk(dev, &plat->clks);
+	if (ret) {
+		pr_err("Can't get clk: %d\n", ret);
+		return ret;
+	}
+
+	ret = clk_enable_bulk(&plat->clks);
+	if (ret) {
+		pr_err("Failed to enable clk: %d\n", ret);
+		return ret;
+	}
 
 	/* Set quirks */
 	host->quirks = SDHCI_QUIRK_WAIT_SEND_CMD | SDHCI_QUIRK_32BIT_DMA_ADDR;
@@ -279,11 +271,6 @@ static int spacemit_sdhci_ofdata_to_platdata(struct udevice *dev)
 	host->name = dev->name;
 	host->ioaddr = (void *)devfdt_get_addr(dev);
 	priv->phy_module = fdtdec_get_uint(blob, node, "sdh-phy-module", 0);
-	priv->pmuap_reg = (uintptr_t)fdtdec_get_uint(blob, node, "sdh-pmuap-reg", 0);
-	if (!priv->pmuap_reg) {
-		printf("%s: fail to get pmuap register.\n", host->name);
-		return -EINVAL;
-	}
 
 	ret = mmc_of_parse(dev, &plat->cfg);
 	if (ret)
