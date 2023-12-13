@@ -132,7 +132,11 @@ struct spacemit_sdhci_priv {
 
 static int is_emulator_platform(void)
 {
+#ifdef CONFIG_K1_X_BOARD_FPGA
 	return 1;
+#else
+	return 0;
+#endif
 }
 
 static void set_emmc_phy_bypass(struct sdhci_host *host)
