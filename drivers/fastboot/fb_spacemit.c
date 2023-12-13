@@ -101,6 +101,7 @@ static int _update_partinfo_to_env(void *download_buffer, u32 download_bytes, ch
 	}
 
 	switch(boot_mode){
+#ifdef FLASH_ENV_OFFSET_MMC
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
 		/*write to emmc default offset*/
@@ -108,6 +109,7 @@ static int _update_partinfo_to_env(void *download_buffer, u32 download_bytes, ch
 		//maybe it could just use env save command
 		fastboot_mmc_flash_offset((u32)FLASH_ENV_OFFSET_MMC, download_buffer, (u32)CONFIG_ENV_SIZE);
 		break;
+#endif
 	case BOOT_MODE_NOR:
 		/*write to nor offset*/
 		break;
@@ -482,6 +484,7 @@ static __maybe_unused lbaint_t fb_mmc_blk_write(struct blk_desc *block_dev, lbai
 	return blks;
 }
 
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
 static void flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 							int hwpart, u32 buff_sz, char *response)
 {
@@ -526,6 +529,7 @@ static void flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 
 	fastboot_okay(NULL, response);
 }
+#endif
 
 /**
  * fastboot_mmc_flash_offset() - Write fsbl image to eMMC
@@ -627,6 +631,7 @@ int check_mmc_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 download_bytes,
 			char *response, struct flash_dev *fdev)
 {
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
 	debug("%s\n", __func__);
 	struct blk_desc *dev_desc = blk_get_dev("mmc",
 					   CONFIG_FASTBOOT_FLASH_MMC_DEV);
@@ -659,5 +664,6 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 dow
 	printf("bootinfo:%p, boot_info->crc32:%x, sizeof(boot_info):%lx, download_buffer:%p\n", boot_info, boot_info->crc32, sizeof(boot_info), download_buffer);
 
 	flash_mmc_boot_op(dev_desc, download_buffer, 1, sizeof(boot_info), response);
+#endif
 	return;
 }

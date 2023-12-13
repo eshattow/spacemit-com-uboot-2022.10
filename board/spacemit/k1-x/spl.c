@@ -100,7 +100,7 @@ static struct env_driver *spl_env_driver_lookup(enum env_operation op, enum env_
 static void spl_load_env(void)
 {
 	struct env_driver *drv;
-	int ret = 0;
+	int ret = -1;
 	u32 boot_mode = get_boot_mode();
 
 	/*if boot from usb, spl should not find env*/
@@ -108,9 +108,14 @@ static void spl_load_env(void)
 		return;
 	}
 
+#ifdef CONFIG_MMC
 	/*would try sd at first*/
 	drv = spl_env_driver_lookup(ENVOP_INIT, ENVL_MMC);
-	ret = drv->load();
+	if (!drv)
+		ret = -1;
+	else
+		ret = drv->load();
+#endif
 
 	if (!ret){
 		printf("has init env successful at sd\n");
@@ -118,20 +123,29 @@ static void spl_load_env(void)
 		/*if try sd fail, it would try emmc or nor or nand*/
 		enum env_location loc = ENVL_UNKNOWN;
 		switch (boot_mode) {
+#ifdef CONFIG_MMC
 		case BOOT_MODE_EMMC:
 			loc = ENVL_MMC;
 			break;
+#endif
+#ifdef CONFIG_MTD_SPI_NAND
 		case BOOT_MODE_NAND:
 			loc = ENVL_NAND;
 			break;
+#endif
+#ifdef CONFIG_SPI_FLASH
 		case BOOT_MODE_NOR:
 			loc = ENVL_SPI_FLASH;
 			break;
+#endif
 		default:
 			break;
 		}
 
 		drv = spl_env_driver_lookup(ENVOP_INIT, loc);
+		if (!drv)
+			return;
+
 		ret = drv->load();
 		if (!ret){
 			printf("has init env successful\n");
@@ -140,14 +154,6 @@ static void spl_load_env(void)
 			/*if load env from storage fail, it should not write bootmode to reg*/
 			boot_mode = BOOT_MODE_NONE;
 		}
-		const char *mtdparts = NULL;
-		const char *gptparts = NULL;
-		mtdparts = env_get("mtdparts");
-		gptparts = env_get("partitions");
-		if (mtdparts)
-			debug("mtdparts:%s,\n", mtdparts);
-		if (gptparts)
-			debug(" gptparts:%s,\n", gptparts);
 	}
 	set_boot_mode(boot_mode);
 }

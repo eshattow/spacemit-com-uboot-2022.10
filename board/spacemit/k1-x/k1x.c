@@ -103,6 +103,7 @@ void run_fastboot_command(void)
 
 void import_env_from_bootfs(void)
 {
+#ifdef CONFIG_MMC
 	/*
 	TODO:
 		load env from bootfs, if bootfs is fat/ext4 at blk dev, use fatload/ext4load.
@@ -110,16 +111,19 @@ void import_env_from_bootfs(void)
 	int err, dev;
 	u32 part;
 	char cmd[128];
-	static struct mmc *mmc;
+	struct mmc *mmc;
 	struct disk_partition info;
 
 	dev = mmc_get_env_dev();
 	mmc = find_mmc_device(dev);
-	if (mmc){
-		if (mmc_init(mmc)){
-			return;
-		}
+	if (!mmc) {
+		printf("Cannot find mmc device\n");
+		return;
 	}
+	if (mmc_init(mmc)){
+		return;
+	}
+
 	for (u32 p = 1; p <= MAX_SEARCH_PARTITIONS; p++) {
 		err = part_get_info(mmc_get_blk_desc(mmc), p, &info);
 		if (err)
@@ -144,6 +148,7 @@ void import_env_from_bootfs(void)
 	debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0))
 		printf("load env%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
+#endif
 	return;
 }
 

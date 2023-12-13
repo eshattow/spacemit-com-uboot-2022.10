@@ -29,24 +29,6 @@ static int dev_emmc_num = -1;
 static int dev_sdio_num = -1;
 static u32 bootfs_part_index = 0;
 
-/* Initialize the mmc device given its number */
-static int init_mmc_device(int dev_num)
-{
-	struct mmc *mmc = find_mmc_device(dev_num);
-
-	if (!mmc) {
-		debug("Cannot find mmc device %d\n", dev_num);
-		return RESULT_FAIL;
-	}
-
-	if (mmc_init(mmc)) {
-		debug("mmc init failed for device %d\n", dev_num);
-		return RESULT_FAIL;
-	}
-
-	return RESULT_OK;
-}
-
 static void free_flash_dev(struct flash_dev *fdev)
 {
 	for (int i = 0; i < MAX_PARTITION_NUM; i++){
@@ -63,9 +45,28 @@ static void free_flash_dev(struct flash_dev *fdev)
 	free(fdev);
 }
 
+
+/* Initialize the mmc device given its number */
+static int init_mmc_device(int dev_num)
+{
+	struct mmc *mmc = find_mmc_device(dev_num);
+
+	if (!mmc) {
+		debug("Cannot find mmc device %d\n", dev_num);
+		return RESULT_FAIL;
+	}
+
+	if (mmc_init(mmc)) {
+		debug("mmc init failed for device %d\n", dev_num);
+		return RESULT_FAIL;
+	}
+	return RESULT_OK;
+}
+
 /* Detect and classify mmc device */
 static void detect_and_classify_mmc(int dev_num)
 {
+
 	int current_dev_num, err;
 	struct disk_partition info;
 
@@ -93,6 +94,7 @@ static void detect_and_classify_mmc(int dev_num)
 	}
 }
 
+
 int check_mmc_exist_and_initialize(void)
 {
 	int mmc_dev_num = get_mmc_num();
@@ -115,7 +117,6 @@ int check_mmc_exist_and_initialize(void)
 		printf("SDIO not detected.\n");
 		return RESULT_FAIL;
 	}
-
 	return RESULT_OK;
 }
 
@@ -125,6 +126,7 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 	int retval = RESULT_OK;
 
 	switch (device_type) {
+#ifdef CONFIG_MMC
 	case DEVICE_MMC:
 		if (check_mmc_exist_and_initialize() != RESULT_OK) {
 			retval = RESULT_FAIL;
@@ -170,7 +172,7 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 	case DEVICE_NET:
 		retval = RESULT_FAIL;
 		break;
-
+#endif //CONFIG_MMC
 	default:
 		printf("Unknown device type!\n");
 		retval = RESULT_FAIL;
@@ -246,6 +248,7 @@ static int get_part_info(struct blk_desc *dev_desc, const char *name,
 	return ret;
 }
 
+
 /**
  * mmc_blk_write() - Write/erase MMC in chunks of MAX_BLK_WRITE
  *
@@ -254,7 +257,7 @@ static int get_part_info(struct blk_desc *dev_desc, const char *name,
  * @blkcnt: Count of blocks
  * @buffer: Pointer to data buffer for write or NULL for erase
  */
-static lbaint_t mmc_blk_write(struct blk_desc *block_dev, lbaint_t start,
+static __maybe_unused lbaint_t mmc_blk_write(struct blk_desc *block_dev, lbaint_t start,
 			lbaint_t blkcnt, const void *buffer)
 {
 	lbaint_t blk = start;
@@ -277,10 +280,12 @@ static lbaint_t mmc_blk_write(struct blk_desc *block_dev, lbaint_t start,
 	return blks;
 }
 
+
 static int write_raw_image(struct blk_desc *dev_desc,
 		struct disk_partition *info, const char *part_name,
 		void *buffer, u32 download_bytes)
 {
+#ifdef CONFIG_MMC
 	lbaint_t blkcnt;
 	lbaint_t blks;
 
@@ -305,6 +310,11 @@ static int write_raw_image(struct blk_desc *dev_desc,
 	printf("........ wrote " LBAFU " bytes to '%s'\n", \
 		blkcnt * info->blksz,part_name);
 	return RESULT_OK;
+#else
+	printf("not mmc dev found\n");
+	return RESULT_FAIL;
+#endif
+	
 }
 
 static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
@@ -375,9 +385,10 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 				if (do_load(cmdtp, 0, 5, argv_fsbl, FS_TYPE_FAT)) {
 					return RESULT_FAIL;
 				}
-
+#ifdef FASTBOOT_FLASH_MMC
 				printf("write fsbl to %x, info.start:%lx\n", f_offset, info.start);
 				fastboot_mmc_flash_offset(f_offset, load_addr, image_size);
+#endif
 				/*has flash fsbl, */
 				div_times = 0;
 			}else{
@@ -418,10 +429,12 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 		}
 		/* read from device and check crc */
 		debug("check crc, read %lx, imagesize:%d\n", part_start_cnt, image_size);
+#ifdef FASTBOOT_FLASH_MMC
 		if (check_mmc_image_crc(fdev->dev_desc, crc_value, part_start_cnt, info.blksz, image_size)) {
 			printf("check image crc32 fail, \n");
 			return RESULT_FAIL;
 		}
+#endif
 		time_start_flash = get_timer(time_start_flash);
 		printf("flashing image %s over, use time:%lu ms\n", file_name, time_start_flash);
 	}
@@ -440,8 +453,12 @@ static int flash_gpt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 
 static int parse_flash_config(struct flash_dev *fdev)
 {
+#ifdef FASTBOOT_FLASH_MMC
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
 	return _parse_flash_config(fdev, load_addr);
+#else
+	return 0;
+#endif
 }
 
 /*Attempt to load recovery files from all possible sources*/

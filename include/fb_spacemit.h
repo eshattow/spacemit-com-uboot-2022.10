@@ -23,9 +23,11 @@
 #define FLASH_FSBL1_OFFSET (0x60000)
 
 /*if they have different addr, it can define here*/
+#ifdef CONFIG_ENV_OFFSET
 #define FLASH_ENV_OFFSET_MMC (CONFIG_ENV_OFFSET)
 #define FLASH_ENV_OFFSET_NOR (CONFIG_ENV_OFFSET)
 #define FLASH_ENV_OFFSET_NAND (CONFIG_ENV_OFFSET)
+#endif
 
 /*define bootinfo for emmc*/
 #define BOOT_INFO_EMMC_MAGICCODE (0xb00714f0)
