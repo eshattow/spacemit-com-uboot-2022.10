@@ -24,6 +24,7 @@
 #include <env.h>
 #include <env_internal.h>
 #include <asm/arch/ddr.h>
+#include <power/regulator.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -183,6 +184,13 @@ void setenv_boot_mode(void)
 
 int board_init(void)
 {
+#ifdef CONFIG_DM_REGULATOR
+	int ret;
+
+	ret = regulators_enable_boot_on(false);
+	if (ret)
+		debug("%s: Cannot enable boot on regulator\n", __func__);
+#endif
 	return 0;
 }
 
