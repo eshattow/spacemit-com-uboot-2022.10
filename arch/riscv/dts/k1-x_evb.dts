@@ -21,6 +21,10 @@
 	};
 };
 
+&cpus {
+	timebase-frequency = <24000000>;
+};
+
 &uart0 {
 	status = "okay";
 };
