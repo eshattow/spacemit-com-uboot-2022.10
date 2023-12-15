@@ -464,7 +464,8 @@ static int ddr_freq_change(u32 freq_level)
 /* adjust ddr frequency to the max value */
 int ddr_freq_max(void)
 {
-	return ddr_freq_change(MAX_FREQ_LV - 1);
+//	return ddr_freq_change(MAX_FREQ_LV - 1);
+	return 0;
 }
 
 int do_ddr_freq(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])

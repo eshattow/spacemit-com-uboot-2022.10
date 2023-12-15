@@ -20,8 +20,6 @@
 #include <dt-bindings/soc/spacemit-k1x.h>
 #ifdef CONFIG_K1_X_BOARD_FPGA
 #include "ddr_init_fpga.h"
-#else
-#include "ddr_init_asic.h"
 #endif
 
 #define DDR_CHECK_SIZE			(0x4000)
@@ -114,12 +112,105 @@ ERR_HANDLE:
 	return err;
 }
 
+#ifdef CONFIG_K1_X_BOARD_ASIC
+
+extern void lpddr4_silicon_init(uint32_t base);
+
+extern uint8_t pmic_read(uint8_t i2c_bus, uint8_t addr, uint8_t reg);
+extern uint8_t pmic_write_with_check(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_t reg_val, uint8_t check_val);
+extern uint8_t pmic_write(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_t reg_val);
+
+void init_pmic(void)
+{
+	int	i;
+	uint8_t val;
+	uint8_t i2c_bus = 8;
+	uint8_t base_addr = 0x30;
+	uint8_t power_addr = 0x31;
+	uint8_t id_reg = 0x0;
+	uint8_t buck1_reg = 0x30;
+	uint8_t dvc_reg = 0x41;
+	uint8_t pwr_reg_en1 = 0x11;
+	uint8_t pwr_reg_en3 = 0x13;
+
+	/* read pmic version */
+	val = pmic_read(i2c_bus, base_addr, id_reg);
+	printf("%s chip_id = 0x%x\n", __func__, val);
+
+	/* disable dvc */
+	printf("disable pmic dvc function!\n");
+	pmic_write(i2c_bus, power_addr, dvc_reg, 0x0);
+
+	/* enable buck5, default 1.5v */
+	printf("enable buck-5, default voltage is 1.5v\n");
+	val = pmic_read(i2c_bus, power_addr, pwr_reg_en1);
+	val |= (1 << 4);
+	pmic_write(i2c_bus, power_addr, pwr_reg_en1, val);
+
+	/* enable ldo19, default value is 1.1v */
+	printf("enable ldo-19, default voltage is 1.1v\n");
+	val = pmic_read(i2c_bus, power_addr, pwr_reg_en3);
+	val |= 1 << 7;
+	pmic_write(i2c_bus, power_addr, pwr_reg_en3, val);
+
+	/* enable buck4, default 0.6v */
+	printf("enable buck-4, default voltage is 0.6v\n");
+	val = pmic_read(i2c_bus, power_addr, pwr_reg_en1);
+	val |= (1 << 3);
+	pmic_write(i2c_bus, power_addr, pwr_reg_en1, val);
+
+	/* enable ldo4, default 3.1v */
+	printf("enable ldo-4, default voltage is 3.1v\n");
+	val = pmic_read(i2c_bus, power_addr, 0x12);
+	val |= (1 << 0);
+	pmic_write(i2c_bus, power_addr, 0x12, val);
+
+	/* adjust buck1 to 0.95v */
+	printf("adust buck-1 voltage to 0.95v\n");
+	val = pmic_read(i2c_bus, power_addr, buck1_reg);
+	val = 0x2f;
+	pmic_write_with_check(i2c_bus, power_addr, buck1_reg, val, (val | (1 << 7)));
+
+	/* set ext-dcdc to 1.0v */
+	printf("adust ext-dcdc voltage to 1.0v\n");
+	pmic_write(i2c_bus, 0x70, 0x0, 0x28);
+
+	/* delay some time to wait power stable */
+	for(i=0; i<0x1000000; i++) {
+		nop();
+		nop();
+		nop();
+		nop();
+		nop();
+	}
+}
+#endif
+
 static int spacemit_ddr_probe(struct udevice *dev)
 {
 	int ret;
-	uint32_t val;
-	void (*ddr_init)(void);
 
+#ifdef CONFIG_K1_X_BOARD_FPGA
+	void (*ddr_init)(void);
+#else
+	uint32_t val;
+	fdt_addr_t ddrc_base;
+	ddrc_base = dev_read_addr(dev);
+#endif
+
+	printf("%s(%d): here\n", __func__, __LINE__);
+
+#ifdef CONFIG_K1_X_BOARD_FPGA
+	ddr_init = (void(*)(void))(lpddr4_init_fpga_data + 0x144);
+	ddr_init();
+#else
+	writel(0x2dffff, (void __iomem *)0xd4051024);
+
+	/* ajdust power supply */
+	init_pmic();
+
+	/* change cpu cluster0 frequency to 1248Mhz */
+	printf("adjust cpu0 freqency to 1248Mhz\n");
 	val = readl((void __iomem *)(K1X_MPMU_BASE + 0x1024));
 	val |= BIT(16);
 	writel(val, (void __iomem *)(K1X_MPMU_BASE + 0x1024));
@@ -131,23 +222,11 @@ static int spacemit_ddr_probe(struct udevice *dev)
 
 	val = readl((void __iomem *)(K1X_APMU_BASE + 0x38c));
 	val |= BIT(12);
+
 	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x38c));
 	while(readl((void __iomem *)(K1X_APMU_BASE + 0x38c)) & BIT(12));
 
-#ifdef CONFIG_K1_X_BOARD_FPGA
-	ddr_init = (void(*)(void))(lpddr4_init_fpga_data + 0x144);
-	ddr_init();
-#else
-	ddr_init = (void(*)(void))(lpddr4_init_asic_data + 0x462);
-	ddr_init();
-
-	val = readl((void __iomem *)(K1X_APMU_BASE + 0x00A0));
-	val &= ~0x10;
-	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x00A0));
-
-	val = readl((void __iomem *)(K1X_APMU_BASE + 0x0098));
-	val &= ~0x10;
-	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x0098));
+	lpddr4_silicon_init(ddrc_base);
 #endif
 
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
