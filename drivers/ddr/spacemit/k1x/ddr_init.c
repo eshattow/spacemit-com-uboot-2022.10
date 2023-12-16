@@ -172,8 +172,8 @@ void init_pmic(void)
 	pmic_write_with_check(i2c_bus, power_addr, buck1_reg, val, (val | (1 << 7)));
 
 	/* set ext-dcdc to 1.0v */
-	printf("adust ext-dcdc voltage to 1.0v\n");
-	pmic_write(i2c_bus, 0x70, 0x0, 0x28);
+//	printf("adust ext-dcdc voltage to 1.0v\n");
+//	pmic_write(i2c_bus, 0x70, 0x0, 0x28);
 
 	/* delay some time to wait power stable */
 	for(i=0; i<0x1000000; i++) {
