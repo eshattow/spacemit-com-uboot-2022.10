@@ -338,7 +338,8 @@ static int spacemit_reset_update(struct reset_ctl *rst, bool assert)
 {
 	if(rst->id < RESET_UART1 || rst->id >= RESET_NUMBER)
 		return 0;
-
+	if (rst->id == RESET_TWSI8)
+		return 0;
 	if(assert == true){
 		spacemit_reset_set(rst, rst->id, assert);
 	}
