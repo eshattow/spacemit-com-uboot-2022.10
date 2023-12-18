@@ -153,7 +153,7 @@
 struct spacemit_k1x_clk k1x_clock_controller;
 struct clk vctcxo_24, vctcxo_3, vctcxo_1, pll1_vco, clk_32k, clk_dummy;
 
-#if IS_ENABLED(CONFIG_SPL_CLK)
+#if IS_ENABLED(CONFIG_SPL_BUILD)
 
 //apbs
 static SPACEMIT_CCU_FACTOR(pll1_2457p6_vco, "pll1_2457p6_vco", "pll1_vco",
