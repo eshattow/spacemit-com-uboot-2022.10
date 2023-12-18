@@ -4,6 +4,7 @@
 /dts-v1/;
 
 #include "k1-x.dtsi"
+#include "k1-x_pinctrl.dtsi"
 
 / {
 	model = "spacemit k1-x fpga board";
@@ -101,16 +102,18 @@
 
 &eth0 {
 	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_gmac0>;
 
-	phy-reset-pin = <40>;
+	phy-reset-pin = <44>;
 
 	clk_tuning_enable;
-	clk-tuning-by-reg;
-	tx-phase = <0x1>;
-	rx-phase = <0x5>;
+	clk-tuning-by-delayline;
+	tx-phase = <20>;
+	rx-phase = <0>;
 
 	phy-mode = "rgmii";
-	phy-addr = <0>;
+	phy-addr = <1>;
 	phy-handle = <&rgmii>;
 
 	ref-clock-from-phy;
@@ -119,9 +122,9 @@
 		#address-cells = <0x1>;
 		#size-cells = <0x0>;
 		rgmii: phy@0 {
-			compatible = "ethernet-phy-ieee802.3-c22";
+			compatible = "ethernet-phy-id001c.c916";
 			device_type = "ethernet-phy";
-			reg = <0x0>;
+			reg = <0x1>;
 		};
 	};
 };

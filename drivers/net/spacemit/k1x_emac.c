@@ -570,28 +570,38 @@ static int emac_phy_reset(struct emac_priv *priv)
     }
     mdelay(15);
 #else
-    reg =  (void *)(ulong)(0xD4019004 + 0xc);
+    u32 reg_gbase = 0, reg_goff = 0, bit_no = 0;
+
+    if (priv->phy_reset_gpio < 96) {
+        reg_goff = (priv->phy_reset_gpio >> 5) * (0x4);
+    } else {
+        reg_goff = 0x100;
+    }
+    reg_gbase = 0xD4019000 + reg_goff;
+    bit_no = (priv->phy_reset_gpio) & 0x1f;
+
+    reg =  (void *)(ulong)(reg_gbase + 0xc);
     u32 val = readl(reg);
-    val |= 1 << 8;
+    val |= 1 << bit_no;
     writel(val, reg);
 
     udelay(2);
 
-    reg =  (void *)(ulong)(0xD4019004 + 0x18);
+    reg =  (void *)(ulong)(reg_gbase + 0x18);
     val = readl(reg);
-    val |= 1 << 8;
+    val |= 1 << bit_no;
     writel(val, reg);
 
     mdelay(10);
-    reg =  (void *)(ulong)(0xD4019004 + 0x24);
+    reg =  (void *)(ulong)(reg_gbase + 0x24);
     val = readl(reg);
-    val |= 1 << 8;
+    val |= 1 << bit_no;
     writel(val, reg);
 
     mdelay(15);
-    reg =  (void *)(ulong)(0xD4019004 + 0x18);
+    reg =  (void *)(ulong)(reg_gbase + 0x18);
     val = readl(reg);
-    val |= 1 << 8;
+    val |= 1 << bit_no;
     writel(val, reg);
 
 #endif
