@@ -159,11 +159,17 @@ void init_pmic(void)
 	val |= (1 << 3);
 	pmic_write(i2c_bus, power_addr, pwr_reg_en1, val);
 
-	/* enable ldo4, default 3.1v */
-	printf("enable ldo-4, default voltage is 3.1v\n");
+	/* enable ldo4, default 2.8v */
+	printf("enable ldo-4, default voltage is 2.8v\n");
 	val = pmic_read(i2c_bus, power_addr, 0x12);
 	val |= (1 << 0);
 	pmic_write(i2c_bus, power_addr, 0x12, val);
+
+	/* adjust ldo-4 to 3.3v */
+	printf("adust ldo-4 voltage to 3.3v\n");
+	val = pmic_read(i2c_bus, power_addr, 0xBA);
+	val |= 0x0f;
+	pmic_write(i2c_bus, power_addr, 0xBA, val);
 
 	/* enable ld9, default 3.1v */
 	printf("enable ldo-9, default voltage is 3.1v\n");
