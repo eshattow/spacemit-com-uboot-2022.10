@@ -542,7 +542,6 @@ static int emac_write_hwaddr(struct udevice *dev)
 
 static int emac_phy_reset(struct emac_priv *priv)
 {
-    void __iomem *reg;
 
 #ifdef CONFIG_GPIO  /* gpio driver is not ready for fpga platform */
     int ret;
@@ -570,6 +569,7 @@ static int emac_phy_reset(struct emac_priv *priv)
     }
     mdelay(15);
 #else
+    void __iomem *reg;
     u32 reg_gbase = 0, reg_goff = 0, bit_no = 0;
 
     if (priv->phy_reset_gpio < 96) {
