@@ -221,10 +221,10 @@ void setenv_boot_mode(void)
 
 int board_init(void)
 {
-#ifdef CONFIG_DM_REGULATOR
+#ifdef CONFIG_DM_REGULATOR_SPM8XX
 	int ret;
 
-	ret = regulators_enable_boot_on(false);
+	ret = regulators_enable_boot_on(true);
 	if (ret)
 		debug("%s: Cannot enable boot on regulator\n", __func__);
 #endif
