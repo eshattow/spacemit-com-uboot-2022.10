@@ -275,6 +275,18 @@
 			riscv,ndev = <159>;
 		};
 
+		gpio: gpio@d4019000 {
+			compatible = "spacemit,k1x-gpio";
+			reg = <0x0 0xd4019000 0x0 0x800>;
+			gpio-controller;
+			gpio-count = <128>;
+			#gpio-cells = <2>;
+			interrupts = <58>;
+			clocks = <&ccu CLK_GPIO>;
+			interrupt-names = "gpio_mux";
+			interrupt-parent = <&intc>;
+		};
+
 		pinctrl: pinctrl@d401e000 {
 			compatible = "pinctrl-single";
 			reg = <0x0 0xd401e000 0x0 0x400>;
