@@ -4,6 +4,8 @@
 /dts-v1/;
 #include <dt-bindings/reset/reset-spacemit-k1x.h>
 #include <dt-bindings/clock/spacemit-k1x-clock.h>
+#include <dt-bindings/power-domain/k1x-pmu.h>
+
 / {
 	compatible = "spacemit,k1x", "riscv";
 	#address-cells = <2>;
@@ -286,6 +288,12 @@
 				#pinctrl-single,gpio-range-cells = <3>;
 			};
 		};
+
+                pmu: power-management@0 {
+			compatible = "spacemit,k1x-pm-domain";
+			reg = <0x0 0xd4050000 0x0 0x3004>, <0x0 0xd4282800 0x0 0x3f4>;
+			#power-domain-cells = <1>;
+                };
 
 		uart0: uart@d4017000 {
 			u-boot,dm-spl;
