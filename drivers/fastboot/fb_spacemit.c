@@ -490,10 +490,11 @@ static __maybe_unused lbaint_t fb_mmc_blk_write(struct blk_desc *block_dev, lbai
 }
 
 int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
-							int hwpart, u32 buff_sz)
+							int hwpart, u32 buff_sz, u32 offset)
 {
 	lbaint_t blkcnt;
 	lbaint_t blks;
+	lbaint_t blkoff;
 	unsigned long blksz;
 
 	// To operate on EMMC_BOOT1/2 (mmc0boot0/1) we first change the hwpart
@@ -513,10 +514,14 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 			pr_err("Image size too large\n");
 			return -1;
 		}
+        if (offset % blksz) {
+                pr_err("offset must be %lx align\n", blksz);
+                return -1;
+        }
 
 		debug("Start Flashing Image to EMMC_BOOT%d...\n", hwpart);
-
-		blks = fb_mmc_blk_write(dev_desc, 0, blkcnt, buffer);
+		blkoff = offset / blksz;
+		blks = fb_mmc_blk_write(dev_desc, blkoff, blkcnt, buffer);
 
 		if (blks != blkcnt) {
 			pr_err("Failed to write EMMC_BOOT%d\n", hwpart);
@@ -644,12 +649,7 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 dow
 
 	/*fill up emmc bootinfo*/
 	struct boot_parameter_info *boot_info;
-	boot_info = malloc(sizeof(struct boot_parameter_info));
-	if (!boot_info){
-		if (response)
-			fastboot_fail("can not malloc size", response);
-		return;
-	}
+	boot_info = (struct boot_parameter_info *)download_buffer;
 	memset(boot_info, 0, sizeof(boot_info));
 	boot_info->magic_code = BOOT_INFO_EMMC_MAGICCODE;
 	boot_info->version_number = BOOT_INFO_EMMC_VERSION;
@@ -661,10 +661,11 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 dow
 	boot_info->spl_size_limit = BOOT_INFO_EMMC_LIMIT;
 	strcpy(boot_info->flash_type, "eMMC");
 	boot_info->crc32 = crc32_wd(0, (const uchar *)boot_info, 0x40, CHUNKSZ_CRC32);
-	memcpy(download_buffer, boot_info, 0x80);
+
+	/*flash bootinfo*/
 	printf("bootinfo:%p, boot_info->crc32:%x, sizeof(boot_info):%lx, download_buffer:%p\n", boot_info, boot_info->crc32, sizeof(boot_info), download_buffer);
 
-	if (flash_mmc_boot_op(dev_desc, download_buffer, 1, sizeof(boot_info))){
+	if (flash_mmc_boot_op(dev_desc, download_buffer, 1, sizeof(boot_info), 0)){
 		if (response)
 			fastboot_fail("flash mmc boot fail", response);
 		return;

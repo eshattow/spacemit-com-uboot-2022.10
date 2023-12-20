@@ -321,7 +321,7 @@ static int write_raw_image(struct blk_desc *dev_desc,
 	
 }
 
-void specific_flash_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
+void specific_flash_mmc_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 {
 	char blk_dev_str[10] = {"\0"};
 	char file_name[20] = {"\0"};
@@ -330,9 +330,9 @@ void specific_flash_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
 
 	/*flash emmc info to boot0*/
-	fastboot_oem_flash_bootinfo(NULL, load_addr, 0, NULL, fdev);
+	fastboot_oem_flash_bootinfo(NULL, load_addr, image_size, NULL, fdev);
 
-	/*flash fsbl.bin to boot1*/
+	/*load fsbl.bin to load_addr*/
 	if (strlen(FLASH_IMG_FACTORY_FOLDER) > 0){
 		strcpy(file_name, FLASH_IMG_FACTORY_FOLDER);
 		strcat(file_name, "/");
@@ -357,7 +357,15 @@ void specific_flash_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 		pr_err("invalid mmc device\n");
 		return;
 	}
-	if (flash_mmc_boot_op(dev_desc, load_addr, 2, image_size)){
+
+	/*flash fsbl.bin to boot0*/
+	if (flash_mmc_boot_op(dev_desc, load_addr, 1, image_size, BOOT_INFO_EMMC_SPL0_OFFSET)){
+		printf("flash fsbl fail\n");
+		return;
+	}
+
+	/*flash fsbl.bin to boot1*/
+	if (flash_mmc_boot_op(dev_desc, load_addr, 2, image_size, BOOT_INFO_EMMC_SPL1_OFFSET)){
 		printf("flash fsbl fail\n");
 		return;
 	}
@@ -534,7 +542,7 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 	}
 
 	/*flash other image to specific offset*/
-	specific_flash_opt(cmdtp, fdev);
+	specific_flash_mmc_opt(cmdtp, fdev);
 
 	/* all flash operations successed */
 	return RESULT_OK;

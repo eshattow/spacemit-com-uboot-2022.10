@@ -234,6 +234,6 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 dow
  * @return int 
  */
 int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
-							int hwpart, u32 buff_sz);
+							int hwpart, u32 buff_sz, u32 offset);
 
 #endif
