@@ -434,14 +434,18 @@ void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download
 	char cmdbuf[32];
 	memset(cmdbuf, '\0', 32);
 
-	/*load env.txt*/
-	sprintf(cmdbuf, "env import -d -t 0x%lx", (ulong)download_buffer);
-
 	/*load env.bin*/
-	// sprintf(cmdbuf, "env import -d -c 0x%lx 0x%lx", (ulong)download_buffer, (ulong)CONFIG_ENV_SIZE);
+	sprintf(cmdbuf, "env import -d -c 0x%lx 0x%lx", (ulong)download_buffer, (ulong)CONFIG_ENV_SIZE);
+
 	if (run_command(cmdbuf, 0)){
-		fastboot_fail("Cannot import env.bin", response);
-		return;
+		printf("can not import env, try to load env.txt\n");
+		memset(cmdbuf, '\0', 32);
+		/*load env.txt*/
+		sprintf(cmdbuf, "env import -d -t 0x%lx", (ulong)download_buffer);
+		if (run_command(cmdbuf, 0)){
+			fastboot_fail("Cannot flash env partition", response);
+			return;
+		}
 	}
 
 	if (_update_partinfo_to_env(download_buffer, download_bytes, fdev)){
