@@ -16,13 +16,13 @@
 #define MAX_FREQ_LV		8
 
 typedef enum {
-	DDR_4Gb = 0,
+	DDR_2Gb = 0,
+	DDR_3Gb,
+	DDR_4Gb,
 	DDR_6Gb,
 	DDR_8Gb,
 	DDR_12Gb,
 	DDR_16Gb,
-	DDR_24Gb,
-	DDR_32Gb,
 	RESERVEDX,
 } lpddr4_density_type;
 
@@ -69,6 +69,6 @@ union dfc_level_ctrl {
 	u32 ctrl;
 };
 
-u32 ddr_get_capacity(void);
+u32 ddr_get_density(void);
 
 #endif /* _DDR_FREQ_H_ */

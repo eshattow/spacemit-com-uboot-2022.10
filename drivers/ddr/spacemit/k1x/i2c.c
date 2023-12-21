@@ -39,22 +39,6 @@ static inline uint32_t mmio_read_32(uintptr_t addr)
 	return *(volatile uint32_t *)addr;
 }
 
-static void my_udelay(uint32_t us)
-{
-	uint64_t start = 0x100000;
-
-	while(1) {
-		start --;
-		if (start == 0)
-			break;
-	}
-}
-
-static void my_mdelay(uint32_t ms)
-{
-	my_udelay(ms * 1000);
-}
-
 static uint32_t apbc_clk_reg[] = {
 	REG_APBC_APBC_TWSI0_CLK_RST,
 	REG_APBC_APBC_TWSI1_CLK_RST,
@@ -132,7 +116,7 @@ static void i2c_fifo_bus_reset(int port_idx)
 	if(!(bus_status & TWSI_IBMR_SDA) || !(bus_status & TWSI_IBMR_SCL)) {
 		/* controller reset */
 		mmio_write_32(TWSI_ICR + port_base, TWSI_ICR_UR);
-		my_udelay(5);
+		udelay(5);
 		mmio_write_32(TWSI_ICR + port_base, 0x0);
 
 		/* set load counter register */
@@ -154,7 +138,7 @@ static void i2c_fifo_bus_reset(int port_idx)
 		/* if still locked, send one clk to slave to request release */
 		mmio_write_32(TWSI_RST_CYC + port_base, 0x1);
 		mmio_write_32(TWSI_ICR + port_base, TWSI_ICR_BUS_RESET);
-		my_udelay(20);
+		udelay(20);
 		clk_cnt++;
 	}
 
@@ -172,7 +156,7 @@ static void I2CResetUnit(int port_idx)
 	mmio_write_32(TWSI_ICR + port_base, TWSI_ICR_UR);
 	mmio_write_32(TWSI_ISR + port_base, I2C_INT_ALL);
 	mmio_write_32(TWSI_ICR + port_base, 0);
-	//my_mdelay(100);          /*Delay of 100 millisecond - enable the module to sync with the bus*/
+	//mdelay(100);          /*Delay of 100 millisecond - enable the module to sync with the bus*/
 
 }
 
@@ -185,7 +169,7 @@ void i2c_fifo_init(int port_idx, I2C_FAST_MODE fastMode)
 	i2c_clear_tx_rx_fifo(port_idx);
 	I2CResetUnit(port_idx);
 	i2c_fifo_bus_reset(port_idx);
-	my_mdelay(5);
+	mdelay(5);
 	mmio_write_32(TWSI_ILCR + port_base, 0x82c469f);
 	mmio_write_32(TWSI_IWCR + port_base, 0x142a);
 	mmio_write_32(TWSI_ICR + port_base,
@@ -200,7 +184,7 @@ int i2c_fifo_wait_status(int port_idx, uint32_t status)
 	uint32_t port_base = twsi_base[port_idx];
 	uint32_t i = 0;
 	while (status != (status & (mmio_read_32(TWSI_ISR + port_base)))) {
-		my_udelay(100);
+		udelay(100);
 		i++;
 		if (TWSI_ISR_BED & (mmio_read_32(TWSI_ISR + port_base))) {
 			printf("bus error detected!0x%x,0x%x\n",

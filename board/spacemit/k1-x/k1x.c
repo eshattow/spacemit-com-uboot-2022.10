@@ -346,3 +346,36 @@ int misc_init_r(void)
 
 	return 0;
 }
+
+int dram_init(void)
+{
+	gd->ram_base = CONFIG_SYS_SDRAM_BASE;
+#if 0
+	if(ddr_get_density() > SZ_2GB / SZ_1MB) {
+		gd->ram_size = SZ_2GB;
+	} else {
+		gd->ram_size = ddr_get_density() * SZ_1MB;
+	}
+#else
+	gd->ram_size = SZ_2GB;
+#endif
+	return 0;
+}
+
+int dram_init_banksize(void)
+{
+	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
+	gd->bd->bi_dram[0].size = SZ_2G;
+
+	return 0;
+}
+
+ulong board_get_usable_ram_top(ulong total_size)
+{
+        /* Some devices (like the EMAC) have a 32-bit DMA limit. */
+        if (gd->ram_top > (1ULL << 31))
+                return 1ULL << 31;
+
+        return gd->ram_top;
+}
+

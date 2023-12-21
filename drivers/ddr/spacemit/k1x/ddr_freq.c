@@ -122,14 +122,11 @@ static u32 mode_register_read(u32 MR, u32 CH, u32 CS)
 {
 	u32 read_data;
 	u32 UI3 = 0;
-	u32 timeout = 0;
 
 	writel((0x10010000 + ((CS + 1) << 24) + (CH << 18) + MR), (void __iomem*)DDR_MR_REG);
 	read_data = readl((void __iomem*)DDR_MR_DATA);
 
 	while(!(read_data & 0x80000000)) {
-		if (timeout++ > 100)
-			return 0;
 		read_data = readl((void __iomem*)DDR_MR_DATA);
 	}
 
@@ -137,11 +134,17 @@ static u32 mode_register_read(u32 MR, u32 CH, u32 CS)
 	return UI3;
 }
 
-static u32 format_size(u32 capacity, u32 io_width)
+static u32 format_size(u32 density, u32 io_width)
 {
 	u32 size = 0;
 
-	switch (capacity) {
+	switch (density) {
+	case DDR_2Gb:
+		size = 256;
+		break;
+	case DDR_3Gb:
+		size = 384;
+		break;
 	case DDR_4Gb:
 		size = 512;
 		break;
@@ -157,14 +160,8 @@ static u32 format_size(u32 capacity, u32 io_width)
 	case DDR_16Gb:
 		size = 2048;
 		break;
-	case DDR_24Gb:
-		size = 3072;
-		break;
-	case DDR_32Gb:
-		size = 4096;
-		break;
 	default:
-		printf("donot support such density=0x%x device\n", capacity);
+		printf("donot support such density=0x%x device\n", density);
 		return -EINVAL;
 	}
 	if (io_width == 1)
@@ -173,21 +170,29 @@ static u32 format_size(u32 capacity, u32 io_width)
 	return size;
 }
 
-u32 ddr_get_capacity(void)
+u32 ddr_get_density(void)
 {
-	u32 mr8_cs0, mr8_cs1, io_width_cs0, io_width_cs1;
+	u32 mr8_cs00, mr8_cs01, mr8_cs10, mr8_cs11;
+	u32 io_width_cs00, io_width_cs01, io_width_cs10, io_width_cs11;
+
 	u32 cs0_size = 0;
 	u32 cs1_size = 0;
 	u32 ddr_size = 0;
 
-	mr8_cs0 = mode_register_read(8, 0, 0);
-	mr8_cs1 = mode_register_read(8, 0, 1);
+	mr8_cs00 = mode_register_read(8, 0, 0);
+	mr8_cs01 = mode_register_read(8, 1, 0);
+	mr8_cs10 = mode_register_read(8, 0, 1);
+	mr8_cs11 = mode_register_read(8, 1, 1);
 
-	io_width_cs0 = mr8_cs0 ? mr8_cs0 >> 6 : 0;
-	io_width_cs1 = mr8_cs1 ? mr8_cs1 >> 6 : 0;
+	io_width_cs00 = mr8_cs00 ? mr8_cs00 >> 6 : 0;
+	io_width_cs01 = mr8_cs01 ? mr8_cs01 >> 6 : 0;
+	io_width_cs10 = mr8_cs10 ? mr8_cs10 >> 6 : 0;
+	io_width_cs11 = mr8_cs11 ? mr8_cs11 >> 6 : 0;
 
-	cs0_size = mr8_cs0 ? format_size(((mr8_cs0 >> 2) & 0xf), io_width_cs0) : 0;
-	cs1_size = mr8_cs1 ? format_size(((mr8_cs1 >> 2) & 0xf), io_width_cs1) : 0;
+	cs0_size = mr8_cs00 ? format_size(((mr8_cs00 >> 2) & 0xf), io_width_cs00) : 0;
+	cs0_size += mr8_cs01 ? format_size(((mr8_cs01 >> 2) & 0xf), io_width_cs01) : 0;
+	cs1_size = mr8_cs10 ? format_size(((mr8_cs10 >> 2) & 0xf), io_width_cs10) : 0;
+	cs1_size += mr8_cs11 ? format_size(((mr8_cs11 >> 2) & 0xf), io_width_cs11) : 0;
 
 	ddr_size = cs0_size + cs1_size;
 
@@ -195,6 +200,23 @@ u32 ddr_get_capacity(void)
 	return ddr_size;
 }
 
+uint32_t get_manufacture_id(void)
+{
+	uint32_t mr5;
+
+	mr5 = mode_register_read(5, 0, 0);
+	printf("MR5 = 0x%x\n",mr5);
+	return (mr5&0xff);
+}
+
+uint32_t get_ddr_rev_id(void)
+{
+	uint32_t mr6;
+
+	mr6 = mode_register_read(6, 0, 0);
+	printf("MR6 = 0x%x\n",mr6);
+	return (mr6&0xff);
+}
 static int get_cur_freq_level(void)
 {
 	u32 level = readl((void __iomem *)DFC_STATUS);

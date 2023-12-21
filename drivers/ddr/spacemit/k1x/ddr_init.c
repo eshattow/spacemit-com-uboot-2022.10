@@ -198,6 +198,30 @@ void init_pmic(void)
 }
 #endif
 
+__maybe_unused static void fix_ddr_data(unsigned long long start, unsigned long long end)
+{
+	unsigned long long value;
+
+	printf("try write 0x%llx ~ 0x%llx ...\n", start, end);
+	for(value=start; value<end; value +=8) {
+		*(unsigned long long *)value = value;
+	}
+}
+
+__maybe_unused static void check_ddr_data(unsigned long long start, unsigned long long end)
+{
+	unsigned long long value;
+
+	printf("checking 0x%llx ~ 0x%llx ...\n", start, end);
+	for(value=start; value<end; value +=8) {
+		if(*(unsigned long long *)value != value) {
+			printf("addr:0x%llx err:0x%llx, should be:0x%llx \n",
+				 value, *(unsigned long long *)value, value);
+		}
+	}
+	printf("checking 0x%llx ~ 0x%llx done\n", start, end);
+}
+
 static int spacemit_ddr_probe(struct udevice *dev)
 {
 	int ret;
@@ -247,6 +271,30 @@ static int spacemit_ddr_probe(struct udevice *dev)
 		return -EIO;
 	}
 	log_debug("dram init done\n");
+
+/* check dram space */
+#if 0
+	/* check 0GB~2GB rw */
+	fix_ddr_data(0x1000, 0x7fffffff);
+	check_ddr_data(0x1000, 0x7fffffff);
+
+	/* check 2GB~4GB rw */
+	fix_ddr_data(0x100000000, 0x17fffffff);
+	check_ddr_data(0x100000000, 0x17fffffff);
+
+	/* check 4GB~6GB rw */
+	fix_ddr_data(0x180000000, 0x1ffffffff);
+	check_ddr_data(0x180000000, 0x1ffffffff);
+
+	/* check 6GB~8GB rw */
+	fix_ddr_data(0x200000000, 0x27fffffff);
+	check_ddr_data(0x200000000, 0x27fffffff);
+
+	/* check 0GB~2GB rw */
+	check_ddr_data(0x1000, 0x7fffffff);
+	/* check 2GB~8GB rw */
+	check_ddr_data(0x100000000, 0x27fffffff);
+#endif
 
 	return 0;
 }
