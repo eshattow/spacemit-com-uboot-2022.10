@@ -308,8 +308,26 @@
 	};
 };
 
+&pinctrl {
+	usbp1_vbus: usbp1_vbus {
+		pinctrl-single,pins =<
+			K1X_PADCONF(GPIO_66, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_1V8_DS2))    /* drive_vbus1_iso */
+		>;
+	};
+};
+
 &udc {
 	status = "okay";
+};
+
+&usbphy1 {
+	status = "disabled";
+};
+
+&ehci1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&usbp1_vbus>;
+	status = "disabled";
 };
 
 &usbdrd3 {
