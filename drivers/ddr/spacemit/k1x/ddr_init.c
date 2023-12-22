@@ -12,6 +12,7 @@
 #include <init.h>
 #include <log.h>
 #include <ram.h>
+#include <cpu.h>
 #include <asm/cache.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
@@ -119,6 +120,7 @@ extern void lpddr4_silicon_init(uint32_t base, uint32_t data_rate);
 extern uint8_t pmic_read(uint8_t i2c_bus, uint8_t addr, uint8_t reg);
 extern uint8_t pmic_write_with_check(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_t reg_val, uint8_t check_val);
 extern uint8_t pmic_write(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_t reg_val);
+extern int pmic_detect(uint8_t i2c_bus, uint8_t addr, uint8_t reg_addr);
 
 void init_pmic(void)
 {
@@ -132,6 +134,8 @@ void init_pmic(void)
 	uint8_t dvc_reg = 0x41;
 	uint8_t pwr_reg_en1 = 0x11;
 	uint8_t pwr_reg_en3 = 0x13;
+	struct udevice *cpu;
+	uint32_t cpu_voltage;
 
 	/* read pmic version */
 	val = pmic_read(i2c_bus, base_addr, id_reg);
@@ -142,50 +146,79 @@ void init_pmic(void)
 	pmic_write(i2c_bus, power_addr, dvc_reg, 0x0);
 
 	/* enable buck5, default 1.5v */
-	printf("enable buck-5, default voltage is 1.5v\n");
+	printf("enable buck-5, default voltage is 1.5v ...");
 	val = pmic_read(i2c_bus, power_addr, pwr_reg_en1);
 	val |= (1 << 4);
 	pmic_write(i2c_bus, power_addr, pwr_reg_en1, val);
+	printf("	[succeed]\n");
 
 	/* enable ldo19, default value is 1.1v */
-	printf("enable ldo-19, default voltage is 1.1v\n");
+	printf("enable ldo-19, default voltage is 1.1v ...");
 	val = pmic_read(i2c_bus, power_addr, pwr_reg_en3);
 	val |= 1 << 7;
 	pmic_write(i2c_bus, power_addr, pwr_reg_en3, val);
+	printf("	[succeed]\n");
 
 	/* enable buck4, default 0.6v */
-	printf("enable buck-4, default voltage is 0.6v\n");
+	printf("enable buck-4, default voltage is 0.6v ...");
 	val = pmic_read(i2c_bus, power_addr, pwr_reg_en1);
 	val |= (1 << 3);
 	pmic_write(i2c_bus, power_addr, pwr_reg_en1, val);
+	printf("	[succeed]\n");
 
 	/* enable ldo4, default 2.8v */
-	printf("enable ldo-4, default voltage is 2.8v\n");
+	printf("enable ldo-4, default voltage is 2.8v ...");
 	val = pmic_read(i2c_bus, power_addr, 0x12);
 	val |= (1 << 0);
 	pmic_write(i2c_bus, power_addr, 0x12, val);
+	printf("	[succeed]\n");
 
 	/* adjust ldo-4 to 3.3v */
-	printf("adust ldo-4 voltage to 3.3v\n");
+	printf("adust ldo-4 voltage to 3.3v ...");
 	val = pmic_read(i2c_bus, power_addr, 0xBA);
 	val |= 0x0f;
 	pmic_write(i2c_bus, power_addr, 0xBA, val);
+	printf("			[succeed]\n");
 
 	/* enable ld9, default 3.1v */
-	printf("enable ldo-9, default voltage is 3.1v\n");
+	printf("enable ldo-9, default voltage is 3.1v ...");
 	val = pmic_read(i2c_bus, power_addr, 0x12);
 	val |= (1 << 5);
 	pmic_write(i2c_bus, power_addr, 0x12, val);
+	printf("	[succeed]\n");
 
-	/* adjust buck1 to 0.95v */
-	printf("adust buck-1 voltage to 0.95v\n");
+	cpu = cpu_get_current_dev();
+	if(dev_read_u32u(cpu, "boot_voltage", &cpu_voltage)) {
+		printf("boot_voltage not configured, use 0.95v as default!\n");
+		cpu_voltage = 950;
+	}
+	/* check if cpu voltage is valid */
+	cpu_voltage = cpu_voltage < 800? 800:cpu_voltage;
+	cpu_voltage = cpu_voltage > 1200? 1200:cpu_voltage;
+
+	/* adjust buck1 voltage */
+	printf("adust buck-1 voltage to %u.%03uv ...", cpu_voltage/1000, cpu_voltage%1000);
 	val = pmic_read(i2c_bus, power_addr, buck1_reg);
-	val = 0x2f;
+	val = 0x20 + (cpu_voltage - 800)/10;
 	pmic_write_with_check(i2c_bus, power_addr, buck1_reg, val, (val | (1 << 7)));
+	printf("		[succeed]\n");
 
-	/* set ext-dcdc to 1.0v */
-//	printf("adust ext-dcdc voltage to 1.0v\n");
-//	pmic_write(i2c_bus, 0x70, 0x0, 0x28);
+	if(pmic_detect(i2c_bus, 0x70, 0x0) == 0) {
+		printf("try to detect ext-cpu-dcdc ..."	\
+			"			[succeed]\n");
+		val = (cpu_voltage - 600)/10;
+		/* set ext-dcdc to 1.0v */
+		if(pmic_write(i2c_bus, 0x70, 0x0, val) != val) {
+			printf("try adjust ext-dcdc voltage to %u.%03uv "\
+				"...	[failed]\n", cpu_voltage/1000, cpu_voltage%1000);
+		} else {
+			printf("try adjust ext-dcdc voltage to %u.%03uv "\
+				"...	[succeed]\n", cpu_voltage/1000, cpu_voltage%1000);
+		}
+	} else {
+		printf("try detect ext-cpu-dcdc ..."\
+			"			[failed]\n");
+	}
 
 	/* delay some time to wait power stable */
 	for(i=0; i<0x1000000; i++) {
@@ -222,6 +255,43 @@ __maybe_unused static void check_ddr_data(unsigned long long start, unsigned lon
 	printf("checking 0x%llx ~ 0x%llx done\n", start, end);
 }
 
+static uint32_t adjust_cpu_freq(uint64_t cluster, uint32_t freq)
+{
+	uint32_t freq_act=freq, val;
+
+	/* switch cpu clock source */
+	val = readl((void __iomem *)(K1X_APMU_BASE + 0x38c + cluster*4));
+	val &= ~(0x07 | BIT(13));
+	switch(freq) {
+	case 1600000:
+		val |= 0x07;
+		break;
+
+	case 1228000:
+		val |= 0x04;
+		break;
+
+	case 819000:
+		val |= 0x01;
+		break;
+
+	case 614000:
+	default:
+		freq_act = 614000;
+		val |= 0x00;
+		break;
+	}
+	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x38c + cluster*4));
+
+	/* set cluster frequency change request, and wait done */
+	val = readl((void __iomem *)(K1X_APMU_BASE + 0x38c + cluster*4));
+	val |= BIT(12);
+	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x38c + cluster*4));
+	while(readl((void __iomem *)(K1X_APMU_BASE + 0x38c + cluster*4)) & BIT(12));
+
+	return freq_act;
+}
+
 static int spacemit_ddr_probe(struct udevice *dev)
 {
 	int ret;
@@ -229,8 +299,10 @@ static int spacemit_ddr_probe(struct udevice *dev)
 #ifdef CONFIG_K1_X_BOARD_FPGA
 	void (*ddr_init)(void);
 #else
-	uint32_t val, ddr_datarate;
+	uint32_t val, cpu_freq, ddr_datarate;
 	fdt_addr_t ddrc_base;
+	struct udevice *cpu;
+
 	ddrc_base = dev_read_addr(dev);
 
 	if(dev_read_u32u(dev, "datarate", &ddr_datarate)) {
@@ -249,22 +321,34 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	/* ajdust power supply */
 	init_pmic();
 
-	/* change cpu cluster0 frequency to 1248Mhz */
-	printf("adjust cpu0 freqency to 1248Mhz\n");
+	/* enable CLK_1228M */
 	val = readl((void __iomem *)(K1X_MPMU_BASE + 0x1024));
-	val |= BIT(16);
+	val |= BIT(16) | BIT(15) | BIT(14) | BIT(13);
 	writel(val, (void __iomem *)(K1X_MPMU_BASE + 0x1024));
 
-	val = readl((void __iomem *)(K1X_APMU_BASE + 0x38c));
-	val &= ~0x07;
-	val |= 0x04;
-	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x38c));
+	/* enable PLL3(3200Mhz) */
+	val = readl((void __iomem *)(K1X_APB_SPARE_BASE + 0x12C));
+	val |= BIT(31);
+	writel(val, (void __iomem *)(K1X_APB_SPARE_BASE + 0x12C));
+	/* enable PLL3_DIV2 */
+	val = readl((void __iomem *)(K1X_APB_SPARE_BASE + 0x128));
+	val |= BIT(1);
+	writel(val, (void __iomem *)(K1X_APB_SPARE_BASE + 0x128));
 
-	val = readl((void __iomem *)(K1X_APMU_BASE + 0x38c));
-	val |= BIT(12);
+	cpu = cpu_get_current_dev();
+	if(dev_read_u32u(cpu, "boot_freq_cluster0", &cpu_freq)) {
+		printf("boot_freq_cluster0 not configured, use 1228000 as default!\n");
+		cpu_freq = 1228000;
+	}
+	cpu_freq = adjust_cpu_freq(0, cpu_freq);
+	printf("adjust cluster-0 frequency to %u done\n", cpu_freq);
 
-	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x38c));
-	while(readl((void __iomem *)(K1X_APMU_BASE + 0x38c)) & BIT(12));
+	if(dev_read_u32u(cpu, "boot_freq_cluster1", &cpu_freq)) {
+		printf("boot_freq_cluster1 not configured, use 1228000 as default!\n");
+		cpu_freq = 614000;
+	}
+	cpu_freq = adjust_cpu_freq(1, cpu_freq);
+	printf("adjust cluster-1 frequency to %u done\n", cpu_freq);
 
 	lpddr4_silicon_init(ddrc_base, ddr_datarate);
 #endif

@@ -517,6 +517,31 @@ uint8_t pmic_read(uint8_t i2c_bus, uint8_t addr, uint8_t reg)
 	return i2c_fifo_rx_8a_8d(i2c_bus, addr << 1, reg);
 }
 
+int pmic_detect(uint8_t i2c_bus, uint8_t addr, uint8_t reg_addr)
+{
+	uint32_t port_base = twsi_base[i2c_bus];
+	uint8_t  slave_addr=addr<<1;
+	uint32_t status = 0;
+
+	pmic_i2c_init(i2c_bus);
+
+	if ((HS_MODE == i2c_fast_mode) || (HS_MODE_FAST == i2c_fast_mode))
+		mmio_write_32(TWSI_WFIFO + port_base, START_BYTE_CNTROL | 0x0e);
+	mmio_write_32(TWSI_WFIFO + port_base,
+		      START_BYTE_CNTROL | I2C_SLAVE_WRITE(slave_addr));
+	mmio_write_32(TWSI_WFIFO + port_base, TB_CNTROL | reg_addr);
+	mmio_write_32(TWSI_WFIFO + port_base,
+		      START_BYTE_CNTROL | I2C_SLAVE_READ(slave_addr));
+	mmio_write_32(TWSI_WFIFO + port_base,
+		      RX_END_BYTE_CNTROL | I2C_SLAVE_READ(slave_addr));
+
+	i2c_fifo_clear_status(i2c_bus, I2C_INT_ALL);
+	status = i2c_fifo_wait_status(i2c_bus, TWSI_ISR_TXE | TWSI_ISR_TXDONE);
+	i2c_fifo_clear_control(i2c_bus);
+
+	return status;
+}
+
 uint8_t pmic_write_with_check(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_t reg_val, uint8_t check_val)
 {
 	int timeout = 3;
@@ -529,7 +554,7 @@ uint8_t pmic_write_with_check(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_
 		val = i2c_fifo_rx_8a_8d(i2c_bus, addr << 1, reg);
 	} while ((val != check_val) && (timeout--));
 
-	if ((timeout < 0) && (val != check_val)) {
+	if ((timeout < 0) || (val != check_val)) {
 		printf("pmic write reg: %x, val: %x failed, cur_val: %x != check_val: %x\n",
 		      reg, reg_val, val, check_val);
 		//wdt_reset();
@@ -550,7 +575,7 @@ uint8_t pmic_write(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_t reg_val)
 		val = i2c_fifo_rx_8a_8d(i2c_bus, addr << 1, reg);
 	} while ((val != reg_val) && (timeout--));
 
-	if ((timeout < 0) && (val != reg_val)) {
+	if ((timeout < 0) || (val != reg_val)) {
 		printf("pmic write reg: %x, val: %x failed, cur_val: %x\n",
 		      reg, reg_val, val);
 		//wdt_reset();
