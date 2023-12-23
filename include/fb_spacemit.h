@@ -19,13 +19,28 @@
 #define FLASH_CONFIG_NAME ("partition_universal.json")
 #define FLASH_IMG_PARTNAME ("bootfs")
 
+/*check the file exist or not*/
+#define CARD_FLASH_FILE ("partition_universal.json")
+
 #define FLASH_FSBL0_OFFSET (0x20000)
 #define FLASH_FSBL1_OFFSET (0x60000)
 
 /*if they have different addr, it can define here*/
+#ifdef CONFIG_ENV_OFFSET
 #define FLASH_ENV_OFFSET_MMC (CONFIG_ENV_OFFSET)
 #define FLASH_ENV_OFFSET_NOR (CONFIG_ENV_OFFSET)
 #define FLASH_ENV_OFFSET_NAND (CONFIG_ENV_OFFSET)
+#endif
+
+/*define bootinfo for emmc*/
+#define BOOT_INFO_EMMC_MAGICCODE (0xb00714f0)
+#define BOOT_INFO_EMMC_VERSION (0x00010001)
+#define BOOT_INFO_EMMC_PAGESIZE (0x200)
+#define BOOT_INFO_EMMC_BLKSIZE (0x10000)
+#define BOOT_INFO_EMMC_TOTALSIZE (0x10000000)
+#define BOOT_INFO_EMMC_SPL0_OFFSET (0x200)
+#define BOOT_INFO_EMMC_SPL1_OFFSET (0x0)
+#define BOOT_INFO_EMMC_LIMIT (CONFIG_SPL_SIZE_LIMIT)
 
 /*define bootinfo for emmc*/
 #define BOOT_INFO_EMMC_MAGICCODE (0xb00714f0)
@@ -104,8 +119,30 @@ struct boot_parameter_info {
 	uint32_t crc32;
 } __attribute__((packed));
 
+/**
+ * @brief Set the boot mode object, it would set boot mode to register
+ * 
+ * @param boot_mode 
+ */
 void set_boot_mode(u32 boot_mode);
+
+/**
+ * @brief Get the boot mode object, it would get boot mode from register,
+ * the register would save boot_mode while boot from emmc/nor/nand success.
+ * if not set boot mode, it would return get_boot_pin_select.
+ * 
+ * @return u32 
+ */
 u32 get_boot_mode(void);
+
+/**
+ * @brief Get the boot pin select object. it would get boot pin select,
+ * which is different from get_boot_mode.
+ * 
+ * @return u32 
+ */
+u32 get_boot_pin_select(void);
+
 
 /**
  * fastboot_oem_flash_gpt() - parse flash config and write gpt table.
@@ -160,6 +197,18 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr);
 
 
 /**
+ * @brief update env to storage.
+ * 
+ * @param download_buffer 
+ * @param download_bytes 
+ * @param response 
+ * @param fdev 
+ * @return int 
+ */
+int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
+								 struct flash_dev *fdev);
+
+/**
  * @brief flash env to reserve partition.
  *
  * @param cmd env
@@ -184,5 +233,17 @@ void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download
 void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 download_bytes,
 			char *response, struct flash_dev *fdev);
 
+
+/**
+ * @brief flash mmc boot option
+ * 
+ * @param dev_desc 
+ * @param buffer 
+ * @param hwpart 
+ * @param buff_sz 
+ * @return int 
+ */
+int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
+							int hwpart, u32 buff_sz, u32 offset);
 
 #endif

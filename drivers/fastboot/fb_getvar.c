@@ -283,7 +283,7 @@ static void getvar_partition_type(char *part_name, char *response)
 static void getvar_partition_size(char *part_name, char *response)
 {
 	int r;
-	size_t size;
+	size_t size = 0;
 
 	r = getvar_get_part_info(part_name, response, &size);
 	if (r >= 0)

@@ -55,19 +55,18 @@ static int _write_gpt_partition(char gpt_table[256], char *response)
 	return 0;
 }
 
-static int _update_partinfo_to_env(void *download_buffer, u32 download_bytes, char *response,
+int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 								 struct flash_dev *fdev)
 {
 	char *gpt_table_str = NULL;
 	char *mtd_table_str = NULL;
-	u32 boot_mode = get_boot_mode();
+	u32 boot_mode = get_boot_pin_select();
 	char cmdbuf[64] = {"\0"};
 
-	if (strlen(fdev->mtd_table) > 0){
+	if (fdev->mtd_table != NULL && strlen(fdev->mtd_table) > 0){
 		mtd_table_str = malloc(strlen(fdev->mtd_table)+32);
 
 		if (mtd_table_str == NULL){
-			fastboot_fail("updata env fail", response);
 			return -1;
 		}
 		sprintf(mtd_table_str, "env set -f mtdparts 'spi-dev:%s'", fdev->mtd_table);
@@ -82,13 +81,11 @@ static int _update_partinfo_to_env(void *download_buffer, u32 download_bytes, ch
 		*/
 	}
 
-	if (strlen(fdev->gptinfo.gpt_table) > 0){
-		gpt_table_str = malloc(strlen(fdev->gptinfo.gpt_table)+32);
+	if (fdev->gptinfo.gpt_table != NULL && strlen(fdev->gptinfo.gpt_table) > 0){
+		gpt_table_str = malloc(strlen(fdev->gptinfo.gpt_table) + 32);
 		if (gpt_table_str == NULL){
-			fastboot_fail("updata env fail", response);
 			return -1;
 		}
-
 		sprintf(gpt_table_str, "env set -f partitions '%s'", fdev->gptinfo.gpt_table);
 		run_command(gpt_table_str, 0);
 		free(gpt_table_str);
@@ -96,18 +93,19 @@ static int _update_partinfo_to_env(void *download_buffer, u32 download_bytes, ch
 
 	sprintf(cmdbuf, "env export -c -s 0x%lx 0x%lx", (ulong)CONFIG_ENV_SIZE, (ulong)download_buffer);
 	if (run_command(cmdbuf, 0)){
-		fastboot_fail("Cannot import env.bin", response);
 		return -1;
 	}
 
 	switch(boot_mode){
+#ifdef FLASH_ENV_OFFSET_MMC
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
 		/*write to emmc default offset*/
-		printf("write to mmc offset:%lx\n", (ulong)FLASH_ENV_OFFSET_MMC);
+		debug("write env to mmc offset:%lx\n", (ulong)FLASH_ENV_OFFSET_MMC);
 		//maybe it could just use env save command
 		fastboot_mmc_flash_offset((u32)FLASH_ENV_OFFSET_MMC, download_buffer, (u32)CONFIG_ENV_SIZE);
 		break;
+#endif
 	case BOOT_MODE_NOR:
 		/*write to nor offset*/
 		break;
@@ -342,9 +340,13 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 					result = RESULT_FAIL;
 					goto free_cjson;
 				}
-				strcpy(fdev->parts_info[part_index].file_name, FLASH_IMG_FOLDER);
-				strcat(fdev->parts_info[part_index].file_name, "/");
-				strcat(fdev->parts_info[part_index].file_name, node_file);
+				if (strlen(FLASH_IMG_FOLDER) > 0){
+					strcpy(fdev->parts_info[part_index].file_name, FLASH_IMG_FOLDER);
+					strcat(fdev->parts_info[part_index].file_name, "/");
+					strcat(fdev->parts_info[part_index].file_name, node_file);
+				}else{
+					strcpy(fdev->parts_info[part_index].file_name, node_file);
+				}
 			}
 
 			printf("part info %s, %s\n", \
@@ -364,6 +366,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 		fdev->gptinfo.gpt_table = realloc(fdev->gptinfo.gpt_table, combine_len);
 		strcpy(fdev->gptinfo.gpt_table, combine_str);
 	}
+
 free_cjson:
 	cJSON_free(json_root);
 	free(combine_str);
@@ -405,8 +408,10 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
 
 
 	/*set partition to env*/
-	if (_update_partinfo_to_env(download_buffer, download_bytes, response, fdev))
+	if (_update_partinfo_to_env(download_buffer, download_bytes, fdev)){
+		fastboot_fail("update part info to env fail", response);
 		return;
+	}
 
 	/*maybe there doesn't have gpt/mtd partition, should not return fail*/
 	fastboot_okay("parse gpt/mtd table okay", response);
@@ -429,18 +434,24 @@ void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download
 	char cmdbuf[32];
 	memset(cmdbuf, '\0', 32);
 
-	/*load env.txt*/
-	sprintf(cmdbuf, "env import -d -t 0x%lx", (ulong)download_buffer);
-
 	/*load env.bin*/
-	// sprintf(cmdbuf, "env import -d -c 0x%lx 0x%lx", (ulong)download_buffer, (ulong)CONFIG_ENV_SIZE);
+	sprintf(cmdbuf, "env import -d -c 0x%lx 0x%lx", (ulong)download_buffer, (ulong)CONFIG_ENV_SIZE);
+
 	if (run_command(cmdbuf, 0)){
-		fastboot_fail("Cannot import env.bin", response);
-		return;
+		printf("can not import env, try to load env.txt\n");
+		memset(cmdbuf, '\0', 32);
+		/*load env.txt*/
+		sprintf(cmdbuf, "env import -d -t 0x%lx", (ulong)download_buffer);
+		if (run_command(cmdbuf, 0)){
+			fastboot_fail("Cannot flash env partition", response);
+			return;
+		}
 	}
 
-	if (_update_partinfo_to_env(download_buffer, download_bytes, response, fdev))
+	if (_update_partinfo_to_env(download_buffer, download_bytes, fdev)){
+		fastboot_fail("update part info to env fail", response);
 		return;
+	}
 
 	fastboot_okay("flash env partition okay", response);
 	return;
@@ -482,18 +493,18 @@ static __maybe_unused lbaint_t fb_mmc_blk_write(struct blk_desc *block_dev, lbai
 	return blks;
 }
 
-static void flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
-							int hwpart, u32 buff_sz, char *response)
+int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
+							int hwpart, u32 buff_sz, u32 offset)
 {
 	lbaint_t blkcnt;
 	lbaint_t blks;
+	lbaint_t blkoff;
 	unsigned long blksz;
 
 	// To operate on EMMC_BOOT1/2 (mmc0boot0/1) we first change the hwpart
 	if (blk_dselect_hwpart(dev_desc, hwpart)) {
 		pr_err("Failed to select hwpart\n");
-		fastboot_fail("Failed to select hwpart", response);
-		return;
+		return -1;
 	}
 
 	if (buffer) { /* flash */
@@ -505,26 +516,27 @@ static void flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 
 		if (blkcnt > dev_desc->lba) {
 			pr_err("Image size too large\n");
-			fastboot_fail("Image size too large", response);
-			return;
+			return -1;
 		}
+        if (offset % blksz) {
+                pr_err("offset must be %lx align\n", blksz);
+                return -1;
+        }
 
 		debug("Start Flashing Image to EMMC_BOOT%d...\n", hwpart);
-
-		blks = fb_mmc_blk_write(dev_desc, 0, blkcnt, buffer);
+		blkoff = offset / blksz;
+		blks = fb_mmc_blk_write(dev_desc, blkoff, blkcnt, buffer);
 
 		if (blks != blkcnt) {
 			pr_err("Failed to write EMMC_BOOT%d\n", hwpart);
-			fastboot_fail("Failed to write EMMC_BOOT part",
-				      response);
-			return;
+			return -1;
 		}
 
 		printf("........ wrote %lu bytes to EMMC_BOOT%d\n",
 		       blkcnt * blksz, hwpart);
 	}
 
-	fastboot_okay(NULL, response);
+	return 0;
 }
 
 /**
@@ -627,23 +639,21 @@ int check_mmc_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 download_bytes,
 			char *response, struct flash_dev *fdev)
 {
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
 	debug("%s\n", __func__);
 	struct blk_desc *dev_desc = blk_get_dev("mmc",
 					   CONFIG_FASTBOOT_FLASH_MMC_DEV);
 
 	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
 		pr_err("invalid mmc device\n");
-		fastboot_fail("invalid mmc device", response);
+		if (response)
+			fastboot_fail("invalid mmc device", response);
 		return;
 	}
 
 	/*fill up emmc bootinfo*/
 	struct boot_parameter_info *boot_info;
-	boot_info = malloc(sizeof(struct boot_parameter_info));
-	if (!boot_info){
-		fastboot_fail("can not malloc size", response);
-		return;
-	}
+	boot_info = (struct boot_parameter_info *)download_buffer;
 	memset(boot_info, 0, sizeof(boot_info));
 	boot_info->magic_code = BOOT_INFO_EMMC_MAGICCODE;
 	boot_info->version_number = BOOT_INFO_EMMC_VERSION;
@@ -655,9 +665,17 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 dow
 	boot_info->spl_size_limit = BOOT_INFO_EMMC_LIMIT;
 	strcpy(boot_info->flash_type, "eMMC");
 	boot_info->crc32 = crc32_wd(0, (const uchar *)boot_info, 0x40, CHUNKSZ_CRC32);
-	memcpy(download_buffer, boot_info, 0x80);
+
+	/*flash bootinfo*/
 	printf("bootinfo:%p, boot_info->crc32:%x, sizeof(boot_info):%lx, download_buffer:%p\n", boot_info, boot_info->crc32, sizeof(boot_info), download_buffer);
 
-	flash_mmc_boot_op(dev_desc, download_buffer, 1, sizeof(boot_info), response);
+	if (flash_mmc_boot_op(dev_desc, download_buffer, 1, sizeof(boot_info), 0)){
+		if (response)
+			fastboot_fail("flash mmc boot fail", response);
+		return;
+	}
+	if (response)
+		fastboot_okay(NULL, response);
+#endif
 	return;
 }

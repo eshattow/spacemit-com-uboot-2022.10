@@ -100,7 +100,7 @@ static struct env_driver *spl_env_driver_lookup(enum env_operation op, enum env_
 static void spl_load_env(void)
 {
 	struct env_driver *drv;
-	int ret = 0;
+	int ret = -1;
 	u32 boot_mode = get_boot_mode();
 
 	/*if boot from usb, spl should not find env*/
@@ -108,48 +108,47 @@ static void spl_load_env(void)
 		return;
 	}
 
-	/*would try sd at first*/
-	drv = spl_env_driver_lookup(ENVOP_INIT, ENVL_MMC);
+	/*
+	only load env from mtd dev, because only mtd dev need
+	env mtdparts info to load image.
+	*/
+	enum env_location loc = ENVL_UNKNOWN;
+	switch (boot_mode) {
+#ifdef CONFIG_MTD_SPI_NAND
+	case BOOT_MODE_NAND:
+		loc = ENVL_NAND;
+		break;
+#endif
+#ifdef CONFIG_SPI_FLASH
+	case BOOT_MODE_NOR:
+		loc = ENVL_SPI_FLASH;
+		break;
+#endif
+	default:
+		return;
+	}
+
+	drv = spl_env_driver_lookup(ENVOP_INIT, loc);
+	if (!drv){
+		printf("%s, can not load env from storage\n", __func__);
+		return;
+	}
+
 	ret = drv->load();
-
 	if (!ret){
-		printf("has init env successful at sd\n");
+		printf("has init env successful\n");
 	}else{
-		/*if try sd fail, it would try emmc or nor or nand*/
-		enum env_location loc = ENVL_UNKNOWN;
-		switch (boot_mode) {
-		case BOOT_MODE_EMMC:
-			loc = ENVL_MMC;
-			break;
-		case BOOT_MODE_NAND:
-			loc = ENVL_NAND;
-			break;
-		case BOOT_MODE_NOR:
-			loc = ENVL_SPI_FLASH;
-			break;
-		default:
-			break;
-		}
-
-		drv = spl_env_driver_lookup(ENVOP_INIT, loc);
-		ret = drv->load();
-		if (!ret){
-			printf("has init env successful\n");
-		}else{
-			printf("load env from storage fail, would use default env\n");
-			/*if load env from storage fail, it should not write bootmode to reg*/
-			boot_mode = BOOT_MODE_NONE;
-		}
-		const char *mtdparts = NULL;
-		const char *gptparts = NULL;
-		mtdparts = env_get("mtdparts");
-		gptparts = env_get("partitions");
-		if (mtdparts)
-			debug("mtdparts:%s,\n", mtdparts);
-		if (gptparts)
-			debug(" gptparts:%s,\n", gptparts);
+		printf("load env from storage fail, would use default env\n");
+		/*if load env from storage fail, it should not write bootmode to reg*/
+		boot_mode = BOOT_MODE_NONE;
 	}
 	set_boot_mode(boot_mode);
+}
+
+void spl_board_init(void)
+{
+	/*load env*/
+	spl_load_env();
 }
 
 void spl_board_init(void)

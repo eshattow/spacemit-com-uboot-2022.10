@@ -556,9 +556,16 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 #ifdef CONFIG_FASTBOOT_MMC_BOOT_SUPPORT
 	if (strcmp(cmd, CONFIG_FASTBOOT_MMC_BOOT1_NAME) == 0) {
 		dev_desc = fastboot_mmc_get_dev(response);
-		if (dev_desc)
+		if (dev_desc){
+#ifdef CONFIG_SPACEMIT_FLASH
+			flash_mmc_boot_op(dev_desc, download_buffer, 1,
+					download_bytes, BOOT_INFO_EMMC_SPL0_OFFSET);
+			fastboot_okay(NULL, response);
+#else
 			fb_mmc_boot_ops(dev_desc, download_buffer, 1,
 					download_bytes, response);
+#endif
+		}
 		return;
 	}
 	if (strcmp(cmd, CONFIG_FASTBOOT_MMC_BOOT2_NAME) == 0) {

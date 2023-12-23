@@ -66,6 +66,12 @@ config SYS_I2C_LEGACY
 	  deprecated in U-Boot itself, this can be useful in some situations
 	  in SPL or TPL.
 
+config SYS_I2C_SPACEMIT
+        bool "SPACEMIT I2C driver"
+        depends on DM_I2C
+        help
+          Support for SPACEMIT I2C controllers.
+
 config SPL_SYS_I2C_LEGACY
 	bool "Enable legacy I2C subsystem and drivers in SPL"
 	depends on SUPPORT_SPL && !SPL_DM_I2C

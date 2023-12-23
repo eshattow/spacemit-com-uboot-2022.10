@@ -1,0 +1,5 @@
+config PHY_SPACEMIT_K1X_USB2
+	bool "Spacemit k1-x USB2 PHY Driver"
+	depends on PHY
+	help
+	  Support for Spacemit k1-x USB 2 PHY

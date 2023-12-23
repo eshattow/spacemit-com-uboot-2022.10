@@ -148,6 +148,8 @@ enum clk_tuning_way {
 struct emac_priv {
     struct udevice *dev;
     void __iomem *io_base;
+    struct clk mac_clk;
+    struct reset_ctl reset;
     struct mii_dev *mii;
     struct phy_device *phy;
     int phy_interface;
@@ -540,7 +542,6 @@ static int emac_write_hwaddr(struct udevice *dev)
 
 static int emac_phy_reset(struct emac_priv *priv)
 {
-    void __iomem *reg;
 
 #ifdef CONFIG_GPIO  /* gpio driver is not ready for fpga platform */
     int ret;
@@ -568,28 +569,39 @@ static int emac_phy_reset(struct emac_priv *priv)
     }
     mdelay(15);
 #else
-    reg =  (void *)(ulong)(0xD4019004 + 0xc);
+    void __iomem *reg;
+    u32 reg_gbase = 0, reg_goff = 0, bit_no = 0;
+
+    if (priv->phy_reset_gpio < 96) {
+        reg_goff = (priv->phy_reset_gpio >> 5) * (0x4);
+    } else {
+        reg_goff = 0x100;
+    }
+    reg_gbase = 0xD4019000 + reg_goff;
+    bit_no = (priv->phy_reset_gpio) & 0x1f;
+
+    reg =  (void *)(ulong)(reg_gbase + 0xc);
     u32 val = readl(reg);
-    val |= 1 << 8;
+    val |= 1 << bit_no;
     writel(val, reg);
 
     udelay(2);
 
-    reg =  (void *)(ulong)(0xD4019004 + 0x18);
+    reg =  (void *)(ulong)(reg_gbase + 0x18);
     val = readl(reg);
-    val |= 1 << 8;
+    val |= 1 << bit_no;
     writel(val, reg);
 
     mdelay(10);
-    reg =  (void *)(ulong)(0xD4019004 + 0x24);
+    reg =  (void *)(ulong)(reg_gbase + 0x24);
     val = readl(reg);
-    val |= 1 << 8;
+    val |= 1 << bit_no;
     writel(val, reg);
 
     mdelay(15);
-    reg =  (void *)(ulong)(0xD4019004 + 0x18);
+    reg =  (void *)(ulong)(reg_gbase + 0x18);
     val = readl(reg);
-    val |= 1 << 8;
+    val |= 1 << bit_no;
     writel(val, reg);
 
 #endif
@@ -855,13 +867,9 @@ int emac_phy_interface_select(struct emac_priv *priv)
 
 int emac_enable_clk(struct emac_priv *priv)
 {
-    u32 val;
-
     /* enable mac clock */
-    val = readl(priv->ctrl_reg);
-    val |= EMAC_AXI_CLK_ENABLE;
-    val |= EMAC_AXI_CLK_RESET;
-    writel(val, priv->ctrl_reg);
+    clk_enable(&priv->mac_clk);
+    reset_deassert(&priv->reset);
 
 #if 0   /* CLK driver is not ready on fpga platform */
     /* enable phy clock */
@@ -873,13 +881,9 @@ int emac_enable_clk(struct emac_priv *priv)
 
 int emac_disable_clk(struct emac_priv *priv)
 {
-    u32 val;
-
     /* disable mac clock */
-    val = readl(priv->ctrl_reg);
-    val &= ~EMAC_AXI_CLK_ENABLE;
-    val &= ~EMAC_AXI_CLK_RESET;
-    writel(val, priv->ctrl_reg);
+    reset_assert(&priv->reset);
+    clk_disable(&priv->mac_clk);
 
 #if 0   /* CLK driver is not ready on fpga platform */
     /* disable phy clock */
@@ -1122,6 +1126,18 @@ static int emac_probe(struct udevice *dev)
     ret = emac_probe_resources_core(dev);
     if (ret < 0) {
         pr_err("emac_probe_resources_core() failed: %d", ret);
+        return ret;
+    }
+
+    ret = clk_get_by_index(dev, 0, &priv->mac_clk);
+    if (ret) {
+        pr_err("It has no clk: %d\n", ret);
+        return ret;
+    }
+
+    ret = reset_get_by_index(dev, 0, &priv->reset);
+    if (ret) {
+        pr_err("It has no reset: %d\n", ret);
         return ret;
     }
 

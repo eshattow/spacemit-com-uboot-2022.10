@@ -88,10 +88,12 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 	struct mtd_info *mtd = NULL;
 	static u32 __maybe_unused start_offset = 0;
 	int ret;
+	struct flash_dev *fdev;
 
 	if (!strncmp(cmd, "mtd", 3)){
 		fastboot_oem_flash_gpt(cmd, fastboot_buf_addr, download_bytes,
-								response);
+						response, fdev);
+
 		return;
 	}
 

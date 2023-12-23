@@ -81,6 +81,8 @@ u32 spl_boot_device(void)
 		return BOOT_DEVICE_MMC1;//sd
 	case 3:
 		return BOOT_DEVICE_UART;
+	case 4:
+		return BOOT_DEVICE_NAND;
 	default:
 		debug("Unsupported boot device 0x%x.\n",
 			  boot_mode);

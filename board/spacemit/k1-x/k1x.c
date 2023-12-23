@@ -23,6 +23,9 @@
 #include <part.h>
 #include <env.h>
 #include <env_internal.h>
+#include <asm/arch/ddr.h>
+#include <power/regulator.h>
+#include <fb_spacemit.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -31,31 +34,13 @@ void set_boot_mode(enum board_boot_mode boot_mode)
 	writel(boot_mode, (void *)BOOT_DEV_FLAG_REG);
 }
 
-enum board_boot_mode get_boot_mode(void)
+enum board_boot_mode get_boot_pin_select(void)
 {
-	u32 boot_mode;
-	u32 boot_select;
-
-	/*if usb boot or has set boot mode, return boot mode*/
-	boot_mode = readl((void *)BOOT_DEV_FLAG_REG);
-	debug("%s, boot_mode:%x\n", __func__, boot_mode);
-
-	switch (boot_mode) {
-	case BOOT_MODE_USB:
-		return BOOT_MODE_USB;
-	case BOOT_MODE_EMMC:
-		return BOOT_MODE_EMMC;
-	case BOOT_MODE_NAND:
-		return BOOT_MODE_NAND;
-	case BOOT_MODE_NOR:
-		return BOOT_MODE_NOR;
-	case BOOT_MODE_SD:
-		return BOOT_MODE_SD;
-	}
-
 	/*if not set boot mode, try to return boot pin select*/
-	boot_select = readl((void *)BOOT_PIN_SELECT) & BOOT_STRAP_BIT_STORAGE_MASK;
+	u32 boot_select = readl((void *)BOOT_PIN_SELECT) & BOOT_STRAP_BIT_STORAGE_MASK;
 	boot_select = boot_select >> BOOT_STRAP_BIT_OFFSET;
+	debug("boot_select:%x\n", boot_select);
+
 	/*select spl boot device:
  
 	     b'(bit1)(bit0)
@@ -76,6 +61,30 @@ enum board_boot_mode get_boot_mode(void)
 		return BOOT_MODE_SD;
 	}
 }
+
+enum board_boot_mode get_boot_mode(void)
+{
+	/*if usb boot or has set boot mode, return boot mode*/
+	u32 boot_mode = readl((void *)BOOT_DEV_FLAG_REG);
+	debug("%s, boot_mode:%x\n", __func__, boot_mode);
+
+	switch (boot_mode) {
+	case BOOT_MODE_USB:
+		return BOOT_MODE_USB;
+	case BOOT_MODE_EMMC:
+		return BOOT_MODE_EMMC;
+	case BOOT_MODE_NAND:
+		return BOOT_MODE_NAND;
+	case BOOT_MODE_NOR:
+		return BOOT_MODE_NOR;
+	case BOOT_MODE_SD:
+		return BOOT_MODE_SD;
+	}
+
+	/*else return boot pin select*/
+	return get_boot_pin_select();
+}
+
 
 int mmc_get_env_dev(void)
 {
@@ -101,6 +110,7 @@ void run_fastboot_command(void)
 
 void import_env_from_bootfs(void)
 {
+#ifdef CONFIG_MMC
 	/*
 	TODO:
 		load env from bootfs, if bootfs is fat/ext4 at blk dev, use fatload/ext4load.
@@ -108,26 +118,31 @@ void import_env_from_bootfs(void)
 	int err, dev;
 	u32 part;
 	char cmd[128];
-	static struct mmc *mmc;
+	struct mmc *mmc;
 	struct disk_partition info;
 
 	dev = mmc_get_env_dev();
 	mmc = find_mmc_device(dev);
-	if (mmc){
-		if (mmc_init(mmc)){
-			return;
-		}
+	if (!mmc) {
+		printf("Cannot find mmc device\n");
+		return;
 	}
-	for (u32 p = 1; p <= MAX_SEARCH_PARTITIONS; p++) {
-		err = part_get_info(mmc_get_blk_desc(mmc), p, &info);
+	if (mmc_init(mmc)){
+		return;
+	}
+
+	for (part = 1; part <= MAX_SEARCH_PARTITIONS; part++) {
+		err = part_get_info(mmc_get_blk_desc(mmc), part, &info);
 		if (err)
 			continue;
 		if (!strcmp(BOOTFS_NAME, info.name)){
 			debug("match info.name:%s\n", info.name);
-			part = p;
 			break;
 		}
 	}
+	if (part > MAX_SEARCH_PARTITIONS)
+		return;
+
 	env_set("bootfs_part", simple_itoa(part));
 
 	/*load env.txt and import to uboot*/
@@ -142,17 +157,41 @@ void import_env_from_bootfs(void)
 	debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0))
 		printf("load env%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
+#endif
 	return;
 }
 
 void run_cardfirmware_flash_command(void)
 {
-	/*
-	TODO:
-		try to find partition in sd card, if it has partition name 'flashing_image',
-		it would try to excute command 'spacemit_flashing', and it would flash image
-		to emmc/nor/nand.
-	*/
+	struct mmc *mmc;
+	struct disk_partition info;
+	int part_dev, err;
+	char cmd[128] = {"\0"};
+
+	mmc = find_mmc_device(MMC_DEV_SD);
+	if (!mmc)
+		return;
+	if (mmc_init(mmc))
+		return;
+
+	for (part_dev = 1; part_dev <= MAX_SEARCH_PARTITIONS; part_dev++) {
+		err = part_get_info(mmc_get_blk_desc(mmc), part_dev, &info);
+		if (err)
+			continue;
+		if (!strcmp(BOOTFS_NAME, info.name))
+			break;
+
+	}
+
+	if (part_dev > MAX_SEARCH_PARTITIONS)
+		return;
+
+	/*check json file exist or not in sd card*/
+	sprintf(cmd, "fatsize mmc %d:%d %s", MMC_DEV_SD, part_dev, CARD_FLASH_FILE);
+	debug("cmd:%s\n", cmd);
+	if (!run_command(cmd, 0))
+		run_command("spacemit_flashing mmc", 0);
+
 	return;
 }
 
@@ -182,6 +221,13 @@ void setenv_boot_mode(void)
 
 int board_init(void)
 {
+#ifdef CONFIG_DM_REGULATOR_SPM8XX
+	int ret;
+
+	ret = regulators_enable_boot_on(true);
+	if (ret)
+		debug("%s: Cannot enable boot on regulator\n", __func__);
+#endif
 	return 0;
 }
 
@@ -192,6 +238,8 @@ int board_late_init(void)
 	int ret;
 
 	run_fastboot_command();
+
+	run_cardfirmware_flash_command();
 
 	/*import env.txt from bootfs*/
 	import_env_from_bootfs();
@@ -268,7 +316,7 @@ void board_boot_order(u32 *spl_boot_list)
 
 enum env_location env_get_location(enum env_operation op, int prio)
 {
-	if (prio >= 3)
+	if (prio >= 1)
 		return ENVL_UNKNOWN;
 
 	u32 boot_mode = get_boot_mode();
@@ -283,3 +331,64 @@ enum env_location env_get_location(enum env_operation op, int prio)
 		return ENVL_MMC;
 	}
 }
+
+int misc_init_r(void)
+{
+#ifdef CONFIG_DYNAMIC_DDR_CLK_FREQ
+	int ret;
+
+	ret = ddr_freq_max();
+	if(ret < 0) {
+		debug("%s: Try to adjust ddr freq failed!\n", __func__);
+		return ret;
+	}
+#endif
+
+	return 0;
+}
+
+int dram_init(void)
+{
+	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
+
+	gd->ram_base = CONFIG_SYS_SDRAM_BASE;
+
+	if(dram_size > SZ_2GB) {
+		gd->ram_size = SZ_2GB;
+	} else {
+		gd->ram_size = dram_size;
+	}
+
+	return 0;
+}
+
+int dram_init_banksize(void)
+{
+	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
+
+	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
+	if(dram_size > SZ_2GB) {
+		gd->bd->bi_dram[0].size = SZ_2G;
+		gd->bd->bi_dram[1].start = 0x100000000;
+		gd->bd->bi_dram[1].size = dram_size - SZ_2G;
+	} else {
+		gd->bd->bi_dram[0].size = dram_size;
+		gd->bd->bi_dram[1].start = 0;
+		gd->bd->bi_dram[1].size = 0;
+	}
+
+	return 0;
+}
+
+ulong board_get_usable_ram_top(ulong total_size)
+{
+	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
+
+        /* Some devices (like the EMAC) have a 32-bit DMA limit. */
+	if(dram_size > SZ_2GB) {
+		return 0x80000000;
+	} else {
+		return dram_size;
+	}
+}
+
