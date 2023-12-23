@@ -7,7 +7,7 @@
 #include "k1-x_pinctrl.dtsi"
 
 / {
-	model = "spacemit k1-x fpga board";
+	model = "spacemit k1-x evb board";
 
 	memory@0 {
 		device_type = "memory";
@@ -20,6 +20,11 @@
 		stdout-path = "serial0:115200n8";
 		u-boot,dm-spl;
 	};
+};
+
+&dramc {
+	/* dram data rate, should be 1200, 1600, or 2400 */
+	datarate = <2400>;
 };
 
 &cpus {

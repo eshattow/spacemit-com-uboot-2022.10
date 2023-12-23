@@ -114,7 +114,7 @@ ERR_HANDLE:
 
 #ifdef CONFIG_K1_X_BOARD_ASIC
 
-extern void lpddr4_silicon_init(uint32_t base);
+extern void lpddr4_silicon_init(uint32_t base, uint32_t data_rate);
 
 extern uint8_t pmic_read(uint8_t i2c_bus, uint8_t addr, uint8_t reg);
 extern uint8_t pmic_write_with_check(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_t reg_val, uint8_t check_val);
@@ -229,12 +229,16 @@ static int spacemit_ddr_probe(struct udevice *dev)
 #ifdef CONFIG_K1_X_BOARD_FPGA
 	void (*ddr_init)(void);
 #else
-	uint32_t val;
+	uint32_t val, ddr_datarate;
 	fdt_addr_t ddrc_base;
 	ddrc_base = dev_read_addr(dev);
-#endif
 
-	printf("%s(%d): here\n", __func__, __LINE__);
+	if(dev_read_u32u(dev, "datarate", &ddr_datarate)) {
+		printf("ddr data rate not configed in dts, use 1200 as default!\n");
+		ddr_datarate = 1200;
+	}
+	printf("ddr data rate is %u configured in dts\n", ddr_datarate);
+#endif
 
 #ifdef CONFIG_K1_X_BOARD_FPGA
 	ddr_init = (void(*)(void))(lpddr4_init_fpga_data + 0x144);
@@ -262,7 +266,7 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	writel(val, (void __iomem *)(K1X_APMU_BASE + 0x38c));
 	while(readl((void __iomem *)(K1X_APMU_BASE + 0x38c)) & BIT(12));
 
-	lpddr4_silicon_init(ddrc_base);
+	lpddr4_silicon_init(ddrc_base, ddr_datarate);
 #endif
 
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
@@ -273,7 +277,10 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	log_debug("dram init done\n");
 
 /* check dram space */
-#if 0
+
+//#define CHECK_4GB_DDR_ACCESS
+//#define CHECK_8GB_DDR_ACCESS
+#if defined(CHECK_4GB_DDR_ACCESS) || defined (CHECK_8GB_DDR_ACCESS)
 	/* check 0GB~2GB rw */
 	fix_ddr_data(0x1000, 0x7fffffff);
 	check_ddr_data(0x1000, 0x7fffffff);
@@ -282,6 +289,7 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	fix_ddr_data(0x100000000, 0x17fffffff);
 	check_ddr_data(0x100000000, 0x17fffffff);
 
+#if defined(CHECK_8GB_DDR_ACCESS)
 	/* check 4GB~6GB rw */
 	fix_ddr_data(0x180000000, 0x1ffffffff);
 	check_ddr_data(0x180000000, 0x1ffffffff);
@@ -289,11 +297,19 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	/* check 6GB~8GB rw */
 	fix_ddr_data(0x200000000, 0x27fffffff);
 	check_ddr_data(0x200000000, 0x27fffffff);
+#endif
 
 	/* check 0GB~2GB rw */
 	check_ddr_data(0x1000, 0x7fffffff);
-	/* check 2GB~8GB rw */
-	check_ddr_data(0x100000000, 0x27fffffff);
+
+	/* check 2GB~4GB rw */
+	check_ddr_data(0x100000000, 0x17fffffff);
+
+#if defined(CHECK_8GB_DDR_ACCESS)
+	/* check 4GB~8GB rw */
+	check_ddr_data(0x180000000, 0x27fffffff);
+#endif
+
 #endif
 
 	return 0;

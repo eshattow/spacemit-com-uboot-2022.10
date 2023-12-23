@@ -299,10 +299,10 @@ void mck6_sw_fc_top(unsigned freqNo)
   fp2 2400
   fp1 1600
   fp0 1200
-  */
+ */
 void fp_timing_init(unsigned DDRC_BASE)
 {
-	unsigned int read_data = 0;
+	unsigned int read_data=0;
 	/***** LPDDR4x timing config relate register  ************/
 	/*CH0_DRAM_Config_1:  CAS latency  ,   RL3 Option Support ,  CWL, wl_select
 CH0_DRAM_Config_2:	 DRAM burst type, write_level_en,  DM  pu_cal,  FSP_OP,  FSP_WR
@@ -323,13 +323,17 @@ CH0_Off_spec_timing_0:		tCCD_ccs_ext_dly,tCCD_ccs_wr_ext_dly,trwd_ext_dly,twl_ea
 CH0_Off_spec_timing_1:		read_gap_extend, tccd_ccs_ext_dly_min, tccd_ccs_wr_ext_dly_min
 CH0_dram_read_timing:		tDQSCK
 CH0_dram_ca_train_timing:	tCACKEL, tCAEXT,tCAENT,tVref_long
-*/
-
+	 */
 	/************************************************/
+
 	//DDR 3200
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0104) = 0xF0800400; //DRAM_Config_2
-							      // REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x00000E1C;
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0100) = 0x00000E20;	// relevent to dbi
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0104)= 0xF0800400; //DRAM_Config_2
+	// REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x00000E1C;
+	// #if defined(SAMSUNG_8GB)
+	// REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x00000E24;	// relevent to dbi
+	// #else
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x00000E20;	// relevent to dbi
+	// #endif
 	/*on silicon: DRAM_config_4
 	  SOC ODT:100 60ohm,
 Vref_Training_Range_CA:0
@@ -340,82 +344,86 @@ wr_post:	0.5*tCK
 wr_pre: 2*tCK
 rd_post: 1.5*tCK
 rd_pre: static
-*/
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x010c) = 0x19194314;	//en r/w dbi(data bus inversion)
+	 */
+	REG32(DDRC_BASE+MC_CH0_BASE+0x010c)= 0x19194314;	//en r/w dbi(data bus inversion)
 	/*
 	   on silicon:
 	   Device CA ODT : 100  60ohm, bit28~bit30
 	   Device DQ ODT:  100  60ohm, bit20~bit22
 	   Device pull-down drive strength: 100 60ohm bit16~bit19
-	   */
-	//for micron
+	 */
 	REG32(DDRC_BASE+MC_CH0_BASE+0x0110)= 0x20440000;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x0114)= 0x20440000;
 
 	//    REG32(DDRC_BASE+MC_CH0_BASE+0x018c) = 0x00500000;   //ZQC timing 0	 no effection
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x018c) = 0x00000030;   //ZQC timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0190) = 0x06400030;   //ZQC timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0194) = 0x80e001c0;   //Refresh timing 0
-								// REG32(DDRC_BASE+MC_CH0_BASE+0x0194) = 0x81300260;   //Refresh timing 0
-								//    REG32(DDRC_BASE+MC_CH0_BASE+0x01fc) = 0x000d0065;   //Refresh timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01fc) = 0x000C005E;   //Refresh timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0198) = 0x01CC01CC;   //SelfRefresh timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x019c) = 0x00181818;   //SelfRefresh timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a0) = 0x08180C0C;   //Power down timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a4) = 0x00000003;   //Power down timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a8) = 0x00000217;   //MRS timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01ac) = 0x30651D44;   //ACT timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b0) = 0x1120080F;
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b4) = 0x08001000;   //CAS/RAS timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b8) = 0x00000C00;   //CAS/RAS timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01bc) = 0x02020404;   //Off-spec timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01c0) = 0x10000004;   //Off-spec timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x018c) = 0x00000030;   //ZQC timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0190) = 0x06400030;   //ZQC timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0194) = 0x80e001c0;   //Refresh timing 0
+	// REG32(DDRC_BASE+MC_CH0_BASE+0x0194) = 0x81300260;   //Refresh timing 0
+	//    REG32(DDRC_BASE+MC_CH0_BASE+0x01fc) = 0x000d0065;   //Refresh timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01fc) = 0x000C005E;   //Refresh timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0198) = 0x01CC01CC;   //SelfRefresh timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x019c) = 0x00181818;   //SelfRefresh timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a0) = 0x08180C0C;   //Power down timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a4) = 0x00000003;   //Power down timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a8) = 0x00000217;   //MRS timing
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01ac) = 0x30651D44;   //ACT timing
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b0) = 0x1120080F;
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b4) = 0x08001000;   //CAS/RAS timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b8) = 0x00000C00;   //CAS/RAS timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01bc) = 0x02020404;   //Off-spec timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01c0) = 0x10000004;   //Off-spec timing 1
 	//REG32(DDRC_BASE+MC_CH0_BASE+0x01c4) = 0x00000004; //DRAM_read timing  ###check
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01c4) = 0x00000006;   //DRAM_read timing  ###pending
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01c4) = 0x00000006;   //DRAM_read timing  ###pending
 	//REG32(DDRC_BASE+MC_CH0_BASE+0x01c8) = 0x00000A0A; //CA Train timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01d8) = 0x00010190;   //CH0_dram_training_timing [16:10]tOSCO 40ns [9:0]tFC 250ns
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x014c) = 0x000c4090;   // odt_control_3
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01d8) = 0x00010190;   //CH0_dram_training_timing [16:10]tOSCO 40ns [9:0]tFC 250ns
+	REG32(DDRC_BASE+MC_CH0_BASE+0x014c) = 0x000c4090;   // odt_control_3
 #if defined(NEW_FEATURE)
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE + 0x03e4) = 0x15000A02;   //MCK6 DFI phy ctrl register 1  write leveling
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x15000A02;   //MCK6 DFI phy ctrl register 1  write leveling
 #else
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE + 0x03e4) = 0x15000C00;   //MCK6 DFI phy ctrl register 1  write leveling
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x15000C00;   //MCK6 DFI phy ctrl register 1  write leveling
 #endif
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE + 0x03ec) = 0x0000046c;   //CH0_DFI_PHY_Control_3 trdlvl_rr  read training
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03ec) = 0x0000046c;   //CH0_DFI_PHY_Control_3 trdlvl_rr  read training
 
 
 
 #if defined(CONFIG_SILENT)
 #else
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x104),REG32(DDRC_BASE+MC_CH0_BASE+0x104) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x100),REG32(DDRC_BASE+MC_CH0_BASE+0x100) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x10c),REG32(DDRC_BASE+MC_CH0_BASE+0x10c) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x110),REG32(DDRC_BASE+MC_CH0_BASE+0x110) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x114),REG32(DDRC_BASE+MC_CH0_BASE+0x114) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x18c),REG32(DDRC_BASE+MC_CH0_BASE+0x18c) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x190),REG32(DDRC_BASE+MC_CH0_BASE+0x190) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x194),REG32(DDRC_BASE+MC_CH0_BASE+0x194) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1fc),REG32(DDRC_BASE+MC_CH0_BASE+0x1fc) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x198),REG32(DDRC_BASE+MC_CH0_BASE+0x198) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x19c),REG32(DDRC_BASE+MC_CH0_BASE+0x19c) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a0),REG32(DDRC_BASE+MC_CH0_BASE+0x1a0) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a4),REG32(DDRC_BASE+MC_CH0_BASE+0x1a4) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a8),REG32(DDRC_BASE+MC_CH0_BASE+0x1a8) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1ac),REG32(DDRC_BASE+MC_CH0_BASE+0x1ac) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b0),REG32(DDRC_BASE+MC_CH0_BASE+0x1b0) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b4),REG32(DDRC_BASE+MC_CH0_BASE+0x1b4) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b8),REG32(DDRC_BASE+MC_CH0_BASE+0x1b8) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1bc),REG32(DDRC_BASE+MC_CH0_BASE+0x1bc) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c0),REG32(DDRC_BASE+MC_CH0_BASE+0x1c0) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c4),REG32(DDRC_BASE+MC_CH0_BASE+0x1c4) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1d8),REG32(DDRC_BASE+MC_CH0_BASE+0x1d8) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x14c),REG32(DDRC_BASE+MC_CH0_BASE+0x14c) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13e4),REG32(DDRC_BASE+MC_CH0_BASE+0x13e4) );
-	LogMsg(1, "ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13ec),REG32(DDRC_BASE+MC_CH0_BASE+0x13ec) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x104),REG32(DDRC_BASE+MC_CH0_BASE+0x104) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x100),REG32(DDRC_BASE+MC_CH0_BASE+0x100) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x10c),REG32(DDRC_BASE+MC_CH0_BASE+0x10c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x110),REG32(DDRC_BASE+MC_CH0_BASE+0x110) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x114),REG32(DDRC_BASE+MC_CH0_BASE+0x114) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x18c),REG32(DDRC_BASE+MC_CH0_BASE+0x18c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x190),REG32(DDRC_BASE+MC_CH0_BASE+0x190) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x194),REG32(DDRC_BASE+MC_CH0_BASE+0x194) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1fc),REG32(DDRC_BASE+MC_CH0_BASE+0x1fc) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x198),REG32(DDRC_BASE+MC_CH0_BASE+0x198) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x19c),REG32(DDRC_BASE+MC_CH0_BASE+0x19c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a0),REG32(DDRC_BASE+MC_CH0_BASE+0x1a0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a4),REG32(DDRC_BASE+MC_CH0_BASE+0x1a4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a8),REG32(DDRC_BASE+MC_CH0_BASE+0x1a8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1ac),REG32(DDRC_BASE+MC_CH0_BASE+0x1ac) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b0),REG32(DDRC_BASE+MC_CH0_BASE+0x1b0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b4),REG32(DDRC_BASE+MC_CH0_BASE+0x1b4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b8),REG32(DDRC_BASE+MC_CH0_BASE+0x1b8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1bc),REG32(DDRC_BASE+MC_CH0_BASE+0x1bc) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c0),REG32(DDRC_BASE+MC_CH0_BASE+0x1c0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c4),REG32(DDRC_BASE+MC_CH0_BASE+0x1c4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1d8),REG32(DDRC_BASE+MC_CH0_BASE+0x1d8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x14c),REG32(DDRC_BASE+MC_CH0_BASE+0x14c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13e4),REG32(DDRC_BASE+MC_CH0_BASE+0x13e4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13ec),REG32(DDRC_BASE+MC_CH0_BASE+0x13ec) );
 #endif
 
 	//DDR 2667
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0104) = 0xA0800400;
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0100) = 0x00000C18;
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0104)= 0xA0800400;
+	// REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x00000C18;
+	// #if defined(SAMSUNG_8GB)
+	// REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x00000C1E;	// relevent to dbi
+	// #else
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x00000C18;
+	// #endif
 	/*on silicon: DRAM_config_4
 	  SOC ODT:100 60ohm,
 Vref_Training_Range_CA:0
@@ -426,75 +434,86 @@ wr_post:	0.5*tCK
 wr_pre: 2*tCK
 rd_post: 1.5*tCK
 rd_pre: static
-*/
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x010c) = 0x19194314;
+	 */
+	REG32(DDRC_BASE+MC_CH0_BASE+0x010c)= 0x9d194314;
+
 	/*
 	   on silicon:
 	   Device CA ODT : 100  60ohm, bit28~bit30
 	   Device DQ ODT:  100  60ohm, bit20~bit22
 	   Device pull-down drive strength: 100 60ohm bit16~bit19
-	   */
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0110) = 0x20440000;
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0114) = 0x20440000;
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x018c) = 0x00430000;   //ZQC timing 0, zq calibration reset time, 50ns/0.75=67 cycle
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0190) = 0x05350028;   //ZQC timing 1, zq latch 30ns/0.75=40 cycle. 1us/0.75ns=1333 cycle
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0194) = 0x80A80151;   //Refresh timing 0, tRFC=280ns, tRFCpb=140ns
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01fc) = 0x000d0065;   //Refresh timing 1, tREFI=3.9us	,fclk=26mhz , tREFIpb=0.488us
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0198) = 0x017F017F;   //SelfRefresh timing 0	, tRFC+7.5ns
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x019c) = 0x00141414;   //SelfRefresh timing 1	,15ns/0.75ns=20
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a0) = 0x07140A0A;   //Power down timing 0, tXP=7.5ns, tCPDED=5ns
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a4) = 0x00000003;   //Power down timing 1, tCMDCKE=3 clk
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a8) = 0x00000213;   //MRS timing, tMRD=14ns
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01ac) = 0x36541838;   //ACT timing, tRAS, RCD, RC, FAW
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b0) = 0x1c180a18;   //Pre-Charge timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b4) = 0x08000E00;   //CAS/RAS timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b8) = 0x00000E00;   //CAS/RAS timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01bc) = 0x02020404;   //Off-spec timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01c0) = 0x10000004;   //Off-spec timing 1
+	 */
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0110)= 0x00440000;
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0114)= 0x00440000;
+
+	REG32(DDRC_BASE+MC_CH0_BASE+0x018c) = 0x00430000;   //ZQC timing 0, zq calibration reset time, 50ns/0.75=67 cycle
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0190) = 0x05350028;   //ZQC timing 1, zq latch 30ns/0.75=40 cycle. 1us/0.75ns=1333 cycle
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0194) = 0x80A80151;   //Refresh timing 0, tRFC=280ns, tRFCpb=140ns
+	//    REG32(DDRC_BASE+MC_CH0_BASE+0x0194) = 0x80FD01FB;	//Refresh timing 0, tRFC=380ns, tRFCpb=190ns
+	//    REG32(DDRC_BASE+MC_CH0_BASE+0x01fc) = 0x000d0065;   //Refresh timing 1, tREFI=3.9us	,fclk=26mhz , tREFIpb=0.488us
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01fc) = 0x000C005E;   //Refresh timing 1, tREFI=3.9us	,fclk=24mhz , tREFIpb=0.488us
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0198) = 0x017F017F;   //SelfRefresh timing 0	, tRFC+7.5ns
+	REG32(DDRC_BASE+MC_CH0_BASE+0x019c) = 0x00141414;   //SelfRefresh timing 1	,15ns/0.75ns=20
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a0) = 0x07140A0A;   //Power down timing 0, tXP=7.5ns, tCPDED=5ns
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a4) = 0x00000003;   //Power down timing 1, tCMDCKE=3 clk
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a8) = 0x00000213;   //MRS timing, tMRD=14ns
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01ac) = 0x36541838;   //ACT timing, tRAS, RCD, RC, FAW
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b0) = 0x1c180a18;
+
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b4) = 0x08000E00;   //CAS/RAS timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b8) = 0x00000E00;   //CAS/RAS timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01bc) = 0x02020404;   //Off-spec timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01c0) = 0x10000004;   //Off-spec timing 1
 	//REG32(DDRC_BASE+MC_CH0_BASE+0x01c4) = 0x00000004; //DRAM_read timing  ###check
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01c4) = 0x00000004;   //DRAM_read timing  ###pending
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01c4) = 0x00000004;   //DRAM_read timing  ###pending
 	//REG32(DDRC_BASE+MC_CH0_BASE+0x01c8) = 0x00000A0A; //CA Train timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01d8) = 0x0000D94E;   //CH0_dram_training_timing [16:10]tOSCO 40ns [9:0]tFC 250ns
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x014c) = 0x0007204a;   // odt_control_3
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01d8) = 0x0000D94E;   //CH0_dram_training_timing [16:10]tOSCO 40ns [9:0]tFC 250ns
+	REG32(DDRC_BASE+MC_CH0_BASE+0x014c) = 0x0007204a;   // odt_control_3
 #if defined(NEW_FEATURE)
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE+0x03e4) = 0x15000802;   //MCK6 DFI phy ctrl register 1  write leveling
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x13000802;   //MCK6 DFI phy ctrl register 1  write leveling
 #else
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE+0x03e4) = 0x15000A00;   //MCK6 DFI phy ctrl register 1  write leveling
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x13000A00;   //MCK6 DFI phy ctrl register 1  write leveling
 #endif
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE+0x03ec) = 0x00000450;   //CH0_DFI_PHY_Control_3 trdlvl_rr  read training
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03ec) = 0x00000450;   //CH0_DFI_PHY_Control_3 trdlvl_rr  read training
+
+
 
 #if defined(CONFIG_SILENT)
 #else
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x104),REG32(DDRC_BASE+MC_CH0_BASE+0x104) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x100),REG32(DDRC_BASE+MC_CH0_BASE+0x100) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x10c),REG32(DDRC_BASE+MC_CH0_BASE+0x10c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x110),REG32(DDRC_BASE+MC_CH0_BASE+0x110) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x114),REG32(DDRC_BASE+MC_CH0_BASE+0x114) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x18c),REG32(DDRC_BASE+MC_CH0_BASE+0x18c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x190),REG32(DDRC_BASE+MC_CH0_BASE+0x190) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x194),REG32(DDRC_BASE+MC_CH0_BASE+0x194) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1fc),REG32(DDRC_BASE+MC_CH0_BASE+0x1fc) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x198),REG32(DDRC_BASE+MC_CH0_BASE+0x198) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x19c),REG32(DDRC_BASE+MC_CH0_BASE+0x19c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a0),REG32(DDRC_BASE+MC_CH0_BASE+0x1a0) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a4),REG32(DDRC_BASE+MC_CH0_BASE+0x1a4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a8),REG32(DDRC_BASE+MC_CH0_BASE+0x1a8) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1ac),REG32(DDRC_BASE+MC_CH0_BASE+0x1ac) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b0),REG32(DDRC_BASE+MC_CH0_BASE+0x1b0) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b4),REG32(DDRC_BASE+MC_CH0_BASE+0x1b4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b8),REG32(DDRC_BASE+MC_CH0_BASE+0x1b8) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1bc),REG32(DDRC_BASE+MC_CH0_BASE+0x1bc) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c0),REG32(DDRC_BASE+MC_CH0_BASE+0x1c0) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c4),REG32(DDRC_BASE+MC_CH0_BASE+0x1c4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1d8),REG32(DDRC_BASE+MC_CH0_BASE+0x1d8) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x14c),REG32(DDRC_BASE+MC_CH0_BASE+0x14c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13e4),REG32(DDRC_BASE+MC_CH0_BASE+0x13e4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13ec),REG32(DDRC_BASE+MC_CH0_BASE+0x13ec) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x104),REG32(DDRC_BASE+MC_CH0_BASE+0x104) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x100),REG32(DDRC_BASE+MC_CH0_BASE+0x100) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x10c),REG32(DDRC_BASE+MC_CH0_BASE+0x10c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x110),REG32(DDRC_BASE+MC_CH0_BASE+0x110) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x114),REG32(DDRC_BASE+MC_CH0_BASE+0x114) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x18c),REG32(DDRC_BASE+MC_CH0_BASE+0x18c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x190),REG32(DDRC_BASE+MC_CH0_BASE+0x190) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x194),REG32(DDRC_BASE+MC_CH0_BASE+0x194) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1fc),REG32(DDRC_BASE+MC_CH0_BASE+0x1fc) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x198),REG32(DDRC_BASE+MC_CH0_BASE+0x198) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x19c),REG32(DDRC_BASE+MC_CH0_BASE+0x19c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a0),REG32(DDRC_BASE+MC_CH0_BASE+0x1a0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a4),REG32(DDRC_BASE+MC_CH0_BASE+0x1a4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a8),REG32(DDRC_BASE+MC_CH0_BASE+0x1a8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1ac),REG32(DDRC_BASE+MC_CH0_BASE+0x1ac) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b0),REG32(DDRC_BASE+MC_CH0_BASE+0x1b0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b4),REG32(DDRC_BASE+MC_CH0_BASE+0x1b4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b8),REG32(DDRC_BASE+MC_CH0_BASE+0x1b8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1bc),REG32(DDRC_BASE+MC_CH0_BASE+0x1bc) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c0),REG32(DDRC_BASE+MC_CH0_BASE+0x1c0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c4),REG32(DDRC_BASE+MC_CH0_BASE+0x1c4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1d8),REG32(DDRC_BASE+MC_CH0_BASE+0x1d8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x14c),REG32(DDRC_BASE+MC_CH0_BASE+0x14c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13e4),REG32(DDRC_BASE+MC_CH0_BASE+0x13e4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13ec),REG32(DDRC_BASE+MC_CH0_BASE+0x13ec) );
 #endif
 
 	//DDR_1600
 	REG32(DDRC_BASE+MC_CH0_BASE+0x0104)= 0x50800400;
+	// #if defined(SAMSUNG_8GB)
+	// REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x00001208;	// relevent to dbi
+	// #else
 	REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x0000080e;//0x0000080e;
+	//   #endif
 	/*on silicon: DRAM_config_4
 	  SOC ODT:100 60ohm,
 Vref_Training_Range_CA:0
@@ -505,77 +524,85 @@ wr_post:  0.5*tCK
 wr_pre: 2*tCK
 rd_post: 1.5*tCK
 rd_pre: static
-*/
-	REG32(DDRC_BASE+MC_CH0_BASE+0x010c)= 0x19194314;
+	 */
+	REG32(DDRC_BASE+MC_CH0_BASE+0x010c)= 0x9d194314;
+
 	/*
 	   on silicon:
 	   Device CA ODT : 100  60ohm, bit28~bit30
 	   Device DQ ODT:  100  60ohm, bit20~bit22
 	   Device pull-down drive strength: 100 60ohm bit16~bit19
-	   */
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0110)= 0x20440000;
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0114)= 0x20440000;
+	 */
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0110)= 0x00440000;
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0114)= 0x00440000;
 
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x018c) = 0x00280018;   //ZQC timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0190) = 0x03200018;   //ZQC timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0194) = 0x807000e0;   //Refresh timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01fc) = 0x000d0065;   //Refresh timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0198) = 0x00e600e6;   //SelfRefresh timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x019c) = 0x000c0c0c;   //SelfRefresh timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a0) = 0x050c0606;   //Power down timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a4) = 0x00000003;   //Power down timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a8) = 0x0000020c;   //MRS timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01ac) = 0x18330f22;   //ACT timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b0) = 0x110f080f;   //Pre-Charge timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b4) = 0x08000800;   //CAS/RAS timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b8) = 0x00000600;   //CAS/RAS timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01bc) = 0x02020404;   //Off-spec timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01c0) = 0x00000003;   //Off-spec timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01c4) = 0x00000003;   //DRAM_read timing
+	REG32(DDRC_BASE+MC_CH0_BASE+0x018c) = 0x00280018;   //ZQC timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0190) = 0x03200018;   //ZQC timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0194) = 0x807000e0;   //Refresh timing 0
+	//    REG32(DDRC_BASE+MC_CH0_BASE+0x0194) = 0x80980130;   //Refresh timing 0
+	//    REG32(DDRC_BASE+MC_CH0_BASE+0x01fc) = 0x000d0065;   //Refresh timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01fc) = 0x000C005E;   //Refresh timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0198) = 0x00e600e6;   //SelfRefresh timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x019c) = 0x000c0c0c;   //SelfRefresh timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a0) = 0x050c0606;   //Power down timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a4) = 0x00000003;   //Power down timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a8) = 0x0000020c;   //MRS timing
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01ac) = 0x18330f22;   //ACT timing
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b0) = 0x110f080f;
+
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b4) = 0x08000800;   //CAS/RAS timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b8) = 0x00000600;   //CAS/RAS timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01bc) = 0x02020404;   //Off-spec timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01c0) = 0x00000003;   //Off-spec timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01c4) = 0x00000003;   //DRAM_read timing
 	//REG32(DDRC_BASE+MC_CH0_BASE+0x01c8) = 0x00000A0A; //CA Train timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01d8) = 0x00008190;   //CH0_dram_training_timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x014c) = 0x00030848;   // odt_control_3
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01d8) = 0x00008190;   //CH0_dram_training_timing
+	REG32(DDRC_BASE+MC_CH0_BASE+0x014c) = 0x00030848;   // odt_control_3
 #if defined(NEW_FEATURE)
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE + 0x03e4) = 0x0a000402;   //MCK6 DFI phy ctrl register 1
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x0a000402;   //MCK6 DFI phy ctrl register 1
 #else
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE + 0x03e4) = 0x0a000600;   //MCK6 DFI phy ctrl register 1
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x0a000600;   //MCK6 DFI phy ctrl register 1
 #endif
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE + 0x03ec) = 0x00000480;   //CH0_DFI_PHY
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03ec) = 0x00000480;   //CH0_DFI_PHY
 
 #if defined(CONFIG_SILENT)
 #else
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x104),REG32(DDRC_BASE+MC_CH0_BASE+0x104) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x100),REG32(DDRC_BASE+MC_CH0_BASE+0x100) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x10c),REG32(DDRC_BASE+MC_CH0_BASE+0x10c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x110),REG32(DDRC_BASE+MC_CH0_BASE+0x110) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x114),REG32(DDRC_BASE+MC_CH0_BASE+0x114) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x18c),REG32(DDRC_BASE+MC_CH0_BASE+0x18c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x190),REG32(DDRC_BASE+MC_CH0_BASE+0x190) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x194),REG32(DDRC_BASE+MC_CH0_BASE+0x194) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1fc),REG32(DDRC_BASE+MC_CH0_BASE+0x1fc) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x198),REG32(DDRC_BASE+MC_CH0_BASE+0x198) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x19c),REG32(DDRC_BASE+MC_CH0_BASE+0x19c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a0),REG32(DDRC_BASE+MC_CH0_BASE+0x1a0) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a4),REG32(DDRC_BASE+MC_CH0_BASE+0x1a4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a8),REG32(DDRC_BASE+MC_CH0_BASE+0x1a8) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1ac),REG32(DDRC_BASE+MC_CH0_BASE+0x1ac) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b0),REG32(DDRC_BASE+MC_CH0_BASE+0x1b0) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b4),REG32(DDRC_BASE+MC_CH0_BASE+0x1b4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b8),REG32(DDRC_BASE+MC_CH0_BASE+0x1b8) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1bc),REG32(DDRC_BASE+MC_CH0_BASE+0x1bc) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c0),REG32(DDRC_BASE+MC_CH0_BASE+0x1c0) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c4),REG32(DDRC_BASE+MC_CH0_BASE+0x1c4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1d8),REG32(DDRC_BASE+MC_CH0_BASE+0x1d8) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x14c),REG32(DDRC_BASE+MC_CH0_BASE+0x14c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13e4),REG32(DDRC_BASE+MC_CH0_BASE+0x13e4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13ec),REG32(DDRC_BASE+MC_CH0_BASE+0x13ec) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x104),REG32(DDRC_BASE+MC_CH0_BASE+0x104) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x100),REG32(DDRC_BASE+MC_CH0_BASE+0x100) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x10c),REG32(DDRC_BASE+MC_CH0_BASE+0x10c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x110),REG32(DDRC_BASE+MC_CH0_BASE+0x110) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x114),REG32(DDRC_BASE+MC_CH0_BASE+0x114) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x18c),REG32(DDRC_BASE+MC_CH0_BASE+0x18c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x190),REG32(DDRC_BASE+MC_CH0_BASE+0x190) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x194),REG32(DDRC_BASE+MC_CH0_BASE+0x194) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1fc),REG32(DDRC_BASE+MC_CH0_BASE+0x1fc) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x198),REG32(DDRC_BASE+MC_CH0_BASE+0x198) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x19c),REG32(DDRC_BASE+MC_CH0_BASE+0x19c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a0),REG32(DDRC_BASE+MC_CH0_BASE+0x1a0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a4),REG32(DDRC_BASE+MC_CH0_BASE+0x1a4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a8),REG32(DDRC_BASE+MC_CH0_BASE+0x1a8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1ac),REG32(DDRC_BASE+MC_CH0_BASE+0x1ac) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b0),REG32(DDRC_BASE+MC_CH0_BASE+0x1b0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b4),REG32(DDRC_BASE+MC_CH0_BASE+0x1b4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b8),REG32(DDRC_BASE+MC_CH0_BASE+0x1b8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1bc),REG32(DDRC_BASE+MC_CH0_BASE+0x1bc) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c0),REG32(DDRC_BASE+MC_CH0_BASE+0x1c0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c4),REG32(DDRC_BASE+MC_CH0_BASE+0x1c4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1d8),REG32(DDRC_BASE+MC_CH0_BASE+0x1d8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x14c),REG32(DDRC_BASE+MC_CH0_BASE+0x14c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13e4),REG32(DDRC_BASE+MC_CH0_BASE+0x13e4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13ec),REG32(DDRC_BASE+MC_CH0_BASE+0x13ec) );
 #endif
 
 
 
 	//DDR_1200
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0104) = 0x00800400;
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0100) = 0x0000080e;//0x0000080e;
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0104)= 0x00800400;
+	// #if defined(SAMSUNG_8GB)
+	// REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x00001208;	// relevent to dbi
+	// #else
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x0000080e;//0x0000080e;
+	// #endif
 	/*on silicon: DRAM_config_4
 	  SOC ODT:100 60ohm,
 Vref_Training_Range_CA:0
@@ -586,79 +613,83 @@ wr_post:	0.5*tCK
 wr_pre: 2*tCK
 rd_post: 1.5*tCK
 rd_pre: static
-*/
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x010c) = 0x19194314;
+	 */
+	REG32(DDRC_BASE+MC_CH0_BASE+0x010c)= 0x9d194314;
 	/*
 	   on silicon:
 	   Device CA ODT : 100  60ohm, bit28~bit30
 	   Device DQ ODT:  100  60ohm, bit20~bit22
 	   Device pull-down drive strength: 100 60ohm bit16~bit19
-	   */
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0110)= 0x20440000;
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0114)= 0x20440000;
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x018c) = 0x00280018;   //ZQC timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0190) = 0x03200018;   //ZQC timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0194) = 0x805400A8;   //Refresh timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01fc) = 0x000d0065;   //Refresh timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x0198) = 0x00e600e6;   //SelfRefresh timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x019c) = 0x000c0c0c;   //SelfRefresh timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a0) = 0x050c0606;   //Power down timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a4) = 0x00000003;   //Power down timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01a8) = 0x0000020c;   //MRS timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01ac) = 0x18330f22;   //ACT timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b0) = 0x110f080f;   //Pre-Charge timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b4) = 0x08000800;   //CAS/RAS timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01b8) = 0x00000600;   //CAS/RAS timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01bc) = 0x02020404;   //Off-spec timing 0
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01c0) = 0x00000002;   //Off-spec timing 1
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01c4) = 0x00000003;   //DRAM_read timing
+	 */
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0110)= 0x00440000;
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0114)= 0x00440000;
+
+	REG32(DDRC_BASE+MC_CH0_BASE+0x018c) = 0x00280018;   //ZQC timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0190) = 0x03200018;   //ZQC timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0194) = 0x805400A8;   //Refresh timing 0
+	//    REG32(DDRC_BASE+MC_CH0_BASE+0x0194) = 0x807200E4;   //Refresh timing 0
+	//    REG32(DDRC_BASE+MC_CH0_BASE+0x01fc) = 0x000d0065;   //Refresh timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01fc) = 0x000C005E;
+	REG32(DDRC_BASE+MC_CH0_BASE+0x0198) = 0x00e600e6;   //SelfRefresh timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x019c) = 0x000c0c0c;   //SelfRefresh timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a0) = 0x050c0606;   //Power down timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a4) = 0x00000003;   //Power down timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01a8) = 0x0000020c;   //MRS timing
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01ac) = 0x18330f22;   //ACT timing
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b0) = 0x110f080f;
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b4) = 0x08000800;   //CAS/RAS timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01b8) = 0x00000600;   //CAS/RAS timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01bc) = 0x02020404;   //Off-spec timing 0
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01c0) = 0x00000002;   //Off-spec timing 1
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01c4) = 0x00000003;   //DRAM_read timing
 	//REG32(DDRC_BASE+MC_CH0_BASE+0x01c8) = 0x00000A0A; //CA Train timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x01d8) = 0x00008190;   //CH0_dram_training_timing
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x014c) = 0x00030848;   // odt_control_3
+	REG32(DDRC_BASE+MC_CH0_BASE+0x01d8) = 0x00008190;   //CH0_dram_training_timing
+	REG32(DDRC_BASE+MC_CH0_BASE+0x014c) = 0x00030848;   // odt_control_3
 #if defined(NEW_FEATURE)
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE + 0x03e4) = 0x0a000402;   //MCK6 DFI phy ctrl register 1
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x0a000402;   //MCK6 DFI phy ctrl register 1
 #else
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE + 0x03e4) = 0x0a000600;   //MCK6 DFI phy ctrl register 1
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x0a000600;   //MCK6 DFI phy ctrl register 1
 #endif
-	REG32(DDRC_BASE + MC_CH0_PHY_BASE + 0x03ec) = 0x00000480;   //CH0_DFI_PHY_Control_3 trdlvl_rr
+	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03ec) = 0x00000480;   //CH0_DFI_PHY_Control_3 trdlvl_rr
 #if defined(CONFIG_SILENT)
 #else
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x104),REG32(DDRC_BASE+MC_CH0_BASE+0x104) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x100),REG32(DDRC_BASE+MC_CH0_BASE+0x100) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x10c),REG32(DDRC_BASE+MC_CH0_BASE+0x10c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x110),REG32(DDRC_BASE+MC_CH0_BASE+0x110) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x114),REG32(DDRC_BASE+MC_CH0_BASE+0x114) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x18c),REG32(DDRC_BASE+MC_CH0_BASE+0x18c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x190),REG32(DDRC_BASE+MC_CH0_BASE+0x190) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x194),REG32(DDRC_BASE+MC_CH0_BASE+0x194) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1fc),REG32(DDRC_BASE+MC_CH0_BASE+0x1fc) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x198),REG32(DDRC_BASE+MC_CH0_BASE+0x198) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x19c),REG32(DDRC_BASE+MC_CH0_BASE+0x19c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a0),REG32(DDRC_BASE+MC_CH0_BASE+0x1a0) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a4),REG32(DDRC_BASE+MC_CH0_BASE+0x1a4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a8),REG32(DDRC_BASE+MC_CH0_BASE+0x1a8) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1ac),REG32(DDRC_BASE+MC_CH0_BASE+0x1ac) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b0),REG32(DDRC_BASE+MC_CH0_BASE+0x1b0) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b4),REG32(DDRC_BASE+MC_CH0_BASE+0x1b4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b8),REG32(DDRC_BASE+MC_CH0_BASE+0x1b8) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1bc),REG32(DDRC_BASE+MC_CH0_BASE+0x1bc) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c0),REG32(DDRC_BASE+MC_CH0_BASE+0x1c0) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c4),REG32(DDRC_BASE+MC_CH0_BASE+0x1c4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1d8),REG32(DDRC_BASE+MC_CH0_BASE+0x1d8) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x14c),REG32(DDRC_BASE+MC_CH0_BASE+0x14c) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13e4),REG32(DDRC_BASE+MC_CH0_BASE+0x13e4) );
-	LogMsg(1,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13ec),REG32(DDRC_BASE+MC_CH0_BASE+0x13ec) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x104),REG32(DDRC_BASE+MC_CH0_BASE+0x104) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x100),REG32(DDRC_BASE+MC_CH0_BASE+0x100) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x10c),REG32(DDRC_BASE+MC_CH0_BASE+0x10c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x110),REG32(DDRC_BASE+MC_CH0_BASE+0x110) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x114),REG32(DDRC_BASE+MC_CH0_BASE+0x114) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x18c),REG32(DDRC_BASE+MC_CH0_BASE+0x18c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x190),REG32(DDRC_BASE+MC_CH0_BASE+0x190) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x194),REG32(DDRC_BASE+MC_CH0_BASE+0x194) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1fc),REG32(DDRC_BASE+MC_CH0_BASE+0x1fc) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x198),REG32(DDRC_BASE+MC_CH0_BASE+0x198) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x19c),REG32(DDRC_BASE+MC_CH0_BASE+0x19c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a0),REG32(DDRC_BASE+MC_CH0_BASE+0x1a0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a4),REG32(DDRC_BASE+MC_CH0_BASE+0x1a4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1a8),REG32(DDRC_BASE+MC_CH0_BASE+0x1a8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1ac),REG32(DDRC_BASE+MC_CH0_BASE+0x1ac) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b0),REG32(DDRC_BASE+MC_CH0_BASE+0x1b0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b4),REG32(DDRC_BASE+MC_CH0_BASE+0x1b4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1b8),REG32(DDRC_BASE+MC_CH0_BASE+0x1b8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1bc),REG32(DDRC_BASE+MC_CH0_BASE+0x1bc) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c0),REG32(DDRC_BASE+MC_CH0_BASE+0x1c0) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1c4),REG32(DDRC_BASE+MC_CH0_BASE+0x1c4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x1d8),REG32(DDRC_BASE+MC_CH0_BASE+0x1d8) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x14c),REG32(DDRC_BASE+MC_CH0_BASE+0x14c) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13e4),REG32(DDRC_BASE+MC_CH0_BASE+0x13e4) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+0x13ec),REG32(DDRC_BASE+MC_CH0_BASE+0x13ec) );
 #endif
-	/*set DQS internal timer runtime=0x10*/
-	read_data = REG32(DDRC_BASE + MC_CH0_BASE + 0x0108);//DRAM_config_3
-	read_data &= 0xF00FFFFF;
 
+
+	/*set DQS internal timer runtime=0x10*/
+	read_data=REG32(DDRC_BASE+MC_CH0_BASE+0x0108);//DRAM_config_3
+	read_data &= 0xF00FFFFF;
 	read_data |= (0x10<<20);
 	REG32(DDRC_BASE+MC_CH0_BASE+0x0108)=read_data;
-	LogMsg(0,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x108),REG32(DDRC_BASE+MC_CH0_BASE+0x108) );
+	LogMsg(2,"ADDR[0x%08x]=0x%08x !!!! \n",(DDRC_BASE+MC_CH0_BASE+0x108),REG32(DDRC_BASE+MC_CH0_BASE+0x108) );
+
 	return;
 }
-
 void fp_sel(unsigned DDRC_BASE,unsigned int fp)
 {
 	uint32_t data;
@@ -673,45 +704,46 @@ void fp_sel(unsigned DDRC_BASE,unsigned int fp)
 
 
 
-void init_table_mc_tim (uint32_t ddrc_base, uint32_t *idx) {
-	uint32_t i;
-	uint32_t read_data;
-	//uint32_t MC_CH0_BASE=0x200;
-	uint32_t mc_ch0_phy_base = 0x1000;
-	volatile unsigned addrs[] = {
-		MC_CH0_BASE + 0x0100,	//DRAM Config 1 RL/WL
-		MC_CH0_BASE + 0x010c,	//DRAM Config 4
-		MC_CH0_BASE + 0x0110,	//DRAM Config 5 cs0
-		MC_CH0_BASE + 0x0114,	//DRAM Config 5 cs1
-		MC_CH0_BASE + 0x018c,	//ZQC timing 0
-		MC_CH0_BASE + 0x0190,	//ZQC timing 1
-		MC_CH0_BASE + 0x0194,	//Refresh timing
-		MC_CH0_BASE + 0x0198,	//SelfRefresh timing 0
-		MC_CH0_BASE + 0x019c,	//SelfRefresh timing 1
-		MC_CH0_BASE + 0x01a0,	//Power down timing 0
-		MC_CH0_BASE + 0x01a4,	//Power down timing 1
-		MC_CH0_BASE + 0x01a8,	//MRS timing
-		MC_CH0_BASE + 0x01ac,	//ACT timing
-		MC_CH0_BASE + 0x01b0,	//Pre-Charge timing
-		MC_CH0_BASE + 0x01b4,	//CAS/RAS timing 0
-		MC_CH0_BASE + 0x01b8,	//CAS/RAS timing 1
-		MC_CH0_BASE + 0x01bc,	//Off-spec timing 0	WDQS enable
-		MC_CH0_BASE + 0x01c0,	//Off-spec timing 1
-		MC_CH0_BASE + 0x01c4,	//DRAM_read timing
-		MC_CH0_BASE + 0x0200,	//WDQS timing
-		MC_CH0_BASE + 0x01d8,   //CH0_dram_training_timing
-		MC_CH0_BASE + 0x014c,	// odt_control_3
-		mc_ch0_phy_base + 0x03e4,	//MCK6 DFI phy ctrl register 1
-		mc_ch0_phy_base + 0x03ec	//CH0_DFI_PHY_Control_3 trdlvl_rr
-	};
-	uint32_t tim_size = sizeof(addrs) >> 2;
 
-	for (i = 0; i < tim_size; i++) {
-		read_data = REG32(ddrc_base + addrs[i]);
-		REG32(ddrc_base + 0x0074) = read_data;
-		REG32(ddrc_base + 0x0078) = addrs[i];
-		REG32(ddrc_base + 0x0070) = (*idx)++;
-	}
+void init_table_mc_tim (uint32_t ddrc_base, uint32_t *idx) {
+        uint32_t i;
+        uint32_t read_data;
+        //uint32_t MC_CH0_BASE=0x200;
+        uint32_t mc_ch0_phy_base = 0x1000;
+        volatile unsigned addrs[ ] = {
+                MC_CH0_BASE+0x0100,	//DRAM Config 1 RL/WL
+                MC_CH0_BASE+0x010c,	//DRAM Config 4
+                MC_CH0_BASE+0x0110,	//DRAM Config 5 cs0
+                MC_CH0_BASE+0x0114,	//DRAM Config 5 cs1
+                MC_CH0_BASE+0x018c,	//ZQC timing 0
+                MC_CH0_BASE+0x0190,	//ZQC timing 1
+                MC_CH0_BASE+0x0194,	//Refresh timing
+                MC_CH0_BASE+0x0198,	//SelfRefresh timing 0
+                MC_CH0_BASE+0x019c,	//SelfRefresh timing 1
+                MC_CH0_BASE+0x01a0,	//Power down timing 0
+                MC_CH0_BASE+0x01a4,	//Power down timing 1
+                MC_CH0_BASE+0x01a8,	//MRS timing
+                MC_CH0_BASE+0x01ac,	//ACT timing
+                MC_CH0_BASE+0x01b0,	//Pre-Charge timing
+                MC_CH0_BASE+0x01b4,	//CAS/RAS timing 0
+                MC_CH0_BASE+0x01b8,	//CAS/RAS timing 1
+                MC_CH0_BASE+0x01bc,	//Off-spec timing 0	WDQS enable
+                MC_CH0_BASE+0x01c0,	//Off-spec timing 1
+                MC_CH0_BASE+0x01c4,	//DRAM_read timing
+                MC_CH0_BASE+0x0200,	//WDQS timing
+                MC_CH0_BASE+0x01d8,   //CH0_dram_training_timing
+                MC_CH0_BASE+0x014c,	// odt_control_3
+                mc_ch0_phy_base+0x03e4,	//MCK6 DFI phy ctrl register 1
+                mc_ch0_phy_base+0x03ec	//CH0_DFI_PHY_Control_3 trdlvl_rr
+        };
+        uint32_t tim_size = sizeof(addrs)>>2;
+
+        for(i=0;i<tim_size;i++) {
+                read_data = REG32(ddrc_base + addrs[i]);
+                REG32(ddrc_base + 0x0074) = read_data;
+                REG32(ddrc_base + 0x0078) = addrs[i];
+                REG32(ddrc_base + 0x0070) = (*idx)++;
+        }
 }
 
 
@@ -1269,8 +1301,8 @@ void top_DDR_MC_init(unsigned DDRC_BASE,unsigned int fp)
 	  Bank address assignment boundary:4KB
 	  DDR device type: X32
 	  */
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x20) = 0x05030632;//8 bank, 17 row, 10 column
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x24) = 0x05030632;//8 bank, 17 row, 10 column
+	REG32(DDRC_BASE + MC_CH0_BASE + 0x20) = 0x05030732;//8 bank, 17 row, 10 column
+	REG32(DDRC_BASE + MC_CH0_BASE + 0x24) = 0x05030732;//8 bank, 17 row, 10 column
 
 
 	/*Init MC feature*/
@@ -1748,12 +1780,13 @@ void adjust_timing(u32 DDRC_BASE)
 
 void adjust_mapping(u32 DDRC_BASE)
 {
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x24) = 0;//8 bank, 17 row, 10 column
-	REG32(DDRC_BASE + MC_CH0_BASE + 0x8) = 0;
-	REG32(DDRC_BASE + MC_CH0_BASE + 0xc) = 0;
-	if (get_manufacture_id() == 0xff) {
-		REG32(DDRC_BASE + MC_CH0_BASE + 0x20) = 0x05030732;//8 bank, 17 row, 10 column
-	}
+	REG32(DDRC_BASE + MC_CH0_BASE) = 0xf0001;
+	REG32(DDRC_BASE + MC_CH0_BASE + 0x4) = 0x0;
+	REG32(DDRC_BASE + MC_CH0_BASE + 0x8) = 0x800f0001;
+	REG32(DDRC_BASE + MC_CH0_BASE + 0xc) = 0x0;
+	REG32(DDRC_BASE + MC_CH0_BASE + 0x20) = 0x05030632;//8 bank, 17 row, 10 column
+	REG32(DDRC_BASE + MC_CH0_BASE + 0x24) = 0x05030632;//8 bank, 17 row, 10 column
+
 }
 
 static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp)
@@ -1777,7 +1810,7 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp)
 	training(to_traning_param);
 }
 
-void lpddr4_silicon_init(u32 ddr_base)
+void lpddr4_silicon_init(u32 ddr_base, u32 data_rate)
 {
 	unsigned fp=0;
 	unsigned cs_num=2;
@@ -1787,10 +1820,10 @@ void lpddr4_silicon_init(u32 ddr_base)
 	top_DDR_MC_Phy_Device_Init(ddr_base,cs_num,0);
 
 	if (ddr_get_density() == 4096) {
-		adjust_timing(ddr_base);
 		adjust_mapping(ddr_base);
-		cs_num = 1;
 	}
+	LogMsg(0,"ddr density: %u \n", ddr_get_density());
+
 	LogMsg(0,"init table start \n");
 	ddr_dfc_table_init(0xF0000000);
 	LogMsg(0,"init table done \n");
@@ -1806,7 +1839,22 @@ void lpddr4_silicon_init(u32 ddr_base)
 	ddr_dfc(fp);
 	top_training_fp_all(ddr_base,cs_num,fp);
 
-	ddr_dfc(0);
+	/* change dram frequency */	
+	switch(data_rate) {
+	case 1600:
+		ddr_dfc(1);
+		break;
+	
+	case 2400:
+		ddr_dfc(2);
+		break;
+
+	case 1200:
+	default:
+		ddr_dfc(1);
+		break;
+	}
+
 	return;
 }
 

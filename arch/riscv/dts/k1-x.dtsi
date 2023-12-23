@@ -304,7 +304,7 @@
 			clock-frequency = <14000000>;
 		};
 
-		ddr@c0000000 {
+		dramc: ddr@c0000000 {
 			u-boot,dm-spl;
 			compatible = "spacemit,ddr-ctl";
 			reg = <0x00000000 0xC0000000 0x00000000 0x00400000>;

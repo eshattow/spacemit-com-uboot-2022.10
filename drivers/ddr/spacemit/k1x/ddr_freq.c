@@ -172,12 +172,15 @@ static u32 format_size(u32 density, u32 io_width)
 
 u32 ddr_get_density(void)
 {
+	u32 ddr_size = 0;
 	u32 mr8_cs00, mr8_cs01, mr8_cs10, mr8_cs11;
 	u32 io_width_cs00, io_width_cs01, io_width_cs10, io_width_cs11;
 
 	u32 cs0_size = 0;
 	u32 cs1_size = 0;
-	u32 ddr_size = 0;
+
+//	if (ddr_size)
+//		return ddr_size;
 
 	mr8_cs00 = mode_register_read(8, 0, 0);
 	mr8_cs01 = mode_register_read(8, 1, 0);
@@ -195,8 +198,9 @@ u32 ddr_get_density(void)
 	cs1_size += mr8_cs11 ? format_size(((mr8_cs11 >> 2) & 0xf), io_width_cs11) : 0;
 
 	ddr_size = cs0_size + cs1_size;
-
+//#ifdef CONFIG_SPL_BUILD
 	printf("DDR size = %d MB\n", ddr_size);
+//#endif
 	return ddr_size;
 }
 
