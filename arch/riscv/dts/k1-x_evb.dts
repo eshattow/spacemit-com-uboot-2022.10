@@ -322,6 +322,17 @@
 			K1X_PADCONF(GPIO_80, MUX_MODE0, (EDGE_BOTH | PULL_UP | PAD_3V_DS4))  /* mmc cd */
 		>;
 	};
+
+	pinctrl_qspi: qspi_grp {
+		pinctrl-single,pins = <
+			K1X_PADCONF(QSPI_DAT3, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d3 */
+			K1X_PADCONF(QSPI_DAT2, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d2 */
+			K1X_PADCONF(QSPI_DAT1, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d1 */
+			K1X_PADCONF(QSPI_DAT0, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d1 */
+			K1X_PADCONF(QSPI_CLK,  MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_clk */
+			K1X_PADCONF(QSPI_CSI,  MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_1V8_DS2))          /* qspi_csi */
+		>;
+	};
 };
 
 &udc {
@@ -400,4 +411,19 @@
 
 &pcie0_rc {
 	status = "disabled";
+};
+
+&qspi {
+        status = "okay";
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_qspi>;
+
+        flash@0 {
+                compatible = "jedec,spi-nor";
+                reg = <0>;
+                spi-max-frequency = <26500000>;
+                m25p,fast-read;
+                broken-flash-reset;
+                status = "okay";
+        };
 };
