@@ -33,7 +33,7 @@
 
 &dramc {
 	/* dram data rate, should be 1200, 1600, or 2400 */
-	datarate = <1200>;
+	datarate = <2400>;
 	/* boot voltage for dram, should be 600~800, which means 0.6v~0.8v */
 	dram_voltage = <650>;
 };
