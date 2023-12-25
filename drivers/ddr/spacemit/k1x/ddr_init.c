@@ -299,17 +299,11 @@ static int spacemit_ddr_probe(struct udevice *dev)
 #ifdef CONFIG_K1_X_BOARD_FPGA
 	void (*ddr_init)(void);
 #else
-	uint32_t val, cpu_freq, ddr_datarate;
+	uint32_t val, cpu_freq, ddr_datarate, ddr_voltage=0;
 	fdt_addr_t ddrc_base;
 	struct udevice *cpu;
 
 	ddrc_base = dev_read_addr(dev);
-
-	if(dev_read_u32u(dev, "datarate", &ddr_datarate)) {
-		printf("ddr data rate not configed in dts, use 1200 as default!\n");
-		ddr_datarate = 1200;
-	}
-	printf("ddr data rate is %u configured in dts\n", ddr_datarate);
 #endif
 
 #ifdef CONFIG_K1_X_BOARD_FPGA
@@ -350,6 +344,31 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	cpu_freq = adjust_cpu_freq(1, cpu_freq);
 	printf("adjust cluster-1 frequency to %u done\n", cpu_freq);
 
+
+	/* check if need adjust ddr voltage */
+	if(dev_read_u32u(dev, "dram_voltage", &ddr_voltage)) {
+		printf("dram voltage not configed in dts, use pmic output default!\n");
+	} else {
+		if ((ddr_voltage < 600) || (ddr_voltage > 800)) {
+			printf("dram voltage 0.%uv configured in dts is invalid!\n ", ddr_voltage/10);
+		} else {
+			printf("adust buck-4 voltage to 0.%uv ...", ddr_voltage/10);
+			val = (ddr_voltage - 480)/10;
+			/* i2c_bus:8, i2c_addr:0x31, buck4_reg:0x80 */
+			pmic_write_with_check(8, 0x31, 0x80, val, (val | (1 << 7)));
+			printf("		[succeed]\n");
+		}
+	}
+
+	/* check if dram data-rate is configued in dts */
+	if(dev_read_u32u(dev, "datarate", &ddr_datarate)) {
+		printf("ddr data rate not configed in dts, use 1200 as default!\n");
+		ddr_datarate = 1200;
+	} else {
+		printf("ddr data rate is %u configured in dts\n", ddr_datarate);
+	}
+
+	/* init dram */
 	lpddr4_silicon_init(ddrc_base, ddr_datarate);
 #endif
 
