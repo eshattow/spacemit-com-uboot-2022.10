@@ -41,12 +41,12 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 void fastboot_mmc_erase(const char *cmd, char *response);
 
 /**
- * fastboot_mmc_load() - load data from eMMC for fastboot
+ * fastboot_mmc_read() - load data from eMMC for fastboot
  *
  * @part: Named partition to erase
  * @response: Pointer to fastboot response buffer
  */
-u32 fastboot_mmc_load(const char *part, u32 offset, u32 size,
+u32 fastboot_mmc_read(const char *part, u32 offset, u32 size,
 			void *download_buffer, char *response);
 
 #endif

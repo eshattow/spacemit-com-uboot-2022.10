@@ -54,8 +54,8 @@ static void oem_partconf(char *, char *);
 static void oem_bootbus(char *, char *);
 #endif
 
-#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_LOAD)
-static void oem_load(char *cmd_parameter, char *response);
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_READ)
+static void oem_read(char *cmd_parameter, char *response);
 #endif
 
 
@@ -141,10 +141,10 @@ static const struct {
 		.dispatch = oem_bootbus,
 	},
 #endif
-#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_LOAD)
-	[FASTBOOT_COMMAND_OEM_LOAD] = {
-		.command = "oem load",
-		.dispatch = oem_load,
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_READ)
+	[FASTBOOT_COMMAND_OEM_READ] = {
+		.command = "oem read",
+		.dispatch = oem_read,
 	},
 #endif
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
@@ -622,14 +622,14 @@ static void oem_bootbus(char *cmd_parameter, char *response)
 }
 #endif
 
-#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_LOAD)
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_READ)
 /**
- * oem_load() - Execute the OEM load command
+ * oem_read() - Execute the OEM read command
  *
  * @cmd_parameter: Pointer to command parameter
  * @response: Pointer to fastboot response buffer
  */
-static void oem_load(char *cmd_parameter, char *response)
+static void oem_read(char *cmd_parameter, char *response)
 {
 	char *part, *offset_str, *size_str, *cmd_str;
 	u32 off, size;
@@ -638,7 +638,7 @@ static void oem_load(char *cmd_parameter, char *response)
 	part = strsep(&cmd_str, " ");
 	if (!part){
 		fastboot_fail("miss part, send command:\
-			fastboot oem load:part offset size", response);
+			fastboot oem read:part offset size", response);
 		return;
 	}
 
@@ -662,7 +662,7 @@ static void oem_load(char *cmd_parameter, char *response)
 	debug("get part:%s, offset:%x, size:%x\n", part, off, size);
 
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
-	fastboot_bytes_expected = fastboot_mmc_load(part, off, size, fastboot_buf_addr, response);
+	fastboot_bytes_expected = fastboot_mmc_read(part, off, size, fastboot_buf_addr, response);
 #endif
 
 }

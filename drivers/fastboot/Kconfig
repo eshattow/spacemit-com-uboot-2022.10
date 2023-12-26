@@ -243,11 +243,11 @@ config FASTBOOT_CMD_OEM_BOOTBUS
 	  Add support for the "oem bootbus" command from a client. This set
 	  the mmc boot configuration for the selecting eMMC device.
 
-config FASTBOOT_CMD_OEM_LOAD
-	bool "Enable the 'oem load' command"
+config FASTBOOT_CMD_OEM_READ
+	bool "Enable the 'oem read' command"
 	depends on FASTBOOT_FLASH_MMC
 	help
-	  Add support for the "oem load" command from a client. This only
+	  Add support for the "oem read" command from a client. This only
 	  load data to ddr, and should use upload command to load data to
 	  host.
 
