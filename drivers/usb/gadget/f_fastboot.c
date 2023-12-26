@@ -450,6 +450,24 @@ static unsigned int rx_bytes_expected(struct usb_ep *ep)
 	return rx_remain;
 }
 
+static unsigned int tx_bytes_expected(struct usb_ep *ep)
+{
+	int tx_remain = fastboot_data_remaining();
+	unsigned int rem;
+	unsigned int maxpacket = usb_endpoint_maxp(ep->desc);
+
+	if (tx_remain <= 0)
+		return 0;
+	else if (tx_remain > EP_BUFFER_SIZE)
+		return EP_BUFFER_SIZE;
+
+	rem = tx_remain % maxpacket;
+	if (rem > 0)
+		tx_remain = tx_remain + (maxpacket - rem);
+
+	return tx_remain;
+}
+
 static void rx_handler_dl_image(struct usb_ep *ep, struct usb_request *req)
 {
 	char response[FASTBOOT_RESPONSE_LEN] = {0};
@@ -484,6 +502,46 @@ static void rx_handler_dl_image(struct usb_ep *ep, struct usb_request *req)
 
 	req->actual = 0;
 	usb_ep_queue(ep, req, 0);
+}
+
+static void tx_handler_up_image(struct usb_ep *ep, struct usb_request *in_req)
+{
+	char response[FASTBOOT_RESPONSE_LEN] = {0};
+	unsigned int remain_size = fastboot_data_remaining();
+	const unsigned char *buffer = in_req->buf;
+
+	unsigned int transfer_size = tx_bytes_expected(ep);
+
+	if (in_req->status != 0) {
+		printf("Bad status: %d\n", in_req->status);
+		return;
+	}
+
+	if (!fastboot_data_remaining()) {
+		fastboot_data_complete(response);
+
+		/*
+		 * Reset global transfer variable
+		 */
+		in_req->complete = fastboot_complete;
+
+		fastboot_tx_write_str(response);
+		return ;
+	}
+
+	if (transfer_size > remain_size)
+		transfer_size = remain_size;
+
+
+	fastboot_data_upload(buffer, transfer_size, response);
+
+	if (response[0]) {
+		fastboot_tx_write_str(response);
+		return;
+	}
+
+	in_req->length = transfer_size;
+	usb_ep_queue(ep, in_req, 0);
 }
 
 static void do_exit_on_complete(struct usb_ep *ep, struct usb_request *req)
@@ -531,6 +589,13 @@ static void rx_handler_command(struct usb_ep *ep, struct usb_request *req)
 	if (!strncmp("DATA", response, 4)) {
 		req->complete = rx_handler_dl_image;
 		req->length = rx_bytes_expected(ep);
+	}
+
+	if (!strncmp("PUSH", response, 4)) {
+		fastboot_func->in_req->complete = tx_handler_up_image;
+
+		/* must replace 'PUSH' to 'DATA' */
+		strncpy(response, "DATA", 4);
 	}
 
 	if (!strncmp("OKAY", response, 4)) {

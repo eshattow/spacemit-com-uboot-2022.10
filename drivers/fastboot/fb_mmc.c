@@ -788,3 +788,61 @@ void fastboot_mmc_erase(const char *cmd, char *response)
 	       blks_size * info.blksz, cmd);
 	fastboot_okay(NULL, response);
 }
+
+/**
+ * fastboot_mmc_load() - load data from eMMC for fastboot
+ *
+ * @part: Named partition to erase
+ * @response: Pointer to fastboot response buffer
+ */
+u32 fastboot_mmc_load(const char *part, u32 offset, u32 size,
+					void *download_buffer, char *response)
+{
+	struct blk_desc *dev_desc;
+	struct disk_partition info = {0};
+	lbaint_t hdr_sectors, off_blk, size_blk;
+	lbaint_t res;
+
+	if (do_get_part_info(&dev_desc, part, &info) >= 0){
+		/*transfer offset to blk size*/
+		off_blk = (offset / info.blksz) + info.start;
+		if (!size)
+			size_blk = info.size;
+		else
+			size_blk = (size + info.blksz - 1) / info.blksz;
+	}else{
+		off_blk = offset / info.blksz;
+		if (!size){
+			fastboot_fail("can not find part, but size is 0", response);
+			return 0;
+		}else{
+			size_blk = (size + info.blksz - 1) / info.blksz;
+		}
+	}
+
+	if (offset % info.blksz)
+		printf("offset should be align to 0x%lx, would change offset to 0x%lx\n",
+								info.blksz, (offset / info.blksz) * info.blksz);
+
+	debug("info->blksize:%lx, off_blk:%lx, size_blk:%lx\n", info.blksz, off_blk, size_blk);
+
+	/*if size > buffer_size, it would only load buffer_size, and return offset*/
+	if (size > fastboot_buf_size){
+		/* Read the boot image header */
+		hdr_sectors = fastboot_buf_size / info.blksz;
+		offset += fastboot_buf_size;
+		size = fastboot_buf_size;
+	}else{
+		hdr_sectors = size_blk;
+		offset = 0;
+	}
+
+	res = blk_dread(dev_desc, off_blk, hdr_sectors, download_buffer);
+	if (res != hdr_sectors) {
+		fastboot_fail("cannot read data from mmc", response);
+		return 0;
+	}
+
+	fastboot_response("OKAY", response, "0x%08x", offset);
+	return size_blk * info.blksz;
+}

@@ -4,6 +4,17 @@
 #include <linux/delay.h>
 I2C_FAST_MODE i2c_fast_mode = FAST_MODE;
 
+#define LOGLEVEL 0
+#if (LOGLEVEL > 0)
+#define LogMsg(level, format, args...) \
+	do { \
+		if (level < LOGLEVEL) \
+			printf(format, ##args); \
+	} while (0)
+#else
+#define LogMsg(level, format, args...)
+#endif
+
 uint32_t twsi_base[] = {
 	0xd4010000,	/* TWSI0 */
 	0xd4011000,	/* TWSI1 */
@@ -99,11 +110,11 @@ void i2c_clear_tx_rx_fifo(int port_idx)
 
 void i2c_apbclk_init(int port_idx, I2C_FUNCTION_CLK clk)
 {
-	printf("i2c_apbclk_init: %x\n", port_idx);
+	LogMsg(1, "i2c_apbclk_init: %x\n", port_idx);
 	mmio_write_32(0xd4015020, (clk << 4) | 0x4);
 	mmio_write_32(apbc_clk_reg[port_idx], (clk << 4) | 0x7);
 	mmio_write_32(apbc_clk_reg[port_idx], (clk << 4) | 0x3);
-	printf("i2c_apbclk_init: %x done\n", port_idx);
+	LogMsg(1, "i2c_apbclk_init: %x done\n", port_idx);
 }
 
 static void i2c_fifo_bus_reset(int port_idx)
@@ -126,7 +137,7 @@ static void i2c_fifo_bus_reset(int port_idx)
 
 		bus_status = mmio_read_32(TWSI_IBMR + port_base);
 		if(!(bus_status & TWSI_IBMR_SCL))
-			printf("i2c unit reset failed\n");
+			LogMsg(0, "i2c unit reset failed\n");
 	}
 
 	while(clk_cnt < 0x9) {
@@ -144,9 +155,9 @@ static void i2c_fifo_bus_reset(int port_idx)
 
 	bus_status = mmio_read_32(TWSI_IBMR + port_base);
 	if(clk_cnt >=9 && !(bus_status & TWSI_IBMR_SDA))
-		printf("i2c bus reset reaches the max 9-clocks\n");
+		LogMsg(1, "i2c bus reset reaches the max 9-clocks\n");
 	else
-		printf("i2c bus reset, send clk: %d\n", clk_cnt);
+		LogMsg(1, "i2c bus reset, send clk: %d\n", clk_cnt);
 }
 
 static void I2CResetUnit(int port_idx)
@@ -174,7 +185,7 @@ void i2c_fifo_init(int port_idx, I2C_FAST_MODE fastMode)
 	mmio_write_32(TWSI_IWCR + port_base, 0x142a);
 	mmio_write_32(TWSI_ICR + port_base,
 		      I2C_INIT | (fastMode << TWSI_ICR_MODE_BASE));
-	printf("init 0x%x,0x%x,0x%x\n", mmio_read_32(TWSI_ICR + port_base),
+	LogMsg(1, "init 0x%x,0x%x,0x%x\n", mmio_read_32(TWSI_ICR + port_base),
 	       mmio_read_32(TWSI_ISR + port_base),
 	       mmio_read_32(TWSI_IBMR + port_base));
 }
@@ -187,13 +198,13 @@ int i2c_fifo_wait_status(int port_idx, uint32_t status)
 		udelay(100);
 		i++;
 		if (TWSI_ISR_BED & (mmio_read_32(TWSI_ISR + port_base))) {
-			printf("bus error detected!0x%x,0x%x\n",
+			LogMsg(0, "bus error detected!0x%x,0x%x\n",
 			      mmio_read_32(TWSI_ICR + port_base),
 			      mmio_read_32(TWSI_ISR + port_base));
 			i2c_fifo_init(port_idx, i2c_fast_mode);
 			return -1;
 		} else if (i > 2000) {	/*200ms timeout */
-			printf("i2c_fifo_wait_status time out!0x%x,0x%x\n",
+			LogMsg(0, "i2c_fifo_wait_status time out!0x%x,0x%x\n",
 			      mmio_read_32(TWSI_ICR + port_base),
 			      mmio_read_32(TWSI_ISR + port_base));
 			i2c_fifo_init(port_idx, i2c_fast_mode);
@@ -213,7 +224,7 @@ int i2c_fifo_tx_8a_16d(int port_idx, uint8_t slave_addr, uint8_t reg_addr, uint1
 	value_hb = ( reg_value >> 8) & 0xff;
 	value_lb = reg_value & 0xff;
 
-	printf("slave addr %x, reg_addr %x, reg_value %x\n", slave_addr, reg_addr, reg_value);
+	LogMsg(1, "slave addr %x, reg_addr %x, reg_value %x\n", slave_addr, reg_addr, reg_value);
 	while (repeat--) {
 		if ((HS_MODE == i2c_fast_mode) || (HS_MODE_FAST == i2c_fast_mode))
 			mmio_write_32(TWSI_WFIFO + port_base, START_BYTE_CNTROL | 0x0e);	//Master code for HS
@@ -233,7 +244,7 @@ int i2c_fifo_tx_8a_16d(int port_idx, uint8_t slave_addr, uint8_t reg_addr, uint1
 			return 0;
 	}
 
-	printf("i2c tx 8a_16d failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
+	LogMsg(0, "i2c tx 8a_16d failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
 		mmio_read_32(TWSI_ISR + port_base));
 	return -1;
 }
@@ -276,7 +287,7 @@ int i2c_fifo_rx_8a_16d(int port_idx, uint8_t slave_addr, uint8_t reg_addr, uint1
 		}
 	}
 
-	printf("i2c rx 8a_16d failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
+	LogMsg(0, "i2c rx 8a_16d failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
 		mmio_read_32(TWSI_ISR + port_base));
 	return -1;
 }
@@ -314,7 +325,7 @@ int i2c_fifo_tx_8a_32d(int port_idx, uint8_t slave_addr, uint8_t reg_addr, uint3
 			return 0;
 	}
 
-	printf("i2c tx 8a_32d failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
+	LogMsg(0, "i2c tx 8a_32d failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
 		mmio_read_32(TWSI_ISR + port_base));
 	return -1;
 }
@@ -365,7 +376,7 @@ int i2c_fifo_rx_8a_32d(int port_idx, uint8_t slave_addr, uint8_t reg_addr, uint3
 		}
 	}
 
-	printf("i2c rx 8a_32d failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
+	LogMsg(0, "i2c rx 8a_32d failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
 		mmio_read_32(TWSI_ISR + port_base));
 	return -1;
 }
@@ -457,7 +468,7 @@ int i2c_fifo_tx_8a_8d_1(int port_idx, uint8_t slave_addr, uint8_t reg_addr, uint
 		if (0 == status)
 			return 0;
 	}
-	printf("i2c tx 8a_8d_1 failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
+	LogMsg(0, "i2c tx 8a_8d_1 failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
 				mmio_read_32(TWSI_ISR + port_base));
 	return -1;
 }
@@ -495,7 +506,7 @@ int i2c_fifo_rx_8a_8d_1(int port_idx, uint8_t slave_addr, uint8_t reg_addr, uint
 			return 0;
 		}
 	}
-	printf("i2c rx 8a_8d_1 failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
+	LogMsg(0, "i2c rx 8a_8d_1 failed cr(0x%x),sr(0x%x)\n", mmio_read_32(TWSI_ICR + port_base),
 			mmio_read_32(TWSI_ISR + port_base));
 	return -1;
 }
@@ -555,7 +566,7 @@ uint8_t pmic_write_with_check(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_
 	} while ((val != check_val) && (timeout--));
 
 	if ((timeout < 0) || (val != check_val)) {
-		printf("pmic write reg: %x, val: %x failed, cur_val: %x != check_val: %x\n",
+		LogMsg(0, "pmic write reg: %x, val: %x failed, cur_val: %x != check_val: %x\n",
 		      reg, reg_val, val, check_val);
 		//wdt_reset();
 		while (1) ;
@@ -576,7 +587,7 @@ uint8_t pmic_write(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_t reg_val)
 	} while ((val != reg_val) && (timeout--));
 
 	if ((timeout < 0) || (val != reg_val)) {
-		printf("pmic write reg: %x, val: %x failed, cur_val: %x\n",
+		LogMsg(0, "pmic write reg: %x, val: %x failed, cur_val: %x\n",
 		      reg, reg_val, val);
 		//wdt_reset();
 		while (1) ;
@@ -603,7 +614,7 @@ int pmic_write8(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint8_t reg_val)
 	} while ((rx_val != reg_val) && (timeout--));
 
 	if ((timeout < 0) && (rx_val != reg_val)) {
-		printf("pmic write reg: %x, val: %x failed, cur_val: %x\n",
+		LogMsg(0, "pmic write reg: %x, val: %x failed, cur_val: %x\n",
 		      reg, reg_val, rx_val);
 		return -1;
 	} else
@@ -630,7 +641,7 @@ int pmic_write16(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint16_t reg_val)
 	} while ((rx_val != reg_val) && (timeout--));
 
 	if ((timeout < 0) && (rx_val != reg_val)) {
-		printf("pmic write reg: %x, val: %x failed, cur_val: %x\n",
+		LogMsg(0, "pmic write reg: %x, val: %x failed, cur_val: %x\n",
 		      reg, reg_val, rx_val);
 		return -1;
 	} else
@@ -657,7 +668,7 @@ int pmic_write32(uint8_t i2c_bus, uint8_t addr, uint8_t reg, uint32_t reg_val)
 	} while ((rx_val != reg_val) && (timeout--));
 
 	if ((timeout < 0) && (rx_val != reg_val)) {
-		printf("pmic write reg: %x, val: %x failed, cur_val: %x\n",
+		LogMsg(0, "pmic write reg: %x, val: %x failed, cur_val: %x\n",
 		      reg, reg_val, rx_val);
 		return -1;
 	} else
@@ -686,7 +697,7 @@ void set_reboot_reason(uint8_t reason)
 
 	i2c_fifo_tx_8a_8d(i2c_no, 0x32 * 2, 0xc0, reason);
 	val = i2c_fifo_rx_8a_8d(i2c_no, 0x32 * 2, 0xc0);
-	printf("reboot_reason read=0x%x\n", val);
+	LogMsg(1, "reboot_reason read=0x%x\n", val);
 }
 
 void enable_avdd_usb(void)
@@ -697,7 +708,7 @@ void enable_avdd_usb(void)
 	if (0 == (val & BIT(0))) {
 		val |= BIT(0);
 		i2c_fifo_tx_8a_8d(i2c_no, 0x31 * 2, 0x9, val);
-		printf("LDO enable 0x%x,value 0x%x\n",
+		LogMsg(1, "LDO enable 0x%x,value 0x%x\n",
 		       i2c_fifo_rx_8a_8d(i2c_no, 0x31 * 2, 0x9),
 		       i2c_fifo_rx_8a_8d(i2c_no, 0x31 * 2, 0x30));
 	}
@@ -713,7 +724,7 @@ int is_adb_reboot_download_mode(void)
 	if (val == reason) {
 		val &= ~reason;
 		i2c_fifo_tx_8a_8d(i2c_no, 0x32 * 2, 0xc0, val);
-		printf("now reboot_reason 0x%x\n",
+		LogMsg(1, "now reboot_reason 0x%x\n",
 		       i2c_fifo_rx_8a_8d(i2c_no, 0x32 * 2, 0xc0));
 		enable_avdd_usb();
 		return 1;
@@ -738,7 +749,7 @@ unsigned int whether_bootup_from_powerdown(void)
 	     (i2c_no, PMIC_88PM802_ADDRESS * 2, POWER_DOWN_LOG1) & 0xff) << 8;
 	pmic_log |= (i2c_fifo_rx_8a_8d
 	     (i2c_no, PMIC_88PM802_ADDRESS * 2, POWER_DOWN_LOG2) & 0xff) << 16;
-	printf("pmic_log 0x%x\n", pmic_log);
+	LogMsg(1, "pmic_log 0x%x\n", pmic_log);
 	if (pmic_log & BOOTUP_FROM_POWERDOWN)
 		return 1;
 	else

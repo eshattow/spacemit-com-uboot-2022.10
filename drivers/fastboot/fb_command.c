@@ -34,6 +34,7 @@ static u32 fastboot_bytes_expected;
 static void okay(char *, char *);
 static void getvar(char *, char *);
 static void download(char *, char *);
+static void upload(char *, char *);
 
 #if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
@@ -52,6 +53,12 @@ static void oem_partconf(char *, char *);
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_BOOTBUS)
 static void oem_bootbus(char *, char *);
 #endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_LOAD)
+static void oem_load(char *cmd_parameter, char *response);
+#endif
+
+
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
 static void run_ucmd(char *, char *);
 static void run_acmd(char *, char *);
@@ -70,6 +77,10 @@ static const struct {
 	[FASTBOOT_COMMAND_DOWNLOAD] = {
 		.command = "download",
 		.dispatch = download
+	},
+	[FASTBOOT_COMMAND_UPLOAD] = {
+		.command = "upload",
+		.dispatch = upload
 	},
 #if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
@@ -128,6 +139,12 @@ static const struct {
 	[FASTBOOT_COMMAND_OEM_BOOTBUS] = {
 		.command = "oem bootbus",
 		.dispatch = oem_bootbus,
+	},
+#endif
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_LOAD)
+	[FASTBOOT_COMMAND_OEM_LOAD] = {
+		.command = "oem load",
+		.dispatch = oem_load,
 	},
 #endif
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
@@ -237,6 +254,38 @@ static void download(char *cmd_parameter, char *response)
 	}
 }
 
+
+/**
+ * fastboot_upload() - Start a upload transfer from the host
+ *
+ * @cmd_parameter: Pointer to command parameter
+ * @response: Pointer to fastboot response buffer
+ */
+static void upload(char *cmd_parameter, char *response)
+{
+	/*fastboot_bytes_received would record had send byte*/
+	fastboot_bytes_received = 0;
+
+	if (fastboot_bytes_expected == 0) {
+		fastboot_fail("Expected nonzero image size", response);
+		return;
+	}
+	/*
+	 * Nothing to upload yet. Response is of the form:
+	 * [DATA|FAIL]$cmd_parameter
+	 *
+	 * where cmd_parameter is an 8 digit hexadecimal number
+	 */
+	if (fastboot_bytes_expected > fastboot_buf_size) {
+		fastboot_fail(cmd_parameter, response);
+	} else {
+		printf("Starting upload of %d bytes\n",
+		       fastboot_bytes_expected);
+		fastboot_response("PUSH", response, "%08x", fastboot_bytes_expected);
+	}
+}
+
+
 /**
  * fastboot_data_remaining() - return bytes remaining in current transfer
  *
@@ -291,6 +340,50 @@ void fastboot_data_download(const void *fastboot_data,
 	*response = '\0';
 }
 
+
+/**
+ * fastboot_data_upload() - Copy image data to fastboot_buf_addr.
+ *
+ * @fastboot_data: Pointer to received fastboot data
+ * @fastboot_data_len: Length of received fastboot data
+ * @response: Pointer to fastboot response buffer
+ *
+ * Copies image data from fastboot_buf_addr to fastboot_data. Writes to
+ * response. fastboot_bytes_received is updated to indicate the number
+ * of bytes that have been transferred.
+ */
+void fastboot_data_upload(const void *fastboot_data,
+			    unsigned int fastboot_data_len,
+			    char *response)
+{
+#define BYTES_PER_DOT	0x20000
+	u32 pre_dot_num, now_dot_num;
+
+	if (fastboot_data_len == 0 ||
+	    (fastboot_bytes_received + fastboot_data_len) >
+	    fastboot_bytes_expected) {
+		fastboot_fail("Received invalid data length",
+			      response);
+		return;
+	}
+
+	/* copy data to buffer */
+	memcpy((void *)fastboot_data,
+	       fastboot_buf_addr + fastboot_bytes_received, fastboot_data_len);
+
+	pre_dot_num = fastboot_bytes_received / BYTES_PER_DOT;
+	fastboot_bytes_received += fastboot_data_len;
+	now_dot_num = fastboot_bytes_received / BYTES_PER_DOT;
+
+	if (pre_dot_num != now_dot_num) {
+		putc('.');
+		if (!(now_dot_num % 74))
+			putc('\n');
+	}
+	*response = '\0';
+}
+
+
 /**
  * fastboot_data_complete() - Mark current transfer complete
  *
@@ -302,7 +395,7 @@ void fastboot_data_complete(char *response)
 {
 	/* Download complete. Respond with "OKAY" */
 	fastboot_okay(NULL, response);
-	printf("\ndownloading of %d bytes finished\n", fastboot_bytes_received);
+	printf("\ndownloading/uploading of %d bytes finished\n", fastboot_bytes_received);
 	image_size = fastboot_bytes_received;
 	env_set_hex("filesize", image_size);
 	fastboot_bytes_expected = 0;
@@ -526,6 +619,52 @@ static void oem_bootbus(char *cmd_parameter, char *response)
 		fastboot_fail("Cannot set oem bootbus", response);
 	else
 		fastboot_okay(NULL, response);
+}
+#endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_LOAD)
+/**
+ * oem_load() - Execute the OEM load command
+ *
+ * @cmd_parameter: Pointer to command parameter
+ * @response: Pointer to fastboot response buffer
+ */
+static void oem_load(char *cmd_parameter, char *response)
+{
+	char *part, *offset_str, *size_str, *cmd_str;
+	u32 off, size;
+
+	cmd_str = cmd_parameter;
+	part = strsep(&cmd_str, " ");
+	if (!part){
+		fastboot_fail("miss part, send command:\
+			fastboot oem load:part offset size", response);
+		return;
+	}
+
+	offset_str = strsep(&cmd_str, " ");
+	if (!offset_str){
+		printf("miss offset, would set offset to 0\n");
+		off = 0;
+		size = 0;
+	}else{
+		off = simple_strtoul(offset_str, NULL, 0);
+
+		size_str = strsep(&cmd_str, " ");
+		if (!size_str){
+			printf("miss size, would set size to 0\n");
+			size = 0;
+		}else{
+			size = simple_strtoul(size_str, NULL, 0);
+		}
+	}
+
+	debug("get part:%s, offset:%x, size:%x\n", part, off, size);
+
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
+	fastboot_bytes_expected = fastboot_mmc_load(part, off, size, fastboot_buf_addr, response);
+#endif
+
 }
 #endif
 

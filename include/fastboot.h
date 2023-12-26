@@ -24,6 +24,7 @@
 enum {
 	FASTBOOT_COMMAND_GETVAR = 0,
 	FASTBOOT_COMMAND_DOWNLOAD,
+	FASTBOOT_COMMAND_UPLOAD,
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 	FASTBOOT_COMMAND_FLASH,
 	FASTBOOT_COMMAND_ERASE,
@@ -43,6 +44,9 @@ enum {
 #endif
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_BOOTBUS)
 	FASTBOOT_COMMAND_OEM_BOOTBUS,
+#endif
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_LOAD)
+	FASTBOOT_COMMAND_OEM_LOAD,
 #endif
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
 	FASTBOOT_COMMAND_ACMD,
@@ -162,6 +166,22 @@ u32 fastboot_data_remaining(void);
  */
 void fastboot_data_download(const void *fastboot_data,
 			    unsigned int fastboot_data_len, char *response);
+
+/**
+ * fastboot_data_upload() - Copy image data to fastboot_buf_addr.
+ *
+ * @fastboot_data: Pointer to received fastboot data
+ * @fastboot_data_len: Length of received fastboot data
+ * @response: Pointer to fastboot response buffer
+ *
+ * Copies image data from fastboot_data to fastboot_buf_addr. Writes to
+ * response. fastboot_bytes_received is updated to indicate the number
+ * of bytes that have been transferred.
+ */
+void fastboot_data_upload(const void *fastboot_data,
+			    unsigned int fastboot_data_len, char *response);
+
+
 
 /**
  * fastboot_data_complete() - Mark current transfer complete

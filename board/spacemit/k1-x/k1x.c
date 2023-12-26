@@ -6,6 +6,7 @@
 #include <common.h>
 #include <dm.h>
 #include <dm/ofnode.h>
+#include <dm/lists.h>
 #include <env.h>
 #include <fdtdec.h>
 #include <image.h>
@@ -102,7 +103,13 @@ int mmc_get_env_dev(void)
 void run_fastboot_command(void)
 {
 	u32 boot_mode = get_boot_mode();
-	if (boot_mode == BOOT_MODE_USB){
+
+	/*if define BOOT_MODE_USB flag in BOOT_CIU_DEBUG_REG0, it would excute fastboot*/
+	u32 cui_flasg = readl((void *)BOOT_CIU_DEBUG_REG0);
+	if (boot_mode == BOOT_MODE_USB || cui_flasg == BOOT_MODE_USB){
+		/*would reset debug_reg0*/
+		writel(0, (void *)BOOT_CIU_DEBUG_REG0);
+
 		char *cmd_para = "fastboot 0";
 		run_command(cmd_para, 0);
 	}
@@ -236,6 +243,10 @@ int board_late_init(void)
 	ulong kernel_start;
 	ofnode chosen_node;
 	int ret;
+
+	if (IS_ENABLED(CONFIG_SYSRESET_SPACEMIT))
+		device_bind_driver(gd->dm_root, "spacemit_sysreset",
+					"spacemit_sysreset", NULL);
 
 	run_fastboot_command();
 
