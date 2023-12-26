@@ -216,7 +216,7 @@ void init_pmic(void)
 				"...	[succeed]\n", cpu_voltage/1000, cpu_voltage%1000);
 		}
 	} else {
-		printf("try detect ext-cpu-dcdc ..."\
+		printf("try to detect ext-dcdc ..."\
 			"			[failed]\n");
 	}
 
@@ -335,15 +335,14 @@ static int spacemit_ddr_probe(struct udevice *dev)
 		cpu_freq = 1228000;
 	}
 	cpu_freq = adjust_cpu_freq(0, cpu_freq);
-	printf("adjust cluster-0 frequency to %u done\n", cpu_freq);
+	printf("adjust cluster-0 frequency to %u ...	[done]\n", cpu_freq);
 
 	if(dev_read_u32u(cpu, "boot_freq_cluster1", &cpu_freq)) {
 		printf("boot_freq_cluster1 not configured, use 1228000 as default!\n");
 		cpu_freq = 614000;
 	}
 	cpu_freq = adjust_cpu_freq(1, cpu_freq);
-	printf("adjust cluster-1 frequency to %u done\n", cpu_freq);
-
+	printf("adjust cluster-1 frequency to %u ...	[done]\n", cpu_freq);
 
 	/* check if need adjust ddr voltage */
 	if(dev_read_u32u(dev, "dram_voltage", &ddr_voltage)) {

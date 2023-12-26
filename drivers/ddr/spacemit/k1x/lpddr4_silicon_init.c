@@ -28,12 +28,16 @@
 #define REG32(x)	(*((volatile uint32_t *)((uintptr_t)(x))))
 
 #define NEW_FEATURE
-#define LOGLEVEL 1
+#define LOGLEVEL 0
+#if (LOGLEVEL > 0)
 #define LogMsg(level, format, args...) \
 	do { \
 		if (level < LOGLEVEL) \
 			printf(format, ##args); \
 	} while (0)
+#else
+#define LogMsg(level, format, args...)
+#endif
 
 extern u32 ddr_get_density(void);
 extern uint32_t get_manufacture_id(void);
@@ -43,7 +47,7 @@ extern uint32_t get_ddr_rev_id(void);
 void top_Phy_reg_dump(unsigned DDRC_BASE,unsigned int fp)
 {
 
-	unsigned DPHY0_BASE=DDRC_BASE+0x040000;
+	__maybe_unused unsigned DPHY0_BASE=DDRC_BASE+0x040000;
 	unsigned i=0;
 
 
@@ -1674,7 +1678,7 @@ void top_Common_config(void)
 void top_DDR_MC_Phy_Device_Init(unsigned int DDRC_BASE,unsigned int cs_val,unsigned int fp)
 {
 	unsigned DFI_PHY_USER_COMMAND_0 = DDRC_BASE + 0x13D0;
-	unsigned DPHY0_BASE = DDRC_BASE + 0x40000;
+	__maybe_unused unsigned DPHY0_BASE = DDRC_BASE + 0x40000;
 	unsigned read_data = 0;
 	unsigned cs_num;
 
@@ -1789,11 +1793,20 @@ void adjust_mapping(u32 DDRC_BASE)
 
 }
 
+__maybe_unused static int printf_no_output(const char *fmt, ...)
+{
+        return 0;
+}
+
 static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp)
 {
 	u64 to_traning_param[10];
 	int (*func)(const char*, ...) = printf;
 	void (*training)(void* param);
+
+	#if !(LOGLEVEL > 0)
+	func = printf_no_output;
+	#endif
 
 	to_traning_param[0] = ddr_base;
 	to_traning_param[1] = cs_num;
@@ -1839,22 +1852,25 @@ void lpddr4_silicon_init(u32 ddr_base, u32 data_rate)
 	ddr_dfc(fp);
 	top_training_fp_all(ddr_base,cs_num,fp);
 
-	/* change dram frequency */	
+	/* change dram frequency */
 	switch(data_rate) {
 	case 1600:
 		ddr_dfc(1);
 		break;
-	
+
 	case 2400:
 		ddr_dfc(2);
 		break;
 
 	case 1200:
 	default:
+		data_rate = 1200;
 		ddr_dfc(1);
 		break;
 	}
 
+	printf("change ddr data rate to %u ..."	\
+		"		[succeed]\n", data_rate);
 	return;
 }
 
