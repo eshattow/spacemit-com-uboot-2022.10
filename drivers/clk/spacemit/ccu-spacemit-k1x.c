@@ -1413,7 +1413,7 @@ const struct clk_ops ccu_clk_ops = {
 	.disable = ccu_clk_disable,
 };
 
-int ccu_common_init(struct clk * clk, struct spacemit_k1x_clk *clk_info)
+int ccu_common_init(struct clk * clk, struct spacemit_k1x_clk *clk_info, struct spacemit_clk_table *clks)
 {
 	struct ccu_common *common = clk_to_ccu_common(clk);
 	struct ccu_pll *pll = clk_to_ccu_pll(clk);
@@ -1452,6 +1452,7 @@ int ccu_common_init(struct clk * clk, struct spacemit_k1x_clk *clk_info)
 		break;
 
 	}
+	common->clk_tbl = clks;
 	if(common->is_pll)
 		pll->pll.lock_base = clk_info->mpmu_base;
 
@@ -1475,7 +1476,7 @@ int spacemit_ccu_probe(struct spacemit_k1x_clk *clk_info,
 		if(clk->id >= CLK_VCTCXO_24)
 			continue;
 		clk->id = i;
-		ccu_common_init(clk, clk_info);
+		ccu_common_init(clk, clk_info, clks);
 	}
 	return 0;
 }

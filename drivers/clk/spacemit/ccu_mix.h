@@ -271,6 +271,7 @@ struct ccu_mix {
 		.gate	= CCU_GATE_INIT(_gate_mask, _val_enable, _val_disable, 0),	\
 		.div	= CCU_DIV_INIT(_mshift, _mwidth, NULL, 0),		\
 		.common = { 					\
+			.reg_type = CLK_DIV_TYPE_1REG_FC_V2,    \
 			.reg_ctrl		= _reg_ctrl, 			\
 			.fc 			= _fc,         \
 			.base_type		= _base_type,		\
@@ -288,6 +289,7 @@ struct ccu_mix {
 		.div	= CCU_DIV_INIT(_mshift, _mwidth, NULL, 0),		\
 		.mux	= CCU_MUX_INIT(_muxshift, _muxwidth, NULL, 0), \
 		.common = { 					\
+			.reg_type = CLK_DIV_TYPE_1REG_FC_V2,    \
 			.reg_ctrl		= _reg_ctrl, 			\
 			.fc 			= _fc,         \
 			.base_type		= _base_type,		\
