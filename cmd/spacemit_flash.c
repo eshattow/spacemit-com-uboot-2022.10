@@ -208,8 +208,6 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
 	char *fat_argv[] = {"fatload", fdev->device_name, blk_dev_str, load_str, temp_fname};
 
-	char *fat_argv[] = {"fatload", fdev->device_name, fdev->dev_str, ":",
-						simple_itoa(bootfs_part_index), load_str, temp_fname};
 	if (do_load(cmdtp, 0, 5, fat_argv, FS_TYPE_FAT)) {
 		printf("do_load flash_config from %s failed\n", fdev->device_name);
 		retval = RESULT_FAIL;

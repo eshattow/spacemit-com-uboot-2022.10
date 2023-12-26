@@ -151,13 +151,6 @@ void spl_board_init(void)
 	spl_load_env();
 }
 
-void spl_board_init(void)
-{
-	/*load env*/
-	spl_load_env();
-}
-
-
 void spl_perform_fixups(struct spl_image_info *spl_image)
 {
 	u32 boot_mode = get_boot_mode();
