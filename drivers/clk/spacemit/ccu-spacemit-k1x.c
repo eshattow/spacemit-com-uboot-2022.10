@@ -1087,9 +1087,9 @@ static SPACEMIT_CCU_MUX(cpu_c0_hi_clk, "cpu_c0_hi_clk", cpu_c0_hi_parent_names,
 static const char * const cpu_c0_parent_names[] = { "pll1_d4_614p4", "pll1_d3_819p2", "pll1_d6_409p6",
 	"pll1_d5_491p52", "pll1_d2_1228p8", "pll3_d3", "pll2_d3", "cpu_c0_hi_clk"
 };
-static SPACEMIT_CCU_DIV_FC_MUX(cpu_c0_core_clk, "cpu_c0_core_clk", cpu_c0_parent_names,
+static SPACEMIT_CCU_MUX_FC(cpu_c0_core_clk, "cpu_c0_core_clk", cpu_c0_parent_names,
 	BASE_TYPE_APMU, APMU_CPU_C0_CLK_CTRL,
-	3, 3, BIT(12),
+	BIT(12),
 	0, 3,
 	0);
 static SPACEMIT_CCU_DIV(cpu_c0_ace_clk, "cpu_c0_ace_clk", "cpu_c0_core_clk",
@@ -1110,9 +1110,9 @@ static SPACEMIT_CCU_MUX(cpu_c1_hi_clk, "cpu_c1_hi_clk", cpu_c1_hi_parent_names,
 static const char * const cpu_c1_parent_names[] = { "pll1_d4_614p4", "pll1_d3_819p2", "pll1_d6_409p6",
 	"pll1_d5_491p52", "pll1_d2_1228p8", "pll3_d3", "pll2_d3", "cpu_c1_hi_clk"
 };
-static SPACEMIT_CCU_DIV_FC_MUX(cpu_c1_pclk, "cpu_c1_pclk", cpu_c1_parent_names,
+static SPACEMIT_CCU_MUX_FC(cpu_c1_pclk, "cpu_c1_pclk", cpu_c1_parent_names,
 	BASE_TYPE_APMU, APMU_CPU_C1_CLK_CTRL,
-	3, 3, BIT(12),
+	BIT(12),
 	0, 3,
 	0);
 static SPACEMIT_CCU_DIV(cpu_c1_ace_clk, "cpu_c1_ace_clk", "cpu_c1_pclk",

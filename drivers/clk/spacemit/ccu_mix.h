@@ -300,6 +300,24 @@ struct ccu_mix {
 			.flags			= _flags, \
 		},							\
 	}
+
+#define SPACEMIT_CCU_MUX_FC(_struct, _name, _parents, _base_type, _reg_ctrl,		\
+			_fc, _muxshift, _muxwidth, _flags)					\
+	struct ccu_mix _struct = {					\
+		.mux	= CCU_MUX_INIT(_muxshift, _muxwidth, NULL, 0), \
+		.common = { 					\
+			.reg_type = CLK_DIV_TYPE_1REG_FC_V2,	\
+			.reg_ctrl		= _reg_ctrl,			\
+			.fc 			= _fc,		   \
+			.base_type		= _base_type,		\
+			.name			= _name,	\
+			.parent_names	= _parents, \
+			.num_parents	= ARRAY_SIZE(_parents), \
+			.driver_name	= CCU_CLK_MIX, \
+			.flags			= _flags, \
+		},							\
+	}
+
 static inline struct ccu_mix *clk_to_ccu_mix(struct clk *clk)
 {
 	struct ccu_common *common = clk_to_ccu_common(clk);
