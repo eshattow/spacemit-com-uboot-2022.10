@@ -27,6 +27,9 @@
 #include <asm/arch/ddr.h>
 #include <power/regulator.h>
 #include <fb_spacemit.h>
+#include <net.h>
+#include <i2c.h>
+#include <linux/delay.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -226,6 +229,98 @@ void setenv_boot_mode(void)
 	}
 }
 
+
+void setenv_random_ethaddr(void)
+{
+#if CONFIG_IS_ENABLED(DM_I2C)
+	struct udevice *bus;
+	struct uclass *uc;
+	struct udevice *dev;
+	int ret;
+	int	bus_no = -1;
+	uchar ethaddr[6];
+	char ethaddr_str[42] = {"\0"};
+
+	/*default info*/
+	uint chip = 0x50;
+	uint addr = 0;
+
+	/*check if eeprom has data, verify the data valid or not*/
+	ret = uclass_get(UCLASS_I2C, &uc);
+	if (ret){
+		printf("can not get i2c devices\n");
+		return;
+	}
+	uclass_foreach_dev(bus, uc){
+		for (device_find_first_child(bus, &dev);
+			dev;
+			device_find_next_child(&dev)) {
+			if (!strncmp("eeprom", dev->name, 6)){
+				bus_no = dev_seq(bus);
+				break;
+			}
+		}
+		if (bus_no >= 0)
+			break;
+	}
+	if (!bus)
+		return;
+
+	i2c_get_chip(bus, chip, 1, &dev);
+
+	ret = dm_i2c_read(dev, addr, ethaddr, 6);
+	// for (int i = 0; i < 6; i++)
+	// 	printf("value[%d]:%x\n", i, ethaddr[i]);
+
+	if (is_valid_ethaddr(ethaddr)){
+		printf("read eeprom is a valid ethaddr\n");
+		sprintf(ethaddr_str, "env set -f ethaddr %x:%x:%x:%x:%x:%x", \
+				ethaddr[0], ethaddr[1], ethaddr[2], ethaddr[3], ethaddr[4], ethaddr[5]);
+		printf("set ethaddr env command:%s\n", ethaddr_str);
+		run_command(ethaddr_str, 0);
+		return;
+	}
+
+#endif
+
+	for (int i = 0; i < 10; i++){
+		/*create random ethaddr*/
+		net_random_ethaddr(ethaddr);
+
+		if (is_valid_ethaddr(ethaddr)){
+			printf("is a valid ethaddr\n");
+			break;
+		}
+	}
+	if (!is_valid_ethaddr(ethaddr)){
+		printf("can not get valid random ethaddr\n");
+		/*if can not get valid ethaddr, it would set a default value*/
+		run_command("env set -f ethaddr fe:fe:fe:c7:26:14", 0);
+		return;
+	}
+
+	/*format front addr to 0xfe*/
+	for (int i = 0; i < 3; i++)
+		ethaddr[i] = 0xfe;
+
+#if CONFIG_IS_ENABLED(DM_I2C)
+	/* write ethaddr to eeprom*/
+	uchar *byte = ethaddr;
+	for (int i = 0; i < 6; i++) {
+		ret = dm_i2c_write(dev, addr++, byte++, 1);
+		udelay(11000);
+	}
+#endif
+
+	/*set to env 'ethaddr'*/
+	sprintf(ethaddr_str, "env set -f ethaddr %x:%x:%x:%x:%x:%x", \
+			ethaddr[0], ethaddr[1], ethaddr[2], ethaddr[3], ethaddr[4], ethaddr[5]);
+	printf("set ethaddr env command:%s\n", ethaddr_str);
+
+	run_command(ethaddr_str, 0);
+	return;
+}
+
 int board_init(void)
 {
 #ifdef CONFIG_DM_REGULATOR_SPM8XX
@@ -256,6 +351,8 @@ int board_late_init(void)
 	import_env_from_bootfs();
 
 	setenv_boot_mode();
+
+	setenv_random_ethaddr();
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
