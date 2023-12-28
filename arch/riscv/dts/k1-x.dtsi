@@ -466,7 +466,7 @@
                 };
 
                 i2c6: twsi6@d4018800 {
-                        compatible = "asr,i2c";
+                        compatible = "spacemit,i2c";
                         reg = <0x0 0xd4018800 0x0 0x38>;
                         clocks = <&ccu CLK_TWSI6>;
                         resets = <&reset RESET_TWSI6>;

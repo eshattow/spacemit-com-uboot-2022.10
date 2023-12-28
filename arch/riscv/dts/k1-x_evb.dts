@@ -73,7 +73,23 @@
 };
 
 &i2c6 {
-	status = "disabled";
+	#address-cells = <1>;
+        #size-cells = <0>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_i2c6_1>;
+        status = "okay";
+
+        eeprom@50{
+                compatible = "atmel,24c02";
+                reg = <0x50>;
+                #address-cells = <1>;
+                #size-cells = <1>;
+
+                eeprom_1v8-supply = <&ldo_11>;
+                vin-supply-names = "eeprom_1v8";
+                status = "okay";
+        };
+
 };
 
 &i2c7 {
@@ -238,8 +254,13 @@
 
 			ldo_11: LDO_REG11 {
 				regulator-name = "ldo11";
+				regulator-always-on;
 				regulator-min-microvolt = <1200000>;
 				regulator-max-microvolt = <1950000>;
+				regulator-state-mem {
+                                        regulator-off-in-suspend;
+                                        u-boot,dm-spl;
+				};
 			};
 
 			ldo_12: LDO_REG12 {
