@@ -150,6 +150,16 @@
 #define APMU_EMAC1_CLK_RES_CTRL     0x3ec
 /* end of APMU register offset */
 
+/* APBC2 register offset */
+#define APBC2_UART1_CLK_RST		0x00
+#define APBC2_SSP2_CLK_RST		0x04
+#define APBC2_TWSI3_CLK_RST		0x08
+#define APBC2_RTC_CLK_RST		0x0c
+#define APBC2_TIMERS0_CLK_RST		0x10
+#define APBC2_KPC_CLK_RST		0x14
+#define APBC2_GPIO_CLK_RST		0x1c
+/* end of APBC2 register offset */
+
 struct spacemit_k1x_clk k1x_clock_controller;
 struct clk vctcxo_24, vctcxo_3, vctcxo_1, pll1_vco, clk_32k, clk_dummy;
 
@@ -1148,6 +1158,51 @@ static SPACEMIT_CCU_GATE(emac1_ptp_clk, "emac1_ptp_clk", "pll1_d3_819p2",
 	BIT(15), BIT(15), 0x0,
 	0);
 
+//apbc2
+static const char * const uart1_sec_parent_names[] = {
+	"pll1_m3d128_57p6", "slow_uart1_14p74", "slow_uart2_48"
+};
+static SPACEMIT_CCU_MUX_GATE(uart1_sec_clk, "uart1_sec_clk", uart1_sec_parent_names,
+	BASE_TYPE_APBC2, APBC2_UART1_CLK_RST,
+	4, 3, 0x3, 0x3, 0x0,
+	0);
+
+static const char *ssp2_sec_parent_names[] = { "pll1_d384_6p4", "pll1_d192_12p8", "pll1_d96_25p6",
+	"pll1_d48_51p2", "pll1_d768_3p2", "pll1_d1536_1p6", "pll1_d3072_0p8"
+};
+static SPACEMIT_CCU_MUX_GATE(ssp2_sec_clk, "ssp2_sec_clk", ssp2_sec_parent_names,
+	BASE_TYPE_APBC2, APBC2_SSP2_CLK_RST,
+	4, 3, 0x3, 0x3, 0x0,
+	0);
+static const char *twsi3_sec_parent_names[] = {
+	"pll1_d78_31p5", "pll1_d48_51p2", "pll1_d40_61p44"
+};
+static SPACEMIT_CCU_MUX_GATE(twsi3_sec_clk, "twsi3_sec_clk", twsi3_sec_parent_names,
+	BASE_TYPE_APBC2, APBC2_TWSI3_CLK_RST,
+	4, 3, 0x3, 0x3, 0x0,
+	0);
+static SPACEMIT_CCU_GATE(rtc_sec_clk, "rtc_sec_clk", "clk_32k",
+	BASE_TYPE_APBC2, APBC2_RTC_CLK_RST,
+	0x83, 0x83, 0x0, 0);
+static const char *timer_sec_parent_names[] = {
+	"pll1_d192_12p8", "clk_32k", "pll1_d384_6p4", "vctcxo_3", "vctcxo_1"
+};
+static SPACEMIT_CCU_MUX_GATE(timers0_sec_clk, "timers0_sec_clk", timer_sec_parent_names,
+	BASE_TYPE_APBC2, APBC2_TIMERS0_CLK_RST,
+	4, 3, 0x3, 0x3, 0x0,
+	0);
+static const char *kpc_sec_parent_names[] = {
+	"pll1_d192_12p8", "clk_32k", "pll1_d384_6p4", "vctcxo_3", "vctcxo_1"
+};
+static SPACEMIT_CCU_MUX_GATE(kpc_sec_clk, "kpc_sec_clk", kpc_sec_parent_names,
+	BASE_TYPE_APBC2, APBC2_KPC_CLK_RST,
+	4, 3, 0x3, 0x3, 0x0,
+	0);
+static SPACEMIT_CCU_GATE(gpio_sec_clk, "gpio_sec_clk", "vctcxo_24",
+	BASE_TYPE_APBC2, APBC2_GPIO_CLK_RST,
+	0x3, 0x3, 0x0,
+	0);
+
 static struct spacemit_clk_table spacemit_k1x_clks = {
 	.clks	= {
 		[CLK_PLL1_2457P6]	= &pll1_2457p6_vco.common.clk,
@@ -1320,6 +1375,13 @@ static struct spacemit_clk_table spacemit_k1x_clks = {
 		[CLK_EMAC0_PTP]		= &emac0_ptp_clk.common.clk,
 		[CLK_EMAC1_BUS]		= &emac1_bus_clk.common.clk,
 		[CLK_EMAC1_PTP]		= &emac1_ptp_clk.common.clk,
+		[CLK_SEC_UART1]		= &uart1_sec_clk.common.clk,
+		[CLK_SEC_SSP2]		= &ssp2_sec_clk.common.clk,
+		[CLK_SEC_TWSI3]		= &twsi3_sec_clk.common.clk,
+		[CLK_SEC_RTC]		= &rtc_sec_clk.common.clk,
+		[CLK_SEC_TIMERS0]	= &timers0_sec_clk.common.clk,
+		[CLK_SEC_KPC]		= &kpc_sec_clk.common.clk,
+		[CLK_SEC_GPIO]		= &gpio_sec_clk.common.clk,
 	},
 	.num = CLK_MAX_NO,
 };
@@ -1447,6 +1509,9 @@ int ccu_common_init(struct clk * clk, struct spacemit_k1x_clk *clk_info, struct 
 	case BASE_TYPE_AUDC:
 		common->base = clk_info->audio_ctrl_base;
 		break;
+	case BASE_TYPE_APBC2:
+		common->base = clk_info->apbc2_base;
+		break;
 	default:
 		common->base = clk_info->apbc_base;
 		break;
@@ -1536,6 +1601,12 @@ static int spacemit_k1x_ccu_probe(struct udevice *dev)
 	clk_info->ddrc_base = (void __iomem *)dev_remap_addr_index(dev, 6);
 	if (!clk_info->ddrc_base) {
 		pr_err("failed to map ddrc registers\n");
+		goto out;
+	}
+
+	clk_info->apbc2_base = (void __iomem *)dev_remap_addr_index(dev, 7);
+	if (!clk_info->apbc2_base) {
+		pr_err("failed to map apbc2 registers\n");
 		goto out;
 	}
 

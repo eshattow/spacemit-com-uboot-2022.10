@@ -174,12 +174,20 @@
 #define CLK_EMAC1_BUS   168
 #define CLK_EMAC1_PTP   169
 
-#define CLK_VCTCXO_24   170
-#define CLK_VCTCXO_3    171
-#define CLK_VCTCXO_1    172
-#define CLK_PLL1        173
-#define CLK_32K         174
-#define CLK_DUMMY       175
+#define CLK_SEC_UART1   170
+#define CLK_SEC_SSP2    171
+#define CLK_SEC_TWSI3   172
+#define CLK_SEC_RTC     173
+#define CLK_SEC_TIMERS0 174
+#define CLK_SEC_KPC     175
+#define CLK_SEC_GPIO    176
 
-#define CLK_MAX_NO      176
+#define CLK_VCTCXO_24   177
+#define CLK_VCTCXO_3    178
+#define CLK_VCTCXO_1    179
+#define CLK_PLL1        180
+#define CLK_32K         181
+#define CLK_DUMMY       182
+
+#define CLK_MAX_NO      183
 #endif /* _DT_BINDINGS_CLK_SPACEMIT_K1X_H_ */
