@@ -159,13 +159,31 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 		usb_init();
 #ifdef CONFIG_USB_STORAGE
 		int device_number = usb_stor_scan(1);
-		if (device_number < 0) {
+		if (device_number < 0){
+			printf("No USB storage devices found.\n");
 			retval = RESULT_FAIL;
 			break;
 		}
 		fdev->dev_str = strdup(simple_itoa((ulong)device_number));
 		fdev->device_name = strdup("usb");
+
+		char cmd[128];
+		for (u32 p = 1; p <= MAX_SEARCH_PARTITIONS; p++){
+			sprintf(cmd, "fatls usb %d:%d", device_number, p);
+			if (!run_command(cmd, 0))
+			{
+				bootfs_part_index = p;
+				break;
+			}
+		}
+
+		if (bootfs_part_index == 0){
+			printf("No valid filesystem found in any partition on USB.\n");
+			retval = RESULT_FAIL;
+			break;
+		}
 #else
+		printf("USB storage support is not enabled.\n");
 		retval = RESULT_FAIL;
 #endif
 		break;
@@ -232,8 +250,9 @@ void recovery_show_result(struct flash_dev *fdev, int ret)
 	free_flash_dev(fdev);
 
 	while(1){
-		/*do not retrun while flashing over!*/
+		/* do not retrun while flashing over! */
 	}
+
 }
 
 int get_part_info(struct blk_desc *dev_desc, const char *name,
@@ -462,7 +481,7 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 
 		/* read from device and check crc */
 		debug("check crc, read %lx, imagesize:%d\n", part_start_cnt, image_size);
-#ifdef FASTBOOT_FLASH_MMC
+#ifdef CONFIG_FASTBOOT_FLASH_MMC
 		if (check_mmc_image_crc(fdev->dev_desc, crc_value, part_start_cnt, info.blksz, image_size)) {
 			printf("check image crc32 fail, \n");
 			return RESULT_FAIL;
@@ -494,7 +513,7 @@ static int flash_gpt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 
 static int parse_flash_config(struct flash_dev *fdev)
 {
-#ifdef FASTBOOT_FLASH_MMC
+#ifdef CONFIG_FASTBOOT_FLASH_MMC
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
 	return _parse_flash_config(fdev, load_addr);
 #else
