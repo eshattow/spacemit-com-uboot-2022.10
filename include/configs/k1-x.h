@@ -97,7 +97,6 @@ enum board_boot_mode {
     "scriptaddr=0x2c100000\0" \
     "pxefile_addr_r=0x2c200000\0" \
     "ramdisk_addr_r=0x2c300000\0" \
-    "ethaddr=02:f6:c3:67:27:55\0" \
     BOOTENV
 
 #endif /* __CONFIG_H */
