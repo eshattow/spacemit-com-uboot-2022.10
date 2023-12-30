@@ -409,8 +409,8 @@
 
 	clk_tuning_enable;
 	clk-tuning-by-delayline;
-	tx-phase = <20>;
-	rx-phase = <0>;
+	tx-phase = <90>;
+	rx-phase = <73>;
 
 	phy-mode = "rgmii";
 	phy-addr = <1>;
