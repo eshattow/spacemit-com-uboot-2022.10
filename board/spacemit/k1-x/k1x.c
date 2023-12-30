@@ -30,6 +30,7 @@
 #include <net.h>
 #include <i2c.h>
 #include <linux/delay.h>
+#include <tlv_eeprom.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -273,6 +274,62 @@ void set_env_ethaddr(void)
 	run_command(cmd_str, 0);
 }
 
+void set_dev_serial_no(void)
+{
+	u8 eeprom_data[256], sn[6] = {0};
+	char cmd_str[128] = {0};
+	struct tlvinfo_header *tlv_hdr = NULL;
+	struct tlvinfo_tlv *tlv_entry;
+	unsigned int tlv_offset, tlv_len;
+	int ret = 0, i = 0, sn_found = 0;
+	unsigned int seed = 0;
+
+	ret = read_tlvinfo_tlv_eeprom(eeprom_data, &tlv_hdr,
+					      &tlv_entry, 0);
+	tlv_offset = sizeof(struct tlvinfo_header);
+	tlv_len = sizeof(struct tlvinfo_header) + be16_to_cpu(tlv_hdr->totallen);
+	while (tlv_offset < tlv_len) {
+		tlv_entry = (struct tlvinfo_tlv *)&eeprom_data[tlv_offset];
+
+		printf("tlv entry type = 0x%x\n", tlv_entry->type);
+		if (tlv_entry->type == TLV_CODE_SERIAL_NUMBER) {
+			printf("Serial number found\n");
+			sn_found = 1;
+			break;
+		}
+
+		tlv_offset += sizeof(struct tlvinfo_tlv) + tlv_entry->length;
+	}
+
+	if (sn_found && tlv_entry->length == 12) {
+			if (tlv_entry->value[0] | tlv_entry->value[1] | tlv_entry->value[2] |
+				tlv_entry->value[3] | tlv_entry->value[4] | tlv_entry->value[5] |
+				tlv_entry->value[6] | tlv_entry->value[7] | tlv_entry->value[8] |
+				tlv_entry->value[9] | tlv_entry->value[10] | tlv_entry->value[11]) {
+				printf("Serial number is valid.\n");
+				return ;
+			}
+	}
+
+	printf("Generate rand serial number:\n");
+	/* Generate rand serial number */
+	seed = get_ticks();
+	for (i = 0; i < 6; i++) {
+		sn[i] = rand_r(&seed);
+		printf("%02x", sn[i]);
+	}
+	printf("\n");
+
+	/* save serial number to eeprom */
+	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x23 %02x%02x%02x%02x%02x%02x", \
+			sn[0], sn[1], sn[2], sn[3], sn[4], sn[5]);
+	run_command(cmd_str, 0);
+
+	memset(cmd_str, 0, sizeof(cmd_str));
+	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom write");
+	run_command(cmd_str, 0);
+}
+
 int board_init(void)
 {
 #ifdef CONFIG_DM_REGULATOR_SPM8XX
@@ -305,6 +362,7 @@ int board_late_init(void)
 	setenv_boot_mode();
 
 	set_env_ethaddr();
+	set_dev_serial_no();
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
