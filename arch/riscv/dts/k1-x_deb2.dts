@@ -1,0 +1,444 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/* Copyright (c) 2023 Spacemit, Inc */
+
+/dts-v1/;
+
+#include "k1-x.dtsi"
+#include "k1-x_pinctrl.dtsi"
+
+/ {
+	model = "spacemit k1-x deb2 board";
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x00000000 0x00000000 0x00000000 0x80000000>;
+		u-boot,dm-spl;
+	};
+
+	chosen {
+		bootargs = "earlycon=sbi console=ttyS0,115200 debug loglevel=8,initcall_debug=1 rdinit=/init.tmp";
+		stdout-path = "serial0:115200n8";
+		u-boot,dm-spl;
+	};
+};
+
+&cpu_0 {
+	/* boot frequency for cluster-0, should be 1600000, 1228000, 819000, or 614000 */
+	boot_freq_cluster0 = <1228000>;
+	/* boot frequency for cluster-1, should be 1600000, 1228000, 819000, or 614000 */
+	boot_freq_cluster1 = <1228000>;
+	/* boot voltage for cpu, should be 800~1200, which means 0.8v~1.2v */
+	boot_voltage = <950>;
+};
+
+&dramc {
+	/* dram data rate, should be 1200, 1600, or 2400 */
+	datarate = <2400>;
+	/* boot voltage for dram, should be 600~800, which means 0.6v~0.8v */
+	dram_voltage = <650>;
+};
+
+&cpus {
+	timebase-frequency = <24000000>;
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "disabled";
+};
+
+&i2c1 {
+	status = "disabled";
+};
+
+&i2c2 {
+	#address-cells = <1>;
+        #size-cells = <0>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_i2c2_0>;
+        status = "okay";
+
+        eeprom@50{
+                compatible = "atmel,24c02";
+                reg = <0x50>;
+                eeprom_1v8-supply = <&ldo_11>;
+                vin-supply-names = "eeprom_1v8";
+                status = "okay";
+        };
+};
+
+&i2c3 {
+	/* SEC_I2C */
+	status = "disabled";
+};
+
+&i2c4 {
+	clock-frequency = <400000>;
+	status = "okay";
+};
+
+&i2c5 {
+	status = "disabled";
+};
+
+&i2c6 {
+        status = "disabled";
+};
+
+&i2c7 {
+	status = "disabled";
+};
+
+&i2c8 {
+	/* PWR_I2C */
+	clock-frequency = <100000>;
+	u-boot,dm-spl;
+	status = "okay";
+
+	pm853: pmic@31 {
+		compatible = "spacemit,pm853";
+		reg = <0x31>;
+		u-boot,dm-spl;
+
+		regulators {
+			/* buck */
+			dcdc_1: DCDC_REG1 {
+				regulator-name = "dcdc1";
+				regulator-min-microvolt = <480000>;
+				regulator-max-microvolt = <3160000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					u-boot,dm-spl;
+				};
+			};
+
+			dcdc_2: DCDC_REG2 {
+				regulator-name = "dcdc2";
+				regulator-min-microvolt = <600000>;
+				regulator-max-microvolt = <3950000>;
+			};
+
+			dcdc_3: DCDC_REG3 {
+				regulator-name = "dcdc3";
+				regulator-min-microvolt = <600000>;
+				regulator-max-microvolt = <3950000>;
+			};
+
+			/**
+			 * the order of powering on
+			 * 1. dcdc5
+			 * 2. ldo19
+			 * 3. dcdc4
+			 * 4. ldo4
+			 * 5. ldo9
+			 */
+			dcdc_5: DCDC_REG5 {
+				regulator-name = "dcdc5";
+				regulator-min-microvolt = <600000>;
+				regulator-max-microvolt = <3950000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					u-boot,dm-spl;
+				};
+			};
+
+			ldo_19: LDO_REG19 {
+				regulator-name = "ldo19";
+				regulator-min-microvolt = <100000>;
+				regulator-max-microvolt = <1350000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					u-boot,dm-spl;
+				};
+			};
+
+			dcdc_4: DCDC_REG4 {
+				regulator-name = "dcdc4";
+				regulator-min-microvolt = <480000>;
+				regulator-max-microvolt = <3160000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					u-boot,dm-spl;
+				};
+			};
+
+			ldo_4: LDO_REG4 {
+				regulator-name = "ldo4";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					u-boot,dm-spl;
+				};
+			};
+
+			ldo_9: LDO_REG9 {
+				regulator-name = "ldo9";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					u-boot,dm-spl;
+				};
+			};
+
+			/* ldo */
+			ldo_1: LDO_REG1 {
+				regulator-name = "ldo1";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			ldo_2: LDO_REG2 {
+				regulator-name = "ldo2";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			ldo_3: LDO_REG3 {
+				regulator-name = "ldo3";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			ldo_5: LDO_REG5 {
+				regulator-name = "ldo5";
+				regulator-min-microvolt = <1600000>;
+				regulator-max-microvolt = <1900000>;
+			};
+
+			ldo_6: LDO_REG6 {
+				regulator-name = "ldo6";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			ldo_7: LDO_REG7 {
+				regulator-name = "ldo7";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <1950000>;
+			};
+
+			ldo_8: LDO_REG8 {
+				regulator-name = "ldo8";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			ldo_10: LDO_REG10 {
+				regulator-name = "ldo10";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			ldo_11: LDO_REG11 {
+				regulator-name = "ldo11";
+				regulator-always-on;
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <1950000>;
+				regulator-state-mem {
+                                        regulator-off-in-suspend;
+                                        u-boot,dm-spl;
+				};
+			};
+
+			ldo_12: LDO_REG12 {
+				regulator-name = "ldo12";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			ldo_13: LDO_REG13 {
+				regulator-name = "ldo13";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			ldo_14: LDO_REG14 {
+				regulator-name = "ldo14";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			ldo_15: LDO_REG15 {
+				regulator-name = "ldo15";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <1950000>;
+			};
+
+			ldo_16: LDO_REG16 {
+				regulator-name = "ldo16";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <3300000>;
+			};
+
+			ldo_17: LDO_REG17 {
+				regulator-name = "ldo17";
+				regulator-min-microvolt = <100000>;
+				regulator-max-microvolt = <1350000>;
+			};
+
+			ldo_18: LDO_REG18 {
+				regulator-name = "ldo18";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <1950000>;
+			};
+
+			ldo_20: LDO_REG20 {
+				regulator-name = "ldo20";
+				regulator-min-microvolt = <100000>;
+				regulator-max-microvolt = <1350000>;
+			};
+
+			ldo_21: LDO_REG21 {
+				regulator-name = "ldo21";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <1950000>;
+			};
+
+			ldo_22: LDO_REG22 {
+				regulator-name = "ldo22";
+				regulator-min-microvolt = <100000>;
+				regulator-max-microvolt = <1350000>;
+			};
+
+			sw_1: SWITCH_REG1 {
+				regulator-name = "switch1";
+			};
+		};
+	};
+};
+
+&pinctrl {
+	usbp1_vbus: usbp1_vbus {
+		pinctrl-single,pins =<
+			K1X_PADCONF(GPIO_66, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_1V8_DS2))    /* drive_vbus1_iso */
+		>;
+	};
+
+	gpio80_pmx_func0: gpio80_pmx_func0 {
+		pinctrl-single,pins = <
+			K1X_PADCONF(GPIO_80, MUX_MODE0, (EDGE_BOTH | PULL_UP | PAD_3V_DS4))  /* mmc cd */
+		>;
+	};
+
+	pinctrl_qspi: qspi_grp {
+		pinctrl-single,pins = <
+			K1X_PADCONF(QSPI_DAT3, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d3 */
+			K1X_PADCONF(QSPI_DAT2, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d2 */
+			K1X_PADCONF(QSPI_DAT1, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d1 */
+			K1X_PADCONF(QSPI_DAT0, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d1 */
+			K1X_PADCONF(QSPI_CLK,  MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_clk */
+			K1X_PADCONF(QSPI_CSI,  MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_1V8_DS2))          /* qspi_csi */
+		>;
+	};
+};
+
+&udc {
+	status = "okay";
+};
+
+&usbphy1 {
+	status = "disabled";
+};
+
+&ehci1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&usbp1_vbus>;
+	status = "disabled";
+};
+
+&usbdrd3 {
+	status = "disabled";
+	dwc3@c0a00000 {
+		maximum-speed = "high-speed";
+		dr_mode = "peripheral";
+		phy_type = "utmi_wide";
+		snps,dis_enblslpm_quirk;
+	};
+};
+
+&sdhci0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_mmc1 &gpio80_pmx_func0>;
+	bus-width = <4>;
+	cd-gpios = <&gpio 80 0>;
+	cd-inverted;
+	cap-sd-highspeed;
+	sdh-phy-module = <0>;
+	status = "okay";
+};
+
+/* eMMC */
+&sdhci2 {
+	bus-width = <8>;
+	non-removable;
+	mmc-hs400-1_8v;
+	mmc-hs400-enhanced-strobe;
+	sdh-phy-module = <1>;
+	status = "okay";
+};
+
+&eth0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_gmac0>;
+
+	phy-reset-pin = <44>;
+
+	clk_tuning_enable;
+	clk-tuning-by-delayline;
+	tx-phase = <90>;
+	rx-phase = <73>;
+
+	phy-mode = "rgmii";
+	phy-addr = <1>;
+	phy-handle = <&rgmii>;
+
+	ref-clock-from-phy;
+
+	mdio {
+		#address-cells = <0x1>;
+		#size-cells = <0x0>;
+		rgmii: phy@0 {
+			compatible = "ethernet-phy-id001c.c916";
+			device_type = "ethernet-phy";
+			reg = <0x1>;
+		};
+	};
+};
+
+&pcie0_rc {
+	status = "disabled";
+};
+
+&qspi {
+        status = "okay";
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_qspi>;
+
+        flash@0 {
+                compatible = "jedec,spi-nor";
+                reg = <0>;
+                spi-max-frequency = <26500000>;
+                m25p,fast-read;
+                broken-flash-reset;
+                u-boot,dm-spl;
+                status = "okay";
+        };
+};
