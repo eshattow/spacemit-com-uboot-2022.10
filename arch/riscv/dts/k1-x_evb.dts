@@ -444,6 +444,7 @@
                 spi-max-frequency = <26500000>;
                 m25p,fast-read;
                 broken-flash-reset;
+                u-boot,dm-spl;
                 status = "okay";
         };
 };

@@ -636,6 +636,7 @@
 			qspi-pmuap-reg = <0xd4282860>;
 			qspi-freq = <26500000>;
 			qspi-id = <4>;
+			u-boot,dm-spl;
 			status = "disabled";
 		};
 	};
