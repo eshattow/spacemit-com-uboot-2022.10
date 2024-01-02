@@ -179,6 +179,7 @@ void run_cardfirmware_flash_command(void)
 	int part_dev, err;
 	char cmd[128] = {"\0"};
 
+#ifdef CONFIG_MMC
 	mmc = find_mmc_device(MMC_DEV_SD);
 	if (!mmc)
 		return;
@@ -202,7 +203,7 @@ void run_cardfirmware_flash_command(void)
 	debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0))
 		run_command("spacemit_flashing mmc", 0);
-
+#endif
 	return;
 }
 
@@ -439,14 +440,25 @@ enum env_location env_get_location(enum env_operation op, int prio)
 
 	u32 boot_mode = get_boot_mode();
 	switch (boot_mode) {
+#ifdef CONFIG_ENV_IS_IN_NAND
 	case BOOT_MODE_NAND:
 		return ENVL_NAND;
+#endif
+#ifdef CONFIG_ENV_IS_IN_SPI_FLASH
 	case BOOT_MODE_NOR:
 		return ENVL_SPI_FLASH;
+#endif
+#ifdef CONFIG_ENV_IS_IN_MMC
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
-	default:
 		return ENVL_MMC;
+#endif
+	default:
+#ifdef CONFIG_ENV_IS_NOWHERE
+		return ENVL_NOWHERE;
+#else
+		return ENVL_UNKNOWN;
+#endif
 	}
 }
 

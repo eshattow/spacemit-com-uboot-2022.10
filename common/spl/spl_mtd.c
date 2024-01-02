@@ -11,6 +11,7 @@
 #include <mtd.h>
 #include <linux/err.h>
 #include <env.h>
+#include <mapmem.h>
 
 static uint mtd_len_to_pages(struct mtd_info *mtd, u64 len)
 {
@@ -36,9 +37,12 @@ static int spl_mtd_read(struct mtd_info *mtd, ulong sector, ulong count, void *b
 	struct mtd_oob_ops io_op = {};
 	uint npages;
 	int ret = -1;
-	u8 *buffer = (u8 *)buf;
-	debug("sector:%lx, count:%lx, buffer:%lx\n", sector, count, (ulong)buffer);
 
+	u8 *buffer = map_sysmem((u64)buf, 0);
+	if (!buffer)
+		return -1;
+
+	debug("sector:%lx, count:%lx, buffer:%lx\n", sector, count, (ulong)buffer);
 	start_off = sector;
 	if (!mtd_is_aligned_with_min_io_size(mtd, start_off)) {
 		printf("Offset not aligned with a page (0x%x)\n",
@@ -103,6 +107,7 @@ static ulong spl_spi_load_read(struct spl_load_info *load, ulong sector,
 	      __func__, sector, count, (ulong)buf);
 
 	struct mtd_info *mtd = load->dev;
+	debug("%s, get mtd:%p\n", __func__, mtd);
 	ret = spl_mtd_read(mtd, sector, count, buf);
 	if (!ret)
 		return count;
@@ -111,22 +116,12 @@ static ulong spl_spi_load_read(struct spl_load_info *load, ulong sector,
 }
 
 
-static int spl_spi_load_image(struct spl_image_info *spl_image,
-			      struct spl_boot_device *bootdev)
+static int mtd_load_image(struct spl_image_info *spl_image,
+			      struct spl_boot_device *bootdev, struct mtd_info *mtd)
 {
 	struct image_header *header;
-	struct mtd_info *mtd;
-	int err = 0;
 	ulong len;
-
-	mtd_probe_devices();
-	mtd = get_mtd_device_nm(SPL_SPI_BOOT_MTD_NAME);
-	if (IS_ERR_OR_NULL(mtd)){
-		printf("MTD device %s not found\n", SPL_SPI_BOOT_MTD_NAME);
-		return -1;
-	}
-
-	debug("mtd->type:%x, mtd->writesize:%x, mtd:%p\n", mtd->type, mtd->writesize, mtd);
+	int err = 0;
 	len = sizeof(*header);
 	if (!mtd_is_aligned_with_min_io_size(mtd, len)) {
 		len = round_up(len, mtd->writesize);
@@ -155,6 +150,38 @@ static int spl_spi_load_image(struct spl_image_info *spl_image,
 	return err;
 }
 
+
+static int spl_spi_load_image(struct spl_image_info *spl_image,
+			      struct spl_boot_device *bootdev)
+{
+	struct mtd_info *mtd;
+	int err = 0;
+	__maybe_unused int load_others_res = -1;
+
+	mtd_probe_devices();
+
+#ifdef CONFIG_SYS_MTD_LOAD_U_BOOT_SEC_PARTITION
+	mtd = get_mtd_device_nm(CONFIG_SYS_MTD_LOAD_U_BOOT_SEC_PARTITION_NAME);
+	if (IS_ERR_OR_NULL(mtd)){
+		debug("MTD device %s not found\n", CONFIG_SYS_MTD_LOAD_U_BOOT_SEC_PARTITION_NAME);
+		return -1;
+	}
+	load_others_res = mtd_load_image(spl_image, bootdev, mtd);
+#endif
+
+	mtd = get_mtd_device_nm(CONFIG_SYS_MTD_LOAD_U_BOOT_PARTITION_NAME);
+	if (IS_ERR_OR_NULL(mtd)){
+		debug("MTD device %s not found\n", CONFIG_SYS_MTD_LOAD_U_BOOT_PARTITION_NAME);
+		return -1;
+	}
+	err = mtd_load_image(spl_image, bootdev, mtd);
+
+	if (!err || !load_others_res)
+		return 0;
+	else
+		return -1;
+}
+
 /* Use priorty 1 so that boards can override this */
-SPL_LOAD_IMAGE_METHOD("SPI", 0, BOOT_DEVICE_SPI, spl_spi_load_image);
-SPL_LOAD_IMAGE_METHOD("SPI", 0, BOOT_DEVICE_NAND, spl_spi_load_image);
+SPL_LOAD_IMAGE_METHOD("MTD-NOR", 0, BOOT_DEVICE_NOR, spl_spi_load_image);
+SPL_LOAD_IMAGE_METHOD("MTD-NAND", 0, BOOT_DEVICE_NAND, spl_spi_load_image);

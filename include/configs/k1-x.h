@@ -45,8 +45,8 @@
 #define BOOT_STRAP_BIT_OFFSET (9)
 #define BOOT_STRAP_BIT_STORAGE_MASK (0x3 << BOOT_STRAP_BIT_OFFSET)
 #define BOOT_STRAP_BIT_EMMC (0x0)
-#define BOOT_STRAP_BIT_NAND (0x1)
-#define BOOT_STRAP_BIT_NOR  (0x2)
+#define BOOT_STRAP_BIT_NOR (0x1)
+#define BOOT_STRAP_BIT_NAND  (0x2)
 #define BOOT_STRAP_BIT_SD   (0x3)
 
 /*use CIU register to save boot flag*/
