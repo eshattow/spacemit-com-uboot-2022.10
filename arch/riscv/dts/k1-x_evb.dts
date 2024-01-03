@@ -28,7 +28,7 @@
 	/* boot frequency for cluster-1, should be 1600000, 1228000, 819000, or 614000 */
 	boot_freq_cluster1 = <1228000>;
 	/* boot voltage for cpu, should be 800~1200, which means 0.8v~1.2v */
-	boot_voltage = <950>;
+	boot_voltage = <1050>;
 };
 
 &dramc {
