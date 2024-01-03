@@ -233,16 +233,20 @@ void setenv_boot_mode(void)
 
 void set_env_ethaddr(void)
 {
-	int ethaddr_valid = 0, eth1addr_valid = 0;
-	uint8_t mac_addr[6];
+	int ret = 0, ethaddr_valid = 0, eth1addr_valid = 0;
+	uint8_t mac_addr[6], mac1_addr[6];
 	char cmd_str[128] = {0};
 
 	/* get mac address from eeprom */
-	mac_read_from_eeprom();
+	ret = mac_read_from_eeprom();
+	if (ret < 0) {
+		printf("read mac address from eeprom failed!\n");
+		return ;
+	}
 
 	/* check ethaddr valid */
 	ethaddr_valid = eth_env_get_enetaddr("ethaddr", mac_addr);
-	eth1addr_valid = eth_env_get_enetaddr("eth1addr", mac_addr);
+	eth1addr_valid = eth_env_get_enetaddr("eth1addr", mac1_addr);
 	if (ethaddr_valid && eth1addr_valid) {
 		printf("valid ethaddr: %02x:%02x:%02x:%02x:%02x:%02x\n",
 			mac_addr[0], mac_addr[1], mac_addr[2],
@@ -256,13 +260,15 @@ void set_env_ethaddr(void)
 	mac_addr[1] = 0xfe;
 	mac_addr[2] = 0xfe;
 
+	memcpy(mac1_addr, mac_addr, sizeof(mac1_addr));
+	mac1_addr[5] = mac_addr[5] + 1;
+
 	/* write to env ethaddr and eth1addr */
 	eth_env_set_enetaddr("ethaddr", mac_addr);
-	mac_addr[5] += 1;
-	eth_env_set_enetaddr("eth1addr", mac_addr);
+	eth_env_set_enetaddr("eth1addr", mac1_addr);
 
 	/* save mac address to eeprom */
-	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x24 %x:%x:%x:%x:%x:%x", \
+	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x24 %02x:%02x:%02x:%02x:%02x:%02x", \
 			mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
 	run_command(cmd_str, 0);
 
