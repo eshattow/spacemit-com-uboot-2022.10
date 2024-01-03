@@ -70,6 +70,11 @@ struct spacemit_clk_table{
 	unsigned int num;
 };
 
+struct spacemit_clk_init_rate{
+	u32 clk_id;
+	unsigned int dft_rate;
+};
+
 static inline struct ccu_common *clk_to_ccu_common(struct clk *clk)
 {
 	return container_of(clk, struct ccu_common, clk);

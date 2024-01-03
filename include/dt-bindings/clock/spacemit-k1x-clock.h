@@ -182,12 +182,14 @@
 #define CLK_SEC_KPC     175
 #define CLK_SEC_GPIO    176
 
-#define CLK_VCTCXO_24   177
-#define CLK_VCTCXO_3    178
-#define CLK_VCTCXO_1    179
-#define CLK_PLL1        180
-#define CLK_32K         181
-#define CLK_DUMMY       182
+#define CLK_APB         177
 
-#define CLK_MAX_NO      183
+#define CLK_VCTCXO_24   178
+#define CLK_VCTCXO_3    179
+#define CLK_VCTCXO_1    180
+#define CLK_PLL1        181
+#define CLK_32K         182
+#define CLK_DUMMY       183
+
+#define CLK_MAX_NO      184
 #endif /* _DT_BINDINGS_CLK_SPACEMIT_K1X_H_ */

@@ -110,7 +110,9 @@
 #define MPMU_RIPCCR     0x210 //no define
 #define MPMU_ACGR       0x1024
 #define MPMU_SUCCR      0x14
-#define MPMU_SUCCR_1	0x10b0
+#define MPMU_SUCCR_1	 0x10b0
+#define MPMU_APBCSCR    0x1050
+
 /* end of MPMU register offset */
 
 /* APMU register offset */
@@ -1203,6 +1205,13 @@ static SPACEMIT_CCU_GATE(gpio_sec_clk, "gpio_sec_clk", "vctcxo_24",
 	0x3, 0x3, 0x0,
 	0);
 
+static const char * const apb_parent_names[] = {
+	"pll1_d96_25p6", "pll1_d48_51p2", "pll1_d96_25p6", "pll1_d24_102p4"
+};
+static SPACEMIT_CCU_MUX(apb_clk, "apb_clk", apb_parent_names,
+	BASE_TYPE_MPMU, MPMU_APBCSCR,
+	0, 2, 0);
+
 static struct spacemit_clk_table spacemit_k1x_clks = {
 	.clks	= {
 		[CLK_PLL1_2457P6]	= &pll1_2457p6_vco.common.clk,
@@ -1382,11 +1391,17 @@ static struct spacemit_clk_table spacemit_k1x_clks = {
 		[CLK_SEC_TIMERS0]	= &timers0_sec_clk.common.clk,
 		[CLK_SEC_KPC]		= &kpc_sec_clk.common.clk,
 		[CLK_SEC_GPIO]		= &gpio_sec_clk.common.clk,
+		[CLK_APB]		= &apb_clk.common.clk,
 	},
 	.num = CLK_MAX_NO,
 };
 
 #endif
+
+struct spacemit_clk_init_rate init_rate_tbl[] = {
+	{CLK_PMUA_ACLK, 307200000},
+	{CLK_APB,	102400000},
+};
 
 static inline const struct clk_ops *ccu_clk_dev_ops(struct udevice *dev)
 {
@@ -1543,6 +1558,15 @@ int spacemit_ccu_probe(struct spacemit_k1x_clk *clk_info,
 		clk->id = i;
 		ccu_common_init(clk, clk_info, clks);
 	}
+	//init clk default rate
+	for (i = 0; i < ARRAY_SIZE(init_rate_tbl); i++) {
+		struct clk *clk =clks->clks[init_rate_tbl[i].clk_id];
+		if (!clk)
+			continue;
+
+		clk_set_rate(clk, init_rate_tbl[i].dft_rate);
+	}
+
 	return 0;
 }
 
