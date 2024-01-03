@@ -287,6 +287,10 @@ void set_dev_serial_no(void)
 
 	ret = read_tlvinfo_tlv_eeprom(eeprom_data, &tlv_hdr,
 					      &tlv_entry, 0);
+	if (ret < 0) {
+		printf("read tlvinfo from eeprom failed!\n");
+		return;
+	}
 	tlv_offset = sizeof(struct tlvinfo_header);
 	tlv_len = sizeof(struct tlvinfo_header) + be16_to_cpu(tlv_hdr->totallen);
 	while (tlv_offset < tlv_len) {
