@@ -45,8 +45,8 @@
 #define BOOT_STRAP_BIT_OFFSET (9)
 #define BOOT_STRAP_BIT_STORAGE_MASK (0x3 << BOOT_STRAP_BIT_OFFSET)
 #define BOOT_STRAP_BIT_EMMC (0x0)
-#define BOOT_STRAP_BIT_NAND (0x1)
-#define BOOT_STRAP_BIT_NOR  (0x2)
+#define BOOT_STRAP_BIT_NOR (0x1)
+#define BOOT_STRAP_BIT_NAND  (0x2)
 #define BOOT_STRAP_BIT_SD   (0x3)
 
 /*use CIU register to save boot flag*/
@@ -63,6 +63,7 @@ enum board_boot_mode {
     BOOT_MODE_NAND,
     BOOT_MODE_NOR,
     BOOT_MODE_SD,
+    BOOT_MODE_SHELL = 0x55f,
 };
 #endif
 
@@ -97,7 +98,6 @@ enum board_boot_mode {
     "scriptaddr=0x2c100000\0" \
     "pxefile_addr_r=0x2c200000\0" \
     "ramdisk_addr_r=0x2c300000\0" \
-    "ethaddr=02:f6:c3:67:27:55\0" \
     BOOTENV
 
 #endif /* __CONFIG_H */

@@ -114,12 +114,12 @@ static void spl_load_env(void)
 	*/
 	enum env_location loc = ENVL_UNKNOWN;
 	switch (boot_mode) {
-#ifdef CONFIG_MTD_SPI_NAND
+#ifdef CONFIG_ENV_IS_IN_NAND
 	case BOOT_MODE_NAND:
 		loc = ENVL_NAND;
 		break;
 #endif
-#ifdef CONFIG_SPI_FLASH
+#ifdef CONFIG_ENV_IS_IN_SPI_FLASH
 	case BOOT_MODE_NOR:
 		loc = ENVL_SPI_FLASH;
 		break;

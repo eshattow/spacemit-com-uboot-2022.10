@@ -7,7 +7,7 @@
 #include "k1-x_pinctrl.dtsi"
 
 / {
-	model = "spacemit k1-x evb board";
+	model = "spacemit k1-x deb2 board";
 
 	memory@0 {
 		device_type = "memory";
@@ -55,7 +55,19 @@
 };
 
 &i2c2 {
-	status = "disabled";
+	#address-cells = <1>;
+        #size-cells = <0>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_i2c2_0>;
+        status = "okay";
+
+        eeprom@50{
+                compatible = "atmel,24c02";
+                reg = <0x50>;
+                eeprom_1v8-supply = <&ldo_11>;
+                vin-supply-names = "eeprom_1v8";
+                status = "okay";
+        };
 };
 
 &i2c3 {
@@ -73,23 +85,7 @@
 };
 
 &i2c6 {
-	#address-cells = <1>;
-        #size-cells = <0>;
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_i2c6_1>;
-        status = "okay";
-
-        eeprom@50{
-                compatible = "atmel,24c02";
-                reg = <0x50>;
-                #address-cells = <1>;
-                #size-cells = <1>;
-
-                eeprom_1v8-supply = <&ldo_11>;
-                vin-supply-names = "eeprom_1v8";
-                status = "okay";
-        };
-
+        status = "disabled";
 };
 
 &i2c7 {
@@ -98,8 +94,6 @@
 
 &i2c8 {
 	/* PWR_I2C */
-	#address-cells = <1>;
-	#size-cells = <0>;
 	clock-frequency = <100000>;
 	u-boot,dm-spl;
 	status = "okay";

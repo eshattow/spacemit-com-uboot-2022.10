@@ -27,6 +27,10 @@
 #include <asm/arch/ddr.h>
 #include <power/regulator.h>
 #include <fb_spacemit.h>
+#include <net.h>
+#include <i2c.h>
+#include <linux/delay.h>
+#include <tlv_eeprom.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -80,6 +84,8 @@ enum board_boot_mode get_boot_mode(void)
 		return BOOT_MODE_NOR;
 	case BOOT_MODE_SD:
 		return BOOT_MODE_SD;
+	case BOOT_MODE_SHELL:
+                return BOOT_MODE_SHELL;
 	}
 
 	/*else return boot pin select*/
@@ -114,6 +120,22 @@ void run_fastboot_command(void)
 		run_command(cmd_para, 0);
 	}
 }
+
+int run_uboot_shell(void)
+{
+        u32 boot_mode = get_boot_mode();
+
+        /*if define BOOT_MODE_SHELL flag in BOOT_CIU_DEBUG_REG0, it would into uboot shell*/
+        u32 flag = readl((void *)BOOT_CIU_DEBUG_REG0);
+        if (boot_mode == BOOT_MODE_SHELL || flag == BOOT_MODE_SHELL){
+                /*would reset debug_reg0*/
+                writel(0, (void *)BOOT_CIU_DEBUG_REG0);
+
+		return 0;
+	}
+	return 1;
+}
+
 
 void import_env_from_bootfs(void)
 {
@@ -175,6 +197,7 @@ void run_cardfirmware_flash_command(void)
 	int part_dev, err;
 	char cmd[128] = {"\0"};
 
+#ifdef CONFIG_MMC
 	mmc = find_mmc_device(MMC_DEV_SD);
 	if (!mmc)
 		return;
@@ -198,7 +221,7 @@ void run_cardfirmware_flash_command(void)
 	debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0))
 		run_command("spacemit_flashing mmc", 0);
-
+#endif
 	return;
 }
 
@@ -224,6 +247,116 @@ void setenv_boot_mode(void)
 		env_set("boot_device", "");
 		break;
 	}
+}
+
+void set_env_ethaddr(void)
+{
+	int ret = 0, ethaddr_valid = 0, eth1addr_valid = 0;
+	uint8_t mac_addr[6], mac1_addr[6];
+	char cmd_str[128] = {0};
+
+	/* get mac address from eeprom */
+	ret = mac_read_from_eeprom();
+	if (ret < 0) {
+		printf("read mac address from eeprom failed!\n");
+		return ;
+	}
+
+	/* check ethaddr valid */
+	ethaddr_valid = eth_env_get_enetaddr("ethaddr", mac_addr);
+	eth1addr_valid = eth_env_get_enetaddr("eth1addr", mac1_addr);
+	if (ethaddr_valid && eth1addr_valid) {
+		printf("valid ethaddr: %02x:%02x:%02x:%02x:%02x:%02x\n",
+			mac_addr[0], mac_addr[1], mac_addr[2],
+			mac_addr[3], mac_addr[4], mac_addr[5]);
+		return ;
+	}
+
+	/*create random ethaddr*/
+	net_random_ethaddr(mac_addr);
+	mac_addr[0] = 0xfe;
+	mac_addr[1] = 0xfe;
+	mac_addr[2] = 0xfe;
+
+	memcpy(mac1_addr, mac_addr, sizeof(mac1_addr));
+	mac1_addr[5] = mac_addr[5] + 1;
+
+	/* write to env ethaddr and eth1addr */
+	eth_env_set_enetaddr("ethaddr", mac_addr);
+	eth_env_set_enetaddr("eth1addr", mac1_addr);
+
+	/* save mac address to eeprom */
+	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x24 %02x:%02x:%02x:%02x:%02x:%02x", \
+			mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+	run_command(cmd_str, 0);
+
+	memset(cmd_str, 0, sizeof(cmd_str));
+	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x2A 2");
+	run_command(cmd_str, 0);
+
+	memset(cmd_str, 0, sizeof(cmd_str));
+	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom write");
+	run_command(cmd_str, 0);
+}
+
+void set_dev_serial_no(void)
+{
+	u8 eeprom_data[256], sn[6] = {0};
+	char cmd_str[128] = {0};
+	struct tlvinfo_header *tlv_hdr = NULL;
+	struct tlvinfo_tlv *tlv_entry;
+	unsigned int tlv_offset, tlv_len;
+	int ret = 0, i = 0, sn_found = 0;
+	unsigned int seed = 0;
+
+	ret = read_tlvinfo_tlv_eeprom(eeprom_data, &tlv_hdr,
+					      &tlv_entry, 0);
+	if (ret < 0) {
+		printf("read tlvinfo from eeprom failed!\n");
+		return;
+	}
+	tlv_offset = sizeof(struct tlvinfo_header);
+	tlv_len = sizeof(struct tlvinfo_header) + be16_to_cpu(tlv_hdr->totallen);
+	while (tlv_offset < tlv_len) {
+		tlv_entry = (struct tlvinfo_tlv *)&eeprom_data[tlv_offset];
+
+		printf("tlv entry type = 0x%x\n", tlv_entry->type);
+		if (tlv_entry->type == TLV_CODE_SERIAL_NUMBER) {
+			printf("Serial number found\n");
+			sn_found = 1;
+			break;
+		}
+
+		tlv_offset += sizeof(struct tlvinfo_tlv) + tlv_entry->length;
+	}
+
+	if (sn_found && tlv_entry->length == 12) {
+			if (tlv_entry->value[0] | tlv_entry->value[1] | tlv_entry->value[2] |
+				tlv_entry->value[3] | tlv_entry->value[4] | tlv_entry->value[5] |
+				tlv_entry->value[6] | tlv_entry->value[7] | tlv_entry->value[8] |
+				tlv_entry->value[9] | tlv_entry->value[10] | tlv_entry->value[11]) {
+				printf("Serial number is valid.\n");
+				return ;
+			}
+	}
+
+	printf("Generate rand serial number:\n");
+	/* Generate rand serial number */
+	seed = get_ticks();
+	for (i = 0; i < 6; i++) {
+		sn[i] = rand_r(&seed);
+		printf("%02x", sn[i]);
+	}
+	printf("\n");
+
+	/* save serial number to eeprom */
+	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x23 %02x%02x%02x%02x%02x%02x", \
+			sn[0], sn[1], sn[2], sn[3], sn[4], sn[5]);
+	run_command(cmd_str, 0);
+
+	memset(cmd_str, 0, sizeof(cmd_str));
+	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom write");
+	run_command(cmd_str, 0);
 }
 
 int board_init(void)
@@ -252,10 +385,19 @@ int board_late_init(void)
 
 	run_cardfirmware_flash_command();
 
+	ret = run_uboot_shell();
+	if (!ret) {
+		printf("reboot into uboot shell\n");
+		return 0;
+	}
+
 	/*import env.txt from bootfs*/
 	import_env_from_bootfs();
 
 	setenv_boot_mode();
+
+	set_env_ethaddr();
+	set_dev_serial_no();
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
@@ -332,14 +474,25 @@ enum env_location env_get_location(enum env_operation op, int prio)
 
 	u32 boot_mode = get_boot_mode();
 	switch (boot_mode) {
+#ifdef CONFIG_ENV_IS_IN_NAND
 	case BOOT_MODE_NAND:
 		return ENVL_NAND;
+#endif
+#ifdef CONFIG_ENV_IS_IN_SPI_FLASH
 	case BOOT_MODE_NOR:
 		return ENVL_SPI_FLASH;
+#endif
+#ifdef CONFIG_ENV_IS_IN_MMC
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
-	default:
 		return ENVL_MMC;
+#endif
+	default:
+#ifdef CONFIG_ENV_IS_NOWHERE
+		return ENVL_NOWHERE;
+#else
+		return ENVL_UNKNOWN;
+#endif
 	}
 }
 

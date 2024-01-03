@@ -215,8 +215,9 @@
 				<0x0 0xd4090000 0x0 0x1000>,
 				<0x0 0xd4282c00 0x0 0x400>,
 				<0x0 0xd8440000 0x0 0x98>,
-				<0x0 0xc0000000 0x0 0x4280>;
-			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc";
+				<0x0 0xc0000000 0x0 0x4280>,
+				<0x0 0xf0610000 0x0 0x20>;
+			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2";
 			clocks = <&vctcxo_24>, <&vctcxo_3>, <&vctcxo_1>, <&pll1_vco>,
 				<&clk_32k>, <&clk_dummy>;
 			clock-names = "vctcxo_24", "vctcxo_3", "vctcxo_1", "pll1_vco",
@@ -234,8 +235,9 @@
 				<0x0 0xd4090000 0x0 0x1000>,
 				<0x0 0xd4282c00 0x0 0x400>,
 				<0x0 0xd8440000 0x0 0x98>,
-				<0x0 0xc0000000 0x0 0x4280>;
-			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc";
+				<0x0 0xc0000000 0x0 0x4280>,
+				<0x0 0xf0610000 0x0 0x20>;
+			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2";
 			#reset-cells = <1>;
 			u-boot,dm-spl;
 			status = "okay";
@@ -464,7 +466,7 @@
                 };
 
                 i2c6: twsi6@d4018800 {
-                        compatible = "asr,i2c";
+                        compatible = "spacemit,i2c";
                         reg = <0x0 0xd4018800 0x0 0x38>;
                         clocks = <&ccu CLK_TWSI6>;
                         resets = <&reset RESET_TWSI6>;
@@ -634,6 +636,7 @@
 			qspi-pmuap-reg = <0xd4282860>;
 			qspi-freq = <26500000>;
 			qspi-id = <4>;
+			u-boot,dm-spl;
 			status = "disabled";
 		};
 	};
