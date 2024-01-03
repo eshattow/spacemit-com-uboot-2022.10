@@ -84,6 +84,8 @@ enum board_boot_mode get_boot_mode(void)
 		return BOOT_MODE_NOR;
 	case BOOT_MODE_SD:
 		return BOOT_MODE_SD;
+	case BOOT_MODE_SHELL:
+                return BOOT_MODE_SHELL;
 	}
 
 	/*else return boot pin select*/
@@ -118,6 +120,22 @@ void run_fastboot_command(void)
 		run_command(cmd_para, 0);
 	}
 }
+
+int run_uboot_shell(void)
+{
+        u32 boot_mode = get_boot_mode();
+
+        /*if define BOOT_MODE_SHELL flag in BOOT_CIU_DEBUG_REG0, it would into uboot shell*/
+        u32 flag = readl((void *)BOOT_CIU_DEBUG_REG0);
+        if (boot_mode == BOOT_MODE_SHELL || flag == BOOT_MODE_SHELL){
+                /*would reset debug_reg0*/
+                writel(0, (void *)BOOT_CIU_DEBUG_REG0);
+
+		return 0;
+	}
+	return 1;
+}
+
 
 void import_env_from_bootfs(void)
 {
@@ -366,6 +384,12 @@ int board_late_init(void)
 	run_fastboot_command();
 
 	run_cardfirmware_flash_command();
+
+	ret = run_uboot_shell();
+	if (!ret) {
+		printf("reboot into uboot shell\n");
+		return 0;
+	}
 
 	/*import env.txt from bootfs*/
 	import_env_from_bootfs();

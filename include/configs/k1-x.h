@@ -63,6 +63,7 @@ enum board_boot_mode {
     BOOT_MODE_NAND,
     BOOT_MODE_NOR,
     BOOT_MODE_SD,
+    BOOT_MODE_SHELL = 0x55f,
 };
 #endif
 
