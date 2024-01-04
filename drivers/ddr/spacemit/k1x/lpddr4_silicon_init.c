@@ -1647,19 +1647,6 @@ void top_Common_config(void)
 	REG32(0xd4282800 + 0x39c) &= 0xFFFF00FF;
 	REG32(0xd4282800 + 0x39c) |= (0x3B << 8);
 
-	//pll1 2666mbps
-	unsigned pll1_reg0 = 0x55;
-	unsigned pll1_reg1 = 0x55;
-	unsigned pll1_reg2 = 0x3c;
-	unsigned pll1_reg3 = 0x20;
-	unsigned pll1_reg4 = 0x38;
-	unsigned pll1_reg5 = 0x65;
-	unsigned pll1_reg6 = 0xdd;
-	unsigned pll1_reg7 = 0x50;
-
-	REG32(0xd4282800 + 0x39c) = (pll1_reg3 << 24) | (pll1_reg2 << 16) | (pll1_reg1 << 8) | (pll1_reg0);
-	REG32(0xd4282800 + 0x3a0) = (pll1_reg7 << 24) | (pll1_reg6 << 16) | (pll1_reg5 << 8) | (pll1_reg4);
-
 	enable_PLL();
 
 	LogMsg(0, "ADDR[0x%08x]=0x%08x !!!! \n", (0xd4282800 + 0x3a8), REG32(0xd4282800 + 0x3a8));
@@ -1812,14 +1799,7 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp)
 	to_traning_param[1] = cs_num;
 	to_traning_param[2] = boot_pp;
 	to_traning_param[3] = (u64)func;
-#if 0
-	memcpy((void*)0xc0832000, lpddr4_training_img, sizeof(lpddr4_training_img));
-	flush_dcache_range(0xc0832000, 0xc0832000+sizeof(lpddr4_training_img));
-	invalidate_icache_all();
-	training = (void (*)(void * param))(0xc0832000);
-#else
 	training = (void (*)(void * param))lpddr4_training_img;
-#endif
 	training(to_traning_param);
 }
 
