@@ -159,7 +159,6 @@ static lbaint_t fb_mmc_sparse_write(struct sparse_storage *info,
 {
 	struct fb_mmc_sparse *sparse = info->priv;
 	struct blk_desc *dev_desc = sparse->dev_desc;
-
 	return fb_mmc_blk_write(dev_desc, blk, blkcnt, buffer);
 }
 
@@ -795,7 +794,7 @@ void fastboot_mmc_erase(const char *cmd, char *response)
  * @part: Named partition to erase
  * @response: Pointer to fastboot response buffer
  */
-u32 fastboot_mmc_read(const char *part, u32 offset, u32 size,
+u32 fastboot_mmc_read(const char *part, u32 offset,
 					void *download_buffer, char *response)
 {
 	struct blk_desc *dev_desc;
@@ -803,22 +802,24 @@ u32 fastboot_mmc_read(const char *part, u32 offset, u32 size,
 	lbaint_t hdr_sectors, off_blk, size_blk;
 	lbaint_t res;
 
-	if (do_get_part_info(&dev_desc, part, &info) >= 0){
-		/*transfer offset to blk size*/
-		off_blk = (offset / info.blksz) + info.start;
-		if (!size)
-			size_blk = info.size;
-		else
-			size_blk = (size + info.blksz - 1) / info.blksz;
-	}else{
-		off_blk = offset / info.blksz;
-		if (!size){
-			fastboot_fail("can not find part, but size is 0", response);
-			return 0;
+	if (do_get_part_info(&dev_desc, part, &info) < 0){
+		if (dev_desc && dev_desc->blksz > 0){
+			info.blksz = dev_desc->blksz;
+			info.size = dev_desc->lba * dev_desc->blksz;
+			info.start = 0;
 		}else{
-			size_blk = (size + info.blksz - 1) / info.blksz;
+			fastboot_response("OKAY", response, "%08x", 0);
+			return 0;
 		}
 	}
+
+	if (offset >= info.size){
+		fastboot_response("OKAY", response, "%08x", 0);
+		return 0;
+	}
+	/*transfer offset to blk size*/
+	off_blk = (offset / info.blksz) + info.start;
+	size_blk = (info.size - offset) / info.blksz;
 
 	if (offset % info.blksz)
 		printf("offset should be align to 0x%lx, would change offset to 0x%lx\n",
@@ -827,14 +828,11 @@ u32 fastboot_mmc_read(const char *part, u32 offset, u32 size,
 	debug("info->blksize:%lx, off_blk:%lx, size_blk:%lx\n", info.blksz, off_blk, size_blk);
 
 	/*if size > buffer_size, it would only load buffer_size, and return offset*/
-	if (size > fastboot_buf_size){
+	if (size_blk * info.blksz > fastboot_buf_size){
 		/* Read the boot image header */
 		hdr_sectors = fastboot_buf_size / info.blksz;
-		offset += fastboot_buf_size;
-		size = fastboot_buf_size;
 	}else{
 		hdr_sectors = size_blk;
-		offset = 0;
 	}
 
 	res = blk_dread(dev_desc, off_blk, hdr_sectors, download_buffer);
@@ -843,6 +841,7 @@ u32 fastboot_mmc_read(const char *part, u32 offset, u32 size,
 		return 0;
 	}
 
-	fastboot_response("OKAY", response, "0x%08x", offset);
-	return size_blk * info.blksz;
+	/*return had read size*/
+	fastboot_response("OKAY", response, "%08x", (u32)(hdr_sectors * info.blksz));
+	return hdr_sectors * info.blksz;
 }

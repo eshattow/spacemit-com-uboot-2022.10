@@ -631,14 +631,14 @@ static void oem_bootbus(char *cmd_parameter, char *response)
  */
 static void oem_read(char *cmd_parameter, char *response)
 {
-	char *part, *offset_str, *size_str, *cmd_str;
-	u32 off, size;
+	char *part, *offset_str, *cmd_str;
+	u32 off;
 
 	cmd_str = cmd_parameter;
 	part = strsep(&cmd_str, " ");
 	if (!part){
 		fastboot_fail("miss part, send command:\
-			fastboot oem read:part offset size", response);
+			fastboot oem read:part [offset]", response);
 		return;
 	}
 
@@ -646,23 +646,14 @@ static void oem_read(char *cmd_parameter, char *response)
 	if (!offset_str){
 		printf("miss offset, would set offset to 0\n");
 		off = 0;
-		size = 0;
 	}else{
 		off = simple_strtoul(offset_str, NULL, 0);
-
-		size_str = strsep(&cmd_str, " ");
-		if (!size_str){
-			printf("miss size, would set size to 0\n");
-			size = 0;
-		}else{
-			size = simple_strtoul(size_str, NULL, 0);
-		}
 	}
 
-	debug("get part:%s, offset:%x, size:%x\n", part, off, size);
+	debug("get part:%s, offset:%x\n", part, off);
 
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
-	fastboot_bytes_expected = fastboot_mmc_read(part, off, size, fastboot_buf_addr, response);
+	fastboot_bytes_expected = fastboot_mmc_read(part, off, fastboot_buf_addr, response);
 #endif
 
 }
