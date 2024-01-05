@@ -24,6 +24,7 @@
 #include <usb.h>
 #include <fb_spacemit.h>
 #include <cJSON.h>
+#include <env.h>
 
 static int dev_emmc_num = -1;
 static int dev_sdio_num = -1;
@@ -120,6 +121,35 @@ int check_mmc_exist_and_initialize(void)
 	return RESULT_OK;
 }
 
+int download_file_via_tftp(char *file_name, char *load_addr) {
+	char full_path[128];
+	char cmd_buffer[256];
+	char *tftp_server_ip;
+	char *tftp_path_prefix;
+
+	tftp_server_ip = env_get("serverip");
+	if (!tftp_server_ip) {
+		printf("Error: TFTP server IP not set\n");
+		return -1;
+	}
+
+	tftp_path_prefix = env_get("net_data_path");
+	if (!tftp_path_prefix) {
+		printf("Error: TFTP relative path not set\n");
+		return -1;
+	}
+
+	sprintf(full_path, "%s%s", tftp_path_prefix, file_name);
+	sprintf(cmd_buffer, "tftpboot %s %s:%s", load_addr, tftp_server_ip, full_path);
+
+	if (run_command(cmd_buffer, 0) < 0) {
+		printf("Error: TFTP download failed\n");
+		return -1;
+	}
+
+	return 0;
+}
+
 static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 			int device_type, struct flash_dev *fdev)
 {
@@ -188,9 +218,30 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 #endif
 		break;
 
+#ifdef CONFIG_CMD_TFTPBOOT
 	case DEVICE_NET:
-		retval = RESULT_FAIL;
+		/* Initialize eMMC */
+		if (check_mmc_exist_and_initialize() != RESULT_OK) {
+			printf("Failed to initialize eMMC while handling NET.\n");
+			retval = RESULT_FAIL;
+			break;
+		}
+		fdev->dev_desc = blk_get_dev("mmc", dev_emmc_num);
+		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
+			printf("Failed to get eMMC device descriptor while handling USB.\n");
+			retval = RESULT_FAIL;
+			break;
+		}
+		if (run_command("dhcp", 0) < 0) {
+			printf("Error: DHCP request failed\n");
+			retval = RESULT_FAIL;
+			break;
+		}
+
+		fdev->device_name = strdup("net");
 		break;
+#endif
+
 #endif //CONFIG_MMC
 	default:
 		printf("Unknown device type!\n");
@@ -224,14 +275,25 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 		strcpy(temp_fname, FLASH_CONFIG_NAME);
 	}
 
-	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
-	char *fat_argv[] = {"fatload", fdev->device_name, blk_dev_str, load_str, temp_fname};
+	if (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0) {
 
-	if (do_load(cmdtp, 0, 5, fat_argv, FS_TYPE_FAT)) {
-		printf("do_load flash_config from %s failed\n", fdev->device_name);
-		retval = RESULT_FAIL;
-	} else {
-		printf("do_load flash_config %s success\n", fdev->device_name);
+		sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+		char *fat_argv[] = {"fatload", fdev->device_name, blk_dev_str, load_str, temp_fname};
+
+		if (do_load(cmdtp, 0, 5, fat_argv, FS_TYPE_FAT)) {
+			printf("do_load flash_config from %s failed\n", fdev->device_name);
+			retval = RESULT_FAIL;
+		} else {
+			printf("do_load flash_config %s success\n", fdev->device_name);
+		}
+	} else if (strcmp(fdev->device_name, "net") == 0) {
+
+		if (download_file_via_tftp(temp_fname, load_str) < 0) {
+			printf("Failed to download file via TFTP\n");
+			retval = RESULT_FAIL;
+		} else {
+			printf("Downloaded file via TFTP successfully\n");
+		}
 	}
 
 	free(temp_fname);
@@ -337,14 +399,14 @@ static int write_raw_image(struct blk_desc *dev_desc,
 	printf("not mmc dev found\n");
 	return RESULT_FAIL;
 #endif
-	
+
 }
 
 void specific_flash_mmc_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 {
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
-	char blk_dev_str[10] = {"\0"};
-	char file_name[20] = {"\0"};
+	char blk_dev_str[20] = {"\0"};
+	char file_name[50] = {"\0"};
 	u32 image_size = 0;
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
 	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
@@ -364,14 +426,21 @@ void specific_flash_mmc_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	struct blk_desc *dev_desc = blk_get_dev("mmc",
 					   CONFIG_FASTBOOT_FLASH_MMC_DEV);
 
-	char *const argv_image[] = {"fatload", fdev->device_name, blk_dev_str,
-			simple_xtoa((ulong)load_addr), file_name};
+	if (strcmp(fdev->device_name, "net") == 0) {
+		if (download_file_via_tftp(file_name, simple_xtoa((ulong)load_addr)) < 0) {
+			printf("Failed to download file via TFTP\n");
+			return;
+		}
+		image_size = env_get_hex("filesize", 0);
+	} else {
+		char *const argv_image[] = {"fatload", fdev->device_name, blk_dev_str, simple_xtoa((ulong)load_addr), file_name};
 
-	if (do_load(cmdtp, 0, 5, argv_image, FS_TYPE_FAT)){
-		printf("can not get file size\n");
-		return;
+		if (do_load(cmdtp, 0, 5, argv_image, FS_TYPE_FAT)) {
+			printf("Cannot load file %s\n", file_name);
+			return;
+		}
+		image_size = env_get_hex("filesize", 0);
 	}
-	image_size = env_get_hex("filesize", 0);
 
 	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
 		pr_err("invalid mmc device\n");
@@ -432,17 +501,29 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 		}
 		printf("\n\nflash img %s, part_name:%s\n", file_name, part_name);
 
-		char *const argv_image_size[] = {"fatsize", fdev->device_name, blk_dev_str, file_name};
-		if (do_size(cmdtp, 0, 4, argv_image_size, FS_TYPE_FAT)) {
-			printf("can not find file :%s, \n", file_name);
-			return RESULT_FAIL;
-		}
-		debug("info->start:%lx, info->size:%lx, info->blksz:%lx\n", info.start, info.size, info.blksz);
+		if (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0) {
+			char *const argv_image[] = {"fatload", fdev->device_name, blk_dev_str, load_str, file_name};
+			if (do_load(cmdtp, 0, 5, argv_image, FS_TYPE_FAT)) {
+				printf("Failed to load file :%s, \n", file_name);
+				return RESULT_FAIL;
+			}
 
-		image_size = env_get_hex("filesize", 0);
-		byte_remain = image_size;
-		div_times = (image_size + RECOVERY_LOAD_IMG_SIZE - 1) / RECOVERY_LOAD_IMG_SIZE;
-		debug("\n\ndev_times:%d\n", div_times);
+			char *const argv_image_size[] = {"fatsize", fdev->device_name, blk_dev_str, file_name};
+			if (do_size(cmdtp, 0, 4, argv_image_size, FS_TYPE_FAT)) {
+				printf("can not find file :%s, \n", file_name);
+				return RESULT_FAIL;
+			}
+
+			image_size = env_get_hex("filesize", 0);
+			byte_remain = image_size;
+			div_times = (image_size + RECOVERY_LOAD_IMG_SIZE - 1) / RECOVERY_LOAD_IMG_SIZE;
+			debug("\n\ndev_times:%d\n", div_times);
+
+		} else if (strcmp(fdev->device_name, "net") == 0) {
+			/*  Temporarily, the logic for network fragment download has not been added,
+			so set the number of downloads to 1 and directly download the entire file. */
+			div_times = 1;
+		}
 
 		if (get_part_info(fdev->dev_desc, part_name, &info) < 0) {
 			printf("can not get part %s in gpt tabel\n", part_name);
@@ -453,23 +534,31 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 		part_start_cnt = info.start;
 		for (int j = 0; j < div_times; j++) {
 			debug("\ndownload and flash div %d\n", j);
-			download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
-			strcpy(addr_str, simple_xtoa((ulong)download_bytes));
-			strcpy(offset_str, simple_xtoa((ulong)download_offset));
+			if (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0) {
+				download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
+				strcpy(addr_str, simple_xtoa((ulong)download_bytes));
+				strcpy(offset_str, simple_xtoa((ulong)download_offset));
 
-			char *const argv_image[] = {"fatload", fdev->device_name, blk_dev_str,
-					load_str, file_name, addr_str, offset_str};
-			printf("load from %x, bytes:%x\n", download_offset, download_bytes);
-			debug("%s, %s, \n", addr_str, offset_str);
-			if (do_load(cmdtp, 0, 7, argv_image, FS_TYPE_FAT))
-				return RESULT_FAIL;
-			had_download = env_get_hex("filesize", 0);
-			printf("had_download:%d\n", had_download);
-			if (had_download != download_bytes) {
-				printf("download file size is not equal require\n");
-				return RESULT_FAIL;
+				char *const argv_image[] = {"fatload", fdev->device_name, blk_dev_str,
+											load_str, file_name, addr_str, offset_str};
+				printf("load from %x, bytes:%x\n", download_offset, download_bytes);
+				if (do_load(cmdtp, 0, 7, argv_image, FS_TYPE_FAT))
+					return RESULT_FAIL;
+
+				had_download = env_get_hex("filesize", 0);
+				printf("had_download:%d\n", had_download);
+				if (had_download != download_bytes) {
+					printf("download file size is not equal require\n");
+					return RESULT_FAIL;
+				}
+			} else if (strcmp(fdev->device_name, "net") == 0) {
+				if (download_file_via_tftp(file_name, load_str) < 0) {
+					printf("Failed to download file via TFTP\n");
+					return RESULT_FAIL;
+				}
+				image_size = download_bytes = env_get_hex("filesize", 0);
+				had_download = download_bytes;
 			}
-			debug("had_download:%x, download byte:%x\n", had_download, download_bytes);
 
 			crc_value = crc32_wd(crc_value, (const uchar *)load_addr, had_download, CHUNKSZ_CRC32);
 			info.size = (download_bytes + (info.blksz - 1)) / info.blksz;
@@ -480,7 +569,6 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 			download_offset += download_bytes;
 			byte_remain -= download_bytes;
 		}
-
 		/* read from device and check crc */
 		debug("check crc, read %lx, imagesize:%d\n", part_start_cnt, image_size);
 #ifdef CONFIG_FASTBOOT_FLASH_MMC

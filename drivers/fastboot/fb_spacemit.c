@@ -705,7 +705,7 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer,
 	if (response)
 		fastboot_okay(NULL, response);
 #endif
-	fastboot_okay(NULL, response);
+
 	return;
 }
 #endif
