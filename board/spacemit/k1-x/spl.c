@@ -162,7 +162,7 @@ void spl_perform_fixups(struct spl_image_info *spl_image)
 	}
 	debug("read BOOT_DEV_FLAG_REG:%x\n", boot_mode);
 	switch (spl_image->boot_device) {
-	case BOOT_DEVICE_SPI:
+	case BOOT_DEVICE_NOR:
 		boot_mode = BOOT_MODE_NOR;
 		break;
 	case BOOT_DEVICE_NAND:

@@ -538,11 +538,6 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 								response, fdev);
 		return;
 	}
-	if (strcmp(cmd, "mtd") == 0) {
-		fastboot_oem_flash_gpt(cmd, fastboot_buf_addr, download_bytes,
-						response, fdev);
-		return;
-	}
 	if (strcmp(cmd, "bootinfo") == 0) {
 		printf("flash bootinfo\n");
 		fastboot_oem_flash_bootinfo(cmd, fastboot_buf_addr, download_bytes,
@@ -660,26 +655,7 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 
 	if (!info.name[0] &&
 	    fastboot_mmc_get_part_info(cmd, &dev_desc, &info, response) < 0)
-#ifdef CONFIG_SPACEMIT_FLASH
-		{
-			if (strncmp(cmd, "fsbl", 4) == 0){
-				if (strchr(cmd, '0')){
-					fsbl_offset = FLASH_FSBL0_OFFSET;
-				}else{
-					fsbl_offset = FLASH_FSBL1_OFFSET;
-				}
-
-				if (fastboot_mmc_flash_offset(fsbl_offset, fastboot_buf_addr, download_bytes) ||
-					check_mmc_image_crc(dev_desc, crc_val, fsbl_offset / info.blksz, info.blksz, download_bytes))
-					fastboot_fail("flash fsbl fail", response);
-				else
-					fastboot_okay(NULL, response);
-			}
-			return;
-		}
-#else
 		return;
-#endif
 
 	if (is_sparse_image(download_buffer)) {
 		struct fb_mmc_sparse sparse_priv;
@@ -791,7 +767,7 @@ void fastboot_mmc_erase(const char *cmd, char *response)
 /**
  * fastboot_mmc_read() - load data from eMMC for fastboot
  *
- * @part: Named partition to erase
+ * @part: Named partition to read
  * @response: Pointer to fastboot response buffer
  */
 u32 fastboot_mmc_read(const char *part, u32 offset,

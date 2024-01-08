@@ -48,7 +48,7 @@ enum board_boot_mode get_boot_pin_select(void)
 
 	/*select spl boot device:
  
-	     b'(bit1)(bit0)
+		 b'(bit1)(bit0)
 	emmc:b'00, //BOOT_STRAP_BIT_EMMC
 	nor :b'10, //BOOT_STRAP_BIT_NOR
 	nand:b'01, //BOOT_STRAP_BIT_NAND
@@ -85,7 +85,7 @@ enum board_boot_mode get_boot_mode(void)
 	case BOOT_MODE_SD:
 		return BOOT_MODE_SD;
 	case BOOT_MODE_SHELL:
-                return BOOT_MODE_SHELL;
+		return BOOT_MODE_SHELL;
 	}
 
 	/*else return boot pin select*/
@@ -123,45 +123,31 @@ void run_fastboot_command(void)
 
 int run_uboot_shell(void)
 {
-        u32 boot_mode = get_boot_mode();
+	u32 boot_mode = get_boot_mode();
 
-        /*if define BOOT_MODE_SHELL flag in BOOT_CIU_DEBUG_REG0, it would into uboot shell*/
-        u32 flag = readl((void *)BOOT_CIU_DEBUG_REG0);
-        if (boot_mode == BOOT_MODE_SHELL || flag == BOOT_MODE_SHELL){
-                /*would reset debug_reg0*/
-                writel(0, (void *)BOOT_CIU_DEBUG_REG0);
-
+	/*if define BOOT_MODE_SHELL flag in BOOT_CIU_DEBUG_REG0, it would into uboot shell*/
+	u32 flag = readl((void *)BOOT_CIU_DEBUG_REG0);
+	if (boot_mode == BOOT_MODE_SHELL || flag == BOOT_MODE_SHELL){
+		/*would reset debug_reg0*/
+		writel(0, (void *)BOOT_CIU_DEBUG_REG0);
 		return 0;
 	}
 	return 1;
 }
 
-
-void import_env_from_bootfs(void)
+void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev)
 {
-#ifdef CONFIG_MMC
 	/*
 	TODO:
 		load env from bootfs, if bootfs is fat/ext4 at blk dev, use fatload/ext4load.
 	*/
-	int err, dev;
+	int err;
 	u32 part;
 	char cmd[128];
-	struct mmc *mmc;
 	struct disk_partition info;
 
-	dev = mmc_get_env_dev();
-	mmc = find_mmc_device(dev);
-	if (!mmc) {
-		printf("Cannot find mmc device\n");
-		return;
-	}
-	if (mmc_init(mmc)){
-		return;
-	}
-
 	for (part = 1; part <= MAX_SEARCH_PARTITIONS; part++) {
-		err = part_get_info(mmc_get_blk_desc(mmc), part, &info);
+		err = part_get_info(dev_desc, part, &info);
 		if (err)
 			continue;
 		if (!strcmp(BOOTFS_NAME, info.name)){
@@ -173,9 +159,10 @@ void import_env_from_bootfs(void)
 		return;
 
 	env_set("bootfs_part", simple_itoa(part));
+	env_set("bootfs_devname", dev_name);
 
 	/*load env.txt and import to uboot*/
-	sprintf(cmd, "fatload mmc %d:%d 0x%x env_%s.txt",
+	sprintf(cmd, "fatload %s %d:%d 0x%x env_%s.txt", dev_name,
 			dev, part, CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
 	debug("cmd:%s\n", cmd);
 	if (run_command(cmd, 0))
@@ -185,8 +172,60 @@ void import_env_from_bootfs(void)
 	sprintf(cmd, "env import -t 0x%x", CONFIG_SPL_LOAD_FIT_ADDRESS);
 	debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0))
-		printf("load env%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
+		printf("load env_%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
+}
+
+void import_env_from_bootfs(void)
+{
+	u32 boot_mode = get_boot_mode();
+	switch (boot_mode) {
+	case BOOT_MODE_NAND:
+		/*load env from nand bootfs*/
+		break;
+	case BOOT_MODE_NOR:
+#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
+		struct blk_desc *dev_desc;
+
+		/*nvme need scan at first*/
+		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)
+						&& run_command("nvme scan", 0)){
+			printf("can not can nvme devices!\n");
+			return;
+		}
+
+		if (strlen(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME) > 0){
+			/* First try partition names on the default device */
+			dev_desc = blk_get_dev(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
+								CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM);
+			if (dev_desc) {
+				_load_env_from_blk(dev_desc, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
+							CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM);
+			}
+	}
 #endif
+		break;
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+#ifdef CONFIG_MMC
+		int dev;
+		struct mmc *mmc;
+
+		dev = mmc_get_env_dev();
+		mmc = find_mmc_device(dev);
+		if (!mmc) {
+			printf("Cannot find mmc device\n");
+			return;
+		}
+		if (mmc_init(mmc)){
+			return;
+		}
+
+		_load_env_from_blk(mmc_get_blk_desc(mmc), "mmc", dev);
+		break;
+#endif
+	default:
+		break;
+	}
 	return;
 }
 
@@ -234,6 +273,9 @@ void setenv_boot_mode(void)
 		break;
 	case BOOT_MODE_NOR:
 		env_set("boot_device", "nor");
+#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
+		env_set("boot_devnum", simple_itoa(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM));
+#endif
 		break;
 	case BOOT_MODE_EMMC:
 		env_set("boot_device", "mmc");
@@ -339,7 +381,6 @@ void set_dev_serial_no(void)
 	unsigned int seed = 0;
 
 	read_from_eeprom(&tlv_entry, TLV_CODE_SERIAL_NUMBER);
-
 	if (tlv_entry && tlv_entry->length == 12) {
 			if (tlv_entry->value[0] | tlv_entry->value[1] | tlv_entry->value[2] |
 				tlv_entry->value[3] | tlv_entry->value[4] | tlv_entry->value[5] |
@@ -451,7 +492,7 @@ int board_late_init(void)
 	}
 
 	ret = ofnode_read_u64(chosen_node, "riscv,kernel-start",
-			      (u64 *)&kernel_start);
+				  (u64 *)&kernel_start);
 	if (ret) {
 		debug("Can't find kernel start address in device tree\n");
 		return 0;
@@ -593,7 +634,7 @@ ulong board_get_usable_ram_top(ulong total_size)
 {
 	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
 
-        /* Some devices (like the EMAC) have a 32-bit DMA limit. */
+		/* Some devices (like the EMAC) have a 32-bit DMA limit. */
 	if(dram_size > SZ_2GB) {
 		return 0x80000000;
 	} else {

@@ -119,7 +119,7 @@ static const struct spinand_info dosilicon_spinand_table[] = {
 
 static const struct spinand_info foresee_spinand_table[] = {
 	SPINAND_INFO("jiangbolong", 0x60,
-		     NAND_MEMORG(1, 2048, 64, 64, 1024, 1, 1, 1),
+		     NAND_MEMORG(1, 2048, 64, 64, 512, 1, 1, 1),
 		     NAND_ECCREQ(4, 512),
 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
 					      &write_cache_variants,

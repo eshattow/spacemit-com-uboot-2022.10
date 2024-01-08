@@ -25,61 +25,15 @@
 #include <mtd.h>
 #include <spl.h>
 #include <linux/io.h>
+#include <fb_mtd.h>
+#include <nvme.h>
 
 #define EMMC_MAX_BLK_WRITE 16384
 
-static int _write_gpt_partition(char gpt_table[256], char *response)
+static int _write_gpt_partition(struct flash_dev *fdev, char *response)
 {
 	__maybe_unused char write_part_command[300] = {"\0"};
-
-#ifdef CONFIG_FASTBOOT_FLASH_MMC
-		sprintf(write_part_command, "gpt write mmc %x '%s'",
-			CONFIG_FASTBOOT_FLASH_MMC_DEV, gpt_table);
-		if (run_command(write_part_command, 0)){
-			fastboot_fail("write gpt fail", response);
-			return -1;
-		}
-#endif
-
-#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV
-		printf("mtd write gpt to dev:%s\n", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME);
-		sprintf(write_part_command, "gpt write %s %x '%s'",
-			CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM,
-			gpt_table);
-		if (run_command(write_part_command, 0)){
-			fastboot_fail("write gpt fail", response);
-			return -1;
-		}
-#endif
-	fastboot_okay("parse gpt/mtd table okay", response);
-	return 0;
-}
-
-int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
-								 struct flash_dev *fdev)
-{
 	char *gpt_table_str = NULL;
-	char *mtd_table_str = NULL;
-	u32 boot_mode = get_boot_pin_select();
-	char cmdbuf[64] = {"\0"};
-
-	if (fdev->mtd_table != NULL && strlen(fdev->mtd_table) > 0){
-		mtd_table_str = malloc(strlen(fdev->mtd_table)+32);
-
-		if (mtd_table_str == NULL){
-			return -1;
-		}
-		sprintf(mtd_table_str, "env set -f mtdparts 'spi-dev:%s'", fdev->mtd_table);
-
-		run_command(mtd_table_str, 0);
-		run_command("env set -f mtdids 'nor0=spi-dev'", 0);
-		free(mtd_table_str);
-		/*
-		TODO:
-			add mtdparts/mtdids, mtdparts=spi-dev:xxx, mtdids=nor0=spi-dev.
-			need to get nor/nand name.
-		*/
-	}
 
 	if (fdev->gptinfo.gpt_table != NULL && strlen(fdev->gptinfo.gpt_table) > 0){
 		gpt_table_str = malloc(strlen(fdev->gptinfo.gpt_table) + 32);
@@ -91,13 +45,52 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 		free(gpt_table_str);
 	}
 
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
+		sprintf(write_part_command, "gpt write mmc %x '%s'",
+			CONFIG_FASTBOOT_FLASH_MMC_DEV, fdev->gptinfo.gpt_table);
+		if (run_command(write_part_command, 0)){
+			fastboot_fail("write gpt fail", response);
+			return -1;
+		}
+#endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_SUPPORT_BLOCK_DEV)
+		printf("write gpt to dev:%s\n", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME);
+
+		/*nvme need scan at first*/
+		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)
+						&& nvme_scan_namespace()){
+			fastboot_fail("can not can nvme devices!", response);
+			return -1;
+		}
+
+		sprintf(write_part_command, "gpt write %s %x '%s'",
+			CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM,
+			fdev->gptinfo.gpt_table);
+		if (run_command(write_part_command, 0)){
+			fastboot_fail("write gpt fail", response);
+			return -1;
+		}
+#endif
+
+	fastboot_okay("parse gpt/mtd table okay", response);
+	return 0;
+}
+
+int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
+								 struct flash_dev *fdev)
+{
+	u32 boot_mode = get_boot_pin_select();
+	char cmdbuf[64] = {"\0"};
+
+
 	sprintf(cmdbuf, "env export -c -s 0x%lx 0x%lx", (ulong)CONFIG_ENV_SIZE, (ulong)download_buffer);
 	if (run_command(cmdbuf, 0)){
 		return -1;
 	}
 
 	switch(boot_mode){
-#ifdef FLASH_ENV_OFFSET_MMC
+#ifdef CONFIG_FLASH_ENV_OFFSET_MMC
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
 		/*write to emmc default offset*/
@@ -106,12 +99,31 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 		fastboot_mmc_flash_offset((u32)FLASH_ENV_OFFSET_MMC, download_buffer, (u32)CONFIG_ENV_SIZE);
 		break;
 #endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MTD)
 	case BOOT_MODE_NOR:
-		/*write to nor offset*/
-		break;
 	case BOOT_MODE_NAND:
-		/*write to nand offset*/
+		if (strlen(fdev->mtd_table) > 0){
+			printf("updata mtd env, table:%s\n", fdev->mtd_table);
+
+			/* find env partition and write env data to mtd part*/
+			struct part_info *part;
+			struct mtd_info *mtd;
+			int ret;
+			ret = fb_mtd_lookup("env", &mtd, &part);
+			if (ret) {
+				pr_err("invalid mtd device");
+				return -1;
+			}
+			ret = _fb_mtd_erase(mtd, part);
+			if (ret)
+				return -1;
+			ret = _fb_mtd_write(mtd, part, download_buffer, 0, CONFIG_ENV_SIZE, NULL);
+			if (ret)
+				printf("can not write env to mtd flash \n");
+		}
 		break;
+#endif
 	default:
 		break;
 	}
@@ -252,9 +264,13 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 				node_part = cj_name->valuestring;
 			else
 				node_part = "";
-			if (strlen(node_part) > 0 && !strncmp("bootinfo", node_part, 8)){
-				printf("boot info would not add as partitino\n");
-				continue;
+
+			/*only blk dev would not add bootinfo partition*/
+			if (!parse_mtd_partition){
+				if (strlen(node_part) > 0 && !strncmp("bootinfo", node_part, 8)){
+					printf("boot info would not add as partition\n");
+					continue;
+				}
 			}
 
 			cJSON *cj_filename = cJSON_GetObjectItem(arraypart, "image");
@@ -386,7 +402,6 @@ free_cjson:
 void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download_bytes,
 							char *response, struct flash_dev *fdev)
 {
-
 	int ret = 0;
 
 	ret = _parse_flash_config(fdev, (void *)fastboot_buf_addr);
@@ -399,13 +414,12 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
 	}
 
 	if (strlen(fdev->gptinfo.gpt_table) > 0 && fdev->gptinfo.fastboot_flash_gpt){
-		_write_gpt_partition(fdev->gptinfo.gpt_table, response);
+		_write_gpt_partition(fdev, response);
 	}
 
-
-	if (strlen(fdev->mtd_table) > 0)
+	if (strlen(fdev->mtd_table) > 0){
 		_write_mtd_partition(fdev->mtd_table, response);
-
+	}
 
 	/*set partition to env*/
 	if (_update_partinfo_to_env(download_buffer, download_bytes, fdev)){
@@ -549,7 +563,7 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 int fastboot_mmc_flash_offset(u32 start_offset, void *download_buffer,
                              u32 download_bytes)
 {
-#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 	struct blk_desc *dev_desc;
 	struct disk_partition info = {0};
 	lbaint_t blkcnt;
@@ -639,7 +653,7 @@ int check_mmc_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 download_bytes,
 			char *response, struct flash_dev *fdev)
 {
-#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 	debug("%s\n", __func__);
 	struct blk_desc *dev_desc = blk_get_dev("mmc",
 					   CONFIG_FASTBOOT_FLASH_MMC_DEV);
@@ -677,5 +691,6 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 dow
 	if (response)
 		fastboot_okay(NULL, response);
 #endif
+	fastboot_okay(NULL, response);
 	return;
 }

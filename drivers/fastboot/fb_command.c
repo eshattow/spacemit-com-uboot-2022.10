@@ -15,6 +15,9 @@
 #include <stdlib.h>
 #include <spl.h>
 #include <image.h>
+#include <fb_spacemit.h>
+#include <fb_mtd.h>
+#include <fb_blk.h>
 
 /**
  * image_size - final fastboot image size
@@ -415,16 +418,41 @@ void fastboot_data_complete(char *response)
  */
 static void flash(char *cmd_parameter, char *response)
 {
-#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
-	fastboot_mmc_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
-				 response);
+	u32 boot_mode = get_boot_pin_select();
+
+	switch(boot_mode){
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MTD)
+	case BOOT_MODE_NOR:
+	case BOOT_MODE_NAND:
+		static bool mtd_flash = false;
+		if (!strncmp("mtd", cmd_parameter, 3))
+			mtd_flash = true;
+		if (!strncmp("gpt", cmd_parameter, 3))
+			mtd_flash = false;
+
+		if (mtd_flash){
+			fastboot_mtd_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
+						response);
+
+			if (!strncmp("OKAY", response, 4))
+				return;
+		}
+
+		/* flash blk dev */
+		fastboot_blk_flash_write(cmd_parameter, fastboot_buf_addr, image_size, response);
+		return;
 #endif
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
+		fastboot_mmc_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
+					response);
+		return;
+#endif
+	}
+
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_NAND)
 	fastboot_nand_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
-				  response);
-#endif
-#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD)
-	fastboot_mtd_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
 				  response);
 #endif
 }
@@ -440,9 +468,37 @@ static void flash(char *cmd_parameter, char *response)
  */
 static void erase(char *cmd_parameter, char *response)
 {
-#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
-	fastboot_mmc_erase(cmd_parameter, response);
+	u32 boot_mode = get_boot_pin_select();
+
+	switch(boot_mode){
+#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV
+	case BOOT_MODE_NOR:
+	case BOOT_MODE_NAND:
+		static bool mtd_flash = false;
+		if (!strncmp("mtd", cmd_parameter, 3))
+			mtd_flash = true;
+		if (!strncmp("gpt", cmd_parameter, 3))
+			mtd_flash = false;
+
+		if (mtd_flash){
+			fastboot_mtd_flash_erase(cmd_parameter, response);
+
+			if (!strncmp("OKAY", response, 4))
+				return;
+		}
+
+		/* erase blk dev */
+		fastboot_blk_erase(cmd_parameter, response);
+		return;
 #endif
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
+		fastboot_mmc_erase(cmd_parameter, response);
+		return;
+#endif
+	}
+
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_NAND)
 	fastboot_nand_erase(cmd_parameter, response);
 #endif
@@ -632,7 +688,7 @@ static void oem_bootbus(char *cmd_parameter, char *response)
 static void oem_read(char *cmd_parameter, char *response)
 {
 	char *part, *offset_str, *cmd_str;
-	u32 off;
+	u32 off, boot_mode;
 
 	cmd_str = cmd_parameter;
 	part = strsep(&cmd_str, " ");
@@ -652,9 +708,31 @@ static void oem_read(char *cmd_parameter, char *response)
 
 	debug("get part:%s, offset:%x\n", part, off);
 
-#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
-	fastboot_bytes_expected = fastboot_mmc_read(part, off, fastboot_buf_addr, response);
+	boot_mode = get_boot_pin_select();
+	switch(boot_mode){
+#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV
+	case BOOT_MODE_NOR:
+	case BOOT_MODE_NAND:
+		/*mtd read part not support read raw data*/
+		fastboot_bytes_expected = fastboot_mtd_flash_read(part, off, fastboot_buf_addr, response);
+
+		/* if read data from mtd partition success, it would not try to read from blk dev*/
+		if (fastboot_bytes_expected > 0)
+			return;
+
+		fastboot_bytes_expected = fastboot_blk_read(part, off, fastboot_buf_addr, response);
+
+		return;
 #endif
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+		fastboot_bytes_expected = fastboot_mmc_read(part, off, fastboot_buf_addr, response);
+		return;
+#endif
+	}
+
+	fastboot_okay(NULL, response);
 
 }
 #endif
