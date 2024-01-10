@@ -427,6 +427,13 @@
 	status = "disabled";
 };
 
+&pcie1_rc {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie1_0>;
+};
+
 &qspi {
         status = "okay";
         pinctrl-names = "default";
