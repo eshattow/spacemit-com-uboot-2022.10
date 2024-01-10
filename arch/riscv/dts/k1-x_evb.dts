@@ -98,8 +98,6 @@
 
 &i2c8 {
 	/* PWR_I2C */
-	#address-cells = <1>;
-	#size-cells = <0>;
 	clock-frequency = <100000>;
 	u-boot,dm-spl;
 	status = "okay";
@@ -340,25 +338,6 @@
 	gpio80_pmx_func0: gpio80_pmx_func0 {
 		pinctrl-single,pins = <
 			K1X_PADCONF(GPIO_80, MUX_MODE0, (EDGE_BOTH | PULL_UP | PAD_3V_DS4))  /* mmc cd */
-		>;
-	};
-
-	pinctrl_qspi: qspi_grp {
-		pinctrl-single,pins = <
-			K1X_PADCONF(QSPI_DAT3, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d3 */
-			K1X_PADCONF(QSPI_DAT2, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d2 */
-			K1X_PADCONF(QSPI_DAT1, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d1 */
-			K1X_PADCONF(QSPI_DAT0, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d1 */
-			K1X_PADCONF(QSPI_CLK,  MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_clk */
-			K1X_PADCONF(QSPI_CSI,  MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_1V8_DS2))          /* qspi_csi */
-		>;
-	};
-
-	pinctrl_pcie1_0: pcie1_0_grp {
-		pinctrl-single,pins =<
-			K1X_PADCONF(GPIO_15,    MUX_MODE4, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))  /* PCIe1_perstn */
-			K1X_PADCONF(GPIO_16,    MUX_MODE4, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))  /* PCIe1_waken */
-			K1X_PADCONF(GPIO_17,    MUX_MODE4, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))  /* PCIe1_clkreqn */
 		>;
 	};
 };
