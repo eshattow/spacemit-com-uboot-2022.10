@@ -3,3 +3,9 @@ config PHY_SPACEMIT_K1X_USB2
 	depends on PHY
 	help
 	  Support for Spacemit k1-x USB 2 PHY
+
+config PHY_SPACEMIT_K1X_COMBPHY
+	tristate "Spacemit K1-x USB3&PCIE combo PHY driver"
+	depends on PHY
+	help
+	  USB3 and PCIE Combo PHY Support for Spacemit k1-x Soc
