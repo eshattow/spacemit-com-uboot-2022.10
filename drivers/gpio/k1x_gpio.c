@@ -152,7 +152,7 @@ static int k1x_get_pctrl_from_gpio(struct k1x_gpio_plat *plat, u32 gpio, u32 *pc
 
 	list_for_each_safe(pos, tmp, &plat->gpiomap) {
 		range = list_entry(pos, struct k1x_gpio_pctrl_map, node);
-		if (gpio == range->gpio_pin ||
+		if (gpio >= range->gpio_pin &&
 		    gpio < (range->gpio_pin + range->npins)) {
 			*pctrl_pin = range->pctrl_pin + (gpio - range->gpio_pin);
 			ret = 0;
@@ -254,7 +254,7 @@ static int k1x_gpio_request(struct udevice *dev, unsigned gpio,
 
 	ret = k1x_get_pctrl_from_gpio(plat, gpio, &pctrl);
 	if (ret < 0)
-		return ret;
+		return 0;
 
 	return pinctrl_request(plat->pinctrl_dev, pctrl, 0);
 }
