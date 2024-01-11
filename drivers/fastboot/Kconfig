@@ -248,8 +248,6 @@ config FASTBOOT_CMD_OEM_READ
 	  load data to ddr, and should use upload command to load data to
 	  host.
 
-
-
 config FASTBOOT_SUPPORT_BLOCK_DEV
 	bool "Support blk device such as mmc/nvme/usb/sata"
 	depends on FASTBOOT_FLASH_MTD || FASTBOOT_MULTI_FLASH_OPTION_MTD
@@ -270,6 +268,12 @@ config FASTBOOT_SUPPORT_BLOCK_DEV_NUM
 	default 0
 	help
 	  The block device number.
+
+config FASTBOOT_CMD_OEM_CONFIG_ACCESS
+	bool "Enable the 'oem config' command"
+	help
+	  Add support for the "oem config" command from a client. This command
+	  include read, write configuration.
 
 endif # FASTBOOT
 

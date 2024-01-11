@@ -28,8 +28,10 @@ static void getvar_version_baseband(char *var_parameter, char *response);
 static void getvar_product(char *var_parameter, char *response);
 static void getvar_platform(char *var_parameter, char *response);
 static void getvar_current_slot(char *var_parameter, char *response);
+#if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
 static void getvar_mtd_size(char *var_parameter, char *response);
 static void getvar_blk_size(char *var_parameter, char *response);
+#endif
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void getvar_has_slot(char *var_parameter, char *response);
 #endif
@@ -72,12 +74,14 @@ static const struct {
 	}, {
 		.variable = "platform",
 		.dispatch = getvar_platform
+#if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
 	}, {
 		.variable = "mtd-size",
 		.dispatch = getvar_mtd_size
 	}, {
 		.variable = "blk-size",
 		.dispatch = getvar_blk_size
+#endif
 	}, {
 		.variable = "current-slot",
 		.dispatch = getvar_current_slot
@@ -217,6 +221,7 @@ static void getvar_current_slot(char *var_parameter, char *response)
 	fastboot_okay("a", response);
 }
 
+#if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
 /**
  * @brief Get the mtd size and return, if not mtd dev exists, it would return NULL.
 	if there have multi mtd devices, it would only return the first one.
@@ -259,7 +264,6 @@ static void getvar_mtd_size(char *var_parameter, char *response)
 	}
 }
 
-
 /**
  * @brief Get the var blk size object,  if has blk device, it would return
 	string universal, or return NULL.
@@ -301,6 +305,7 @@ static void getvar_blk_size(char *var_parameter, char *response)
 		return;
 	}
 }
+#endif
 
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void getvar_has_slot(char *part_name, char *response)

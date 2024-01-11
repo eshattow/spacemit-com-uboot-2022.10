@@ -415,20 +415,21 @@ struct code_desc_info {
 	char *m_name;
 };
 
-void set_env_info(void)
+void refresh_config_info(void)
 {
 	struct tlvinfo_tlv *tlv_info = NULL;
 	char *strval;
+    int i;
 
 	struct code_desc_info info[] = {
 		{ TLV_CODE_PRODUCT_NAME,   "product_name"},
 		{ TLV_CODE_SERIAL_NUMBER,  "serial#"},
+		// { TLV_CODE_MAC_BASE,       "ethaddr"},
 		{ TLV_CODE_MANUF_DATE,     "manufacture_date"},
-		{ TLV_CODE_DEVICE_VERSION, "device_version"},
 		{ TLV_CODE_MANUF_NAME,     "manufacturer"},
 	};
 
-	for (int i = 0; i < ARRAY_SIZE(info); i++){
+	for (i = 0; i < ARRAY_SIZE(info); i++){
 		read_from_eeprom(&tlv_info, info[i].m_code);
 		if (tlv_info == NULL){
 			printf("can not find tlv data:%s\n", info[i].m_name);
@@ -436,10 +437,30 @@ void set_env_info(void)
 		}
 
 		strval = malloc(tlv_info->length + 1);
+        memset(strval, 0, tlv_info->length + 1);
 		strncpy(strval, tlv_info->value, tlv_info->length);
 		env_set(info[i].m_name, strval);
 		free(strval);
 	}
+
+	struct code_desc_info version[] = {
+		{ TLV_CODE_DEVICE_VERSION, "device_version"},
+		{ 0x40,                    "sdk_version"},
+	};
+
+    strval = malloc(64);
+	for (i = 0; i < ARRAY_SIZE(version); i++){
+		read_from_eeprom(&tlv_info, version[i].m_code);
+		if (tlv_info == NULL){
+			printf("can not find tlv data:%s\n", version[i].m_name);
+			continue;
+		}
+
+		memset(strval, 0, 64);
+        sprintf(strval, "%d", *tlv_info->value);
+		env_set(version[i].m_name, strval);
+	}
+    free(strval);
 }
 
 int board_init(void)
@@ -464,6 +485,12 @@ int board_late_init(void)
 		device_bind_driver(gd->dm_root, "spacemit_sysreset",
 					"spacemit_sysreset", NULL);
 
+	set_env_ethaddr();
+	set_dev_serial_no();
+
+	/*read from eeprom and update info to env*/
+	refresh_config_info();
+
 	run_fastboot_command();
 
 	run_cardfirmware_flash_command();
@@ -479,11 +506,8 @@ int board_late_init(void)
 
 	setenv_boot_mode();
 
-	set_env_ethaddr();
-	set_dev_serial_no();
-
-	/*read from eeprom and set info to env*/
-	set_env_info();
+	/*read from eeprom and update info to env*/
+	refresh_config_info();
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {

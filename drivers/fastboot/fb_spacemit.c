@@ -27,9 +27,11 @@
 #include <linux/io.h>
 #include <fb_mtd.h>
 #include <nvme.h>
+#include <tlv_eeprom.h>
 
 #define EMMC_MAX_BLK_WRITE 16384
 
+#if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
 static int _write_gpt_partition(struct flash_dev *fdev, char *response)
 {
 	__maybe_unused char write_part_command[300] = {"\0"};
@@ -643,12 +645,12 @@ int check_mmc_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 
 /**
  * @brief flash bootinfo to reserve partition.
- * 
- * @param cmd 
- * @param download_buffer 
- * @param download_bytes 
- * @param response 
- * @param fdev 
+ *
+ * @param cmd
+ * @param download_buffer
+ * @param download_bytes
+ * @param response
+ * @param fdev
  */
 void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 download_bytes,
 			char *response, struct flash_dev *fdev)
@@ -694,3 +696,216 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 dow
 	fastboot_okay(NULL, response);
 	return;
 }
+#endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS)
+struct oem_config_info
+{
+    const char *name;
+    // crc32 hash value of the config name
+    uint32_t hash;
+    uint32_t id;
+    uint32_t max_len;
+    char* (*convert)(char *);
+};
+const struct oem_config_info config_info[] = {
+    {
+        "product_name",
+        0xD3CB5CA7,
+        TLV_CODE_PRODUCT_NAME,
+        16,
+        NULL
+    },
+    {
+        "serial#",
+        0xFFD374C9,
+        TLV_CODE_SERIAL_NUMBER,
+        12,
+        NULL
+    },
+    {
+        "ethaddr",
+        0x0ECD824E,
+        TLV_CODE_MAC_BASE,
+        17,
+        NULL
+    },
+    {
+        "manufacture_date",
+        0xF0A5D267,
+        TLV_CODE_MANUF_DATE,
+        19,
+        NULL
+    },
+    {
+        "device_version",
+        0x35AA0A5E,
+        TLV_CODE_DEVICE_VERSION,
+        3,
+        NULL
+    },
+    {
+        "manufacturer",
+        0x3D0AE6DC,
+        TLV_CODE_MANUF_NAME,
+        32,
+        NULL
+    },
+    {
+        "sdk_version",
+        0xA40BD3BA,
+        0x40,
+        3,
+        NULL
+    },
+};
+
+static int save_config_info_to_eeprom(uint32_t id, char *value)
+{
+    char *cmd_str;
+
+    cmd_str = malloc(128);
+    if (NULL == cmd_str) {
+        log_err("malloc buffer for cmd string fail\n");
+        return -1;
+    }
+
+    log_info("write data to EEPROM, ID:%d, string:%s\n", id, value);
+    /* read eeprom */
+    memset(cmd_str, 0, 128);
+    sprintf(cmd_str, "tlv_eeprom read");
+    if (run_command(cmd_str, 0)) {
+        log_err("tlv_eeprom read fail\n");
+        return 1;
+    }
+
+    memset(cmd_str, 0, 128);
+    // update eeprom data, need add ' ' for space during value string
+    sprintf(cmd_str, "tlv_eeprom set %d '%s'", id, value);
+    if (run_command(cmd_str, 0)) {
+        log_err("tlv_eeprom set %s to %d fail\n", value, id);
+        return 2;
+    }
+
+    /* save to eeprom */
+    memset(cmd_str, 0, 128);
+    sprintf(cmd_str, "tlv_eeprom write");
+    if (run_command(cmd_str, 0)) {
+        log_err("tlv_eeprom write fail\n");
+        return 3;
+    }
+
+    free(cmd_str);
+    return 0;
+}
+
+static struct oem_config_info* get_config_info(char *item)
+{
+    uint32_t i, crc_value;
+    crc_value = crc32_wd(0, (const uchar *)item, strlen(item), CHUNKSZ_CRC32);
+    log_debug("crc32 value for %s is 0x%x\n", item, crc_value);
+
+    for (i = 0; i < ARRAY_SIZE(config_info); i++) {
+        if (crc_value == config_info[i].hash)
+            return (struct oem_config_info*)&config_info[i];
+    }
+
+    return NULL;
+}
+
+static void read_oem_configuration(char *config, char *response)
+{
+    char *key;
+    struct oem_config_info* info;
+    char *ack, *value, *temp;
+    int i = 0, j;
+
+    ack = malloc(256);
+    temp = malloc(256);
+    if ((NULL == ack) || (NULL == temp)) {
+        log_err("malloc buffer for ack and temp fail\n");
+    }
+    memset(ack, 0, 256);
+
+    key = strsep(&config, ",");
+    while (NULL != key) {
+        log_debug("try to find config info for %s\n", key);
+        info = get_config_info(key);
+        if (NULL != info) {
+            value = env_get(key);
+            if (NULL != info->convert)
+                value = info->convert(value);
+            // make sure value string is NOT exceed temp buffer
+            if ((NULL != value) && (strlen(value) < 128)) {
+                memset(temp, 0, 256);
+                // sprintf(temp, "%s:%s", key, value);
+                sprintf(temp, "%s", value);
+                j = strlen(temp);
+                if ((i + j) < 256) {
+                    // add comma between two info dictionary
+                    if (0 != i)
+                        ack[i++] = ',';
+                    memcpy(ack + i, temp, j);
+                    i += j;
+                }
+            }
+        }
+        key = strsep(&config, ",");
+    }
+
+    if (0 != i) {
+        fastboot_okay(ack, response);
+    }
+    else
+        fastboot_fail("NOT exist", response);
+
+    free(ack);
+    free(temp);
+}
+
+static void write_oem_configuration(char *config, char *response)
+{
+    char *item, *key, *value;
+    const struct oem_config_info* info = NULL;
+
+    item = strsep(&config, ",");
+    while (NULL != item) {
+        key = strsep(&item, ":");
+        value = item;
+        log_debug("try to set config info for %s: %s\n", key, value);
+        info = get_config_info(key);
+        if (NULL != info) {
+            if (strlen(value) <= info->max_len) {
+                if (0 == save_config_info_to_eeprom(info->id, value))
+                    env_set(key, value);
+            }
+        }
+        item = strsep(&config, ",");
+    }
+
+    if (NULL != info)
+        fastboot_okay(NULL, response);
+    else
+        fastboot_fail("NOT exist", response);
+}
+
+/**
+ * fastboot_config_access() - Access configurations.
+ *
+ * @operation: Pointer to operation string
+ *              read: read configuration
+ *              write: write configuration
+ * @config: Pointer to config string
+ *              if is read operation, then
+ * @response: Pointer to fastboot response buffer
+ */
+void fastboot_config_access(char *operation, char *config, char *response)
+{
+    if (0 == strcmp(operation, "read"))
+        read_oem_configuration(config, response);
+    else if (0 == strcmp(operation, "write"))
+        write_oem_configuration(config, response);
+    else
+        fastboot_fail("NOT support", response);
+}
+#endif

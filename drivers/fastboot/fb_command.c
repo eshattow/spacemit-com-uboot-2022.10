@@ -61,6 +61,9 @@ static void oem_bootbus(char *, char *);
 static void oem_read(char *cmd_parameter, char *response);
 #endif
 
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS)
+static void oem_config(char *cmd_parameter, char *response);
+#endif
 
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
 static void run_ucmd(char *, char *);
@@ -148,6 +151,12 @@ static const struct {
 	[FASTBOOT_COMMAND_OEM_READ] = {
 		.command = "oem read",
 		.dispatch = oem_read,
+	},
+#endif
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS)
+	[FASTBOOT_COMMAND_CONFIG_ACCESS] = {
+		.command = "oem config",
+		.dispatch = oem_config,
 	},
 #endif
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
@@ -733,8 +742,25 @@ static void oem_read(char *cmd_parameter, char *response)
 	}
 
 	fastboot_okay(NULL, response);
-
 }
 #endif
 
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS)
+void fastboot_config_access(char *operation, char *config, char *response);
+/**
+ * oem_config() - Execute the OEM config command
+ *
+ * @cmd_parameter: Pointer to command parameter
+ * @response: Pointer to fastboot response buffer
+ */
+static void oem_config(char *cmd_parameter, char *response)
+{
+    char *cmd_str, *operation;
+
+	cmd_str = cmd_parameter;
+	operation = strsep(&cmd_str, " ");
+
+    fastboot_config_access(operation, cmd_str, response);
+}
+#endif
 #endif /*#!defined(CONFIG_SPL_BUILD)*/
