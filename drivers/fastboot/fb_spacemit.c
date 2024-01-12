@@ -92,7 +92,7 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 	}
 
 	switch(boot_mode){
-#ifdef CONFIG_FLASH_ENV_OFFSET_MMC
+#ifdef CONFIG_ENV_IS_IN_MMC
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
 		/*write to emmc default offset*/
