@@ -542,41 +542,6 @@ void *board_fdt_blob_setup(int *err)
 	return (ulong *)&_end;
 }
 
-
-void board_boot_order(u32 *spl_boot_list)
-{
-	u32 boot_mode = get_boot_mode();
-	debug("boot_mode:%x\n", boot_mode);
-	if (boot_mode == BOOT_MODE_USB){
-		spl_boot_list[0] = BOOT_DEVICE_BOARD;
-	}else{
-		spl_boot_list[0] = BOOT_DEVICE_MMC1;
-		if (boot_mode != BOOT_MODE_SD){
-			switch (boot_mode) {
-			case BOOT_MODE_EMMC:
-				spl_boot_list[1] = BOOT_DEVICE_MMC2;
-				break;
-			case BOOT_MODE_NAND:
-				spl_boot_list[1] = BOOT_DEVICE_NAND;
-				break;
-			case BOOT_MODE_NOR:
-				spl_boot_list[1] = BOOT_DEVICE_NOR;
-				break;
-			default:
-				spl_boot_list[1] = BOOT_DEVICE_RAM;
-				break;
-			}
-
-			//reserve for fpga to load/run uboot from ram.
-			spl_boot_list[2] = BOOT_DEVICE_RAM;
-		}else{
-			//reserve for fpga to load/run uboot from ram.
-			spl_boot_list[1] = BOOT_DEVICE_RAM;
-		}
-	}
-}
-
-
 enum env_location env_get_location(enum env_operation op, int prio)
 {
 	if (prio >= 1)
