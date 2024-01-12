@@ -178,7 +178,6 @@ static void spl_load_env(void)
 		/*if load env from storage fail, it should not write bootmode to reg*/
 		boot_mode = BOOT_MODE_NONE;
 	}
-	set_boot_mode(boot_mode);
 }
 
 void spl_board_init(void)
