@@ -7,6 +7,44 @@
 #define _FB_MTD_H_
 
 #include <jffs2/load_kernel.h>
+#include <mtd.h>
+
+
+/**
+ * @brief find mtd part
+ * 
+ * @param partname 
+ * @param mtd 
+ * @param part 
+ * @return int 
+ */
+int fb_mtd_lookup(const char *partname, struct mtd_info **mtd,
+					struct part_info **part);
+
+/**
+ * @brief erase mtd partition
+ * 
+ * @param mtd 
+ * @param part 
+ * @return int 
+ */
+int _fb_mtd_erase(struct mtd_info *mtd, struct part_info *part);
+
+
+/**
+ * @brief write data to mtd part.
+ * 
+ * @param mtd 
+ * @param part 
+ * @param buffer 
+ * @param offset 
+ * @param length 
+ * @param written 
+ * @return int 
+ */
+int _fb_mtd_write(struct mtd_info *mtd, struct part_info *part,
+			  void *buffer, u32 offset,
+			  size_t length, size_t *written);
 
 /**
  * fastboot_mtd_get_part_info() - Lookup MTD partion by name
@@ -36,4 +74,15 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
  * @response: Pointer to fastboot response buffer
  */
 void fastboot_mtd_flash_erase(const char *cmd, char *response);
+
+
+/**
+ * fastboot_mtd_flash_read() - load data from mtd for fastboot
+ *
+ * @part_name: Named partition to read
+ * @response: Pointer to fastboot response buffer
+ */
+u32 fastboot_mtd_flash_read(const char *part_name, u32 offset,
+					void *download_buffer, char *response);
+
 #endif

@@ -48,7 +48,7 @@ enum board_boot_mode get_boot_pin_select(void)
 
 	/*select spl boot device:
  
-	     b'(bit1)(bit0)
+		 b'(bit1)(bit0)
 	emmc:b'00, //BOOT_STRAP_BIT_EMMC
 	nor :b'10, //BOOT_STRAP_BIT_NOR
 	nand:b'01, //BOOT_STRAP_BIT_NAND
@@ -85,7 +85,7 @@ enum board_boot_mode get_boot_mode(void)
 	case BOOT_MODE_SD:
 		return BOOT_MODE_SD;
 	case BOOT_MODE_SHELL:
-                return BOOT_MODE_SHELL;
+		return BOOT_MODE_SHELL;
 	}
 
 	/*else return boot pin select*/
@@ -123,45 +123,31 @@ void run_fastboot_command(void)
 
 int run_uboot_shell(void)
 {
-        u32 boot_mode = get_boot_mode();
+	u32 boot_mode = get_boot_mode();
 
-        /*if define BOOT_MODE_SHELL flag in BOOT_CIU_DEBUG_REG0, it would into uboot shell*/
-        u32 flag = readl((void *)BOOT_CIU_DEBUG_REG0);
-        if (boot_mode == BOOT_MODE_SHELL || flag == BOOT_MODE_SHELL){
-                /*would reset debug_reg0*/
-                writel(0, (void *)BOOT_CIU_DEBUG_REG0);
-
+	/*if define BOOT_MODE_SHELL flag in BOOT_CIU_DEBUG_REG0, it would into uboot shell*/
+	u32 flag = readl((void *)BOOT_CIU_DEBUG_REG0);
+	if (boot_mode == BOOT_MODE_SHELL || flag == BOOT_MODE_SHELL){
+		/*would reset debug_reg0*/
+		writel(0, (void *)BOOT_CIU_DEBUG_REG0);
 		return 0;
 	}
 	return 1;
 }
 
-
-void import_env_from_bootfs(void)
+void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev)
 {
-#ifdef CONFIG_MMC
 	/*
 	TODO:
 		load env from bootfs, if bootfs is fat/ext4 at blk dev, use fatload/ext4load.
 	*/
-	int err, dev;
+	int err;
 	u32 part;
 	char cmd[128];
-	struct mmc *mmc;
 	struct disk_partition info;
 
-	dev = mmc_get_env_dev();
-	mmc = find_mmc_device(dev);
-	if (!mmc) {
-		printf("Cannot find mmc device\n");
-		return;
-	}
-	if (mmc_init(mmc)){
-		return;
-	}
-
 	for (part = 1; part <= MAX_SEARCH_PARTITIONS; part++) {
-		err = part_get_info(mmc_get_blk_desc(mmc), part, &info);
+		err = part_get_info(dev_desc, part, &info);
 		if (err)
 			continue;
 		if (!strcmp(BOOTFS_NAME, info.name)){
@@ -173,9 +159,10 @@ void import_env_from_bootfs(void)
 		return;
 
 	env_set("bootfs_part", simple_itoa(part));
+	env_set("bootfs_devname", dev_name);
 
 	/*load env.txt and import to uboot*/
-	sprintf(cmd, "fatload mmc %d:%d 0x%x env_%s.txt",
+	sprintf(cmd, "fatload %s %d:%d 0x%x env_%s.txt", dev_name,
 			dev, part, CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
 	debug("cmd:%s\n", cmd);
 	if (run_command(cmd, 0))
@@ -185,8 +172,60 @@ void import_env_from_bootfs(void)
 	sprintf(cmd, "env import -t 0x%x", CONFIG_SPL_LOAD_FIT_ADDRESS);
 	debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0))
-		printf("load env%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
+		printf("load env_%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
+}
+
+void import_env_from_bootfs(void)
+{
+	u32 boot_mode = get_boot_mode();
+	switch (boot_mode) {
+	case BOOT_MODE_NAND:
+		/*load env from nand bootfs*/
+		break;
+	case BOOT_MODE_NOR:
+#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
+		struct blk_desc *dev_desc;
+
+		/*nvme need scan at first*/
+		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)
+						&& run_command("nvme scan", 0)){
+			printf("can not can nvme devices!\n");
+			return;
+		}
+
+		if (strlen(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME) > 0){
+			/* First try partition names on the default device */
+			dev_desc = blk_get_dev(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
+								CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM);
+			if (dev_desc) {
+				_load_env_from_blk(dev_desc, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
+							CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM);
+			}
+	}
 #endif
+		break;
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+#ifdef CONFIG_MMC
+		int dev;
+		struct mmc *mmc;
+
+		dev = mmc_get_env_dev();
+		mmc = find_mmc_device(dev);
+		if (!mmc) {
+			printf("Cannot find mmc device\n");
+			return;
+		}
+		if (mmc_init(mmc)){
+			return;
+		}
+
+		_load_env_from_blk(mmc_get_blk_desc(mmc), "mmc", dev);
+		break;
+#endif
+	default:
+		break;
+	}
 	return;
 }
 
@@ -234,6 +273,9 @@ void setenv_boot_mode(void)
 		break;
 	case BOOT_MODE_NOR:
 		env_set("boot_device", "nor");
+#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
+		env_set("boot_devnum", simple_itoa(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM));
+#endif
 		break;
 	case BOOT_MODE_EMMC:
 		env_set("boot_device", "mmc");
@@ -247,6 +289,37 @@ void setenv_boot_mode(void)
 		env_set("boot_device", "");
 		break;
 	}
+}
+
+void read_from_eeprom(struct tlvinfo_tlv **tlv_data, u8 tcode)
+{
+	u8 eeprom_data[256];
+	struct tlvinfo_header *tlv_hdr = NULL;
+	struct tlvinfo_tlv *tlv_entry;
+	unsigned int tlv_offset, tlv_len;
+	int ret = 0;
+
+	ret = read_tlvinfo_tlv_eeprom(eeprom_data, &tlv_hdr,
+					      &tlv_entry, 0);
+	if (ret < 0) {
+		printf("read tlvinfo from eeprom failed!\n");
+		return;
+	}
+
+	tlv_offset = sizeof(struct tlvinfo_header);
+	tlv_len = sizeof(struct tlvinfo_header) + be16_to_cpu(tlv_hdr->totallen);
+	while (tlv_offset < tlv_len) {
+		tlv_entry = (struct tlvinfo_tlv *)&eeprom_data[tlv_offset];
+		if (tlv_entry->type == tcode) {
+			*tlv_data = tlv_entry;
+			return;
+		}
+
+		tlv_offset += sizeof(struct tlvinfo_tlv) + tlv_entry->length;
+	}
+
+	*tlv_data = NULL;
+	return;
 }
 
 void set_env_ethaddr(void)
@@ -301,36 +374,14 @@ void set_env_ethaddr(void)
 
 void set_dev_serial_no(void)
 {
-	u8 eeprom_data[256], sn[6] = {0};
+	u8 sn[6] = {0};
 	char cmd_str[128] = {0};
-	struct tlvinfo_header *tlv_hdr = NULL;
-	struct tlvinfo_tlv *tlv_entry;
-	unsigned int tlv_offset, tlv_len;
-	int ret = 0, i = 0, sn_found = 0;
+	struct tlvinfo_tlv *tlv_entry = NULL;
+	int i = 0;
 	unsigned int seed = 0;
 
-	ret = read_tlvinfo_tlv_eeprom(eeprom_data, &tlv_hdr,
-					      &tlv_entry, 0);
-	if (ret < 0) {
-		printf("read tlvinfo from eeprom failed!\n");
-		return;
-	}
-	tlv_offset = sizeof(struct tlvinfo_header);
-	tlv_len = sizeof(struct tlvinfo_header) + be16_to_cpu(tlv_hdr->totallen);
-	while (tlv_offset < tlv_len) {
-		tlv_entry = (struct tlvinfo_tlv *)&eeprom_data[tlv_offset];
-
-		printf("tlv entry type = 0x%x\n", tlv_entry->type);
-		if (tlv_entry->type == TLV_CODE_SERIAL_NUMBER) {
-			printf("Serial number found\n");
-			sn_found = 1;
-			break;
-		}
-
-		tlv_offset += sizeof(struct tlvinfo_tlv) + tlv_entry->length;
-	}
-
-	if (sn_found && tlv_entry->length == 12) {
+	read_from_eeprom(&tlv_entry, TLV_CODE_SERIAL_NUMBER);
+	if (tlv_entry && tlv_entry->length == 12) {
 			if (tlv_entry->value[0] | tlv_entry->value[1] | tlv_entry->value[2] |
 				tlv_entry->value[3] | tlv_entry->value[4] | tlv_entry->value[5] |
 				tlv_entry->value[6] | tlv_entry->value[7] | tlv_entry->value[8] |
@@ -359,6 +410,59 @@ void set_dev_serial_no(void)
 	run_command(cmd_str, 0);
 }
 
+struct code_desc_info {
+	u8    m_code;
+	char *m_name;
+};
+
+void refresh_config_info(void)
+{
+	struct tlvinfo_tlv *tlv_info = NULL;
+	char *strval;
+    int i;
+
+	struct code_desc_info info[] = {
+		{ TLV_CODE_PRODUCT_NAME,   "product_name"},
+		{ TLV_CODE_SERIAL_NUMBER,  "serial#"},
+		// { TLV_CODE_MAC_BASE,       "ethaddr"},
+		{ TLV_CODE_MANUF_DATE,     "manufacture_date"},
+		{ TLV_CODE_MANUF_NAME,     "manufacturer"},
+	};
+
+	for (i = 0; i < ARRAY_SIZE(info); i++){
+		read_from_eeprom(&tlv_info, info[i].m_code);
+		if (tlv_info == NULL){
+			printf("can not find tlv data:%s\n", info[i].m_name);
+			continue;
+		}
+
+		strval = malloc(tlv_info->length + 1);
+        memset(strval, 0, tlv_info->length + 1);
+		strncpy(strval, tlv_info->value, tlv_info->length);
+		env_set(info[i].m_name, strval);
+		free(strval);
+	}
+
+	struct code_desc_info version[] = {
+		{ TLV_CODE_DEVICE_VERSION, "device_version"},
+		{ 0x40,                    "sdk_version"},
+	};
+
+    strval = malloc(64);
+	for (i = 0; i < ARRAY_SIZE(version); i++){
+		read_from_eeprom(&tlv_info, version[i].m_code);
+		if (tlv_info == NULL){
+			printf("can not find tlv data:%s\n", version[i].m_name);
+			continue;
+		}
+
+		memset(strval, 0, 64);
+        sprintf(strval, "%d", *tlv_info->value);
+		env_set(version[i].m_name, strval);
+	}
+    free(strval);
+}
+
 int board_init(void)
 {
 #ifdef CONFIG_DM_REGULATOR_SPM8XX
@@ -381,6 +485,12 @@ int board_late_init(void)
 		device_bind_driver(gd->dm_root, "spacemit_sysreset",
 					"spacemit_sysreset", NULL);
 
+	set_env_ethaddr();
+	set_dev_serial_no();
+
+	/*read from eeprom and update info to env*/
+	refresh_config_info();
+
 	run_fastboot_command();
 
 	run_cardfirmware_flash_command();
@@ -396,8 +506,8 @@ int board_late_init(void)
 
 	setenv_boot_mode();
 
-	set_env_ethaddr();
-	set_dev_serial_no();
+	/*read from eeprom and update info to env*/
+	refresh_config_info();
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
@@ -406,7 +516,7 @@ int board_late_init(void)
 	}
 
 	ret = ofnode_read_u64(chosen_node, "riscv,kernel-start",
-			      (u64 *)&kernel_start);
+				  (u64 *)&kernel_start);
 	if (ret) {
 		debug("Can't find kernel start address in device tree\n");
 		return 0;
@@ -431,41 +541,6 @@ void *board_fdt_blob_setup(int *err)
 	}
 	return (ulong *)&_end;
 }
-
-
-void board_boot_order(u32 *spl_boot_list)
-{
-	u32 boot_mode = get_boot_mode();
-	debug("boot_mode:%x\n", boot_mode);
-	if (boot_mode == BOOT_MODE_USB){
-		spl_boot_list[0] = BOOT_DEVICE_BOARD;
-	}else{
-		spl_boot_list[0] = BOOT_DEVICE_MMC1;
-		if (boot_mode != BOOT_MODE_SD){
-			switch (boot_mode) {
-			case BOOT_MODE_EMMC:
-				spl_boot_list[1] = BOOT_DEVICE_MMC2;
-				break;
-			case BOOT_MODE_NAND:
-				spl_boot_list[1] = BOOT_DEVICE_NAND;
-				break;
-			case BOOT_MODE_NOR:
-				spl_boot_list[1] = BOOT_DEVICE_NOR;
-				break;
-			default:
-				spl_boot_list[1] = BOOT_DEVICE_RAM;
-				break;
-			}
-
-			//reserve for fpga to load/run uboot from ram.
-			spl_boot_list[2] = BOOT_DEVICE_RAM;
-		}else{
-			//reserve for fpga to load/run uboot from ram.
-			spl_boot_list[1] = BOOT_DEVICE_RAM;
-		}
-	}
-}
-
 
 enum env_location env_get_location(enum env_operation op, int prio)
 {
@@ -548,7 +623,7 @@ ulong board_get_usable_ram_top(ulong total_size)
 {
 	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
 
-        /* Some devices (like the EMAC) have a 32-bit DMA limit. */
+		/* Some devices (like the EMAC) have a 32-bit DMA limit. */
 	if(dram_size > SZ_2GB) {
 		return 0x80000000;
 	} else {

@@ -5,91 +5,53 @@
  * Copyright (c) 2023, spacemit Corporation.
  *
  */
-#include <asm/io.h>
-#include <asm-generic/gpio.h>
-#include <clk.h>
 #include <common.h>
 #include <dm.h>
-#include <dm/device_compat.h>
-#include <generic-phy.h>
-#include <linux/bitops.h>
-#include <linux/log2.h>
+#include <log.h>
 #include <pci.h>
-#include <pci_ep.h>
-#include <pci_ids.h>
+#include <generic-phy.h>
+#include <power-domain.h>
 #include <regmap.h>
-#include <reset.h>
 #include <syscon.h>
+#include <asm/global_data.h>
+#include <asm/io.h>
+#include <asm-generic/gpio.h>
+#include <dm/device_compat.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
+#include <linux/err.h>
+#include <clk.h>
+#include <reset.h>
 
 #include "pcie_dw_common.h"
 
-/* Doorbell Interface */
-#define DBI_OFFSET			0x0
-#define DBI_SIZE			0x1000
+DECLARE_GLOBAL_DATA_PTR;
 
-#define PL_OFFSET			0x700
+#define PCIE_VENDORID_MASK	GENMASK(15, 0)
+#define PCIE_DEVICEID_SHIFT	16
 
-#define PHY_DEBUG_R0			(PL_OFFSET + 0x28)
+#define PCIE_LINK_CAPABILITY		0x7c
+#define PCIE_LINK_CTL_2			0xa0
+#define TARGET_LINK_SPEED_MASK		0xf
+#define LINK_SPEED_GEN_1		0x1
+#define LINK_SPEED_GEN_2		0x2
+#define LINK_SPEED_GEN_3		0x3
 
-#define PHY_DEBUG_R1			(PL_OFFSET + 0x2c)
-#define PHY_DEBUG_R1_LINK_UP		(0x1 << 4)
-#define PHY_DEBUG_R1_LINK_IN_TRAINING	(0x1 << 29)
+#define PCIE_MISC_CONTROL_1_OFF		0x8bc
+#define PCIE_DBI_RO_WR_EN		BIT(0)
 
-#define PCIE_MISC_CONTROL_1		0x8bc
-#define DBI_RO_WR_EN			BIT(0)
+#define PLR_OFFSET			0x700
+#define PCIE_PORT_DEBUG0		(PLR_OFFSET + 0x28)
+#define PORT_LOGIC_LTSSM_STATE_MASK	0x1f
+#define PORT_LOGIC_LTSSM_STATE_L0	0x11
 
-#define PCIE_CAP_BASE			0x70
-#define PCI_CONFIG(r)			(DBI_OFFSET + (r))
-#define PCIE_CAPABILITIES(r)		PCI_CONFIG(PCIE_CAP_BASE + (r))
+#define PCIE_LINK_UP_TIMEOUT_MS		1000
 
-/* Link capability */
-#define PF0_PCIE_CAP_LINK_CAP		PCIE_CAPABILITIES(0xc)
-#define PCIE_LINK_CAP_MAX_SPEED_MASK	0xf
-#define PCIE_LINK_CAP_MAX_SPEED_GEN1	BIT(0)
-#define PCIE_LINK_CAP_MAX_SPEED_GEN2	BIT(1)
-#define PCIE_LINK_CAP_MAX_SPEED_GEN3	BIT(2)
-#define PCIE_LINK_CAP_MAX_SPEED_GEN4	BIT(3)
+/* Offsets from App base */
+#define PCIE_CMD_STATUS			0x04
+#define LTSSM_EN_VAL			BIT(0)
 
-/* PCIe controller wrapper k1x configuration registers */
 
-#define	K1X_PHY_AHB_IRQ_EN              0x0000
-#define	IRQ_EN						BIT(0)
-
-#define	K1X_PHY_AHB_IRQSTATUS_INTX      0x0008
-#define	INTA						BIT(6)
-#define	INTB						BIT(7)
-#define	INTC						BIT(8)
-#define	INTD						BIT(9)
-#define	LEG_EP_INTERRUPTS (INTA | INTB | INTC | INTD)
-#define INTX_MASK				GENMASK(9, 6)
-#define INTX_SHIFT					6
-
-#define	K1X_PHY_AHB_IRQENABLE_SET_INTX  0x000c
-
-#define	K1X_PHY_AHB_IRQSTATUS_MSI   0x0010
-#define	MSI						BIT(11)
-#define	PCIE_REMOTE_INTERRUPT				BIT(31)
-/* DMA write channel 0~7 irq*/
-#define	EDMA_INT0					BIT(0)
-#define	EDMA_INT1					BIT(1)
-#define	EDMA_INT2					BIT(2)
-#define	EDMA_INT3					BIT(3)
-#define	EDMA_INT4					BIT(4)
-#define	EDMA_INT5					BIT(5)
-#define	EDMA_INT6					BIT(6)
-#define	EDMA_INT7					BIT(7)
-/* DMA read channel 0~7 irq*/
-#define	EDMA_INT8					BIT(8)
-#define	EDMA_INT9					BIT(9)
-#define	EDMA_INT10					BIT(10)
-#define	EDMA_INT11					BIT(11)
-#define	EDMA_INT12					BIT(12)
-#define	EDMA_INT13					BIT(13)
-#define	EDMA_INT14					BIT(14)
-#define	EDMA_INT15					BIT(15)
-#define	DMA_READ_INT					GENMASK(11, 8)
-
-#define	K1X_PHY_AHB_IRQENABLE_SET_MSI			0x0014
 
 #define	PCIECTRL_K1X_CONF_DEVICE_CMD			0x0000
 #define	LTSSM_EN					BIT(6)
@@ -110,294 +72,745 @@
 #define	SMLH_LINK_UP					BIT(1)
 #define	RDLH_LINK_UP					BIT(12)
 
-#define ADDR_INTR_STATUS1       			0x0018
-#define ADDR_INTR_ENABLE1 				0x001C
-#define MSI_INT						BIT(0)
-#define MSIX_INT 					GENMASK(8, 1)
-
-#define ADDR_MSI_RECV_CTRL 				0x0080
-#define MSI_MON_EN 					BIT(0)
-#define MSIX_MON_EN 					GENMASK(8, 1)
-#define MSIX_AFIFO_FULL 				BIT(30)
-#define MSIX_AFIFO_EMPTY 				BIT(29)
-#define ADDR_MSI_RECV_ADDR0 				0x0084
-#define ADDR_MSIX_MON_MASK 				0x0088
-#define ADDR_MSIX_MON_BASE0 				0x008c
-
-#define ADDR_MON_FIFO_DATA0 				0x00b0
-#define ADDR_MON_FIFO_DATA1 				0x00b4
-#define FIFO_EMPTY 					0xFFFFFFFF
-#define FIFO_LEN 					32
-#define INT_VEC_MASK 					GENMASK(7, 0)
-
-#define EXP_CAP_ID_OFFSET				0x70
-
-#define	PCIECTRL_K1X_CONF_INTX_ASSERT			0x0124
-#define	PCIECTRL_K1X_CONF_INTX_DEASSERT			0x0128
-
-/*RC write config  0xD28 offset register which equal with ELBI offset 0x028 addr*/
-#define PCIE_ELBI_EP_DMA_IRQ_STATUS	0x028
-#define PC_TO_EP_INT			(0x3fffffff)
-
-#define PCIE_ELBI_EP_DMA_IRQ_MASK	0x02c
-#define PC_TO_EP_INT_MASK		(0x3fffffff)
-
-#define PCIE_ELBI_EP_MSI_REASON         0x018
-
-struct pcie_k1x {
+/**
+ *
+ * @pci: The common PCIe DW structure
+ * @app_base: The base address of application register space
+ */
+struct pcie_dw_k1x {
 	/* Must be first member of the struct */
 	struct pcie_dw dw;
-
-	/* private control regs */
-	void __iomem *priv_base;
-
-    /* DT phy_ahb */
-    void __iomem *phy_ahb;
+	void __iomem		*base;		/* DT k1x_conf */
+	void __iomem		*phy_ahb;		/* DT phy_ahb */
+	void __iomem		*phy_addr;		/* DT phy_addr */
+	void __iomem		*conf0_addr;		/* DT conf0_addr */
+	void __iomem		*phy0_addr;		/* DT phy0_addr */
+	int			port_id;
 
 	/* reset, clock resources */
 	struct clk clock;
 	struct reset_ctl reset;
 };
 
-enum pcie_k1x_devtype {
-	K1X_PCIE_ENDPOINT_TYPE = 0,
-	K1X_PCIE_HOST_TYPE = 1
+enum dw_pcie_device_mode {
+	DW_PCIE_UNKNOWN_TYPE,
+	DW_PCIE_EP_TYPE,
+	DW_PCIE_RC_TYPE,
 };
 
-static enum pcie_k1x_devtype pcie_k1x_get_devtype(struct pcie_k1x *k1x)
+static inline u32 k1x_pcie_readl(struct pcie_dw_k1x *pcie, u32 offset)
+{
+	return readl(pcie->base + offset);
+}
+
+static inline void k1x_pcie_writel(struct pcie_dw_k1x *pcie, u32 offset,
+				      u32 value)
+{
+	writel(value, pcie->base + offset);
+}
+
+static inline u32 k1x_pcie_phy_ahb_readl(struct pcie_dw_k1x *pcie, u32 offset)
+{
+	return readl(pcie->phy_ahb + offset);
+}
+
+static inline void k1x_pcie_phy_ahb_writel(struct pcie_dw_k1x *pcie, u32 offset,
+				      u32 value)
+{
+	writel(value, pcie->phy_ahb + offset);
+}
+
+static inline u32 k1x_pcie_phy_reg_readl(struct pcie_dw_k1x *pcie, u32 offset)
+{
+	return readl(pcie->phy_addr + offset);
+}
+
+static inline void k1x_pcie_phy_reg_writel(struct pcie_dw_k1x *pcie, u32 offset,
+				      u32 value)
+{
+	writel(value, pcie->phy_addr + offset);
+}
+
+static inline u32 k1x_pcie_conf0_reg_readl(struct pcie_dw_k1x *pcie, u32 offset)
+{
+	return readl(pcie->conf0_addr + offset);
+}
+
+static inline void k1x_pcie_conf0_reg_writel(struct pcie_dw_k1x *pcie, u32 offset,
+				      u32 value)
+{
+	writel(value, pcie->conf0_addr + offset);
+}
+
+static inline u32 k1x_pcie_phy0_reg_readl(struct pcie_dw_k1x *pcie, u32 offset)
+{
+	return readl(pcie->phy0_addr + offset);
+}
+
+static inline void k1x_pcie_phy0_reg_writel(struct pcie_dw_k1x *pcie, u32 offset,
+				      u32 value)
+{
+	writel(value, pcie->phy0_addr + offset);
+}
+
+/**
+ * pcie_dw_configure() - Configure link capabilities and speed
+ *
+ * @regs_base: A pointer to the PCIe controller registers
+ * @cap_speed: The capabilities and speed to configure
+ *
+ * Configure the link capabilities and speed in the PCIe root complex.
+ */
+static void pcie_dw_configure(struct pcie_dw_k1x *pci, u32 cap_speed)
 {
 	u32 val;
 
-	val = readl(k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
-    if ((val & DEVICE_TYPE_RC) == DEVICE_TYPE_RC) {
-        return K1X_PCIE_HOST_TYPE;
-    } else {
-        return K1X_PCIE_ENDPOINT_TYPE;
-    }
+	dw_pcie_dbi_write_enable(&pci->dw, true);
+
+	val = readl(pci->dw.dbi_base + PCIE_LINK_CAPABILITY);
+	val &= ~TARGET_LINK_SPEED_MASK;
+	val |= cap_speed;
+	writel(val, pci->dw.dbi_base + PCIE_LINK_CAPABILITY);
+
+	val = readl(pci->dw.dbi_base + PCIE_LINK_CTL_2);
+	val &= ~TARGET_LINK_SPEED_MASK;
+	val |= cap_speed;
+	writel(val, pci->dw.dbi_base + PCIE_LINK_CTL_2);
+
+	dw_pcie_dbi_write_enable(&pci->dw, false);
 }
 
-static int pcie_k1x_check_link(struct pcie_k1x *k1x)
+/**
+ * is_link_up() - Return the link state
+ *
+ * @regs_base: A pointer to the PCIe DBICS registers
+ *
+ * Return: 1 (true) for active line and 0 (false) for no link
+ */
+static int is_link_up(struct pcie_dw_k1x *pci)
+{
+	u32 val;
+
+	val = readl(pci->dw.dbi_base + PCIE_PORT_DEBUG0);
+	val &= PORT_LOGIC_LTSSM_STATE_MASK;
+
+	return (val == PORT_LOGIC_LTSSM_STATE_L0);
+}
+
+/**
+ * wait_link_up() - Wait for the link to come up
+ *
+ * @regs_base: A pointer to the PCIe controller registers
+ *
+ * Return: 1 (true) for active line and 0 (false) for no link (timeout)
+ */
+static int wait_link_up(struct pcie_dw_k1x *pci)
+{
+	unsigned long timeout;
+
+	timeout = get_timer(0) + PCIE_LINK_UP_TIMEOUT_MS;
+	while (!is_link_up(pci)) {
+		if (get_timer(0) > timeout)
+			return 0;
+	};
+
+	return 1;
+}
+
+static int pcie_dw_k1x_pcie_link_up(struct pcie_dw_k1x *pci, u32 cap_speed)
 {
 	u32 reg;
 
-	reg = readl(k1x->phy_ahb + K1X_PHY_AHB_LINK_STS);
-	return (reg & RDLH_LINK_UP) && (reg & SMLH_LINK_UP);
-}
+	if (is_link_up(pci)) {
+		printf("PCI Link already up before configuration!\n");
+		return 1;
+	}
 
-static void pcie_k1x_force_gen1(struct pcie_k1x *k1x)
-{
-	u32 val, linkcap;
+	/* DW pre link configurations */
+	pcie_dw_configure(pci, cap_speed);
+
+	/* Initiate link training */
+	reg = k1x_pcie_readl(pci, PCIECTRL_K1X_CONF_DEVICE_CMD);
+	reg |= LTSSM_EN;
+	reg &= ~APP_HOLD_PHY_RST;
+	k1x_pcie_writel(pci, PCIECTRL_K1X_CONF_DEVICE_CMD, reg);
+
+	/* Check that link was established */
+	if (!wait_link_up(pci))
+		return 0;
 
 	/*
-	 * Force Gen1 operation when starting the link. In case the link is
-	 * started in Gen2 mode, there is a possibility the devices on the
-	 * bus will not be detected at all. This happens with PCIe switches.
+	 * Link can be established in Gen 1. still need to wait
+	 * till MAC nagaotiation is completed
 	 */
+	udelay(100);
 
-	/* ctrl_ro_wr_enable */
-	val = readl(k1x->dw.dbi_base + PCIE_MISC_CONTROL_1);
-	val |= DBI_RO_WR_EN;
-	writel(val, k1x->dw.dbi_base + PCIE_MISC_CONTROL_1);
-
-	/* configure link cap */
-	linkcap = readl(k1x->dw.dbi_base + PF0_PCIE_CAP_LINK_CAP);
-	linkcap |= PCIE_LINK_CAP_MAX_SPEED_MASK;
-	writel(linkcap, k1x->dw.dbi_base + PF0_PCIE_CAP_LINK_CAP);
-
-	/* ctrl_ro_wr_disable */
-	val &= ~DBI_RO_WR_EN;
-	writel(val, k1x->dw.dbi_base + PCIE_MISC_CONTROL_1);
+	return 1;
 }
 
-static int pcie_k1x_wait_for_link(struct pcie_k1x *k1x)
+static int pcie_set_mode(struct pcie_dw_k1x *pci,
+			       enum dw_pcie_device_mode mode)
 {
-	u32 val;
-	int timeout;
-
-	/* Wait for the link to train */
-	mdelay(20);
-	timeout = 80;
-
-	do {
-		mdelay(1);
-	} while (--timeout && !pcie_k1x_check_link(k1x));
-
-	val = readl(k1x->phy_ahb + K1X_PHY_AHB_LINK_STS);
-	if (!(val & RDLH_LINK_UP) || !(val & SMLH_LINK_UP)) {
-		printf("Failed to negotiate PCIe link!\n");
-		return -ETIMEDOUT;
-	}
-
-	return 0;
-}
-
-static int pcie_k1x_start_link(struct pcie_k1x *k1x)
-{
-	u32 val;
-
-	if (pcie_k1x_check_link(k1x))
-		return -EALREADY;
-
-	pcie_k1x_force_gen1(k1x);
-
-	val = readl(k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
-	val |= LTSSM_EN;
-	val &= ~APP_HOLD_PHY_RST;
-	writel(val, k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
-	return 0;
-}
-
-static int pcie_k1x_init_port(struct udevice *dev,
-				 enum pcie_k1x_devtype mode)
-{
-	struct pcie_k1x *k1x = dev_get_priv(dev);
 	u32 reg;
 
-	/* enable pcie clk */
-	clk_enable(&k1x->clock);
-	reset_deassert(&k1x->reset);
+	switch (mode) {
+	case DW_PCIE_RC_TYPE:
+		reg = k1x_pcie_readl(pci, PCIECTRL_K1X_CONF_DEVICE_CMD);
+		reg |= DEVICE_TYPE_RC;
+		k1x_pcie_writel(pci, PCIECTRL_K1X_CONF_DEVICE_CMD, reg);
 
-	/* Set desired mode while core is not operational */
-	if (mode == K1X_PCIE_HOST_TYPE) {
-        reg = readl(k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
-        reg |= DEVICE_TYPE_RC;
-        writel(reg, k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
-
-        reg = readl(k1x->priv_base + PCIE_CTRL_LOGIC);
-        reg |= PCIE_IGNORE_PERSTN;
-        writel(reg, k1x->priv_base + PCIE_CTRL_LOGIC);
-    } else {
-        reg = readl(k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
+		reg = k1x_pcie_readl(pci, PCIE_CTRL_LOGIC);
+		reg |= PCIE_IGNORE_PERSTN;
+		k1x_pcie_writel(pci, PCIE_CTRL_LOGIC, reg);
+		break;
+	case DW_PCIE_EP_TYPE:
+		reg = k1x_pcie_readl(pci, PCIECTRL_K1X_CONF_DEVICE_CMD);
 		reg &= ~DEVICE_TYPE_RC;
-		writel(reg, k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
-    }
-
-	/* Confirm desired mode from operational core */
-	if (pcie_k1x_get_devtype(k1x) != mode)
+		k1x_pcie_writel(pci, PCIECTRL_K1X_CONF_DEVICE_CMD, reg);
+		break;
+	default:
+		dev_err(pci->dw.dev, "INVALID device type %d\n", mode);
 		return -EINVAL;
-
-    /* warm reset ep */
-    if (mode == K1X_PCIE_HOST_TYPE) {
-        reg = readl(k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
-        reg |= PCIE_RC_PERST;
-        writel(reg, k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
-
-        mdelay(1000);
-
-        reg = readl(k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
-        reg &= ~PCIE_RC_PERST;
-        writel(reg, k1x->priv_base + PCIECTRL_K1X_CONF_DEVICE_CMD);
-    }
-
-	pcie_dw_setup_host(&k1x->dw);
-
-	if (pcie_k1x_start_link(k1x) == -EALREADY)
-		dev_info(dev, "PCIe link is already up\n");
-	else if (pcie_k1x_wait_for_link(k1x) == -ETIMEDOUT)
-		return -ETIMEDOUT;
+	}
 
 	return 0;
 }
 
-static int pcie_k1x_probe(struct udevice *dev)
+static int k1x_pcie_host_init(struct pcie_dw_k1x *pci)
 {
-	struct pcie_k1x *k1x = dev_get_priv(dev);
-	struct udevice *parent = pci_get_controller(dev);
-	struct pci_controller *hose = dev_get_uclass_priv(parent);
-	int err;
+	u32 reg;
 
-	k1x->dw.first_busno = dev_seq(dev);
-	k1x->dw.dev = dev;
+	mdelay(100);
+	/* set Perst# gpio high state*/
+	reg = k1x_pcie_readl(pci, PCIECTRL_K1X_CONF_DEVICE_CMD);
+	reg &= ~PCIE_RC_PERST;
+	k1x_pcie_writel(pci, PCIECTRL_K1X_CONF_DEVICE_CMD, reg);
 
-	err = pcie_k1x_init_port(dev, K1X_PCIE_HOST_TYPE);
-	if (err) {
-		dev_err(dev, "Failed to init port.\n");
-		return err;
+	return 0;
+}
+
+#define PCIE_REF_CLK_OUTPUT
+static int porta_init_done = 0;
+// wait porta rterm done
+void porta_rterm(struct pcie_dw_k1x *k1x)
+{
+	int rd_data;
+	u32 val;
+
+	//REG32(PMUA_REG_BASE + 0x3CC) = 0x4000003f;
+	val = k1x_pcie_conf0_reg_readl(k1x, 0);
+	val = 0x4000003f;
+	k1x_pcie_conf0_reg_writel(k1x, 0 , val);
+
+	//REG32(PMUA_REG_BASE + 0x3CC) &= 0xbfffffff; // clear hold phy reset
+	val = k1x_pcie_conf0_reg_readl(k1x, 0);
+	val &= 0xbfffffff;
+	k1x_pcie_conf0_reg_writel(k1x, 0 , val);
+
+	// set refclk model
+	//REG32(0xC0B10000 + (0x17 << 2)) |= (0x1 << 10);
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x17 << 2));
+	val |= (0x1 << 10);
+	k1x_pcie_phy0_reg_writel(k1x, (0x17 << 2), val);
+
+	//REG32(0xC0B10000 + (0x17 << 2)) &= ~(0x3 << 8);
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x17 << 2));
+	val &= ~(0x3 << 8);
+	k1x_pcie_phy0_reg_writel(k1x, (0x17 << 2), val);
+
+
+#ifndef PCIE_REF_CLK_OUTPUT
+	// receiver mode
+	//REG32(0xC0B10000 + (0x17 << 2)) |= 0x2 << 8;
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x17 << 2));
+	val |= 0x2 << 8;
+	k1x_pcie_phy0_reg_writel(k1x, (0x17 << 2), val);
+
+	//REG32(0xC0B10000 + (0x8 << 2)) &= ~(0x1 << 29);
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x8 << 2));
+	val &= ~(0x1 << 29);
+	k1x_pcie_phy0_reg_writel(k1x, (0x8 << 2), val);
+#ifdef PCIE_SEL_24M_REF_CLK
+	//REG32(0xC0B10000 + (0x12 << 2)) &= 0xffff0fff;
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x12 << 2));
+	val &= 0xffff0fff;
+	k1x_pcie_phy0_reg_writel(k1x, (0x12 << 2), val);
+
+	//REG32(0xC0B10000 + (0x12 << 2)) |= 0x00002000; // select 24Mhz refclock input pll_reg1[15:13]=2
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x12 << 2));
+	val |= 0x00002000;
+	k1x_pcie_phy0_reg_writel(k1x, (0x12 << 2), val);
+
+	//REG32(0xC0B10000 + (0x8 << 2)) |= 0x3 << 29;	   // rc_cal_reg2 0x68
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x8 << 2));
+	val |= 0x3 << 29;
+	k1x_pcie_phy0_reg_writel(k1x, (0x8 << 2), val);
+#elif PCIE_SEL_100M_REF_CLK
+	//REG32(0xC0B10000 + (0x8 << 2)) |= 0x1 << 30; // rc_cal_reg2 0x48
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x8 << 2));
+	val |= 0x1 << 30;
+	k1x_pcie_phy0_reg_writel(k1x, (0x8 << 2), val);
+#endif
+	//REG32(0xC0B10000 + (0x14 << 2)) |= (0x1 << 3); // pll_reg9[3] en_rterm,only enable in receiver mode
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x14 << 2));
+	val |= (0x1 << 3);
+	k1x_pcie_phy0_reg_writel(k1x, (0x14 << 2), val);
+#else
+	// driver mode
+	//REG32(0xC0B10000 + (0x17 << 2)) |= 0x1 << 8;
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x17 << 2));
+	val |= 0x1 << 8;
+	k1x_pcie_phy0_reg_writel(k1x, (0x17 << 2), val);
+
+	//REG32(0xC0B10000 + 0x400 + (0x17 << 2)) |= 0x1 << 8;
+	val = k1x_pcie_phy0_reg_readl(k1x, 0x400 + (0x17 << 2));
+	val |= 0x1 << 8;
+	k1x_pcie_phy0_reg_writel(k1x, 0x400 + (0x17 << 2), val);
+
+	//REG32(0xC0B10000 + (0x12 << 2)) &= 0xffff0fff;
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x12 << 2));
+	val &= 0xffff0fff;
+	k1x_pcie_phy0_reg_writel(k1x, (0x12 << 2), val);
+
+	//REG32(0xC0B10000 + (0x12 << 2)) |= 0x00002000; // select 24Mhz refclock input pll_reg1[15:13]=2
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x12 << 2));
+	val |= 0x00002000;
+	k1x_pcie_phy0_reg_writel(k1x, (0x12 << 2), val);
+
+	//REG32(0xC0B10000 + (0x13 << 2)) |= (0x1 << 4); // pll_reg5[4] of lane0, enable refclk_100_n/p 100Mhz output
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x13 << 2));
+	val |= (0x1 << 4);
+	k1x_pcie_phy0_reg_writel(k1x, (0x13 << 2), val);
+
+	//// REG32(0xC0B10000+(0x14<<2)) |= (0x1<<3);//pll_reg9[3] en_rterm,only enable in receiver mode
+#endif
+
+	//REG32(0xC0B10000 + (0x12 << 2)) &= 0xfff0ffff; // pll_reg1 of lane0, disable ssc pll_reg4[3:0]=4'h0
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x12 << 2));
+	val &= 0xfff0ffff;
+	k1x_pcie_phy0_reg_writel(k1x, (0x12 << 2), val);
+
+	//REG32(0xC0B10000 + (0x02 << 2)) = 0x00000B78; // PU_ADDR_CLK_CFG of lane0
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x02 << 2));
+	val = 0x00000B78;
+	k1x_pcie_phy0_reg_writel(k1x, (0x02 << 2), val);
+
+	//REG32(0xC0B10000 + (0x06 << 2)) = 0x00000400; // force rcv done
+	val = k1x_pcie_phy0_reg_readl(k1x, (0x06 << 2));
+	val = 0x00000400;
+	k1x_pcie_phy0_reg_writel(k1x, (0x06 << 2), val);
+	printk("Now waiting portA resister tuning done...\n");
+
+	// force PCIE mpu_u3/pu_rx_lfps
+	//REG32(PCIE_PUPHY_REG_BASE + 0x6 * 4) |= (0x1 << 17) | (0x1 << 15);
+	val = k1x_pcie_phy_reg_readl(k1x, (0x6 * 4));
+	val |= ((0x1 << 17) | (0x1 << 15));
+	k1x_pcie_phy_reg_writel(k1x, (0x6 * 4), val);
+
+	// wait pm0 rterm done
+	do
+	{
+		//rd_data = REG32(0xC0B10000 + 0x21 * 4);
+		rd_data = k1x_pcie_phy0_reg_readl(k1x, (0x21 * 4));
+		printk("porta redonly_reg2: %08x\n", rd_data);
+	} while (((rd_data >> 10) & 0x1) == 0); // waiting PCIe portA readonly_reg2[2] r_tune_done==1
+}
+
+// force rterm value to porta/b/c
+void rterm_force(struct pcie_dw_k1x *k1x, u32 pcie_rcal)
+{
+	int i, lane;
+	u32 val = 0;
+
+	if (k1x->port_id != 0x0) {
+		lane = 2;
+	} else {
+		lane = 1;
 	}
 
-	printf("PCIE-%d: Link up (Gen%d-x%d, Bus%d)\n",
-	       dev_seq(dev), pcie_dw_get_link_speed(&k1x->dw),
-	       pcie_dw_get_link_width(&k1x->dw),
+	printk("pcie_rcal = 0x%08x\n", pcie_rcal);
+	printk("pcie port id = %d, lane num = %d\n", k1x->port_id, lane);
+
+	// 2.write pma0 rterm value LSB[3:0](read0nly1[3:0]) to lane0/1 rx_reg1
+	for (i = 0; i < lane; i++)
+	{
+		val = k1x_pcie_phy_reg_readl(k1x, ((0x14 << 2) + 0x400 * i));
+		val |= ((pcie_rcal & 0xf) << 8);
+		k1x_pcie_phy_reg_writel(k1x, ((0x14 << 2) + 0x400 * i), val);
+	}
+	// 3.set lane0/1 rx_reg4 bit5=0
+	for (i = 0; i < lane; i++)
+	{
+		val = k1x_pcie_phy_reg_readl(k1x, ((0x15 << 2) + 0x400 * i));
+		val &= ~(1 << 5);
+		k1x_pcie_phy_reg_writel(k1x, ((0x15 << 2) + 0x400 * i), val);
+	}
+
+	// 4.write pma0 rterm value MSB[7:4](readonly1[7:4]) to lane0/1 tx_reg1[7:4]
+	for (i = 0; i < lane; i++)
+	{
+		val = k1x_pcie_phy_reg_readl(k1x, ((0x19 << 2) + 0x400 * i));
+		val |= ((pcie_rcal >> 4) & 0xf) << 12;
+		k1x_pcie_phy_reg_writel(k1x, ((0x19 << 2) + 0x400 * i), val);
+	}
+
+	// 5.set lane0/1 tx_reg3 bit1=1
+	for (i = 0; i < lane; i++)
+	{
+		val = k1x_pcie_phy_reg_readl(k1x, ((0x19 << 2) + 0x400 * i));
+		val |= (1 << 25);
+		k1x_pcie_phy_reg_writel(k1x, ((0x19 << 2) + 0x400 * i), val);
+	}
+
+	// 6.adjust rc calrefclk freq
+#ifndef PCIE_REF_CLK_OUTPUT
+	//REG32(PCIE_PUPHY_REG_BASE + (0x8 << 2)) &= ~(0x1 << 29);
+	val = k1x_pcie_phy_reg_readl(k1x,  (0x8 << 2));
+	val &= ~(0x1 << 29);
+	k1x_pcie_phy_reg_writel(k1x,  (0x8 << 2), val);
+#ifdef PCIE_SEL_24M_REF_CLK
+	//REG32(PCIE_PUPHY_REG_BASE + (0x8 << 2)) |= 0x3 << 29; // rc_cal_reg2 0x68
+	val = k1x_pcie_phy_reg_readl(k1x,  (0x8 << 2));
+	val |= 0x3 << 29;
+	k1x_pcie_phy_reg_writel(k1x,  (0x8 << 2), val);
+#elif PCIE_SEL_100M_REF_CLK
+	//REG32(PCIE_PUPHY_REG_BASE + (0x8 << 2)) |= 0x1 << 30; // rc_cal_reg2 0x48
+	val = k1x_pcie_phy_reg_readl(k1x,  (0x8 << 2));
+	val |= 0x1 << 30;
+	k1x_pcie_phy_reg_writel(k1x,  (0x8 << 2), val);
+#endif
+#else
+	//REG32(PCIE_PUPHY_REG_BASE + (0x8 << 2)) |= 0x3 << 29;
+	val = k1x_pcie_phy_reg_readl(k1x,  (0x8 << 2));
+	val |= 0x3 << 29;
+	k1x_pcie_phy_reg_writel(k1x,  (0x8 << 2), val);
+#endif
+
+	// 7.set lane0/1 rc_cal_reg1[6]=1
+	for (i = 0; i < lane; i++)
+	{
+		val = k1x_pcie_phy_reg_readl(k1x, ((0x8 << 2) + 0x400 * i));
+		val &= ~(1 << 22);
+		k1x_pcie_phy_reg_writel(k1x, ((0x8 << 2) + 0x400 * i), val);
+	}
+	for (i = 0; i < lane; i++)
+	{
+		val = k1x_pcie_phy_reg_readl(k1x, ((0x8 << 2) + 0x400 * i));
+		val |= (1 << 22);
+		k1x_pcie_phy_reg_writel(k1x, ((0x8 << 2) + 0x400 * i), val);
+	}
+
+	// release forc PCIE mpu_u3/pu_rx_lfps
+	val = k1x_pcie_phy_reg_readl(k1x, 0x6 * 4);
+	val &= 0xFFFD7FFF;
+	k1x_pcie_phy_reg_writel(k1x, 0x6 * 4, val);
+}
+
+static int init_phy(struct pcie_dw_k1x *k1x)
+{
+	u32 rd_data, pcie_rcal;
+	u32 val = 0;
+
+	printk("Now init Rterm...\n");
+	printk("pcie prot id = %d, porta_init_done = %d\n", k1x->port_id, porta_init_done);
+	if (k1x->port_id != 0) {
+	    if (porta_init_done == 0) {
+			porta_rterm(k1x);
+			//pcie_rcal = REG32(0xC0B10000 + (0x21 << 2));
+			pcie_rcal = k1x_pcie_phy0_reg_readl(k1x,  (0x21 << 2));
+
+			//REG32(PMUA_REG_BASE + 0x3CC) &= ~0x4000003f;
+			val = k1x_pcie_conf0_reg_readl(k1x, 0);
+			val &= ~0x4000003f;
+			k1x_pcie_conf0_reg_writel(k1x, 0, val);
+		} else {
+			//pcie_rcal = REG32(0xC0B10000 + (0x21 << 2));
+			pcie_rcal = k1x_pcie_phy0_reg_readl(k1x,  (0x21 << 2));
+		}
+	} else {
+		do {
+			//rd_data = REG32(0xC0B10000 + 0x21 * 4);
+			rd_data = k1x_pcie_phy0_reg_readl(k1x,  (0x21 * 4));
+		} while (((rd_data >> 10) & 0x1) == 0);
+		//pcie_rcal = REG32(0xC0B10000 + (0x21 << 2));
+		pcie_rcal = k1x_pcie_phy0_reg_readl(k1x,  (0x21 << 2));
+	}
+
+	rterm_force(k1x, pcie_rcal);
+
+	printk("Now int init_puphy...\n");
+	val = k1x_pcie_readl(k1x, PCIECTRL_K1X_CONF_DEVICE_CMD);
+	val &= 0xbfffffff;
+	k1x_pcie_writel(k1x, PCIECTRL_K1X_CONF_DEVICE_CMD, val);
+
+	// set refclk model
+	val = k1x_pcie_phy_reg_readl(k1x, (0x17 << 2));
+	val |= (0x1 << 10);
+	k1x_pcie_phy_reg_writel(k1x, (0x17 << 2), val);
+
+	val = k1x_pcie_phy_reg_readl(k1x, (0x17 << 2));
+	val &= ~(0x3 << 8);
+	k1x_pcie_phy_reg_writel(k1x, (0x17 << 2), val);
+
+	val = k1x_pcie_phy_reg_readl(k1x, 0x400 + (0x17 << 2));
+	val |= (0x1 << 10);
+	k1x_pcie_phy_reg_writel(k1x, 0x400 + (0x17 << 2), val);
+
+	val = k1x_pcie_phy_reg_readl(k1x, 0x400 + (0x17 << 2));
+	val &= ~(0x3 << 8);
+	k1x_pcie_phy_reg_writel(k1x, 0x400+ (0x17 << 2), val);
+#ifndef PCIE_REF_CLK_OUTPUT
+	// receiver mode
+	REG32(PCIE_PUPHY_REG_BASE + (0x17 << 2)) |= 0x2 << 8;
+	REG32(PCIE_PUPHY_REG_BASE + 0x400 + (0x17 << 2)) |= 0x2 << 8;
+#ifdef PCIE_SEL_24M_REF_CLK
+	val = k1x_pcie_phy_reg_readl(k1x, (0x12 << 2));
+	val &= 0xffff0fff;
+	k1x_pcie_phy_reg_writel(k1x, (0x12 << 2), val);
+
+	val = k1x_pcie_phy_reg_readl(k1x, (0x12 << 2));
+	val |= 0x00002000;
+	k1x_pcie_phy_reg_writel(k1x, (0x12 << 2), val);
+#endif
+#else
+	// driver mode
+	val = k1x_pcie_phy_reg_readl(k1x, (0x17 << 2));
+	val |= 0x1 << 8;
+	k1x_pcie_phy_reg_writel(k1x, (0x17 << 2), val);
+
+	val = k1x_pcie_phy_reg_readl(k1x, 0x400 + (0x17 << 2));
+	val |= 0x1 << 8;
+	k1x_pcie_phy_reg_writel(k1x, 0x400 + (0x17 << 2), val);
+
+	val = k1x_pcie_phy_reg_readl(k1x, (0x12 << 2));
+	val &= 0xffff0fff;
+	k1x_pcie_phy_reg_writel(k1x, (0x12 << 2), val);
+
+	val = k1x_pcie_phy_reg_readl(k1x, (0x12 << 2));
+	val |= 0x00002000;
+	k1x_pcie_phy_reg_writel(k1x, (0x12 << 2), val);
+
+	val = k1x_pcie_phy_reg_readl(k1x, (0x13 << 2));
+	val |= (0x1 << 4);
+	k1x_pcie_phy_reg_writel(k1x, (0x13 << 2), val);
+
+	if (k1x->port_id == 0x0) {
+		//REG32(0xC0B10000+(0x14<<2)) |= (0x1<<3);//pll_reg9[3] en_rterm,only enable in receiver mode
+		val = k1x_pcie_phy0_reg_readl(k1x,  (0x14 << 2));
+		val |= (0x1 << 3);
+		k1x_pcie_phy0_reg_writel(k1x,  (0x14 << 2), val);
+	}
+#endif
+
+	// pll_reg1 of lane0, disable ssc pll_reg4[3:0]=4'h0
+	val = k1x_pcie_phy_reg_readl(k1x, (0x12 << 2));
+	val &= 0xfff0ffff;
+	k1x_pcie_phy_reg_writel(k1x, (0x12 << 2), val);
+
+	// PU_ADDR_CLK_CFG of lane0
+	val = k1x_pcie_phy_reg_readl(k1x, (0x02 << 2));
+	val = 0x00000B78;
+	k1x_pcie_phy_reg_writel(k1x, (0x02 << 2), val);
+
+	 // PU_ADDR_CLK_CFG of lane1
+	val = k1x_pcie_phy_reg_readl(k1x, 0x400 + (0x02 << 2));
+	val = 0x00000B78;
+	k1x_pcie_phy_reg_writel(k1x, 0x400 + (0x02 << 2), val);
+
+	// force rcv done
+	val = k1x_pcie_phy_reg_readl(k1x, (0x06 << 2));
+	val = 0x00000400;
+	k1x_pcie_phy_reg_writel(k1x, (0x06 << 2), val);
+
+	// force rcv done
+	val = k1x_pcie_phy_reg_readl(k1x, 0x400 + (0x06 << 2));
+	val = 0x00000400;
+	k1x_pcie_phy_reg_writel(k1x, 0x400 + (0x06 << 2), val);
+
+	// waiting pll lock
+	printk("waiting pll lock...\n");
+	do
+	{
+		rd_data = k1x_pcie_phy_reg_readl(k1x, 0x8);
+	} while ((rd_data & 0x1) == 0);
+
+	if (k1x->port_id == 0)
+		porta_init_done = 0x1;
+	printk("Now finish init_puphy....\n");
+	return 0;
+}
+
+/**
+ * pcie_dw_k1x_probe() - Probe the PCIe bus for active link
+ *
+ * @dev: A pointer to the device being operated on
+ *
+ * Probe for an active link on the PCIe bus and configure the controller
+ * to enable this port.
+ *
+ * Return: 0 on success, else -ENODEV
+ */
+static int pcie_dw_k1x_probe(struct udevice *dev)
+{
+	struct pcie_dw_k1x *pci = dev_get_priv(dev);
+	struct udevice *ctlr = pci_get_controller(dev);
+	struct pci_controller *hose = dev_get_uclass_priv(ctlr);
+	struct phy phy0, phy1;
+	int ret;
+	u32 reg;
+
+	printf("%s, %d\n", __FUNCTION__, __LINE__);
+
+	/* enable pcie clk */
+	clk_enable(&pci->clock);
+	reset_deassert(&pci->reset);
+
+	reg = k1x_pcie_readl(pci, PCIECTRL_K1X_CONF_DEVICE_CMD);
+	reg &= ~LTSSM_EN;
+	k1x_pcie_writel(pci, PCIECTRL_K1X_CONF_DEVICE_CMD, reg);
+
+	/* set Perst# (fundamental reset) gpio low state*/
+	reg = k1x_pcie_readl(pci, PCIECTRL_K1X_CONF_DEVICE_CMD);
+	reg |= PCIE_RC_PERST;
+	k1x_pcie_writel(pci, PCIECTRL_K1X_CONF_DEVICE_CMD, reg);
+
+	init_phy(pci);
+
+	ret = generic_phy_get_by_name(dev,  "pcie-phy0", &phy0);
+	if (ret) {
+		dev_err(dev, "Unable to get phy0");
+	} else {
+		generic_phy_reset(&phy0);
+		generic_phy_init(&phy0);
+		generic_phy_power_on(&phy0);
+	}
+
+	ret = generic_phy_get_by_name(dev,  "pcie-phy1", &phy1);
+	if (ret) {
+		dev_err(dev, "Unable to get phy1");
+	} else {
+		generic_phy_reset(&phy1);
+		generic_phy_init(&phy1);
+		generic_phy_power_on(&phy1);
+	}
+
+	pci->dw.first_busno = dev_seq(dev);
+	pci->dw.dev = dev;
+
+	pcie_set_mode(pci, DW_PCIE_RC_TYPE);
+
+	k1x_pcie_host_init(pci);
+	pcie_dw_setup_host(&pci->dw);
+
+	if (!pcie_dw_k1x_pcie_link_up(pci, LINK_SPEED_GEN_2)) {
+		printf("PCIE-%d: Link down\n", dev_seq(dev));
+		return -ENODEV;
+	}
+
+	printf("PCIE-%d: Link up (Gen%d-x%d, Bus%d)\n", dev_seq(dev),
+	       pcie_dw_get_link_speed(&pci->dw),
+	       pcie_dw_get_link_width(&pci->dw),
 	       hose->first_busno);
 
-	return pcie_dw_prog_outbound_atu_unroll(&k1x->dw,
-						PCIE_ATU_REGION_INDEX0,
-						PCIE_ATU_TYPE_MEM,
-						k1x->dw.mem.phys_start,
-						k1x->dw.mem.bus_start,
-						k1x->dw.mem.size);
+	ret = pcie_dw_prog_outbound_atu_unroll(&pci->dw, PCIE_ATU_REGION_INDEX0,
+					 PCIE_ATU_TYPE_MEM,
+					 pci->dw.mem.phys_start,
+					 pci->dw.mem.bus_start, pci->dw.mem.size);
+	return 0;
 }
 
-static void __iomem *get_fdt_addr(struct udevice *dev, const char *name)
+/**
+ * pcie_dw_k1x_of_to_plat() - Translate from DT to device state
+ *
+ * @dev: A pointer to the device being operated on
+ *
+ * Translate relevant data from the device tree pertaining to device @dev into
+ * state that the driver will later make use of. This state is stored in the
+ * device's private data structure.
+ *
+ * Return: 0 on success, else -EINVAL
+ */
+static int pcie_dw_k1x_of_to_plat(struct udevice *dev)
 {
-	fdt_addr_t addr;
+	int ret = 0;
+	struct pcie_dw_k1x *pcie = dev_get_priv(dev);
 
-	addr = dev_read_addr_name(dev, name);
-
-	return (addr == FDT_ADDR_T_NONE) ? NULL : (void __iomem *)addr;
-}
-
-static int pcie_k1x_of_to_plat(struct udevice *dev)
-{
-	struct pcie_k1x *k1x = dev_get_priv(dev);
-	int err;
-
-	/* get designware DBI base addr */
-	k1x->dw.dbi_base = get_fdt_addr(dev, "dbi");
-	if (!k1x->dw.dbi_base)
+	/* Get the controller base address */
+	pcie->dw.dbi_base = (void *)dev_read_addr_name(dev, "dbi");
+	if ((fdt_addr_t)pcie->dw.dbi_base == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
-    /* Get the config space base address and size */
-	k1x->dw.cfg_base = (void *)dev_read_addr_size_name(dev, "config",
-							 &k1x->dw.cfg_size);
-	if ((fdt_addr_t)k1x->dw.cfg_base == FDT_ADDR_T_NONE)
+	/* Get the config space base address and size */
+	pcie->dw.cfg_base = (void *)dev_read_addr_size_name(dev, "config",
+							 &pcie->dw.cfg_size);
+	if ((fdt_addr_t)pcie->dw.cfg_base == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
-    /* Get the iATU base address and size */
-	k1x->dw.atu_base = get_fdt_addr(dev, "atu");
-	if (!k1x->dw.atu_base)
+	/* Get the iATU base address and size */
+	pcie->dw.atu_base = (void *)dev_read_addr_name(dev, "atu");
+	if ((fdt_addr_t)pcie->dw.atu_base == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
-	/* get private control base addr */
-	k1x->priv_base = get_fdt_addr(dev, "k1x_conf");
-	if (!k1x->priv_base)
+	/* Get the app base address */
+	pcie->phy_ahb = (void *)dev_read_addr_name(dev, "phy_ahb");
+	if ((fdt_addr_t)pcie->phy_ahb == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
-    k1x->phy_ahb = get_fdt_addr(dev, "phy_ahb");
-    if (!k1x->phy_ahb)
+	/* Get the PMU base address */
+	pcie->base = (void *)dev_read_addr_name(dev, "k1x_conf");
+	if ((fdt_addr_t)pcie->base == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
-	err = clk_get_by_index(dev, 0, &k1x->clock);
-	if (err) {
-		dev_warn(dev, "It has no clk: %d\n", err);
+	/* Get the phy base address and size */
+	pcie->phy_addr = (void *)dev_read_addr_name(dev, "phy_addr");
+	if ((fdt_addr_t)pcie->phy_addr == FDT_ADDR_T_NONE)
+		return -EINVAL;
+
+	/* Get the pcie0 conf base address */
+	pcie->conf0_addr = (void *)dev_read_addr_name(dev, "conf0_addr");
+	if ((fdt_addr_t)pcie->conf0_addr == FDT_ADDR_T_NONE)
+		return -EINVAL;
+
+	/* Get the pcie0 phy base address and size */
+	pcie->phy0_addr = (void *)dev_read_addr_name(dev, "phy0_addr");
+	if ((fdt_addr_t)pcie->phy0_addr == FDT_ADDR_T_NONE)
+		return -EINVAL;
+
+	ret = dev_read_u32(dev, "k1x,pcie-port", &pcie->port_id);
+	if (ret)
+		return ret;
+
+	ret = clk_get_by_index(dev, 0, &pcie->clock);
+	if (ret) {
+		dev_warn(dev, "It has no clk: %d\n", ret);
 		return -EINVAL;
 	}
 
-	err = reset_get_by_index(dev, 0, &k1x->reset);
-	if (err) {
-		pr_err("It has no reset: %d\n", err);
+	ret = reset_get_by_index(dev, 0, &pcie->reset);
+	if (ret) {
+		dev_warn(dev, "It has no reset: %d\n", ret);
 		return -EINVAL;
 	}
 
 	return 0;
 }
 
-static const struct dm_pci_ops pcie_k1x_ops = {
+static const struct dm_pci_ops pcie_dw_k1x_ops = {
 	.read_config	= pcie_dw_read_config,
 	.write_config	= pcie_dw_write_config,
 };
 
-static const struct udevice_id pcie_k1x_ids[] = {
+static const struct udevice_id pcie_dw_k1x_ids[] = {
 	{ .compatible = "k1x,dwc-pcie" },
-	{}
+	{ }
 };
 
-U_BOOT_DRIVER(pcie_spacemit) = {
-	.name		= "pcie_k1x",
-	.id		= UCLASS_PCI,
-	.of_match	= pcie_k1x_ids,
-	.ops		= &pcie_k1x_ops,
-	.of_to_plat	= pcie_k1x_of_to_plat,
-	.probe		= pcie_k1x_probe,
-	.priv_auto	= sizeof(struct pcie_k1x),
+U_BOOT_DRIVER(pcie_dw_k1x) = {
+	.name			= "pcie_dw_k1x",
+	.id			= UCLASS_PCI,
+	.of_match		= pcie_dw_k1x_ids,
+	.ops			= &pcie_dw_k1x_ops,
+	.of_to_plat	= pcie_dw_k1x_of_to_plat,
+	.probe			= pcie_dw_k1x_probe,
+	.priv_auto	= sizeof(struct pcie_dw_k1x),
 };

@@ -18,41 +18,77 @@
 #include <asm/global_data.h>
 #include <fb_spacemit.h>
 
-#define GEN_CNT         0xD5001000
+#define GEN_CNT             (0xD5001000)
+#define STORAGE_API_P_ADDR  (0xC0838498)
+#define SDCARD_API_ENTRY    (0xFFE0A548)
 
 int timer_init(void)
 {
-        /* enable generic cnt */
-        u32 read_data;
-        void __iomem *reg;
+    /* enable generic cnt */
+    u32 read_data;
+    void __iomem *reg;
 
-        reg = ioremap(GEN_CNT, 0x20);
-        read_data = readl(reg);
-        read_data |= BIT(0);
-        writel(read_data, reg);
+    reg = ioremap(GEN_CNT, 0x20);
+    read_data = readl(reg);
+    read_data |= BIT(0);
+    writel(read_data, reg);
 
-        return 0;
+    return 0;
+}
+
+enum board_boot_mode get_boot_storage(void)
+{
+    size_t *api = (size_t*)STORAGE_API_P_ADDR;
+    size_t address = *api;
+    // Did NOT select sdcard boot, but sdcard always has first boot priority
+    if (SDCARD_API_ENTRY == address)
+        return BOOT_MODE_SD;
+    else
+        return get_boot_pin_select();
+}
+
+void fix_boot_mode(void)
+{
+    if (0 == readl((void *)BOOT_DEV_FLAG_REG))
+        set_boot_mode(get_boot_storage());
 }
 
 int spl_board_init_f(void)
 {
-	int ret;
-	struct udevice *dev;
+    int ret;
+    struct udevice *dev;
 
-	debug("%s\n", __FUNCTION__);
-	/* DDR init */
-	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
-	if (ret) {
-		debug("DRAM init failed: %d\n", ret);
-		return ret;
-	}
+    debug("%s\n", __FUNCTION__);
+    /* DDR init */
+    ret = uclass_get_device(UCLASS_RAM, 0, &dev);
+    if (ret) {
+        debug("DRAM init failed: %d\n", ret);
+        return ret;
+    }
 
-	timer_init();
+    timer_init();
 
-	return 0;
+    return 0;
 }
 
+void board_init_f(ulong dummy)
+{
+    int ret;
 
+    // fix boot mode after boot rom
+    fix_boot_mode();
+    ret = spl_early_init();
+    if (ret)
+        panic("spl_early_init() failed: %d\n", ret);
+
+    riscv_cpu_setup(NULL, NULL);
+
+    preloader_console_init();
+
+    ret = spl_board_init_f();
+    if (ret)
+        panic("spl_board_init_f() failed: %d\n", ret);
+}
 
 #ifdef CONFIG_SPL_LOAD_FIT
 int board_fit_config_name_match(const char *name)
@@ -162,7 +198,7 @@ void spl_perform_fixups(struct spl_image_info *spl_image)
 	}
 	debug("read BOOT_DEV_FLAG_REG:%x\n", boot_mode);
 	switch (spl_image->boot_device) {
-	case BOOT_DEVICE_SPI:
+	case BOOT_DEVICE_NOR:
 		boot_mode = BOOT_MODE_NOR;
 		break;
 	case BOOT_DEVICE_NAND:
@@ -185,3 +221,35 @@ struct image_header *spl_get_load_buffer(ssize_t offset, size_t size)
 	return map_sysmem(CONFIG_SPL_LOAD_FIT_ADDRESS, 0);
 }
 
+void board_boot_order(u32 *spl_boot_list)
+{
+	u32 boot_mode = get_boot_mode();
+	debug("boot_mode:%x\n", boot_mode);
+	if (boot_mode == BOOT_MODE_USB){
+		spl_boot_list[0] = BOOT_DEVICE_BOARD;
+	}else{
+		spl_boot_list[0] = BOOT_DEVICE_MMC1;
+		if (boot_mode != BOOT_MODE_SD){
+			switch (boot_mode) {
+			case BOOT_MODE_EMMC:
+				spl_boot_list[1] = BOOT_DEVICE_MMC2;
+				break;
+			case BOOT_MODE_NAND:
+				spl_boot_list[1] = BOOT_DEVICE_NAND;
+				break;
+			case BOOT_MODE_NOR:
+				spl_boot_list[1] = BOOT_DEVICE_NOR;
+				break;
+			default:
+				spl_boot_list[1] = BOOT_DEVICE_RAM;
+				break;
+			}
+
+			//reserve for fpga to load/run uboot from ram.
+			spl_boot_list[2] = BOOT_DEVICE_RAM;
+		}else{
+			//reserve for fpga to load/run uboot from ram.
+			spl_boot_list[1] = BOOT_DEVICE_RAM;
+		}
+	}
+}

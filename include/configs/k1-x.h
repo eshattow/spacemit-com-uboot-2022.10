@@ -67,7 +67,7 @@ enum board_boot_mode {
 };
 #endif
 
-#define MMC_DEV_EMMC (1)
+#define MMC_DEV_EMMC (2)
 #define MMC_DEV_SD (0)
 
 #define BOOTFS_NAME ("bootfs")

@@ -56,6 +56,10 @@ static lbaint_t write_sparse_chunk_raw(struct sparse_storage *info,
 				       char *response)
 {
 	lbaint_t n = blkcnt, write_blks, blks = 0, aligned_buf_blks = 100;
+#ifdef CONFIG_IMAGE_SPARSE_TRANSFER_BLK_SIZE
+	if (CONFIG_IMAGE_SPARSE_TRANSFER_BLK_SIZE > 0)
+		aligned_buf_blks = CONFIG_IMAGE_SPARSE_TRANSFER_BLK_SIZE;
+#endif
 	uint32_t *aligned_buf = NULL;
 
 	if (CONFIG_IS_ENABLED(SYS_DCACHE_OFF)) {
@@ -68,8 +72,12 @@ static lbaint_t write_sparse_chunk_raw(struct sparse_storage *info,
 
 	aligned_buf = memalign(ARCH_DMA_MINALIGN, info->blksz * aligned_buf_blks);
 	if (!aligned_buf) {
-		info->mssg("Malloc failed for: CHUNK_TYPE_RAW", response);
-		return -ENOMEM;
+		aligned_buf_blks = 100;
+		aligned_buf = memalign(ARCH_DMA_MINALIGN, info->blksz * aligned_buf_blks);
+		if (!aligned_buf){
+			info->mssg("Malloc failed for: CHUNK_TYPE_RAW", response);
+			return -ENOMEM;
+		}
 	}
 
 	while (blkcnt > 0) {

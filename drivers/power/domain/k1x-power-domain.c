@@ -20,6 +20,7 @@ enum pm_domain_id {
 	K1X_PMU_ISP_PWR_DOMAIN,
 	K1X_PMU_AUD_PWR_DOMAIN,
 	K1X_PMU_GNSS_PWR_DOMAIN,
+	K1X_PMU_HDMI_PWR_DOMAIN,
 };
 
 struct pm_domain_desc {
@@ -100,6 +101,7 @@ static struct pm_domain_desc k1x_pm_domain_desc[] = {
 		.bit_auto_pwr_on = 0,
 		.bit_pwr_stat = 3,
 		.bit_hw_pwr_stat = 11,
+		.use_hw = 1,
 		.pm_index = K1X_PMU_AUD_PWR_DOMAIN,
 	},
 
@@ -114,6 +116,20 @@ static struct pm_domain_desc k1x_pm_domain_desc[] = {
 		.bit_pwr_stat = 6,
 		.bit_hw_pwr_stat = 14,
 		.pm_index = K1X_PMU_GNSS_PWR_DOMAIN,
+	},
+
+	[K1X_PMU_HDMI_PWR_DOMAIN] = {
+		.reg_pwr_ctrl = 0x3f4,
+		.pm_qos = 12,
+		.bit_hw_mode = 4,
+		.bit_sleep2 = 3,
+		.bit_sleep1 = 2,
+		.bit_isolation = 1,
+		.bit_auto_pwr_on = 0,
+		.bit_pwr_stat = 7,
+		.bit_hw_pwr_stat = 15,
+		.use_hw = 1,
+		.pm_index = K1X_PMU_HDMI_PWR_DOMAIN,
 	},
 };
 

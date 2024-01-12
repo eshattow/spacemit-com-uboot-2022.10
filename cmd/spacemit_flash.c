@@ -341,6 +341,7 @@ static int write_raw_image(struct blk_desc *dev_desc,
 
 void specific_flash_mmc_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 {
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 	char blk_dev_str[10] = {"\0"};
 	char file_name[20] = {"\0"};
 	u32 image_size = 0;
@@ -387,6 +388,7 @@ void specific_flash_mmc_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 		printf("flash fsbl fail\n");
 		return;
 	}
+#endif
 }
 
 

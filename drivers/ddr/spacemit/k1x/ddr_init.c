@@ -82,7 +82,7 @@ static int test_pattern(fdt_addr_t base, fdt_size_t size)
 
 	/* writeback and invalid cache */
 	flush_dcache_range(base,base+size);
-        invalidate_dcache_range(base,base+size);
+	invalidate_dcache_range(base,base+size);
 
 	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
 		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {

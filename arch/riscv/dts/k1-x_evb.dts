@@ -98,8 +98,6 @@
 
 &i2c8 {
 	/* PWR_I2C */
-	#address-cells = <1>;
-	#size-cells = <0>;
 	clock-frequency = <100000>;
 	u-boot,dm-spl;
 	status = "okay";
@@ -342,17 +340,6 @@
 			K1X_PADCONF(GPIO_80, MUX_MODE0, (EDGE_BOTH | PULL_UP | PAD_3V_DS4))  /* mmc cd */
 		>;
 	};
-
-	pinctrl_qspi: qspi_grp {
-		pinctrl-single,pins = <
-			K1X_PADCONF(QSPI_DAT3, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d3 */
-			K1X_PADCONF(QSPI_DAT2, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d2 */
-			K1X_PADCONF(QSPI_DAT1, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d1 */
-			K1X_PADCONF(QSPI_DAT0, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_d1 */
-			K1X_PADCONF(QSPI_CLK,  MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_1V8_DS2))        /* qspi_clk */
-			K1X_PADCONF(QSPI_CSI,  MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_1V8_DS2))          /* qspi_csi */
-		>;
-	};
 };
 
 &udc {
@@ -433,6 +420,13 @@
 	status = "disabled";
 };
 
+&pcie1_rc {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie1_0>;
+};
+
 &qspi {
         status = "okay";
         pinctrl-names = "default";
@@ -442,9 +436,20 @@
                 compatible = "jedec,spi-nor";
                 reg = <0>;
                 spi-max-frequency = <26500000>;
+
                 m25p,fast-read;
                 broken-flash-reset;
                 u-boot,dm-spl;
                 status = "okay";
         };
+		spi-nand@0 {
+			compatible = "spi-nand";
+			reg = <0>;
+			spi-tx-bus-width = <1>;
+			spi-rx-bus-width = <1>;
+			spi-max-frequency = <6250000>;
+			u-boot,dm-spl;
+			status = "okay";
+		};
+
 };

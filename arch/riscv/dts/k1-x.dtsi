@@ -5,6 +5,7 @@
 #include <dt-bindings/reset/reset-spacemit-k1x.h>
 #include <dt-bindings/clock/spacemit-k1x-clock.h>
 #include <dt-bindings/power-domain/k1x-pmu.h>
+#include <dt-bindings/phy/phy.h>
 
 / {
 	compatible = "spacemit,k1x", "riscv";
@@ -13,6 +14,9 @@
 
 	aliases {
 		serial0 = &uart0;
+		mmc0 = &sdhci0;
+		mmc1 = &sdhci1;
+		mmc2 = &sdhci2;
 	};
 
 	cpus: cpus {
@@ -293,7 +297,7 @@
 
                 pmu: power-management@0 {
 			compatible = "spacemit,k1x-pm-domain";
-			reg = <0x0 0xd4050000 0x0 0x3004>, <0x0 0xd4282800 0x0 0x3f4>;
+			reg = <0x0 0xd4050000 0x0 0x3004>, <0x0 0xd4282800 0x0 0x400>;
 			#power-domain-cells = <1>;
                 };
 
@@ -355,12 +359,40 @@
 			status = "disabled";
 		};
 
+		combphy: phy@c0b10000{
+			compatible = "spacemit,k1x-combphy";
+			reg = <0x0 0xc0b10000 0x0 0x800>,
+				  <0x0 0xd4282910 0x0 0x400>;
+			reg-names = "puphy", "phy_sel";
+			resets = <&reset RESET_PCIE0>;
+			reset-names = "phy_rst";
+			#phy-cells = <1>;
+			status = "disabled";
+		};
+
+		usb2phy: usb2phy@0xc0a30000 {
+			compatible = "spacemit,usb2-phy";
+			reg = <0x0 0xc0a30000  0x0 0x200>;
+			spacemit,phy-name = "mv-usb-phy";
+			spacemit,pll-lock-bypass;
+			clocks = <&ccu CLK_USB30>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		usb3hub: usb3hub@0 {
+			compatible = "spacemit,usb3-hub";
+			status = "disabled";
+		};
+
 		usbdrd3: usb3@0 {
 			compatible = "spacemit,k1-x-dwc3";
 			#address-cells = <2>;
 			#size-cells = <2>;
-			//resets = <&reset RESET_USB31>;
-			//reset-names = "ctl_rst";
+			resets = <&reset RESET_USB3_0>;
+			reset-names = "ctl_rst";
+			clocks = <&ccu CLK_USB30>;
+			clock-names = "usbdrd30";
 			interrupt-parent = <&intc>;
 			interrupts = <149>;
 			ranges;
@@ -371,6 +403,8 @@
 				reg = <0x0 0xc0a00000 0x0 0x10000>;
 				interrupt-parent = <&intc>;
 				interrupts = <125>;
+				phys = <&combphy PHY_TYPE_USB3>, <&usb2phy>;
+				phy-names = "usb3-phy", "usb2-phy";
 			};
 		};
 
@@ -419,75 +453,91 @@
 		};
 
                 i2c0: twsi0@d4010800 {
-                        compatible = "spacemit,i2c";
-                        reg = <0x0 0xd4010800 0x0 0x38>;
-                        clocks = <&ccu CLK_TWSI0>;
-                        resets = <&reset RESET_TWSI0>;
-                        status = "disabled";
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4010800 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI0>;
+			resets = <&reset RESET_TWSI0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
                 };
 
                 i2c1: twsi1@d4011000 {
-                        compatible = "spacemit,i2c";
-                        reg = <0x0 0xd4011000 0x0 0x38>;
-                        clocks = <&ccu CLK_TWSI1>;
-                        resets = <&reset RESET_TWSI1>;
-                        status = "disabled";
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4011000 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI1>;
+			resets = <&reset RESET_TWSI1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
                 };
 
                 i2c2: twsi2@d4012000 {
-                        compatible = "spacemit,i2c";
-                        reg = <0x0 0xd4012000 0x0 0x38>;
-                        clocks = <&ccu CLK_TWSI2>;
-                        resets = <&reset RESET_TWSI2>;
-                        status = "disabled";
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4012000 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI2>;
+			resets = <&reset RESET_TWSI2>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
                 };
 
                 i2c3: twsi3@f0614000 {
-                        /* SEC_I2C */
-                        compatible = "spacemit,i2c";
-                        reg = <0x0 0xf0614000 0x0 0x38>;
-                        status = "disabled";
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xf0614000 0x0 0x38>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
                 };
 
                 i2c4: twsi4@d4012800 {
-                        compatible = "spacemit,i2c";
-                        reg = <0x0 0xd4012800 0x0 0x38>;
-                        clocks = <&ccu CLK_TWSI4>;
-                        resets = <&reset RESET_TWSI4>;
-                        status = "disabled";
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4012800 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI4>;
+			resets = <&reset RESET_TWSI4>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
                 };
 
                 i2c5: twsi5@d4013800 {
-                        compatible = "spacemit,i2c";
-                        reg = <0x0 0xd4013800 0x0 0x38>;
-                        clocks = <&ccu CLK_TWSI5>;
-                        resets = <&reset RESET_TWSI5>;
-                        status = "disabled";
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4013800 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI5>;
+			resets = <&reset RESET_TWSI5>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
                 };
 
                 i2c6: twsi6@d4018800 {
-                        compatible = "spacemit,i2c";
-                        reg = <0x0 0xd4018800 0x0 0x38>;
-                        clocks = <&ccu CLK_TWSI6>;
-                        resets = <&reset RESET_TWSI6>;
-                        status = "disabled";
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4018800 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI6>;
+			resets = <&reset RESET_TWSI6>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
                 };
 
                 i2c7: twsi7@d401d000 {
-                        compatible = "spacemit,i2c";
-                        reg = <0x0 0xd401d000 0x0 0x38>;
-                        clocks = <&ccu CLK_TWSI7>;
-                        resets = <&reset RESET_TWSI7>;
-                        status = "disabled";
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd401d000 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI7>;
+			resets = <&reset RESET_TWSI7>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
                 };
 
                 i2c8: twsi8@d401d800 {
-                        /* PWR_I2C */
-                        compatible = "spacemit,i2c";
-                        reg = <0x0 0xd401d800 0x0 0x38>;
-                        clocks = <&ccu CLK_TWSI8>;
-                        resets = <&reset RESET_TWSI8>;
-                        status = "disabled";
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd401d800 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI8>;
+			resets = <&reset RESET_TWSI8>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
                 };
 
 		pcie0_rc: pcie@ca000000 {
@@ -496,9 +546,13 @@
 			      <0x0 0xca300000 0x0 0x0001ff24>, /* atu registers */
 			      <0x0 0x80000000 0x0 0x00100000>, /* config space */
 			      <0x0 0xd4282bcc 0x0 0x00000008>, /* k1x soc config addr */
-			      <0x0 0xc0b20000 0x0 0x00001000>; /* phy ahb */
-			reg-names = "dbi", "atu", "config", "k1x_conf", "phy_ahb";
+			      <0x0 0xc0b20000 0x0 0x00001000>, /* phy ahb */
+			      <0x0 0xc0b10000 0x0 0x00001000>, /* phy addr */
+			      <0x0 0xd4282bcc 0x0 0x00000008>, /* conf0 addr */
+			      <0x0 0xc0b10000 0x0 0x00001000>; /* phy0 addr */
+			reg-names = "dbi", "atu", "config", "k1x_conf", "phy_ahb", "phy_addr", "conf0_addr", "phy0_addr";
 
+			k1x,pcie-port = <0>;
 			clocks = <&ccu CLK_PCIE0>;
 			clock-names = "pcie-clk";
 			resets = <&reset RESET_PCIE0>;
@@ -536,11 +590,15 @@
 			compatible = "k1x,dwc-pcie";
 			reg = <0x0 0xca400000 0x0 0x00001000>, /* dbi */
 			      <0x0 0xca700000 0x0 0x0001ff24>, /* atu registers */
-			      <0x0 0x90000000 0x0 0x00002000>, /* config space */
+			      <0x0 0x90000000 0x0 0x00100000>, /* config space */
 			      <0x0 0xd4282bd4 0x0 0x00000008>, /* k1x soc config addr */
-			      <0x0 0xc0c20000 0x0 0x00001000>; /* phy ahb */
-			reg-names = "dbi", "atu", "config", "k1x_conf", "phy_ahb";
+			      <0x0 0xc0c20000 0x0 0x00001000>, /* phy ahb */
+			      <0x0 0xc0c10000 0x0 0x00001000>, /* phy addr */
+			      <0x0 0xd4282bcc 0x0 0x00000008>, /* conf0 addr */
+			      <0x0 0xc0b10000 0x0 0x00001000>; /* phy0 addr */
+			reg-names = "dbi", "atu", "config", "k1x_conf", "phy_ahb", "phy_addr", "conf0_addr", "phy0_addr";
 
+			k1x,pcie-port = <1>;
 			clocks = <&ccu CLK_PCIE1>;
 			clock-names = "pcie-clk";
 			resets = <&reset RESET_PCIE1>;
@@ -548,13 +606,13 @@
 
 			bus-range = <0x00 0xff>;
 			max-link-speed = <2>;
-			num-lanes = <1>;
+			num-lanes = <2>;
 			num-viewport = <8>;
 			device_type = "pci";
 			#address-cells = <3>;
 			#size-cells = <2>;
-			ranges = <0x01000000 0x0 0x90002000 0 0x90002000 0x0 0x100000>,
-				 <0x02000000 0x0 0x90102000 0 0x90102000 0x0 0x10000000>;
+			ranges = <0x01000000 0x0 0x90100000 0 0x90100000 0x0 0x100000>,
+				 <0x02000000 0x0 0x90200000 0 0x90200000 0x0 0x0fe00000>;
 
 			interrupts = <142>, <146>;
 			interrupt-parent = <&intc>;
@@ -564,7 +622,7 @@
 					<0000 0 0 2 &pcie1_intc 2>, /* int_b */
 					<0000 0 0 3 &pcie1_intc 3>, /* int_c */
 					<0000 0 0 4 &pcie1_intc 4>; /* int_d */
-			linux,pci-domain = <0>;
+			linux,pci-domain = <1>;
 			status = "disabled";
 			pcie1_intc: interrupt-controller@0 {
 				interrupt-controller;
@@ -578,11 +636,15 @@
 			compatible = "k1x,dwc-pcie";
 			reg = <0x0 0xca800000 0x0 0x00001000>, /* dbi */
 			      <0x0 0xcab00000 0x0 0x0001ff24>, /* atu registers */
-			      <0x0 0xa0000000 0x0 0x00002000>, /* config space */
+			      <0x0 0xa0000000 0x0 0x00100000>, /* config space */
 			      <0x0 0xd4282bdc 0x0 0x00000008>, /* k1x soc config addr */
-			      <0x0 0xc0d20000 0x0 0x00001000>; /* phy ahb */
-			reg-names = "dbi", "atu", "config", "k1x_conf", "phy_ahb";
+			      <0x0 0xc0d20000 0x0 0x00001000>, /* phy ahb */
+			      <0x0 0xc0d10000 0x0 0x00001000>, /* phy addr */
+			      <0x0 0xd4282bcc 0x0 0x00000008>, /* conf0 addr */
+			      <0x0 0xc0b10000 0x0 0x00001000>; /* phy0 addr */
+			reg-names = "dbi", "atu", "config", "k1x_conf", "phy_ahb", "phy_addr", "conf0_addr", "phy0_addr";
 
+			k1x,pcie-port = <2>;
 			clocks = <&ccu CLK_PCIE2>;
 			clock-names = "pcie-clk";
 			resets = <&reset RESET_PCIE2>;
@@ -595,8 +657,8 @@
 			device_type = "pci";
 			#address-cells = <3>;
 			#size-cells = <2>;
-			ranges = <0x01000000 0x0 0xa0002000 0 0xa0002000 0x0 0x100000>,
-				 <0x02000000 0x0 0xa0102000 0 0xa0102000 0x0 0x10000000>;
+			ranges = <0x01000000 0x0 0xa0100000 0 0xa0100000 0x0 0x100000>,
+				 <0x02000000 0x0 0xa0200000 0 0xa0200000 0x0 0x16000000>;
 
 			interrupts = <143>, <147>;
 			interrupt-parent = <&intc>;
