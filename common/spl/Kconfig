@@ -504,39 +504,6 @@ config SYS_MMCSD_RAW_MODE_U_BOOT_PARTITION
 	  Partition on the MMC to load U-Boot from when the MMC is being
 	  used in raw mode
 
-
-config SYS_MMCSD_RAW_MODE_U_BOOT_PARTITION_NAME
-	string "Partition name to use to load U-Boot from"
-	depends on SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION
-	help
-	  Partition name on the MMC to load U-Boot from when the MMC is being
-	  used in raw mode, it would try to load index while fail.
-
-
-config SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION
-	bool "second Partition to use to load U-Boot from"
-	depends on SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION
-	help
-	  Second Partition if need on the MMC to load U-Boot from when the
-	  MMC is being used in raw mode
-
-
-config SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION_INDEX
-	hex "Second partition to use to load U-Boot from"
-	depends on SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION
-	default 2
-	help
-	  Second partition on the MMC to load U-Boot from when the MMC is being
-	  used in raw mode
-
-config SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION_NAME
-	string "Second partition name to use to load U-Boot from"
-	depends on SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION
-	help
-	  Second partition name on the MMC to load U-Boot from when the MMC is being
-	  used in raw mode, it would try to load index while fail.
-
-
 config SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION_TYPE
 	bool "MMC raw mode: by partition type"
 	depends on DOS_PARTITION && SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION
@@ -1350,28 +1317,32 @@ config SPL_MTD_LOAD
 	  Enable support for loading next stage, U-Boot or otherwise, from
 	  SPI NOR in U-Boot SPL. it would dynamic to get the current mtd dev.
 
-config SYS_MTD_LOAD_U_BOOT_PARTITION_NAME
-	string "Partition name to use to load U-Boot from"
-	depends on SPL_MTD_LOAD
-	help
-	  Partition name on the mtd to load U-Boot from when the mtd device is being
-	  used in raw mode
-
-config SYS_MTD_LOAD_U_BOOT_SEC_PARTITION
-	bool "Second partition to use to load U-Boot from"
-	depends on SPL_MTD_LOAD
-	help
-	  Second Partition if need on the mtd to load U-Boot from when the
-	  mtd device is being used in raw mode
-
-config SYS_MTD_LOAD_U_BOOT_SEC_PARTITION_NAME
-	string "Second partition name to use to load U-Boot from"
-	depends on SYS_MTD_LOAD_U_BOOT_SEC_PARTITION
-	help
-	  Second partition name on the mtd to load U-Boot from when the mtd device is being
-	  used in raw mode.
-
 endif # SPL_SPI_FLASH_SUPPORT
+
+config SYS_LOAD_IMAGE_PARTITION_NAME
+	string "Partition name to use to load U-Boot from"
+	depends on SPL_MTD_LOAD || SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION
+	help
+	  Partition name on the storage to load U-Boot from.
+
+config SYS_LOAD_IMAGE_SEC_PARTITION
+	bool "Second partition to use to load U-Boot from"
+	depends on SPL_MTD_LOAD || SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION
+	help
+	  Second Partition if need on the storage to load U-Boot from.
+
+config SYS_LOAD_IMAGE_SEC_PARTITION_INDEX
+	int "Second partition index to use to load U-Boot from"
+	depends on SYS_LOAD_IMAGE_SEC_PARTITION
+	default 2
+	help
+	  Second partition name on the storage to load U-Boot from.
+
+config SYS_LOAD_IMAGE_SEC_PARTITION_NAME
+	string "Second partition name to use to load U-Boot from"
+	depends on SYS_LOAD_IMAGE_SEC_PARTITION
+	help
+	  Second partition name on the storage to load U-Boot from.
 
 config SYS_SPI_U_BOOT_OFFS
 	hex "address of u-boot payload in SPI flash"

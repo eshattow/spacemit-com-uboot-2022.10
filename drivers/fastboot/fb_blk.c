@@ -37,7 +37,7 @@ static int do_get_part_info(struct blk_desc **dev_desc, const char *name,
 
 		/* First try partition names on the default device */
 		*dev_desc = blk_get_dev(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
-							 CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM);
+							 CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX);
 		if (*dev_desc) {
 			ret = part_get_info_by_name(*dev_desc, name, info);
 			if (ret >= 0)
@@ -266,7 +266,7 @@ void fastboot_blk_erase(const char *cmd, char *response)
 	//TODO: align to blk dev erase size.
 #ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
 	if (!strncmp("mmc", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 3)){
-		struct mmc *mmc = find_mmc_device(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM);
+		struct mmc *mmc = find_mmc_device(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX);
 		lbaint_t grp_size;
 
 		grp_size = mmc->erase_grp_size;
@@ -311,29 +311,31 @@ u32 fastboot_blk_read(const char *part, u32 offset,
 	lbaint_t hdr_sectors, off_blk, size_blk;
 	lbaint_t res;
 
-	if (do_get_part_info(&dev_desc, part, &info) >= 0){
-		/*transfer offset to blk size*/
-		off_blk = (offset / info.blksz) + info.start;
-		if (!offset)
-			size_blk = info.size;
-		else
-			size_blk = info.size - (offset / info.blksz);
-	}else{
-		off_blk = offset / info.blksz;
-		size_blk = fastboot_buf_size / info.blksz;
+	if (do_get_part_info(&dev_desc, part, &info) < 0){
+		if (dev_desc && dev_desc->blksz > 0){
+			info.blksz = dev_desc->blksz;
+			info.size = dev_desc->lba * dev_desc->blksz;
+			info.start = 0;
+		}else{
+			fastboot_response("OKAY", response, "%08x", 0);
+			return 0;
+		}
 	}
+
+	if (offset >= info.size){
+		fastboot_response("OKAY", response, "%08x", 0);
+		return 0;
+	}
+
+	/*transfer offset to blk size*/
+	off_blk = (offset / info.blksz) + info.start;
+	size_blk = (info.size - offset) / info.blksz;
 
 	if (offset % info.blksz)
 		printf("offset should be align to 0x%lx, would change offset to 0x%lx\n",
 								info.blksz, (offset / info.blksz) * info.blksz);
 
 	debug("info->blksize:%lx, off_blk:%lx, size_blk:%lx\n", info.blksz, off_blk, size_blk);
-
-	/*if offset == part size, it mean that it had read part data over, return 0*/
-	if (off_blk == info.size){
-		fastboot_okay("0", response);
-		return 0;
-	}
 
 	/*if size > buffer_size, it would only load buffer_size, and return offset*/
 	if (size_blk * info.blksz > fastboot_buf_size){

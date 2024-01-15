@@ -207,18 +207,18 @@ static int mmc_load_image_raw_partition(struct spl_image_info *spl_image,
 	}
 #endif
 
-#ifdef CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_PARTITION_NAME
+#ifdef CONFIG_SYS_LOAD_IMAGE_PARTITION_NAME
 	if (partition == CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_PARTITION){
-		if (strlen(CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_PARTITION_NAME) > 0){
-			part_name = CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_PARTITION_NAME;
+		if (strlen(CONFIG_SYS_LOAD_IMAGE_PARTITION_NAME) > 0){
+			part_name = CONFIG_SYS_LOAD_IMAGE_PARTITION_NAME;
 		}
 	}
 #endif
 
-#ifdef CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION_NAME
-	if (partition == CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION_INDEX){
-		if (strlen(CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION_NAME) > 0){
-			part_name = CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION_NAME;
+#ifdef CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION_NAME
+	if (partition == CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION_INDEX){
+		if (strlen(CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION_NAME) > 0){
+			part_name = CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION_NAME;
 		}
 	}
 #endif
@@ -498,10 +498,10 @@ int spl_mmc_load(struct spl_image_info *spl_image,
 
 #ifdef CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION
 
-#ifdef CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION
+#ifdef CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION
 		/*load second */
 		load_others_res = mmc_load_image_raw_partition(spl_image, bootdev,
-						   mmc, CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SEC_PARTITION_INDEX,
+						   mmc, CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION_INDEX,
 						   raw_sect);
 
 #endif

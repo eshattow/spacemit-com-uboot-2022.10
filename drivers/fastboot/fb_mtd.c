@@ -420,16 +420,8 @@ u32 fastboot_mtd_flash_read(const char *part_name, u32 offset,
 	int ret;
 	u32 hdr_size, hdr_off;
 
-	if (!fb_mtd_lookup(part_name, &mtd, &part)) {
-		hdr_off = (u32)part->offset + offset;
-
-		if (!offset)
-			hdr_size = (u32)part->size;
-		else
-			hdr_size = (u32)part->size - offset;
-	}else{
-		/*can not find part at mtd devices, read raw data*/
-		/*if not read mtd raw data, return 0*/
+	if (fb_mtd_lookup(part_name, &mtd, &part)) {
+		/*can not find mtd part, try to read raw data*/
 		if (strncmp("mtd", part_name, 3))
 			return 0;
 
@@ -440,18 +432,23 @@ u32 fastboot_mtd_flash_read(const char *part_name, u32 offset,
 
 		if (IS_ERR_OR_NULL(mtd)){
 			printf("can not find mtd devices\n");
-			return -1;
+			return 0;
 		}
 
-		printf("get mtd nand :%s\n", mtd->name);
+		printf("get mtd name :%s\n", mtd->name);
 		if (fb_mtd_lookup(mtd->name, &mtd, &part)){
 			printf("can not get the mtd part\n");
-			fastboot_fail("can not find mtd part", response);
-			return -1;
+			return 0;
 		}
-		hdr_off = offset;
-		hdr_size = fastboot_buf_size;
 	}
+
+	if (offset >= part->size){
+		fastboot_response("OKAY", response, "%08x", 0);
+		return 0;
+	}
+
+	hdr_off = (u32)part->offset + offset;
+	hdr_size = (u32)part->size - offset;
 
 	/*if size > buffer_size, it would only load buffer_size, and return offset*/
 	if (hdr_size > fastboot_buf_size){
@@ -460,8 +457,8 @@ u32 fastboot_mtd_flash_read(const char *part_name, u32 offset,
 	}
 
 	ret = _fb_mtd_read(mtd, part, download_buffer, hdr_off, hdr_size, NULL);
-	if (ret) {
-		fastboot_fail("cannot read data from mtd", response);
+	if (ret){
+		fastboot_fail("cannot read data from mtd dev", response);
 		return -1;
 	}
 

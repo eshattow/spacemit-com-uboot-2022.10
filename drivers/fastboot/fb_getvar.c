@@ -16,6 +16,7 @@
 #include <asm/global_data.h>
 #include <mtd.h>
 #include <fb_spacemit.h>
+#include <command.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -282,12 +283,19 @@ static void getvar_blk_size(char *var_parameter, char *response)
 	case BOOT_MODE_NOR:
 #ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
 		blk_name = CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME;
-		blk_index = CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM;
-		dev_desc = blk_get_devnum_by_typename(blk_name, blk_index);
-		if (dev_desc != NULL){
-			fastboot_okay("universal", response);
-			return;
+		blk_index = CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX;
+
+		/*nvme devices need scan at first*/
+		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)){
+			run_command("nvme scan", 0);
 		}
+
+		dev_desc = blk_get_devnum_by_typename(blk_name, blk_index);
+		if (dev_desc != NULL)
+			fastboot_okay("universal", response);
+		else
+			fastboot_okay("NULL", response);
+		return;
 #endif
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
@@ -295,10 +303,11 @@ static void getvar_blk_size(char *var_parameter, char *response)
 		blk_name = "mmc";
 		blk_index = CONFIG_FASTBOOT_FLASH_MMC_DEV;
 		dev_desc = blk_get_devnum_by_typename(blk_name, blk_index);
-		if (dev_desc != NULL) {
+		if (dev_desc != NULL)
 			fastboot_okay("universal", response);
-			return;
-		}
+		else
+			fastboot_okay("NULL", response);
+		return;
 #endif
 	default:
 		fastboot_okay("NULL", response);

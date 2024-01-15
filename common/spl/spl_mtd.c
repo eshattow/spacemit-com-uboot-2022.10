@@ -160,18 +160,18 @@ static int spl_spi_load_image(struct spl_image_info *spl_image,
 
 	mtd_probe_devices();
 
-#ifdef CONFIG_SYS_MTD_LOAD_U_BOOT_SEC_PARTITION
-	mtd = get_mtd_device_nm(CONFIG_SYS_MTD_LOAD_U_BOOT_SEC_PARTITION_NAME);
+#ifdef CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION_NAME
+	mtd = get_mtd_device_nm(CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION_NAME);
 	if (IS_ERR_OR_NULL(mtd)){
-		debug("MTD device %s not found\n", CONFIG_SYS_MTD_LOAD_U_BOOT_SEC_PARTITION_NAME);
+		debug("MTD device %s not found\n", CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION_NAME);
 		return -1;
 	}
 	load_others_res = mtd_load_image(spl_image, bootdev, mtd);
 #endif
 
-	mtd = get_mtd_device_nm(CONFIG_SYS_MTD_LOAD_U_BOOT_PARTITION_NAME);
+	mtd = get_mtd_device_nm(CONFIG_SYS_LOAD_IMAGE_PARTITION_NAME);
 	if (IS_ERR_OR_NULL(mtd)){
-		debug("MTD device %s not found\n", CONFIG_SYS_MTD_LOAD_U_BOOT_PARTITION_NAME);
+		debug("MTD device %s not found\n", CONFIG_SYS_LOAD_IMAGE_PARTITION_NAME);
 		return -1;
 	}
 	err = mtd_load_image(spl_image, bootdev, mtd);

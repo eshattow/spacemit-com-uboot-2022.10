@@ -793,6 +793,7 @@ u32 fastboot_mmc_read(const char *part, u32 offset,
 		fastboot_response("OKAY", response, "%08x", 0);
 		return 0;
 	}
+
 	/*transfer offset to blk size*/
 	off_blk = (offset / info.blksz) + info.start;
 	size_blk = (info.size - offset) / info.blksz;
