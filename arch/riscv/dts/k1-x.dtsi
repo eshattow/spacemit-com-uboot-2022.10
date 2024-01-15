@@ -701,6 +701,16 @@
 			u-boot,dm-spl;
 			status = "disabled";
 		};
+
+		efuse: fuse@f0702800 {
+			compatible = "spacemit,k1x-efuse";
+			reg = <0x0 0xf0702800 0x0 0x400>;
+			resets = <&reset RESET_AES>;
+			reset-names = "aes_reset";
+			clocks = <&ccu CLK_AES>;
+			clock-names = "aes_core";
+			status = "disabled";
+		};
 	};
 
 	binman: binman {
