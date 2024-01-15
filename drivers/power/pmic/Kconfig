@@ -86,13 +86,6 @@ config PMIC_SPM8XX
 	  This config enables driver-model PMIC uclass features for
 	  spm8821, pm853 PMICs.
 
-config SPL_PMIC_SPM8XX
-	bool "Enable Driver Model for SPM8XX PMICs in SPL"
-	depends on SPL_DM_I2C && SPL_DM_PMIC
-	help
-	  This config enables driver-model PMIC uclass features in the SPL for
-	  spm8821, pm853  PMICs.
-
 config DM_PMIC_DA9063
 	bool "Enable Driver Model for the Dialog DA9063 PMIC"
 	help

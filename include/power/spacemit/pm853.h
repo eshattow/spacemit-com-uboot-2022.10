@@ -364,4 +364,18 @@ static const struct pm8xx_buck_desc pm853_switch_desc[] = {	\
 			0, 0, 0, 0, pm853_switch_ranges),		\
 };
 
+#define PM853_REGULATOR_MATCH_DATA					\
+struct regulator_match_data pm853_regulator_match_data = {		\
+	.nr_buck_desc = ARRAY_SIZE(pm853_buck_desc),				\
+	.buck_desc = pm853_buck_desc,						\
+	.nr_ldo_desc = ARRAY_SIZE(pm853_ldo_desc),				\
+	.ldo_desc = pm853_ldo_desc,						\
+	.nr_switch_desc = ARRAY_SIZE(pm853_switch_desc),			\
+	.switch_desc = pm853_switch_desc,					\
+	.name = "pm853",							\
+	.max_registers = 0xf1,							\
+};
+
+#define DECLEAR_PM853_REGULATOR_MATCH_DATA	extern struct regulator_match_data pm853_regulator_match_data;
+
 #endif /* __SPACEMIT_PM853_H__ */

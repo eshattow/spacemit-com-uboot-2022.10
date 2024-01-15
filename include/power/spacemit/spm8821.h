@@ -242,6 +242,20 @@ static const struct pm8xx_buck_desc spm8821_switch_desc[] = {	\
 	/* PWR SWITCH */	\
 	PM8XX_DESC_COMMON(SPM8821_ID_SWITCH1, "SWITCH_REG", 0, SPM8821_SWITCH_CTRL_REG, SPM8821_SWTICH_EN_MASK,		\
 			0, 0, 0, 0, spm8821_switch_ranges),	\
-}
+};
+
+#define SPM8821_REGULATOR_MATCH_DATA					\
+struct regulator_match_data spm8821_regulator_match_data = {	\
+	.nr_buck_desc = ARRAY_SIZE(spm8821_buck_desc),				\
+	.buck_desc = spm8821_buck_desc,						\
+	.nr_ldo_desc = ARRAY_SIZE(spm8821_ldo_desc),				\
+	.ldo_desc = spm8821_ldo_desc,						\
+	.nr_switch_desc = ARRAY_SIZE(spm8821_switch_desc),			\
+	.switch_desc = spm8821_switch_desc,					\
+	.name = "spm8821",							\
+        .max_registers = 0xA8,							\
+};
+
+#define DECLEAR_SPM8821_REGULATOR_MATCH_DATA extern struct regulator_match_data spm8821_regulator_match_data;
 
 #endif /* __SPACEMIT_SPM8821_H__ */

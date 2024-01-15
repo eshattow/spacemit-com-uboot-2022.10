@@ -9,21 +9,15 @@
 #include <power/pmic.h>
 #include <sysreset.h>
 
+DECLEAR_PM853_REGULATOR_MATCH_DATA;
+DECLEAR_SPM8821_REGULATOR_MATCH_DATA;
+DECLEAR_SY8810L_REGULATOR_MATCH_DATA;
+
 static int pm8xx_reg_count(struct udevice *dev)
 {
 	struct pm8xx_priv *priv = dev_get_priv(dev);
 
-	switch (priv->variant) {
-	case SPACEMIT_SPM8821_ID:
-		return SPACEMIT_SPM8821_MAX_REG;
-	case SPACEMIT_PM853_ID:
-		return SPACEMIT_PM853_MAX_REG;
-	default:
-		debug("do not support this varaint: %d\n", priv->variant);
-		break;
-	}
-
-	return 0;
+	return priv->match->max_registers;
 }
 
 static int pm8xx_read(struct udevice *dev, uint reg, uint8_t *buff, int len)
@@ -60,23 +54,18 @@ static struct dm_pmic_ops pm8xx_ops = {
 };
 
 static const struct udevice_id pm8xx_ids[] = {
-	{ .compatible = "spacemit,spm8821", .data = SPACEMIT_SPM8821_ID_REG, },
-	{ .compatible = "spacemit,pm853", .data = SPACEMIT_PM853_ID_REG, },
+	{ .compatible = "spacemit,spm8821", .data = (ulong)&spm8821_regulator_match_data, },
+	{ .compatible = "spacemit,pm853", .data = (ulong)&pm853_regulator_match_data, },
+	{ .compatible = "spacemit,sy8810l", .data = (ulong)&sy8810l_regulator_match_data, },
 	{ }
 };
 
 static int pm8xx_probe(struct udevice *dev)
 {
-	int ret = 0;
-	u8 variant;
 	struct pm8xx_priv *priv = dev_get_priv(dev);
 	ulong driver_data = dev_get_driver_data(dev);
 
-	ret = pm8xx_read(dev, driver_data, &variant, 1);
-	if (ret)
-		return ret;
-
-	priv->variant = variant;
+	priv->match = (struct regulator_match_data *)driver_data;
 
 	return 0;
 }
@@ -84,6 +73,7 @@ static int pm8xx_probe(struct udevice *dev)
 #if CONFIG_IS_ENABLED(PMIC_CHILDREN)
 static const struct pmic_child_info pmic_children_info[] = {
 	{ .prefix = "DCDC_REG", .driver = "pm8xx_buck"},
+	{ .prefix = "EDCDC_REG", .driver = "pm8xx_buck"},
 	{ .prefix = "LDO_REG", .driver = "pm8xx_ldo"},
 	{ .prefix = "SWITCH_REG", .driver = "pm8xx_switch"},
 	{ },
@@ -103,17 +93,6 @@ static int pm8xx_bind(struct udevice *dev)
 
 	debug("%s: '%s' - found regulators subnode\n", __func__, dev->name);
 
-/**
- * 	:Implement this function later
- *
- *	if (CONFIG_IS_ENABLED(SYSRESET)) {
- *		ret = device_bind_driver_to_node(dev, "rk8xx_sysreset",
- *						 "rk8xx_sysreset",
- *						 dev_ofnode(dev), NULL);
- *		if (ret)
- *			return ret;
- *	}
- */
 	children = pmic_bind_children(dev, regulators_node, pmic_children_info);
 	if (!children)
 		debug("%s: %s - no child found\n", __func__, dev->name);

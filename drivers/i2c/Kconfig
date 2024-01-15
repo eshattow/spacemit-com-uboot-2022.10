@@ -66,12 +66,6 @@ config SYS_I2C_LEGACY
 	  deprecated in U-Boot itself, this can be useful in some situations
 	  in SPL or TPL.
 
-config SYS_I2C_SPACEMIT
-        bool "SPACEMIT I2C driver"
-        depends on DM_I2C
-        help
-          Support for SPACEMIT I2C controllers.
-
 config SPL_SYS_I2C_LEGACY
 	bool "Enable legacy I2C subsystem and drivers in SPL"
 	depends on SUPPORT_SPL && !SPL_DM_I2C
@@ -92,6 +86,18 @@ config SYS_I2C_EARLY_INIT
 	help
 	  Add the function prototype for i2c_early_init_f which is called in
 	  board_early_init_f.
+
+config SYS_I2C_SPACEMIT
+        bool "SPACEMIT I2C driver"
+        depends on DM_I2C
+        help
+          Support for SPACEMIT I2C controllers.
+
+config SPL_SYS_I2C_SPACEMIT
+        bool "SPACEMIT I2C SPL driver"
+        depends on SPL_SYS_I2C_LEGACY
+        help
+          Support for SPACEMIT I2C controllers in SPL.
 
 config I2C_CROS_EC_TUNNEL
 	tristate "Chrome OS EC tunnel I2C bus"
