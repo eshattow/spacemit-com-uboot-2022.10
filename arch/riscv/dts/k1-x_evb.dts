@@ -442,14 +442,4 @@
                 u-boot,dm-spl;
                 status = "okay";
         };
-		spi-nand@0 {
-			compatible = "spi-nand";
-			reg = <0>;
-			spi-tx-bus-width = <1>;
-			spi-rx-bus-width = <1>;
-			spi-max-frequency = <6250000>;
-			u-boot,dm-spl;
-			status = "okay";
-		};
-
 };
