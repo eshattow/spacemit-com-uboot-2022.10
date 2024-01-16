@@ -54,6 +54,60 @@ void fix_boot_mode(void)
         set_boot_mode(get_boot_storage());
 }
 
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+int load_board_config_from_efuse(int *eeprom_i2c_index,
+    int *eeprom_pin_group, int *pmic_type)
+{
+	struct udevice *dev;
+	uint8_t fuses[2];
+	int ret;
+
+	/* retrieve the device */
+	ret = uclass_get_device_by_driver(UCLASS_MISC,
+					  DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
+    if (ret) {
+		return ret;
+	}
+
+    // read from efuse, each bank has 32byte efuse data
+    ret = misc_read(dev, 9 * 32 + 0, fuses, sizeof(fuses));
+    if ((0 == ret) && (0 != fuses[0])) {
+        // byte0 bit0~3 is eeprom i2c controller index
+        *eeprom_i2c_index = fuses[0] & 0x0F;
+        // byte0 bit4~5 is eeprom pin group index
+        *eeprom_pin_group = (fuses[0] >> 4) & 0x03;
+        // byte1 bit0~3 is pmic type
+        *pmic_type = fuses[1] & 0x0F;
+    }
+
+	return ret;
+}
+#endif
+
+static void load_default_board_config(int *eeprom_i2c_index,
+    int *eeprom_pin_group, int *pmic_type)
+{
+    char *temp;
+
+    temp = env_get("eeprom_i2c_index");
+    if (NULL != temp)
+        *eeprom_i2c_index = dectoul(temp, NULL);
+    else
+        *eeprom_i2c_index = K1_DEFALT_EEPROM_I2C_INDEX;
+
+    temp = env_get("eeprom_pin_group");
+    if (NULL != temp)
+        *eeprom_pin_group = dectoul(temp, NULL);
+    else
+        *eeprom_pin_group = K1_DEFALT_EEPROM_PIN_GROUP;
+
+    temp = env_get("pmic_type");
+    if (NULL != temp)
+        *pmic_type = dectoul(temp, NULL);
+    else
+        *pmic_type = K1_DEFALT_PMIC_TYPE;
+}
+
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
 extern int board_pmic_init(void);
 #endif
@@ -62,8 +116,19 @@ int spl_board_init_f(void)
 {
     int ret;
     struct udevice *dev;
+    int eeprom_i2c_index, eeprom_pin_group, pmic_type;
 
     debug("%s\n", __FUNCTION__);
+    load_default_board_config(&eeprom_i2c_index, &eeprom_pin_group, &pmic_type);
+
+    /* update env from efuse data */
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+    load_board_config_from_efuse(&eeprom_i2c_index, &eeprom_pin_group, &pmic_type);
+#endif
+
+    printf("eeprom_i2c_index :%d\n", eeprom_i2c_index);
+    printf("eeprom_pin_group :%d\n", eeprom_pin_group);
+    printf("pmic_type :%d\n", pmic_type);
 
     /* init i2c */
 #if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)

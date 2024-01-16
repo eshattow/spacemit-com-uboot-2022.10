@@ -55,6 +55,11 @@
 #define BOOT_CIU_DEBUG_REG1 (BOOT_CIU_REG + 0x0394)
 #define BOOT_CIU_DEBUG_REG2 (BOOT_CIU_REG + 0x0398)
 
+#define K1_EFUSE_USER_BANK0         8
+#define K1_DEFALT_PMIC_TYPE         0
+#define K1_DEFALT_EEPROM_I2C_INDEX  2
+#define K1_DEFALT_EEPROM_PIN_GROUP  0
+
 #ifndef __ASSEMBLY__
 enum board_boot_mode {
     BOOT_MODE_NONE = 0,
@@ -89,15 +94,15 @@ enum board_boot_mode {
     "qemu "
 
 #define BOOTENV_DEVICE_CONFIG \
-    "product_name=k1_deb2\0" \
+    "product_name=k1_deb1\0" \
     "serial#=123456789ABC\0" \
     "manufacturer=" CONFIG_SYS_VENDOR "\0" \
     "manufacture_date=01/16/2023 11:02:20\0" \
     "device_version=1\0" \
     "sdk_version=1\0" \
-    "pmic_type=1\0" \
-    "eeprom_pin_group=0\0" \
-    "eeprom_i2c_index=2\0" \
+    "pmic_type="        __stringify(K1_DEFALT_PMIC_TYPE) "\0" \
+    "eeprom_i2c_index=" __stringify(K1_DEFALT_EEPROM_I2C_INDEX) "\0" \
+    "eeprom_pin_group=" __stringify(K1_DEFALT_EEPROM_PIN_GROUP) "\0"
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
     "fdt_high=0xffffffffffffffff\0" \
