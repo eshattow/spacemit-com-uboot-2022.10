@@ -226,20 +226,20 @@ static void getvar_current_slot(char *var_parameter, char *response)
 /**
  * @brief Get the mtd size and return, if not mtd dev exists, it would return NULL.
 	if there have multi mtd devices, it would only return the first one.
- * 
- * @param var_parameter 
- * @param response 
+ *
+ * @param var_parameter
+ * @param response
  * @return return
 */
 static void getvar_mtd_size(char *var_parameter, char *response)
 {
-	struct mtd_info *mtd;
-
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
 	case BOOT_MODE_NOR:
 	case BOOT_MODE_NAND:
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MTD)
 		/*if select nor/nand, it would check if mtd dev exists or not*/
+		struct mtd_info *mtd;
 		mtd_probe_devices();
 		mtd_for_each_device(mtd) {
 			if (!mtd_is_partition(mtd)) {
@@ -259,6 +259,7 @@ static void getvar_mtd_size(char *var_parameter, char *response)
 
 			}
 		}
+#endif
 	default:
 		fastboot_okay("NULL", response);
 		return;
@@ -268,9 +269,9 @@ static void getvar_mtd_size(char *var_parameter, char *response)
 /**
  * @brief Get the var blk size object,  if has blk device, it would return
 	string universal, or return NULL.
- * 
- * @param var_parameter 
- * @param response 
+ *
+ * @param var_parameter
+ * @param response
  */
 static void getvar_blk_size(char *var_parameter, char *response)
 {
