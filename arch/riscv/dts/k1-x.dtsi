@@ -696,7 +696,7 @@
 				<&reset RESET_QSPI_BUS>;
 			reset-names = "qspi_reset", "qspi_bus_reset";
 			qspi-pmuap-reg = <0xd4282860>;
-			qspi-freq = <26500000>;
+			spi-max-frequency = <26500000>;
 			qspi-id = <4>;
 			u-boot,dm-spl;
 			status = "disabled";
