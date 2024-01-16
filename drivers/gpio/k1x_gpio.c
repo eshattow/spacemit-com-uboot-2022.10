@@ -215,17 +215,16 @@ static int gpio_k1x_probe(struct udevice *dev)
 	uc_priv->gpio_count = dev_read_u32_default(dev, "gpio-count", 0);
 	ret = uclass_get_device_by_phandle(UCLASS_PINCTRL, dev, "gpio-ranges",
 				     &plat->pinctrl_dev);
-	if (ret < 0) {
-		dev_err(dev, "%s: Failed to get pinctrl phandle\n", __func__);
-		return ret;
-	}
-
-	INIT_LIST_HEAD(&plat->gpiomap);
-	ret = k1x_get_gpio_pctrl_mapping(dev);
-	if (ret < 0) {
-		dev_err(dev, "%s: Failed to get gpio to pctrl map ret(%d)\n",
-			__func__, ret);
-		return ret;
+	if (ret == 0) {
+		INIT_LIST_HEAD(&plat->gpiomap);
+		ret = k1x_get_gpio_pctrl_mapping(dev);
+		if (ret < 0) {
+			dev_err(dev, "%s: Failed to get gpio to pctrl map ret(%d)\n",
+				__func__, ret);
+			return ret;
+		}
+	} else {
+		dev_info(dev, "%s: has no gpio-ranges\n", __func__);
 	}
 
 	ret = clk_get_by_index(dev, 0, &gpio_clk);
