@@ -88,6 +88,17 @@ enum board_boot_mode {
 #define BOOTENV_DEV_NAME_QEMU(devtypeu, devtypel, instance) \
     "qemu "
 
+#define BOOTENV_DEVICE_CONFIG \
+    "product_name=k1_deb2\0" \
+    "serial#=123456789ABC\0" \
+    "manufacturer=" CONFIG_SYS_VENDOR "\0" \
+    "manufacture_date=01/16/2023 11:02:20\0" \
+    "device_version=1\0" \
+    "sdk_version=1\0" \
+    "pmic_type=1\0" \
+    "eeprom_pin_group=0\0" \
+    "eeprom_i2c_index=2\0" \
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
     "fdt_high=0xffffffffffffffff\0" \
     "initrd_high=0xffffffffffffffff\0" \
@@ -98,6 +109,7 @@ enum board_boot_mode {
     "scriptaddr=0x2c100000\0" \
     "pxefile_addr_r=0x2c200000\0" \
     "ramdisk_addr_r=0x2c300000\0" \
+    BOOTENV_DEVICE_CONFIG \
     BOOTENV
 
 #endif /* __CONFIG_H */
