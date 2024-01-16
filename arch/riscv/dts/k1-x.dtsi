@@ -709,6 +709,7 @@
 			reset-names = "aes_reset";
 			clocks = <&ccu CLK_AES>;
 			clock-names = "aes_core";
+			u-boot,dm-spl;
 			status = "disabled";
 		};
 	};

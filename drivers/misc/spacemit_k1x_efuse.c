@@ -376,14 +376,16 @@ static int spacemit_efuse_read(struct udevice *dev, int offset, void *buf, int s
 	return efuse_read_bank(dev, offset, buf, size);
 }
 
-static int spacemit_efuse_program(struct udevice *dev, int offset, const void *buf, int size)
+static __maybe_unused int spacemit_efuse_program(struct udevice *dev, int offset, const void *buf, int size)
 {
 	return efuse_write_bank(dev, offset, buf, size);
 }
 
 static const struct misc_ops spacemit_efuse_ops = {
 	.read = spacemit_efuse_read,
+#if !defined(CONFIG_SPL_BUILD)
 	.write = spacemit_efuse_program,
+#endif
 };
 
 static int spacemit_efuse_of_to_plat(struct udevice *dev)
@@ -423,16 +425,10 @@ U_BOOT_DRIVER(spacemit_k1x_efuse) = {
 	.ops = &spacemit_efuse_ops,
 };
 
-#ifdef EFUSE_DEBUG
+#if defined(EFUSE_DEBUG) && !defined(CONFIG_SPL_BUILD)
 static int dump_efuses(struct cmd_tbl *cmdtp, int flag,
 		       int argc, char *const argv[])
 {
-	/*
-	 * N.B.: This function is tailored towards the RK3399 and assumes that
-	 *       there's always 32 fuses x 32 bits (i.e. 128 bytes of data) to
-	 *       be read.
-	 */
-
 	struct udevice *dev;
 	uint8_t fuses[FUSE_BANK_BYTES];
 	int ret, i;
