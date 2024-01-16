@@ -479,6 +479,7 @@ int board_late_init(void)
 {
 	ulong kernel_start;
 	ofnode chosen_node;
+	char ram_size_str[16] = {"\0"};
 	int ret;
 
 	if (IS_ENABLED(CONFIG_SYSRESET_SPACEMIT))
@@ -508,6 +509,10 @@ int board_late_init(void)
 
 	/*read from eeprom and update info to env*/
 	refresh_config_info();
+
+	/*save ram size to env, transfer to MB*/
+	sprintf(ram_size_str, "mem=%dMB", (int)(gd->ram_size / SZ_1MB));
+	env_set("ram_size", ram_size_str);
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
@@ -591,12 +596,7 @@ int dram_init(void)
 	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
 
 	gd->ram_base = CONFIG_SYS_SDRAM_BASE;
-
-	if(dram_size > SZ_2GB) {
-		gd->ram_size = SZ_2GB;
-	} else {
-		gd->ram_size = dram_size;
-	}
+	gd->ram_size = dram_size;
 
 	return 0;
 }
