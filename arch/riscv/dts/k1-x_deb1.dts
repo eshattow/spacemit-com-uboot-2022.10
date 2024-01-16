@@ -101,7 +101,7 @@
 
 		regulators {
 			/* buck */
-			dcdc1: DCDC_REG1 {
+			dcdc_1: DCDC_REG1 {
 				regulator-name = "dcdc1";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3450000>;
@@ -114,13 +114,13 @@
 				};
 			};
 
-			dcdc2: DCDC_REG2 {
+			dcdc_2: DCDC_REG2 {
 				regulator-name = "dcdc2";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3450000>;
 			};
 
-			dcdc3: DCDC_REG3 {
+			dcdc_3: DCDC_REG3 {
 				regulator-name = "dcdc3";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3450000>;
