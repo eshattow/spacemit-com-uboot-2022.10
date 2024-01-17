@@ -299,8 +299,7 @@ void read_from_eeprom(struct tlvinfo_tlv **tlv_data, u8 tcode)
 	unsigned int tlv_offset, tlv_len;
 	int ret = 0;
 
-	ret = read_tlvinfo_tlv_eeprom(eeprom_data, &tlv_hdr,
-					      &tlv_entry, 0);
+	ret = read_tlvinfo_tlv_eeprom(eeprom_data, &tlv_hdr, &tlv_entry, 0);
 	if (ret < 0) {
 		printf("read tlvinfo from eeprom failed!\n");
 		return;
@@ -411,20 +410,19 @@ void set_dev_serial_no(void)
 }
 
 struct code_desc_info {
-	u8    m_code;
-	char *m_name;
+	u8	m_code;
+	char	*m_name;
 };
 
 void refresh_config_info(void)
 {
 	struct tlvinfo_tlv *tlv_info = NULL;
 	char *strval;
-    int i;
+	int i;
 
 	struct code_desc_info info[] = {
 		{ TLV_CODE_PRODUCT_NAME,   "product_name"},
 		{ TLV_CODE_SERIAL_NUMBER,  "serial#"},
-		// { TLV_CODE_MAC_BASE,       "ethaddr"},
 		{ TLV_CODE_MANUF_DATE,     "manufacture_date"},
 		{ TLV_CODE_MANUF_NAME,     "manufacturer"},
 	};
@@ -437,7 +435,7 @@ void refresh_config_info(void)
 		}
 
 		strval = malloc(tlv_info->length + 1);
-        memset(strval, 0, tlv_info->length + 1);
+		memset(strval, 0, tlv_info->length + 1);
 		strncpy(strval, tlv_info->value, tlv_info->length);
 		env_set(info[i].m_name, strval);
 		free(strval);
@@ -448,7 +446,7 @@ void refresh_config_info(void)
 		{ 0x40,                    "sdk_version"},
 	};
 
-    strval = malloc(64);
+	strval = malloc(64);
 	for (i = 0; i < ARRAY_SIZE(version); i++){
 		read_from_eeprom(&tlv_info, version[i].m_code);
 		if (tlv_info == NULL){
@@ -457,10 +455,10 @@ void refresh_config_info(void)
 		}
 
 		memset(strval, 0, 64);
-        sprintf(strval, "%d", *tlv_info->value);
+		sprintf(strval, "%d", *tlv_info->value);
 		env_set(version[i].m_name, strval);
 	}
-    free(strval);
+	free(strval);
 }
 
 int board_init(void)
