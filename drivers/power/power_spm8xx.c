@@ -51,9 +51,9 @@ void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck
 
 /**
  * linear_range_get_value - fetch a value from given range
- * @r:          pointer to linear range where value is looked from
+ * @r:	  pointer to linear range where value is looked from
  * @selector:   selector for which the value is searched
- * @val:        address where found value is updated
+ * @val:	address where found value is updated
  *
  * Search given ranges for value which matches given selector.
  *
@@ -61,22 +61,22 @@ void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck
  * ranges.
  */
 static int linear_range_get_value(const struct pm8xx_linear_range *r, unsigned int selector,
-                           unsigned int *val)
+			   unsigned int *val)
 {
-        if (r->min_sel > selector || r->max_sel < selector)
-                return -EINVAL;
+	if (r->min_sel > selector || r->max_sel < selector)
+		return -EINVAL;
 
-        *val = r->min + (selector - r->min_sel) * r->step;
+	*val = r->min + (selector - r->min_sel) * r->step;
 
-        return 0;
+	return 0;
 }
 
 /**
  * linear_range_get_value_array - fetch a value from array of ranges
- * @r:          pointer to array of linear ranges where value is looked from
+ * @r:	  pointer to array of linear ranges where value is looked from
  * @ranges:     amount of ranges in an array
  * @selector:   selector for which the value is searched
- * @val:        address where found value is updated
+ * @val:	address where found value is updated
  *
  * Search through an array of ranges for value which matches given selector.
  *
@@ -84,15 +84,15 @@ static int linear_range_get_value(const struct pm8xx_linear_range *r, unsigned i
  * ranges.
  */
 static int linear_range_get_value_array(const struct pm8xx_linear_range *r, int ranges,
-                                 unsigned int selector, unsigned int *val)
+				 unsigned int selector, unsigned int *val)
 {
-        int i;
+	int i;
 
-        for (i = 0; i < ranges; i++)
-                if (r[i].min_sel <= selector && r[i].max_sel >= selector)
-                        return linear_range_get_value(&r[i], selector, val);
+	for (i = 0; i < ranges; i++)
+		if (r[i].min_sel <= selector && r[i].max_sel >= selector)
+			return linear_range_get_value(&r[i], selector, val);
 
-        return -EINVAL;
+	return -EINVAL;
 }
 
 /**
@@ -108,37 +108,37 @@ static int linear_range_get_value_array(const struct pm8xx_linear_range *r, int 
  * parsing.
  */
 static int regulator_desc_list_voltage_linear_range(const struct pm8xx_buck_desc *desc,
-                                             unsigned int selector)
+					     unsigned int selector)
 {
-        unsigned int val;
-        int ret;
+	unsigned int val;
+	int ret;
 
-        BUG_ON(!desc->n_linear_ranges);
+	BUG_ON(!desc->n_linear_ranges);
 
-        ret = linear_range_get_value_array(desc->linear_ranges,
-                                           desc->n_linear_ranges, selector,
-                                           &val);
-        if (ret)
-                return ret;
+	ret = linear_range_get_value_array(desc->linear_ranges,
+					   desc->n_linear_ranges, selector,
+					   &val);
+	if (ret)
+		return ret;
 
-        return val;
+	return val;
 }
 
 /**
  * linear_range_get_max_value - return the largest value in a range
- * @r:          pointer to linear range where value is looked from
+ * @r:	  pointer to linear range where value is looked from
  *
  * Return: the largest value in the given range
  */
 static unsigned int linear_range_get_max_value(const struct pm8xx_linear_range *r)
 {
-        return r->min + (r->max_sel - r->min_sel) * r->step;
+	return r->min + (r->max_sel - r->min_sel) * r->step;
 }
 
 /**
  * linear_range_get_selector_high - return linear range selector for value
- * @r:          pointer to linear range where selector is looked from
- * @val:        value for which the selector is searched
+ * @r:	  pointer to linear range where selector is looked from
+ * @val:	value for which the selector is searched
  * @selector:   address where found selector value is updated
  * @found:      flag to indicate that given value was in the range
  *
@@ -150,27 +150,27 @@ static unsigned int linear_range_get_max_value(const struct pm8xx_linear_range *
  * value greater or equal to given value
  */
 static int linear_range_get_selector_high(const struct pm8xx_linear_range *r,
-                                   unsigned int val, unsigned int *selector,
-                                   bool *found)
+				   unsigned int val, unsigned int *selector,
+				   bool *found)
 {
-        *found = false;
+	*found = false;
 
-        if (linear_range_get_max_value(r) < val)
-                return -EINVAL;
+	if (linear_range_get_max_value(r) < val)
+		return -EINVAL;
 
-        if (r->min > val) {
-                *selector = r->min_sel;
-                return 0;
-        }
+	if (r->min > val) {
+		*selector = r->min_sel;
+		return 0;
+	}
 
-        *found = true;
+	*found = true;
 
-        if (r->step == 0)
-                *selector = r->max_sel;
-        else
-                *selector = DIV_ROUND_UP(val - r->min, r->step) + r->min_sel;
+	if (r->step == 0)
+		*selector = r->max_sel;
+	else
+		*selector = DIV_ROUND_UP(val - r->min, r->step) + r->min_sel;
 
-        return 0;
+	return 0;
 }
 
 /**
@@ -184,41 +184,41 @@ static int linear_range_get_selector_high(const struct pm8xx_linear_range *r,
  * their map_voltage() callback.
  */
 static int regulator_map_voltage_linear_range(const struct pm8xx_buck_desc *desc,
-                                       int min_uV, int max_uV)
+				       int min_uV, int max_uV)
 {
-        const struct pm8xx_linear_range *range;
-        int ret = -EINVAL;
-        unsigned int sel;
-        bool found;
-        int voltage, i;
+	const struct pm8xx_linear_range *range;
+	int ret = -EINVAL;
+	unsigned int sel;
+	bool found;
+	int voltage, i;
 
-        if (!desc->n_linear_ranges) {
-                BUG_ON(!desc->n_linear_ranges);
-                return -EINVAL;
-        }
+	if (!desc->n_linear_ranges) {
+		BUG_ON(!desc->n_linear_ranges);
+		return -EINVAL;
+	}
 
-        for (i = 0; i < desc->n_linear_ranges; i++) {
-                range = &desc->linear_ranges[i];
+	for (i = 0; i < desc->n_linear_ranges; i++) {
+		range = &desc->linear_ranges[i];
 
-                ret = linear_range_get_selector_high(range, min_uV, &sel,
-                                                     &found);
-                if (ret)
-                        continue;
-                ret = sel;
+		ret = linear_range_get_selector_high(range, min_uV, &sel,
+						     &found);
+		if (ret)
+			continue;
+		ret = sel;
 
-                /*
-                 * Map back into a voltage to verify we're still in bounds.
-                 * If we are not, then continue checking rest of the ranges.
-                 */
+		/*
+		 * Map back into a voltage to verify we're still in bounds.
+		 * If we are not, then continue checking rest of the ranges.
+		 */
 		voltage = regulator_desc_list_voltage_linear_range(desc, sel);
-                if (voltage >= min_uV && voltage <= max_uV)
-                        break;
-        }
+		if (voltage >= min_uV && voltage <= max_uV)
+			break;
+	}
 
-        if (i == desc->n_linear_ranges)
-                return -EINVAL;
+	if (i == desc->n_linear_ranges)
+		return -EINVAL;
 
-        return ret;
+	return ret;
 }
 
 static int __board_pmic_init(const char *name)
@@ -229,8 +229,7 @@ static int __board_pmic_init(const char *name)
 	const struct pm8xx_buck_desc *buck_desc, *ldo_desc;
 	int offset, bus, ret, sub_offset, len, saddr, i, num_buck, num_ldo, sel;
 
-	offset = fdt_node_offset_by_compatible(gd->fdt_blob, -1,
-			name);
+	offset = fdt_node_offset_by_compatible(gd->fdt_blob, -1, name);
 	if (offset < 0) {
 		printf("%s Get %s node error\n", __func__, name);
 		return -EINVAL;
@@ -256,13 +255,17 @@ static int __board_pmic_init(const char *name)
 
 	ret = i2c_probe(saddr);
 	if (ret < 0) {
-		printf("%s: %s probe i2c failed\n", __func__, name);
+//		printf("%s: %s probe i2c failed\n", __func__, name);
 		return -EINVAL;
 	}
 
-	for (sub_offset = fdt_next_node(gd->fdt_blob, offset, NULL);
+	__regulator_desc_find(name, &buck_desc, &ldo_desc, &num_buck, &num_ldo);
+
+	offset = fdt_first_subnode(gd->fdt_blob, offset);
+
+	for (sub_offset = fdt_first_subnode(gd->fdt_blob, offset);
 		sub_offset >= 0;
-		sub_offset = fdt_next_node(gd->fdt_blob, sub_offset, NULL)) {
+		sub_offset = fdt_next_subnode(gd->fdt_blob, sub_offset)) {
 
 		/* find regulator-boot-on property */
 		if (!fdt_getprop(gd->fdt_blob, sub_offset, "regulator-boot-on", &len))
@@ -280,8 +283,6 @@ static int __board_pmic_init(const char *name)
 
 		/* find wich dcdc or ldo */
 		s = fdt_get_name(gd->fdt_blob, sub_offset, &len);
-
-		__regulator_desc_find(name, &buck_desc, &ldo_desc, &num_buck, &num_ldo);
 
 		if ((strncmp(s, "DCDC_REG", 8) == 0) || (strncmp(s, "EDCDC_REG", 9) == 0)) {
 			for (i = 0; i < num_buck; ++i) {
