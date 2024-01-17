@@ -293,7 +293,7 @@ void setenv_boot_mode(void)
 
 void read_from_eeprom(struct tlvinfo_tlv **tlv_data, u8 tcode)
 {
-	u8 eeprom_data[256];
+	static u8 eeprom_data[256];
 	struct tlvinfo_header *tlv_hdr = NULL;
 	struct tlvinfo_tlv *tlv_entry;
 	unsigned int tlv_offset, tlv_len;
