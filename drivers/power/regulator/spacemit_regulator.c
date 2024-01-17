@@ -4,20 +4,24 @@
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
-#include <power/spacemit/spacemit_pmic.h>
 #include <power/pmic.h>
 #include <power/regulator.h>
 #include <linux/bug.h>
 #include <linux/bitops.h>
 #include <linux/kernel.h>
 #include "regulator_common.h"
+#include <power/spacemit/spacemit_pmic.h>
 
 SPM8821_BUCK_LINER_RANGE; SPM8821_LDO_LINER_RANGE; SPM8821_SWITCH_LINER_RANGE;
 SPM8821_REGULATOR_BUCK_DESC; SPM8821_REGULATOR_LDO_DESC; SPM8821_REGULATOR_SWITCH_DESC;
+SPM8821_REGULATOR_MATCH_DATA;
 
 PM853_BUCK_LINER_RANGE1; PM853_BUCK_LINER_RANGE2; PM853_LDO_LINER_RANGE1; PM853_LDO_LINER_RANGE2;
 PM853_LDO_LINER_RANGE3; PM853_LDO_LINER_RANGE4; PM853_SWITCH_LINER_RANGE;
 PM853_REGULATOR_BUCK_DESC; PM853_REGULATOR_LDO_DESC; PM853_REGULATOR_SWITCH_DESC;
+PM853_REGULATOR_MATCH_DATA;
+
+SY8810L_BUCK_LINER_RANGE; SY8810L_REGULATOR_DESC; SY8810L_REGULATOR_MATCH_DATA;
 
 /**
  * linear_range_get_value - fetch a value from given range
@@ -194,16 +198,9 @@ static int regulator_map_voltage_linear_range(const struct pm8xx_buck_desc *desc
 static const struct pm8xx_buck_desc *get_buck_reg(struct udevice *pmic, int num)
 {
 	struct pm8xx_priv *priv = dev_get_priv(pmic);
+	struct regulator_match_data *math = (struct regulator_match_data *)priv->match;
 
-	switch (priv->variant) {
-	case SPACEMIT_SPM8821_ID:
-		return &spm8821_buck_desc[num];
-	case SPACEMIT_PM853_ID:
-		return &pm853_buck_desc[num];
-	default:
-		debug("do not support this varaint: %d\n", priv->variant);
-		break;
-	}
+	return math->buck_desc + num;
 
 	return NULL;
 }
@@ -382,16 +379,9 @@ U_BOOT_DRIVER(pm8xx_buck) = {
 static const struct pm8xx_buck_desc *get_ldo_reg(struct udevice *pmic, int num)
 {
 	struct pm8xx_priv *priv = dev_get_priv(pmic);
+	struct regulator_match_data *math = (struct regulator_match_data *)priv->match;
 
-	switch (priv->variant) {
-	case SPACEMIT_SPM8821_ID:
-		return &spm8821_ldo_desc[num];
-	case SPACEMIT_PM853_ID:
-		return &pm853_ldo_desc[num];
-	default:
-		debug("do not support this varaint: %d\n", priv->variant);
-		break;
-	}
+	return math->ldo_desc + num;
 
 	return NULL;
 }
@@ -572,16 +562,9 @@ U_BOOT_DRIVER(pm8xx_ldo) = {
 static const struct pm8xx_buck_desc *get_switch_reg(struct udevice *pmic, int num)
 {
 	struct pm8xx_priv *priv = dev_get_priv(pmic);
+	struct regulator_match_data *math = (struct regulator_match_data *)priv->match;
 
-	switch (priv->variant) {
-	case SPACEMIT_SPM8821_ID:
-		return &spm8821_switch_desc[num];
-	case SPACEMIT_PM853_ID:
-		return &pm853_switch_desc[num];
-	default:
-		debug("do not support this varaint: %d\n", priv->variant);
-		break;
-	}
+	return math->switch_desc + num;
 
 	return NULL;
 }

@@ -659,4 +659,10 @@ config SPACEMIT_ONBOARD_USB_HUB
 	  Say Y here if you want to support onboard usb hubs on Spacemit
 	  platform. If unsure, say Y when compile for Spacemit platform.
 
+config SPACEMIT_K1X_EFUSE
+	bool "Spacemit K1x soc eFUSE operation support"
+	depends on MISC
+	help
+	  This enable efuse read/porgram support, on Spacemit K1x SoCs.
+
 endmenu

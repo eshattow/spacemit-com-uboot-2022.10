@@ -37,6 +37,8 @@ static int _write_gpt_partition(struct flash_dev *fdev, char *response)
 	__maybe_unused char write_part_command[300] = {"\0"};
 	char *gpt_table_str = NULL;
 
+	u32 boot_mode = get_boot_pin_select();
+
 	if (fdev->gptinfo.gpt_table != NULL && strlen(fdev->gptinfo.gpt_table) > 0){
 		gpt_table_str = malloc(strlen(fdev->gptinfo.gpt_table) + 32);
 		if (gpt_table_str == NULL){
@@ -47,16 +49,22 @@ static int _write_gpt_partition(struct flash_dev *fdev, char *response)
 		free(gpt_table_str);
 	}
 
+	switch(boot_mode){
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
 		sprintf(write_part_command, "gpt write mmc %x '%s'",
 			CONFIG_FASTBOOT_FLASH_MMC_DEV, fdev->gptinfo.gpt_table);
 		if (run_command(write_part_command, 0)){
 			fastboot_fail("write gpt fail", response);
 			return -1;
 		}
+		break;
 #endif
 
 #if CONFIG_IS_ENABLED(FASTBOOT_SUPPORT_BLOCK_DEV)
+	case BOOT_MODE_NOR:
+	case BOOT_MODE_NAND:
 		printf("write gpt to dev:%s\n", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME);
 
 		/*nvme need scan at first*/
@@ -67,13 +75,18 @@ static int _write_gpt_partition(struct flash_dev *fdev, char *response)
 		}
 
 		sprintf(write_part_command, "gpt write %s %x '%s'",
-			CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM,
+			CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX,
 			fdev->gptinfo.gpt_table);
 		if (run_command(write_part_command, 0)){
 			fastboot_fail("write gpt fail", response);
 			return -1;
 		}
+		break;
 #endif
+	default:
+		break;
+	}
+
 
 	fastboot_okay("parse gpt/mtd table okay", response);
 	return 0;
@@ -114,7 +127,7 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 			int ret;
 			ret = fb_mtd_lookup("env", &mtd, &part);
 			if (ret) {
-				pr_err("invalid mtd device");
+				pr_err("invalid mtd device\n");
 				return -1;
 			}
 			ret = _fb_mtd_erase(mtd, part);
@@ -161,9 +174,8 @@ static int _write_mtd_partition(char mtd_table[128], char *response)
 
 	env_set("mtdids", mtd_ids);
 	env_set("mtdparts", mtd_parts);
-
-	fastboot_okay("parse gpt/mtd table okay", response);
 #endif
+	fastboot_okay("parse gpt/mtd table okay", response);
 	return 0;
 }
 

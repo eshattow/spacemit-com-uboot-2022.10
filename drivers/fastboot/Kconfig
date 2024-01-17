@@ -262,7 +262,7 @@ config FASTBOOT_SUPPORT_BLOCK_DEV_NAME
 	help
 	  The block device name, such as mmc/nvme/usb/sata
 
-config FASTBOOT_SUPPORT_BLOCK_DEV_NUM
+config FASTBOOT_SUPPORT_BLOCK_DEV_INDEX
 	int "The block device number"
 	depends on FASTBOOT_SUPPORT_BLOCK_DEV
 	default 0

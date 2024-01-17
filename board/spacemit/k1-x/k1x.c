@@ -196,10 +196,10 @@ void import_env_from_bootfs(void)
 		if (strlen(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME) > 0){
 			/* First try partition names on the default device */
 			dev_desc = blk_get_dev(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
-								CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM);
+								CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX);
 			if (dev_desc) {
 				_load_env_from_blk(dev_desc, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
-							CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM);
+							CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX);
 			}
 	}
 #endif
@@ -274,7 +274,7 @@ void setenv_boot_mode(void)
 	case BOOT_MODE_NOR:
 		env_set("boot_device", "nor");
 #ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
-		env_set("boot_devnum", simple_itoa(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NUM));
+		env_set("boot_devnum", simple_itoa(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX));
 #endif
 		break;
 	case BOOT_MODE_EMMC:
@@ -293,7 +293,7 @@ void setenv_boot_mode(void)
 
 void read_from_eeprom(struct tlvinfo_tlv **tlv_data, u8 tcode)
 {
-	u8 eeprom_data[256];
+	static u8 eeprom_data[256];
 	struct tlvinfo_header *tlv_hdr = NULL;
 	struct tlvinfo_tlv *tlv_entry;
 	unsigned int tlv_offset, tlv_len;
@@ -479,6 +479,7 @@ int board_late_init(void)
 {
 	ulong kernel_start;
 	ofnode chosen_node;
+	char ram_size_str[16] = {"\0"};
 	int ret;
 
 	if (IS_ENABLED(CONFIG_SYSRESET_SPACEMIT))
@@ -508,6 +509,10 @@ int board_late_init(void)
 
 	/*read from eeprom and update info to env*/
 	refresh_config_info();
+
+	/*save ram size to env, transfer to MB*/
+	sprintf(ram_size_str, "mem=%dMB", (int)(gd->ram_size / SZ_1MB));
+	env_set("ram_size", ram_size_str);
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
@@ -591,12 +596,7 @@ int dram_init(void)
 	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
 
 	gd->ram_base = CONFIG_SYS_SDRAM_BASE;
-
-	if(dram_size > SZ_2GB) {
-		gd->ram_size = SZ_2GB;
-	} else {
-		gd->ram_size = dram_size;
-	}
+	gd->ram_size = dram_size;
 
 	return 0;
 }

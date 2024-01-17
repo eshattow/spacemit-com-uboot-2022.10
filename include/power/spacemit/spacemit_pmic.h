@@ -2,9 +2,10 @@
 #define __SPACEMIT_PMIC_H__
 
 #include <linux/kernel.h>
+struct regulator_match_data;
 
 struct pm8xx_priv {
-	int variant;
+	struct regulator_match_data *match;
 };
 
 struct pm8xx_linear_range {
@@ -25,6 +26,18 @@ struct pm8xx_buck_desc {
 	int vsel_sleep_msk;
 	int n_linear_ranges;
 	const struct pm8xx_linear_range *linear_ranges;
+};
+
+/* regulator: match data */
+struct regulator_match_data {
+        int nr_buck_desc;
+        const struct pm8xx_buck_desc *buck_desc;
+        int nr_ldo_desc;
+        const struct pm8xx_buck_desc *ldo_desc;
+        int nr_switch_desc;
+        const struct pm8xx_buck_desc *switch_desc;
+	int max_registers;
+        const char *name;
 };
 
 /* Initialize struct linear_range for regulators */
@@ -54,5 +67,6 @@ struct pm8xx_buck_desc {
 
 #include "spm8821.h"
 #include "pm853.h"
+#include "sy8810l.h"
 
 #endif /* __SPACEMIT_PMIC_H__ */

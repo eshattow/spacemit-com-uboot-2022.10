@@ -402,10 +402,3 @@ config DM_REGULATOR_SPM8XX
 	help
 	This config enables implementation of driver-model regulator uclass
 	features for regulators on spm8xx & pm8xx PMICs.
-
-config SPL_DM_REGULATOR_SPM8XX
-	bool "Enable Driver Model for SPM8XX regulators in SPL"
-	depends on SPL_PMIC_SPM8XX && SPL
-	help
-	This config enables implementation of driver-model regulator uclass
-	features for regulators on spm8xx & pm8xx in SPL.

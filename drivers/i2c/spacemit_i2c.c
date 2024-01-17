@@ -340,79 +340,86 @@ static int __i2c_write(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen
 	return 0;
 }
 
-#ifndef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
 
-static struct spacemit_i2c *base_glob;
+#define SPACEMIT_APBC_BASE		0xd4015000	/* APB Clock Unit */
+#define REG_APBC_APBC_TWSI0_CLK_RST	(SPACEMIT_APBC_BASE + 0x2c)
+#define REG_APBC_APBC_TWSI1_CLK_RST	(SPACEMIT_APBC_BASE + 0x30)
+#define REG_APBC_APBC_TWSI2_CLK_RST	(SPACEMIT_APBC_BASE + 0x38)
+#define REG_APBC_APBC_TWSI3_CLK_RST	(0xf0610000    + 0x08)
+#define REG_APBC_APBC_TWSI4_CLK_RST	(SPACEMIT_APBC_BASE + 0x40)
+#define REG_APBC_APBC_TWSI5_CLK_RST	(SPACEMIT_APBC_BASE + 0x4c)
+#define REG_APBC_APBC_TWSI6_CLK_RST	(SPACEMIT_APBC_BASE + 0x60)
+#define REG_APBC_APBC_TWSI7_CLK_RST	(SPACEMIT_APBC_BASE + 0x68)
+#define REG_APBC_APBC_TWSI8_CLK_RST	(SPACEMIT_APBC_BASE + 0x20)
 
-static void i2c_board_init(struct spacemit_i2c *base)
+typedef enum {
+	I2C_FUNCLK_33MHz = 0,	/*up to 3.4M bps for HS */
+	I2C_FUNCLK_52MHz = 1,
+	I2C_FUNCLK_62P4MHz = 2,	/*up to 1.8M bps for HS */
+} I2C_FUNCTION_CLK;
+
+static struct spacemit_i2c *i2c_base[] = {
+	(struct spacemit_i2c *)0xd4010800,
+	(struct spacemit_i2c *)0xd4011000,
+	(struct spacemit_i2c *)0xd4011200,
+	(struct spacemit_i2c *)0xf0614000,
+	(struct spacemit_i2c *)0xd4012800,
+	(struct spacemit_i2c *)0xd4013800,
+	(struct spacemit_i2c *)0xd4018800,
+	(struct spacemit_i2c *)0xd401d000,
+	(struct spacemit_i2c *)0xd401d800,
+};
+
+static uint32_t apbc_clk_reg[] = {
+	REG_APBC_APBC_TWSI0_CLK_RST,
+	REG_APBC_APBC_TWSI1_CLK_RST,
+	REG_APBC_APBC_TWSI2_CLK_RST,
+	REG_APBC_APBC_TWSI3_CLK_RST,
+	REG_APBC_APBC_TWSI4_CLK_RST,
+	REG_APBC_APBC_TWSI5_CLK_RST,
+	REG_APBC_APBC_TWSI6_CLK_RST,
+	REG_APBC_APBC_TWSI7_CLK_RST,
+	REG_APBC_APBC_TWSI8_CLK_RST,
+};
+
+static inline void mmio_write_32(uintptr_t addr, uint32_t val)
 {
-#ifdef CONFIG_SYS_I2C_INIT_BOARD
-	u32 icr;
-	/*
-	 * call board specific i2c bus reset routine before accessing the
-	 * environment, which might be in a chip on that bus. For details
-	 * about this problem see doc/I2C_Edge_Conditions.
-	 *
-	 * disable I2C controller first, otherwhise it thinks we want to
-	 * talk to the slave port...
-	 */
-	icr = readl(&base->icr);
-	writel(readl(&base->icr) & ~(ICR_SCLE | ICR_IUE), &base->icr);
-
-	i2c_init_board();
-
-	writel(icr, &base->icr);
-#endif
+	*(volatile uint32_t *)addr = val;
+}
+static inline uint32_t mmio_read_32(uintptr_t addr)
+{
+	return *(volatile uint32_t *)addr;
 }
 
-#ifdef CONFIG_I2C_MULTI_BUS
-static unsigned long i2c_regs[CONFIG_SPACEMIT_I2C_NUM] = CONFIG_SPACEMIT_I2C_REG;
-static unsigned int bus_initialized[CONFIG_SPACEMIT_I2C_NUM];
-static unsigned int current_bus;
-
-int i2c_set_bus_num(unsigned int bus)
+void i2c_init_board(void)
 {
-	if ((bus < 0) || (bus >= CONFIG_SPACEMIT_I2C_NUM)) {
-		printf("Bad bus: %d\n", bus);
-		return -1;
+	int i = 0;
+
+	mmio_write_32(0xd4051024, (*(unsigned int *)0xd4051024) | (1 << 6));
+	mmio_write_32(0xd4090104, (*(unsigned int *)0xd4090104) | (1 << 4));
+	mmio_write_32(0xd4090108, (*(unsigned int *)0xd4090108) | (1 << 31));
+
+	mmio_write_32(0xd401e228, (*(unsigned int *)0xd401e228) | (1 << 1));
+        mmio_write_32(0xd401e22c, (*(unsigned int *)0xd401e22c) | (1 << 1));
+	/* init the clk & reset or pinctrl */
+	for (i = 0; i < sizeof(apbc_clk_reg) / sizeof(apbc_clk_reg[0]); ++i) {
+		mmio_write_32(apbc_clk_reg[i], (I2C_FUNCLK_33MHz << 4) | 0x4);
+		mmio_write_32(apbc_clk_reg[i], (I2C_FUNCLK_33MHz << 4) | 0x7);
+		mmio_write_32(apbc_clk_reg[i], (I2C_FUNCLK_33MHz << 4) | 0x3);
 	}
-
-	base_glob = (struct spacemit_i2c *)i2c_regs[bus];
-	current_bus = bus;
-
-	if (!bus_initialized[current_bus]) {
-		i2c_board_init(base_glob);
-		bus_initialized[current_bus] = 1;
-	}
-
-	return 0;
 }
 
-unsigned int i2c_get_bus_num(void)
-{
-	return current_bus;
-}
-#endif
-
-/* API Functions */
-void i2c_init(int speed, int slaveaddr)
+static void __i2c_init_chip(struct spacemit_i2c *base, int speed, int slaveaddr)
 {
 	u32 val;
-
-#ifdef CONFIG_I2C_MULTI_BUS
-	current_bus = 0;
-	base_glob = (struct spacemit_i2c *)i2c_regs[current_bus];
-#else
-	base_glob = (struct spacemit_i2c *)CONFIG_SPACEMIT_I2C_REG;
-#endif
 
 	if (speed > 100000)
 		val = ICR_FM;
 	else
 		val = ICR_SM;
-	clrsetbits_le32(&base_glob->icr, ICR_MODE_MASK, val);
 
-	i2c_board_init(base_glob);
+	clrsetbits_le32(&base->icr, ICR_MODE_MASK, val);
 }
 
 static int __i2c_probe_chip(struct spacemit_i2c *base, uchar chip)
@@ -438,15 +445,17 @@ static int __i2c_probe_chip(struct spacemit_i2c *base, uchar chip)
 	return 0;
 }
 
-/*
- * i2c_probe: - Test if a chip answers for a given i2c address
- *
- * @chip:	address of the chip which is searched for
- * @return:	0 if a chip was found, -1 otherwhise
- */
-int i2c_probe(uchar chip)
+static void spacemit_i2c_init(struct i2c_adapter *adap, int speed, int slaveadd)
 {
-	return __i2c_probe_chip(base_glob, chip);
+	__i2c_init_chip(i2c_base[adap->hwadapnr], speed, slaveadd);
+}
+
+/*
+ * spacemit_i2c_probe: - Test if a chip answers for a given i2c address
+ */
+static int spacemit_i2c_probe(struct i2c_adapter *adap, uchar chip)
+{
+	return __i2c_probe_chip(i2c_base[adap->hwadapnr], chip);
 }
 
 /*
@@ -462,7 +471,7 @@ int i2c_probe(uchar chip)
  * @len:       how much byte do we want to read
  * @return:    0 in case of success
  */
-int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len)
+static int spacemit_i2c_read(struct i2c_adapter *adap, uchar chip, uint addr, int alen, uchar *buffer, int len)
 {
 	u8 addr_bytes[4];
 
@@ -471,11 +480,11 @@ int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len)
 	addr_bytes[2] = (addr >> 16) & 0xFF;
 	addr_bytes[3] = (addr >> 24) & 0xFF;
 
-	return __i2c_read(base_glob, chip, addr_bytes, alen, buffer, len);
+	return __i2c_read(i2c_base[adap->hwadapnr], chip, addr_bytes, alen, buffer, len);
 }
 
 /*
- * i2c_write: -  Write multiple bytes to an i2c device
+ * spacemit_i2c_write: -  Write multiple bytes to an i2c device
  *
  * The higher level routines take into account that this function is only
  * called with len < page length of the device (see configuration file)
@@ -487,7 +496,7 @@ int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len)
  * @len:	how much byte do we want to read
  * @return:	0 in case of success
  */
-int i2c_write(uchar chip, uint addr, int alen, uchar *buffer, int len)
+static int spacemit_i2c_write(struct i2c_adapter *adap, uchar chip, uint addr, int alen, uchar *buffer, int len)
 {
 	u8 addr_bytes[4];
 
@@ -496,10 +505,46 @@ int i2c_write(uchar chip, uint addr, int alen, uchar *buffer, int len)
 	addr_bytes[2] = (addr >> 16) & 0xFF;
 	addr_bytes[3] = (addr >> 24) & 0xFF;
 
-	return __i2c_write(base_glob, chip, addr_bytes, alen, buffer, len);
+	return __i2c_write(i2c_base[adap->hwadapnr], chip, addr_bytes, alen, buffer, len);
 }
 
-#else /* CONFIG_DM_I2C */
+U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c0, spacemit_i2c_init, spacemit_i2c_probe,
+		spacemit_i2c_read, spacemit_i2c_write,
+		NULL, 100000, 0x31,
+		0);
+U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c1, spacemit_i2c_init, spacemit_i2c_probe,
+		spacemit_i2c_read, spacemit_i2c_write,
+		NULL, 100000, 0x31,
+		1);
+U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c2, spacemit_i2c_init, spacemit_i2c_probe,
+		spacemit_i2c_read, spacemit_i2c_write,
+		NULL, 100000, 0x31,
+		2);
+U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c3, spacemit_i2c_init, spacemit_i2c_probe,
+		spacemit_i2c_read, spacemit_i2c_write,
+		NULL, 100000, 0x31,
+		3);
+U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c4, spacemit_i2c_init, spacemit_i2c_probe,
+		spacemit_i2c_read, spacemit_i2c_write,
+		NULL, 100000, 0x31,
+		4);
+U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c5, spacemit_i2c_init, spacemit_i2c_probe,
+		spacemit_i2c_read, spacemit_i2c_write,
+		NULL, 100000, 0x31,
+		5);
+U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c6, spacemit_i2c_init, spacemit_i2c_probe,
+		spacemit_i2c_read, spacemit_i2c_write,
+		NULL, 100000, 0x50,
+		6);
+U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c7, spacemit_i2c_init, spacemit_i2c_probe,
+		spacemit_i2c_read, spacemit_i2c_write,
+		NULL, 100000, 0x31,
+		7);
+U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c8, spacemit_i2c_init, spacemit_i2c_probe,
+		spacemit_i2c_read, spacemit_i2c_write,
+		NULL, 100000, 0x31,
+		8);
+#else /* SYS_I2C_LEGACY */
 
 struct spacemit_i2c_priv {
 	struct spacemit_i2c *base;
@@ -581,7 +626,6 @@ static int spacemit_i2c_probe(struct udevice *bus)
                 return ret;
         }
 #endif
-
 	priv->base = (void *)devfdt_get_addr_ptr(bus);
 	ret = dev_read_u32(bus, "clock-frequency", &priv->clk_rate);
         if (ret) {

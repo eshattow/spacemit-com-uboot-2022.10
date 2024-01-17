@@ -247,17 +247,6 @@ enum qpsi_cs {
 	QSPI_CS_MAX,
 };
 
-enum qspi_clock_sel {
-	QSPI_FUNC_CLK_26MHZ = 0,
-	QSPI_FUNC_CLK_52MHZ,
-	QSPI_FUNC_CLK_78MHZ,
-	QSPI_FUNC_CLK_104MHZ,
-	QSPI_FUNC_CLK_156MHZ,
-	QSPI_FUNC_CLK_208MHZ,
-	QSPI_FUNC_CLK_312MHZ,
-	QSPI_FUNC_CLK_416MHZ,
-};
-
 enum qpsi_mode {
 	QSPI_NORMAL_MODE = 0,
 	QSPI_DISABLE_MODE,
@@ -282,91 +271,33 @@ static u32 qspi_readl(struct k1x_qspi *qspi, void __iomem *addr)
 
 static void qspi_set_func_clk(struct k1x_qspi *qspi)
 {
-	u32 clk_sel;
-	u32 freq;
-	u32 tmp;
-	void __iomem * mpmu_acgr;
-	void __iomem * pmuap_reg;
-
-	/* MPMU regs */
-	mpmu_acgr = (void __iomem *) (PMUA_QSPI_CLK_RES_CTRL);
-
-	/* qspi clock is divided by 4 in PMUap */
-	freq = qspi->max_hz << 2;
-	if (freq >= 416000000)
-		clk_sel = QSPI_FUNC_CLK_416MHZ;
-	else if (freq >= 312000000)
-		clk_sel = QSPI_FUNC_CLK_312MHZ;
-	else if (freq >= 208000000) {
-		clk_sel = QSPI_FUNC_CLK_208MHZ;
-		tmp = readl(mpmu_acgr);
-		writel(tmp | 1 << 5, mpmu_acgr);
-	} else if (freq >= 156000000)
-		clk_sel = QSPI_FUNC_CLK_156MHZ;
-	else if (freq >= 104000000) {
-		clk_sel = QSPI_FUNC_CLK_104MHZ;
-		tmp = readl(mpmu_acgr);
-		writel(tmp | 1 << 12, mpmu_acgr);
-	} else if (freq >= 78000000)
-		clk_sel = QSPI_FUNC_CLK_78MHZ;
-	else if (freq >= 52000000) {
-		clk_sel = QSPI_FUNC_CLK_52MHZ;
-		tmp = readl(mpmu_acgr);
-		writel(tmp | 1 << 11, mpmu_acgr);
-	} else
-		clk_sel = QSPI_FUNC_CLK_26MHZ;
-
-	/* TODO: FPGA clk_sel = QSPI_FUNC_CLK_26MHZ */
-	pmuap_reg = (void __iomem *)((unsigned long)qspi->pmuap_reg);
-
     reset_assert_bulk(&qspi->resets);
     clk_disable(&qspi->bus_clk);
     clk_disable(&qspi->clk);
 
-	/* change clock select */
-    tmp = readl(pmuap_reg);
-	tmp |= (QSPI_CLK_SEL(clk_sel) & QSPI_CLK_SEL_MASK);
-    writel(tmp, pmuap_reg);
-
-    clk_enable(&qspi->clk);
-    clk_enable(&qspi->bus_clk);
+	clk_enable(&qspi->bus_clk);
+	clk_set_rate(&qspi->clk, qspi->max_hz);
+	clk_enable(&qspi->clk);
     reset_deassert_bulk(&qspi->resets);
-
-	dev_dbg(qspi->dev, "bus clock: %dHz, PMUap reg[0x%08x]:0x%08x\n",
-			qspi->max_hz, qspi->pmuap_reg, readl(pmuap_reg));
 }
 
-static void qspi_config_mfp(struct k1x_qspi *qspi)
-{
-	/*
-	 * the pinctrl module is responsible for the setting of the mfp pin,
-	 * keeping the current function for pre-silicon stage verification.
-	 */
-#if 0
-	int cs = qspi->cs_selected;
-
-	if (cs == QSPI_CS_A1 || cs == QSPI_CS_A2) {
-		writel(0xd000, AIBMFPR_QSPI_DAT3); // QSPI_DAT3
-		writel(0xd000, AIBMFPR_QSPI_DAT2); // QSPI_DAT2
-		writel(0x1000, AIBMFPR_QSPI_DAT1); // QSPI_DAT1
-		writel(0x1000, AIBMFPR_QSPI_DAT0); // QSPI_DAT0
-		writel(0x1000, AIBMFPR_QSPI_CLK); // QSPI_CLK
-		writel(0xd000, AIBMFPR_QSPI_CS1); // QSPI_CS1
-
-		dev_info(qspi->dev, "config mfp for cs:[%d]\n", cs);
-	}
-#endif
-}
-
-static void qspi_reset(struct k1x_qspi *qspi)
+static int qspi_reset(struct k1x_qspi *qspi)
 {
 	uint32_t reg, sr, fr;
+	int count = 0;
+
 	do {
 		sr = qspi_readl(qspi, qspi->iobase + QSPI_SR);
 		fr = qspi_readl(qspi, qspi->iobase + QSPI_FR);
 		if (!(sr & QSPI_SR_BUSY) && !(fr & QSPI_FR_XIP_ON))
 			break;
-         } while(1);
+		mdelay(3);
+	} while(count++ < 1000);
+
+	if (count >= 1000) {
+		dev_err(qspi->dev, "reset failed\r\n");
+		return -1;
+	}
 
 	/* qspi softreset first */
 	reg = qspi_readl(qspi, qspi->iobase + QSPI_MCR);
@@ -379,6 +310,8 @@ static void qspi_reset(struct k1x_qspi *qspi)
 	udelay(1);
 	reg &= ~(QSPI_MCR_SWRSTHD_MASK | QSPI_MCR_SWRSTSD_MASK);
 	qspi_writel(qspi, reg, qspi->iobase + QSPI_MCR);
+
+	return 0;
 }
 
 
@@ -395,9 +328,10 @@ static void qspi_enter_mode(struct k1x_qspi *qspi, uint32_t mode)
 }
 
 
-static void qspi_write_sfar(struct k1x_qspi *qspi, uint32_t val)
+static int qspi_write_sfar(struct k1x_qspi *qspi, uint32_t val)
 {
 	uint32_t fr;
+	int count = 0;
 
 	do {
 		qspi_writel(qspi, val, qspi->iobase + QSPI_SFAR);
@@ -407,7 +341,16 @@ static void qspi_write_sfar(struct k1x_qspi *qspi, uint32_t val)
 
 		fr &= QSPI_FR_IPIEF;
 		qspi_writel(qspi, fr, qspi->iobase + QSPI_FR);
-	} while (1);
+
+		mdelay(3);
+	} while (count++ < 1000);
+
+	if (count >= 1000) {
+		dev_err(qspi->dev, "write sfar failed\r\n");
+		return -1;
+	}
+
+	return 0;
 }
 
 
@@ -415,9 +358,10 @@ static void qspi_write_sfar(struct k1x_qspi *qspi, uint32_t val)
  * IP Command Trigger could not be executed Error Flag may happen for write
  * access to RBCT/SFAR register, need retry for these two register
  */
-static void qspi_write_rbct(struct k1x_qspi *qspi, uint32_t val)
+static int qspi_write_rbct(struct k1x_qspi *qspi, uint32_t val)
 {
 	uint32_t fr;
+	int count = 0;
 
 	do {
 		qspi_writel(qspi, val, qspi->iobase + QSPI_RBCT);
@@ -426,7 +370,16 @@ static void qspi_write_rbct(struct k1x_qspi *qspi, uint32_t val)
 			break;
 		fr &= QSPI_FR_IPIEF;
 		qspi_writel(qspi, fr, qspi->iobase + QSPI_FR);
-	} while (1);
+
+		mdelay(3);
+	} while (count++ < 1000);
+
+	if (count >= 1000) {
+		dev_err(qspi->dev, "write sfar rbct\r\n");
+		return -1;
+	}
+
+	return 0;
 }
 
 void qspi_init_ahbread(struct k1x_qspi *qspi, int seq_id)
@@ -747,7 +700,10 @@ static int k1x_qspi_exec_op(struct spi_slave *slave,
 	qspi_writel(qspi, reg, base + QSPI_SPTRCLR);
 
 	/* set the flash address into the QSPI_SFAR */
-	qspi_write_sfar(qspi, qspi->memmap_phy + op->addr.val);
+	err = qspi_write_sfar(qspi, qspi->memmap_phy + op->addr.val);
+	if (err) {
+		return err;
+	}
 
 	/* clear QSPI_FR before trigger LUT command */
 	reg = qspi_readl(qspi, base + QSPI_FR);
@@ -869,15 +825,16 @@ static int k1x_qspi_host_init(struct k1x_qspi *qspi)
 {
 	void __iomem *base = qspi->iobase;
 	u32 reg;
-
-	/* config mfp */
-	qspi_config_mfp(qspi);
+	int ret = 0;
 
 	/* set PMUap */
 	qspi_set_func_clk(qspi);
 
 	/* rest qspi */
-	qspi_reset(qspi);
+	ret = qspi_reset(qspi);
+	if (ret < 0) {
+		goto dis_clk;
+	}
 
 	/* clock settings */
 	qspi_enter_mode(qspi, QSPI_DISABLE_MODE);
@@ -892,7 +849,10 @@ static int k1x_qspi_host_init(struct k1x_qspi *qspi)
 	qspi_writel(qspi, 0x8, base + QSPI_SOCCR);
 
 	/* Give the default source address */
-	qspi_write_sfar(qspi, qspi->memmap_phy);
+	ret = qspi_write_sfar(qspi, qspi->memmap_phy);
+	if (ret < 0) {
+		goto dis_clk;
+	}
 	qspi_writel(qspi, 0x0, base + QSPI_SFACR);
 
 	 /* config ahb read */
@@ -913,7 +873,10 @@ static int k1x_qspi_host_init(struct k1x_qspi *qspi)
 	qspi_enter_mode(qspi, QSPI_NORMAL_MODE);
 
 	/* Read using the IP Bus registers QSPI_RBDR0 to QSPI_RBDR31*/
-	qspi_write_rbct(qspi, QSPI_RBCT_RXBRD_MASK);
+	ret = qspi_write_rbct(qspi, QSPI_RBCT_RXBRD_MASK);
+	if (ret < 0) {
+		goto dis_clk;
+	}
 
 	/* clear all interrupt status */
 	qspi_writel(qspi, 0xffffffff, base + QSPI_FR);
@@ -921,15 +884,19 @@ static int k1x_qspi_host_init(struct k1x_qspi *qspi)
 	dev_dbg(qspi->dev, "dump registers after qspi host init\n");
 	qspi_dump_reg(qspi);
 	return 0;
+
+dis_clk:
+	reset_assert_bulk(&qspi->resets);
+	clk_disable(&qspi->bus_clk);
+	clk_disable(&qspi->clk);
+	return ret;
 }
 
 static int k1x_qspi_probe(struct udevice *bus)
 {
 	struct k1x_qspi *host = dev_get_priv(bus);
 
-	k1x_qspi_host_init(host);
-
-	return 0;
+	return k1x_qspi_host_init(host);
 }
 
 static int k1x_qspi_claim_bus(struct udevice *dev)

@@ -79,7 +79,7 @@ struct flash_dev {
 
 /**
  * @brief boot info struct
- * 
+ *
  */
 struct boot_parameter_info {
 	uint32_t magic_code;
@@ -111,27 +111,27 @@ struct boot_parameter_info {
 
 /**
  * @brief Set the boot mode object, it would set boot mode to register
- * 
- * @param boot_mode 
+ *
+ * @param boot_mode
  */
-void set_boot_mode(u32 boot_mode);
+void set_boot_mode(enum board_boot_mode boot_mode);
 
 /**
  * @brief Get the boot mode object, it would get boot mode from register,
  * the register would save boot_mode while boot from emmc/nor/nand success.
  * if not set boot mode, it would return get_boot_pin_select.
- * 
- * @return u32 
+ *
+ * @return u32
  */
-u32 get_boot_mode(void);
+enum board_boot_mode get_boot_mode(void);
 
 /**
  * @brief Get the boot pin select object. it would get boot pin select,
  * which is different from get_boot_mode.
- * 
- * @return u32 
+ *
+ * @return u32
  */
-u32 get_boot_pin_select(void);
+enum board_boot_mode get_boot_pin_select(void);
 
 
 /**
@@ -188,12 +188,12 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr);
 
 /**
  * @brief update env to storage.
- * 
- * @param download_buffer 
- * @param download_bytes 
- * @param response 
- * @param fdev 
- * @return int 
+ *
+ * @param download_buffer
+ * @param download_bytes
+ * @param response
+ * @param fdev
+ * @return int
  */
 int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 								 struct flash_dev *fdev);
@@ -214,7 +214,7 @@ void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download
 /**
  * @brief flash bootinfo to reserve partition.
  *
- * @param cmd 
+ * @param cmd
  * @param download_buffer load env.bin to addr
  * @param download_bytes env.bin size
  * @param response
@@ -226,12 +226,12 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 dow
 
 /**
  * @brief flash mmc boot option
- * 
- * @param dev_desc 
- * @param buffer 
- * @param hwpart 
- * @param buff_sz 
- * @return int 
+ *
+ * @param dev_desc
+ * @param buffer
+ * @param hwpart
+ * @param buff_sz
+ * @return int
  */
 int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 							int hwpart, u32 buff_sz, u32 offset);

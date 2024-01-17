@@ -9,6 +9,7 @@
 #include <spl.h>
 #include <misc.h>
 #include <log.h>
+#include <i2c.h>
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -53,12 +54,26 @@ void fix_boot_mode(void)
         set_boot_mode(get_boot_storage());
 }
 
+#if CONFIG_IS_ENABLED(SPACEMIT_POWER)
+extern int board_pmic_init(void);
+#endif
+
 int spl_board_init_f(void)
 {
     int ret;
     struct udevice *dev;
 
     debug("%s\n", __FUNCTION__);
+
+    /* init i2c */
+#if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
+    i2c_init_board();
+#endif
+
+#if CONFIG_IS_ENABLED(SPACEMIT_POWER)
+    board_pmic_init();
+#endif
+
     /* DDR init */
     ret = uclass_get_device(UCLASS_RAM, 0, &dev);
     if (ret) {
