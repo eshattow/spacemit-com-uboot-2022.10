@@ -12,13 +12,11 @@
 	memory@0 {
 		device_type = "memory";
 		reg = <0x00000000 0x00000000 0x00000000 0x80000000>;
-		u-boot,dm-spl;
 	};
 
 	chosen {
 		bootargs = "earlycon=sbi console=ttyS0,115200 debug loglevel=8,initcall_debug=1 rdinit=/init.tmp";
 		stdout-path = "serial0:115200n8";
-		u-boot,dm-spl;
 	};
 };
 
@@ -52,21 +50,20 @@
 
 &i2c2 {
 	#address-cells = <1>;
-        #size-cells = <0>;
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_i2c2_0>;
-        status = "okay";
+	#size-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c2_0>;
+	status = "okay";
 
-        eeprom@50{
-                compatible = "atmel,24c02";
-                reg = <0x50>;
-                vin-supply-names = "eeprom_1v8";
-                status = "okay";
-        };
+	eeprom@50{
+		compatible = "atmel,24c02";
+		reg = <0x50>;
+		vin-supply-names = "eeprom_1v8";
+		status = "okay";
+	};
 };
 
 &i2c3 {
-	/* SEC_I2C */
 	status = "disabled";
 };
 
@@ -80,7 +77,7 @@
 };
 
 &i2c6 {
-        status = "disabled";
+	status = "disabled";
 };
 
 &i2c7 {
@@ -88,29 +85,23 @@
 };
 
 &i2c8 {
-	/* PWR_I2C */
 	clock-frequency = <100000>;
-	u-boot,dm-spl;
 	status = "okay";
 
 	spm8821: pmic@41 {
 		compatible = "spacemit,spm8821";
 		reg = <0x41>;
 		bus = <8>;
-		u-boot,dm-spl;
 
 		regulators {
-			/* buck */
 			dcdc_1: DCDC_REG1 {
 				regulator-name = "dcdc1";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3450000>;
 				regulator-init-microvolt = <950000>;
 				regulator-boot-on;
-				u-boot,dm-spl;
 				regulator-state-mem {
 					regulator-off-in-suspend;
-					u-boot,dm-spl;
 				};
 			};
 
@@ -144,7 +135,6 @@
 				regulator-max-microvolt = <3450000>;
 			};
 
-			/* aldo */
 			ldo_1: LDO_REG1 {
 				regulator-name = "ldo1";
 				regulator-min-microvolt = <500000>;
@@ -169,7 +159,6 @@
 				regulator-max-microvolt = <3400000>;
 			};
 
-			/* dldo */
 			ldo_5: LDO_REG5 {
 				regulator-name = "ldo5";
 				regulator-min-microvolt = <500000>;
@@ -369,17 +358,16 @@
 };
 
 &qspi {
-        status = "okay";
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_qspi>;
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_qspi>;
 
-        flash@0 {
-                compatible = "jedec,spi-nor";
-                reg = <0>;
-                spi-max-frequency = <26500000>;
-                m25p,fast-read;
-                broken-flash-reset;
-                u-boot,dm-spl;
-                status = "okay";
-        };
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <26500000>;
+		m25p,fast-read;
+		broken-flash-reset;
+		status = "okay";
+	};
 };
