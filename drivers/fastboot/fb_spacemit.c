@@ -28,6 +28,7 @@
 #include <fb_mtd.h>
 #include <nvme.h>
 #include <tlv_eeprom.h>
+#include <misc.h>
 
 #define EMMC_MAX_BLK_WRITE 16384
 
@@ -546,10 +547,10 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 			pr_err("Image size too large\n");
 			return -1;
 		}
-        if (offset % blksz) {
-                pr_err("offset must be %lx align\n", blksz);
-                return -1;
-        }
+		if (offset % blksz) {
+				pr_err("offset must be %lx align\n", blksz);
+				return -1;
+		}
 
 		debug("Start Flashing Image to EMMC_BOOT%d...\n", hwpart);
 		blkoff = offset / blksz;
@@ -561,7 +562,7 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 		}
 
 		printf("........ wrote %lu bytes to EMMC_BOOT%d\n",
-		       blkcnt * blksz, hwpart);
+			   blkcnt * blksz, hwpart);
 	}
 
 	return 0;
@@ -575,7 +576,7 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
  * @download_bytes: Size of image data
  */
 int fastboot_mmc_flash_offset(u32 start_offset, void *download_buffer,
-                             u32 download_bytes)
+							 u32 download_bytes)
 {
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 	struct blk_desc *dev_desc;
@@ -664,13 +665,12 @@ int check_mmc_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
  * @param response
  * @param fdev
  */
-void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 download_bytes,
-			char *response, struct flash_dev *fdev)
+void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, 
+		u32 download_bytes, char *response, struct flash_dev *fdev)
 {
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 	debug("%s\n", __func__);
-	struct blk_desc *dev_desc = blk_get_dev("mmc",
-					   CONFIG_FASTBOOT_FLASH_MMC_DEV);
+	struct blk_desc *dev_desc = blk_get_dev("mmc", CONFIG_FASTBOOT_FLASH_MMC_DEV);
 
 	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
 		pr_err("invalid mmc device\n");
@@ -713,211 +713,216 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 dow
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS)
 struct oem_config_info
 {
-    const char *name;
-    // crc32 hash value of the config name
-    uint32_t hash;
-    uint32_t id;
-    uint32_t max_len;
-    char* (*convert)(char *);
+	const char *name;
+	uint32_t id;
+	uint32_t max_len;
+	char* (*convert)(char *);
 };
 const struct oem_config_info config_info[] = {
-    {
-        "product_name",
-        0xD3CB5CA7,
-        TLV_CODE_PRODUCT_NAME,
-        16,
-        NULL
-    },
-    {
-        "serial#",
-        0xFFD374C9,
-        TLV_CODE_SERIAL_NUMBER,
-        12,
-        NULL
-    },
-    {
-        "ethaddr",
-        0x0ECD824E,
-        TLV_CODE_MAC_BASE,
-        17,
-        NULL
-    },
-    {
-        "manufacture_date",
-        0xF0A5D267,
-        TLV_CODE_MANUF_DATE,
-        19,
-        NULL
-    },
-    {
-        "device_version",
-        0x35AA0A5E,
-        TLV_CODE_DEVICE_VERSION,
-        3,
-        NULL
-    },
-    {
-        "manufacturer",
-        0x3D0AE6DC,
-        TLV_CODE_MANUF_NAME,
-        32,
-        NULL
-    },
-    {
-        "sdk_version",
-        0xA40BD3BA,
-        0x40,
-        3,
-        NULL
-    },
+	{ "product_name", TLV_CODE_PRODUCT_NAME, 16, NULL },
+	{ "serial#", TLV_CODE_SERIAL_NUMBER, 12, NULL },
+	{ "ethaddr", TLV_CODE_MAC_BASE, 17, NULL },
+	{ "manufacture_date", TLV_CODE_MANUF_DATE, 19, NULL },
+	{ "device_version", TLV_CODE_DEVICE_VERSION, 3, NULL },
+	{ "manufacturer", TLV_CODE_MANUF_NAME, 32, NULL },
+	{ "sdk_version", TLV_CODE_SDK_VERSION, 3, NULL},
+	{ "pmic_type", TLV_CODE_PMIC_TYPE, 3, NULL},
+	{ "eeprom_i2c_index", TLV_CODE_EEPROM_I2C_INDEX, 3, NULL},
+	{ "eeprom_pin_group", TLV_CODE_EEPROM_PIN_GROUP, 3, NULL},
 };
 
-static int save_config_info_to_eeprom(uint32_t id, char *value)
+static int write_config_info_to_eeprom(uint32_t id, char *value)
 {
-    char *cmd_str;
+	char *cmd_str;
 
-    cmd_str = malloc(128);
-    if (NULL == cmd_str) {
-        log_err("malloc buffer for cmd string fail\n");
-        return -1;
-    }
+	cmd_str = malloc(256);
+	if (NULL == cmd_str) {
+		log_err("malloc buffer for cmd string fail\n");
+		return -1;
+	}
 
-    log_info("write data to EEPROM, ID:%d, string:%s\n", id, value);
-    /* read eeprom */
-    memset(cmd_str, 0, 128);
-    sprintf(cmd_str, "tlv_eeprom read");
-    if (run_command(cmd_str, 0)) {
-        log_err("tlv_eeprom read fail\n");
-        return 1;
-    }
+	log_info("write data to EEPROM, ID:%d, string:%s\n", id, value);
+	/* read eeprom */
+	memset(cmd_str, 0, 256);
+	sprintf(cmd_str, "tlv_eeprom read");
+	if (run_command(cmd_str, 0)) {
+		free(cmd_str);
+		log_err("tlv_eeprom read fail\n");
+		return 1;
+	}
 
-    memset(cmd_str, 0, 128);
-    // update eeprom data, need add ' ' for space during value string
-    sprintf(cmd_str, "tlv_eeprom set %d '%s'", id, value);
-    if (run_command(cmd_str, 0)) {
-        log_err("tlv_eeprom set %s to %d fail\n", value, id);
-        return 2;
-    }
+	memset(cmd_str, 0, 256);
+	// update eeprom data, need add '' for value string that may have space inside
+	sprintf(cmd_str, "tlv_eeprom set %d '%s'", id, value);
+	if (run_command(cmd_str, 0)) {
+		free(cmd_str);
+		log_err("tlv_eeprom set %s to %d fail\n", value, id);
+		return 2;
+	}
 
-    /* save to eeprom */
-    memset(cmd_str, 0, 128);
-    sprintf(cmd_str, "tlv_eeprom write");
-    if (run_command(cmd_str, 0)) {
-        log_err("tlv_eeprom write fail\n");
-        return 3;
-    }
-
-    free(cmd_str);
-    return 0;
+	free(cmd_str);
+	return 0;
 }
 
-static struct oem_config_info* get_config_info(char *item)
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+static int write_config_info_to_efuse(uint32_t id, char *value)
 {
-    uint32_t i, crc_value;
-    crc_value = crc32_wd(0, (const uchar *)item, strlen(item), CHUNKSZ_CRC32);
-    log_debug("crc32 value for %s is 0x%x\n", item, crc_value);
+	struct udevice *dev;
+	uint8_t fuses[2];
+	int ret;
 
-    for (i = 0; i < ARRAY_SIZE(config_info); i++) {
-        if (crc_value == config_info[i].hash)
-            return (struct oem_config_info*)&config_info[i];
-    }
+	/* retrieve the device */
+	ret = uclass_get_device_by_driver(UCLASS_MISC,
+					  DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
+	if (ret) {
+		return ret;
+	}
 
-    return NULL;
+	memset(fuses, 0, sizeof(fuses));
+	if (TLV_CODE_PMIC_TYPE == id)
+		fuses[1] |= dectoul(value, NULL) & 0x0F;
+	else if (TLV_CODE_EEPROM_I2C_INDEX == id)
+		fuses[0] |= dectoul(value, NULL) & 0x0F;
+	else if (TLV_CODE_EEPROM_PIN_GROUP == id)
+		fuses[0] |= (dectoul(value, NULL) & 0x03) << 4;
+	else {
+		log_err("NOT support efuse ID %d\n", id);
+		return EFAULT;
+	}
+
+	// write to efuse, each bank has 32byte efuse data
+	return misc_write(dev, K1_EFUSE_USER_BANK0 * 32, fuses, sizeof(fuses));
+}
+#endif
+
+static struct oem_config_info* get_config_info(char *key)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(config_info); i++) {
+		if (0 == strcmp(key, config_info[i].name))
+			return (struct oem_config_info*)&config_info[i];
+	}
+
+	return NULL;
 }
 
 static void read_oem_configuration(char *config, char *response)
 {
-    char *key;
-    struct oem_config_info* info;
-    char *ack, *value, *temp;
-    int i = 0, j;
+	char *key;
+	struct oem_config_info* info;
+	char *ack, *value, *temp;
+	int i = 0, j;
 
-    ack = malloc(256);
-    temp = malloc(256);
-    if ((NULL == ack) || (NULL == temp)) {
-        log_err("malloc buffer for ack and temp fail\n");
-    }
-    memset(ack, 0, 256);
+	ack = malloc(256);
+	temp = malloc(256);
+	if ((NULL == ack) || (NULL == temp)) {
+		log_err("malloc buffer for ack and temp fail\n");
+	}
+	memset(ack, 0, 256);
 
-    key = strsep(&config, ",");
-    while (NULL != key) {
-        log_debug("try to find config info for %s\n", key);
-        info = get_config_info(key);
-        if (NULL != info) {
-            value = env_get(key);
-            if (NULL != info->convert)
-                value = info->convert(value);
-            // make sure value string is NOT exceed temp buffer
-            if ((NULL != value) && (strlen(value) < 128)) {
-                memset(temp, 0, 256);
-                // sprintf(temp, "%s:%s", key, value);
-                sprintf(temp, "%s", value);
-                j = strlen(temp);
-                if ((i + j) < 256) {
-                    // add comma between two info dictionary
-                    if (0 != i)
-                        ack[i++] = ',';
-                    memcpy(ack + i, temp, j);
-                    i += j;
-                }
-            }
-        }
-        key = strsep(&config, ",");
-    }
+	key = strsep(&config, ",");
+	while (NULL != key) {
+		log_debug("try to find config info for %s\n", key);
+		info = get_config_info(key);
+		if (NULL != info) {
+			value = env_get(key);
+			if (NULL != info->convert)
+				value = info->convert(value);
+			// make sure value string is NOT exceed temp buffer
+			if ((NULL != value) && (strlen(value) < 128)) {
+				memset(temp, 0, 256);
+				sprintf(temp, "%s", value);
+				j = strlen(temp);
+				if ((i + j) < 256) {
+					// add comma between two info dictionary
+					if (0 != i)
+						ack[i++] = ',';
+					memcpy(ack + i, temp, j);
+					i += j;
+				}
+			}
+		}
+		key = strsep(&config, ",");
+	}
 
-    if (0 != i) {
-        fastboot_okay(ack, response);
-    }
-    else
-        fastboot_fail("NOT exist", response);
+	if (0 != i) {
+		fastboot_okay(ack, response);
+	} else {
+		fastboot_fail("NOT exist", response);
+	}
 
-    free(ack);
-    free(temp);
+	free(ack);
+	free(temp);
 }
 
 static void write_oem_configuration(char *config, char *response)
 {
-    char *item, *key, *value;
-    const struct oem_config_info* info = NULL;
+	char *key, *value, *dest;
+	const struct oem_config_info* info;
+	int (*config_write)(uint32_t id, char *value), ret = -1;
 
-    item = strsep(&config, ",");
-    while (NULL != item) {
-        key = strsep(&item, ":");
-        value = item;
-        log_debug("try to set config info for %s: %s\n", key, value);
-        info = get_config_info(key);
-        if (NULL != info) {
-            if (strlen(value) <= info->max_len) {
-                if (0 == save_config_info_to_eeprom(info->id, value))
-                    env_set(key, value);
-            }
-        }
-        item = strsep(&config, ",");
-    }
+	dest = strsep(&config, ":");
+	key = strsep(&dest, "@");
+	value = config;
+	printf("try to set config info for %s: %s@%s\n", key, value, dest);
 
-    if (NULL != info)
-        fastboot_okay(NULL, response);
-    else
-        fastboot_fail("NOT exist", response);
+	if (0 == strcmp(dest, "eeprom"))
+		config_write = write_config_info_to_eeprom;
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+	else if (0 == strcmp(dest, "efuse"))
+		config_write = write_config_info_to_efuse;
+#endif
+	else {
+		fastboot_fail("NOT support destination", response);
+		return;
+	}
+
+	info = get_config_info(key);
+	if ((NULL != info) && (strlen(value) <= info->max_len)) {
+		if (0 == config_write(info->id, value)) {
+			env_set(key, value);
+			ret = 0;
+		}
+	}
+
+	if (0 == ret)
+		fastboot_okay(NULL, response);
+	else
+		fastboot_fail("NOT exist", response);
+}
+
+static void flush_oem_configuration(char *config, char *response)
+{
+	char cmd_str[32];
+
+	memset(cmd_str, 0, sizeof(cmd_str));
+	/* save to eeprom */
+	sprintf(cmd_str, "tlv_eeprom write");
+	if (run_command(cmd_str, 0)) {
+		log_err("tlv_eeprom write fail\n");
+	}
 }
 
 /**
  * fastboot_config_access() - Access configurations.
  *
  * @operation: Pointer to operation string
- *              read: read configuration
- *              write: write configuration
+ *			  read: read configuration
+ *			  write: write configuration
  * @config: Pointer to config string
- *              if is read operation, then
+ *			  if is read operation, then
  * @response: Pointer to fastboot response buffer
  */
 void fastboot_config_access(char *operation, char *config, char *response)
 {
-    if (0 == strcmp(operation, "read"))
-        read_oem_configuration(config, response);
-    else if (0 == strcmp(operation, "write"))
-        write_oem_configuration(config, response);
-    else
-        fastboot_fail("NOT support", response);
+	if (0 == strcmp(operation, "read"))
+		read_oem_configuration(config, response);
+	else if (0 == strcmp(operation, "write"))
+		write_oem_configuration(config, response);
+	else if (0 == strcmp(operation, "flush"))
+		flush_oem_configuration(config, response);
+	else
+		fastboot_fail("NOT support", response);
 }
 #endif
