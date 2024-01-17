@@ -19,44 +19,44 @@
 #include <asm/global_data.h>
 #include <fb_spacemit.h>
 
-#define GEN_CNT             (0xD5001000)
-#define STORAGE_API_P_ADDR  (0xC0838498)
-#define SDCARD_API_ENTRY    (0xFFE0A548)
+#define GEN_CNT			(0xD5001000)
+#define STORAGE_API_P_ADDR	(0xC0838498)
+#define SDCARD_API_ENTRY	(0xFFE0A548)
 
 int timer_init(void)
 {
-    /* enable generic cnt */
-    u32 read_data;
-    void __iomem *reg;
+	/* enable generic cnt */
+	u32 read_data;
+	void __iomem *reg;
 
-    reg = ioremap(GEN_CNT, 0x20);
-    read_data = readl(reg);
-    read_data |= BIT(0);
-    writel(read_data, reg);
+	reg = ioremap(GEN_CNT, 0x20);
+	read_data = readl(reg);
+	read_data |= BIT(0);
+	writel(read_data, reg);
 
-    return 0;
+	return 0;
 }
 
 enum board_boot_mode get_boot_storage(void)
 {
-    size_t *api = (size_t*)STORAGE_API_P_ADDR;
-    size_t address = *api;
-    // Did NOT select sdcard boot, but sdcard always has first boot priority
-    if (SDCARD_API_ENTRY == address)
-        return BOOT_MODE_SD;
-    else
-        return get_boot_pin_select();
+	size_t *api = (size_t*)STORAGE_API_P_ADDR;
+	size_t address = *api;
+	// Did NOT select sdcard boot, but sdcard always has first boot priority
+	if (SDCARD_API_ENTRY == address)
+		return BOOT_MODE_SD;
+	else
+		return get_boot_pin_select();
 }
 
 void fix_boot_mode(void)
 {
-    if (0 == readl((void *)BOOT_DEV_FLAG_REG))
-        set_boot_mode(get_boot_storage());
+	if (0 == readl((void *)BOOT_DEV_FLAG_REG))
+		set_boot_mode(get_boot_storage());
 }
 
 #if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
 int load_board_config_from_efuse(int *eeprom_i2c_index,
-    int *eeprom_pin_group, int *pmic_type)
+	int *eeprom_pin_group, int *pmic_type)
 {
 	struct udevice *dev;
 	uint8_t fuses[2];
@@ -64,110 +64,113 @@ int load_board_config_from_efuse(int *eeprom_i2c_index,
 
 	/* retrieve the device */
 	ret = uclass_get_device_by_driver(UCLASS_MISC,
-					  DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
-    if (ret) {
+			DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
+	if (ret) {
 		return ret;
 	}
 
-    // read from efuse, each bank has 32byte efuse data
-    ret = misc_read(dev, 9 * 32 + 0, fuses, sizeof(fuses));
-    if ((0 == ret) && (0 != fuses[0])) {
-        // byte0 bit0~3 is eeprom i2c controller index
-        *eeprom_i2c_index = fuses[0] & 0x0F;
-        // byte0 bit4~5 is eeprom pin group index
-        *eeprom_pin_group = (fuses[0] >> 4) & 0x03;
-        // byte1 bit0~3 is pmic type
-        *pmic_type = fuses[1] & 0x0F;
-    }
+	// read from efuse, each bank has 32byte efuse data
+	ret = misc_read(dev, 9 * 32 + 0, fuses, sizeof(fuses));
+	if ((0 == ret) && (0 != fuses[0])) {
+		// byte0 bit0~3 is eeprom i2c controller index
+		*eeprom_i2c_index = fuses[0] & 0x0F;
+		// byte0 bit4~5 is eeprom pin group index
+		*eeprom_pin_group = (fuses[0] >> 4) & 0x03;
+		// byte1 bit0~3 is pmic type
+		*pmic_type = fuses[1] & 0x0F;
+	}
 
 	return ret;
 }
 #endif
 
 static void load_default_board_config(int *eeprom_i2c_index,
-    int *eeprom_pin_group, int *pmic_type)
+	int *eeprom_pin_group, int *pmic_type)
 {
-    char *temp;
+	char *temp;
 
-    temp = env_get("eeprom_i2c_index");
-    if (NULL != temp)
-        *eeprom_i2c_index = dectoul(temp, NULL);
-    else
-        *eeprom_i2c_index = K1_DEFALT_EEPROM_I2C_INDEX;
+	temp = env_get("eeprom_i2c_index");
+	if (NULL != temp)
+		*eeprom_i2c_index = dectoul(temp, NULL);
+	else
+		*eeprom_i2c_index = K1_DEFALT_EEPROM_I2C_INDEX;
 
-    temp = env_get("eeprom_pin_group");
-    if (NULL != temp)
-        *eeprom_pin_group = dectoul(temp, NULL);
-    else
-        *eeprom_pin_group = K1_DEFALT_EEPROM_PIN_GROUP;
+	temp = env_get("eeprom_pin_group");
+	if (NULL != temp)
+		*eeprom_pin_group = dectoul(temp, NULL);
+	else
+		*eeprom_pin_group = K1_DEFALT_EEPROM_PIN_GROUP;
 
-    temp = env_get("pmic_type");
-    if (NULL != temp)
-        *pmic_type = dectoul(temp, NULL);
-    else
-        *pmic_type = K1_DEFALT_PMIC_TYPE;
+	temp = env_get("pmic_type");
+	if (NULL != temp)
+		*pmic_type = dectoul(temp, NULL);
+	else
+		*pmic_type = K1_DEFALT_PMIC_TYPE;
 }
 
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
 extern int board_pmic_init(void);
 #endif
 
+extern int k1x_eeprom_init(int bus, int pin);
+extern int spacemit_eeprom_read(uint8_t chip, uint8_t *buffer, uint8_t id);
+
 int spl_board_init_f(void)
 {
-    int ret;
-    struct udevice *dev;
-    int eeprom_i2c_index, eeprom_pin_group, pmic_type;
+	int ret;
+	struct udevice *dev;
+	int eeprom_i2c_index, eeprom_pin_group, pmic_type;
 
-    debug("%s\n", __FUNCTION__);
-    load_default_board_config(&eeprom_i2c_index, &eeprom_pin_group, &pmic_type);
+	debug("%s\n", __FUNCTION__);
+	load_default_board_config(&eeprom_i2c_index, &eeprom_pin_group, &pmic_type);
 
-    /* update env from efuse data */
+	/* update env from efuse data */
 #if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
-    load_board_config_from_efuse(&eeprom_i2c_index, &eeprom_pin_group, &pmic_type);
+	load_board_config_from_efuse(&eeprom_i2c_index, &eeprom_pin_group, &pmic_type);
 #endif
 
-    printf("eeprom_i2c_index :%d\n", eeprom_i2c_index);
-    printf("eeprom_pin_group :%d\n", eeprom_pin_group);
-    printf("pmic_type :%d\n", pmic_type);
+	printf("eeprom_i2c_index :%d\n", eeprom_i2c_index);
+	printf("eeprom_pin_group :%d\n", eeprom_pin_group);
+	printf("pmic_type :%d\n", pmic_type);
 
-    /* init i2c */
+	/* init i2c */
 #if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
-    i2c_init_board();
+	i2c_init_board();
 #endif
 
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
-    board_pmic_init();
+	board_pmic_init();
 #endif
 
-    /* DDR init */
-    ret = uclass_get_device(UCLASS_RAM, 0, &dev);
-    if (ret) {
-        debug("DRAM init failed: %d\n", ret);
-        return ret;
-    }
+	/* DDR init */
+	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
+	if (ret) {
+		debug("DRAM init failed: %d\n", ret);
+		return ret;
+	}
 
-    timer_init();
+	timer_init();
 
-    return 0;
+	return 0;
 }
 
 void board_init_f(ulong dummy)
 {
-    int ret;
+	int ret;
 
-    // fix boot mode after boot rom
-    fix_boot_mode();
-    ret = spl_early_init();
-    if (ret)
-        panic("spl_early_init() failed: %d\n", ret);
+	// fix boot mode after boot rom
+	fix_boot_mode();
+	ret = spl_early_init();
+	if (ret)
+		panic("spl_early_init() failed: %d\n", ret);
 
-    riscv_cpu_setup(NULL, NULL);
+	riscv_cpu_setup(NULL, NULL);
 
-    preloader_console_init();
+	preloader_console_init();
 
-    ret = spl_board_init_f();
-    if (ret)
-        panic("spl_board_init_f() failed: %d\n", ret);
+	ret = spl_board_init_f();
+	if (ret)
+		panic("spl_board_init_f() failed: %d\n", ret);
 }
 
 #ifdef CONFIG_SPL_LOAD_FIT
@@ -177,7 +180,6 @@ int board_fit_config_name_match(const char *name)
 	return 0;
 }
 #endif
-
 
 static struct env_driver *_spl_env_driver_lookup(enum env_location loc)
 {
@@ -195,7 +197,6 @@ static struct env_driver *_spl_env_driver_lookup(enum env_location loc)
 	return NULL;
 }
 
-
 static struct env_driver *spl_env_driver_lookup(enum env_operation op, enum env_location loc)
 {
 	struct env_driver *drv;
@@ -205,8 +206,7 @@ static struct env_driver *spl_env_driver_lookup(enum env_operation op, enum env_
 
 	drv = _spl_env_driver_lookup(loc);
 	if (!drv) {
-		debug("%s: No environment driver for location %d\n", __func__,
-		      loc);
+		debug("%s: No environment driver for location %d\n", __func__, loc);
 		return NULL;
 	}
 
@@ -266,7 +266,6 @@ void spl_board_init(void)
 	spl_load_env();
 }
 
-
 void spl_perform_fixups(struct spl_image_info *spl_image)
 {
 	u32 boot_mode = get_boot_mode();
@@ -294,7 +293,6 @@ void spl_perform_fixups(struct spl_image_info *spl_image)
 	}
 	set_boot_mode(boot_mode);
 }
-
 
 struct image_header *spl_get_load_buffer(ssize_t offset, size_t size)
 {

@@ -70,7 +70,6 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c6_1>;
 	status = "okay";
 
 	eeprom@50{

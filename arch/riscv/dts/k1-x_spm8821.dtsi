@@ -37,6 +37,8 @@
 				regulator-name = "dcdc3";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3450000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
 			};
 
 			dcdc_9: DCDC_REG4 {

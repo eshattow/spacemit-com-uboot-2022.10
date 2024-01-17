@@ -208,6 +208,10 @@ static SPACEMIT_CCU_GATE(pll1_d2_1228p8, "pll1_d2_1228p8", "pll1_d2",
 static const char *twsi_parent_names[] = {
 	"pll1_d78_31p5",
 };
+static SPACEMIT_CCU_MUX_GATE(twsi6_clk, "twsi6_clk", twsi_parent_names,
+	BASE_TYPE_APBC, APBC_TWSI6_CLK_RST,
+	4, 3, 0x3, 0x3, 0x0,
+	0);
 static SPACEMIT_CCU_MUX_GATE(twsi8_clk, "twsi8_clk", twsi_parent_names,
 	BASE_TYPE_APBC, APBC_TWSI8_CLK_RST,
 	4, 3, 0x3, 0x3, 0x0,
@@ -286,6 +290,7 @@ static struct spacemit_clk_table spacemit_k1x_clks = {
 		[CLK_PLL1_409P6]	= &pll1_d6_409p6.common.clk,
 		[CLK_PLL1_31P5]		= &pll1_d78_31p5.common.clk,
 		[CLK_PLL1_1228]		= &pll1_d2_1228p8.common.clk,
+		[CLK_TWSI6]		= &twsi6_clk.common.clk,
 		[CLK_TWSI8]		= &twsi8_clk.common.clk,
 		[CLK_SDH_AXI]		= &sdh_axi_aclk.common.clk,
 		[CLK_SDH0] 		= &sdh0_clk.common.clk,

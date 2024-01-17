@@ -160,12 +160,12 @@
 
 			ldo_11: LDO_REG11 {
 				regulator-name = "ldo11";
-				regulator-always-on;
+				regulator-boot-on;
 				regulator-min-microvolt = <1200000>;
 				regulator-max-microvolt = <1950000>;
+				u-boot,dm-spl;
 				regulator-state-mem {
-                                        regulator-off-in-suspend;
-                                        u-boot,dm-spl;
+					regulator-off-in-suspend;
 				};
 			};
 
