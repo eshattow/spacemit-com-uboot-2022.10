@@ -14,6 +14,7 @@
 #include <reset-uclass.h>
 #include <linux/delay.h>
 #include <misc.h>
+#include <power/regulator.h>
 
 // #define EFUSE_DEBUG
 
@@ -134,6 +135,42 @@ static inline __maybe_unused int se_clock_off(struct udevice *dev)
 	}
 
 	return ret;
+}
+
+static inline __maybe_unused int efuse_power_on(void)
+{
+	struct udevice *rdev;
+	int ret;
+
+	ret = regulator_get_by_devname("LDO_REG15", &rdev);
+	if (ret) {
+		printf("fail to get regulatore device LDO_REG15\n");
+		ret = regulator_get_by_devname("LDO_REG5", &rdev);
+		if (ret) {
+			printf("fail to get regulatore device LDO_REG5\n");
+			return -1;
+		}
+	}
+
+	return regulator_set_enable(rdev, true);
+}
+
+static inline __maybe_unused int efuse_power_off(void)
+{
+	struct udevice *rdev;
+	int ret;
+
+	ret = regulator_get_by_devname("LDO_REG15", &rdev);
+	if (ret) {
+		printf("fail to get regulatore device LDO_REG15\n");
+		ret = regulator_get_by_devname("LDO_REG5", &rdev);
+		if (ret) {
+			printf("fail to get regulatore device LDO_REG5\n");
+			return -1;
+		}
+	}
+
+	return regulator_set_enable(rdev, false);
 }
 
 /* load efuse data from efuse bank reg_offset address */
@@ -352,7 +389,14 @@ static int spacemit_efuse_read(struct udevice *dev, int offset, void *buf, int s
 
 static __maybe_unused int spacemit_efuse_program(struct udevice *dev, int offset, const void *buf, int size)
 {
-	return efuse_write_bank(dev, offset, buf, size);
+	int ret;
+
+	ret = efuse_power_on();
+	if (0 == ret){
+		ret = efuse_write_bank(dev, offset, buf, size);
+		efuse_power_off();
+	}
+	return ret;
 }
 
 static const struct misc_ops spacemit_efuse_ops = {
