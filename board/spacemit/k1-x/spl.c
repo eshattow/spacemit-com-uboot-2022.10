@@ -18,10 +18,16 @@
 #include <mapmem.h>
 #include <asm/global_data.h>
 #include <fb_spacemit.h>
+#include <tlv_eeprom.h>
+#include <stdlib.h>
 
 #define GEN_CNT			(0xD5001000)
 #define STORAGE_API_P_ADDR	(0xC0838498)
 #define SDCARD_API_ENTRY	(0xFFE0A548)
+
+extern int k1x_eeprom_init(int bus, int pin);
+extern int spacemit_eeprom_read(uint8_t chip, uint8_t *buffer, uint8_t id);
+char *product_name;
 
 int timer_init(void)
 {
@@ -56,7 +62,7 @@ void fix_boot_mode(void)
 
 #if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
 int load_board_config_from_efuse(int *eeprom_i2c_index,
-	int *eeprom_pin_group, int *pmic_type)
+				 int *eeprom_pin_group, int *pmic_type)
 {
 	struct udevice *dev;
 	uint8_t fuses[2];
@@ -85,7 +91,7 @@ int load_board_config_from_efuse(int *eeprom_i2c_index,
 #endif
 
 static void load_default_board_config(int *eeprom_i2c_index,
-	int *eeprom_pin_group, int *pmic_type)
+		int *eeprom_pin_group, int *pmic_type)
 {
 	char *temp;
 
@@ -112,29 +118,29 @@ static void load_default_board_config(int *eeprom_i2c_index,
 extern int board_pmic_init(void);
 #endif
 
-extern int k1x_eeprom_init(int bus, int pin);
-extern int spacemit_eeprom_read(uint8_t chip, uint8_t *buffer, uint8_t id);
+void load_board_config(int *eeprom_i2c_index, int *eeprom_pin_group, int *pmic_type)
+{
+	load_default_board_config(eeprom_i2c_index, eeprom_pin_group, pmic_type);
+
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+	/* update env from efuse data */
+	load_board_config_from_efuse(eeprom_i2c_index, eeprom_pin_group, pmic_type);
+#endif
+
+	printf("eeprom_i2c_index :%d\n", *eeprom_i2c_index);
+	printf("eeprom_pin_group :%d\n", *eeprom_pin_group);
+	printf("pmic_type :%d\n", *pmic_type);
+}
 
 int spl_board_init_f(void)
 {
 	int ret;
 	struct udevice *dev;
-	int eeprom_i2c_index, eeprom_pin_group, pmic_type;
 
 	debug("%s\n", __FUNCTION__);
-	load_default_board_config(&eeprom_i2c_index, &eeprom_pin_group, &pmic_type);
 
-	/* update env from efuse data */
-#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
-	load_board_config_from_efuse(&eeprom_i2c_index, &eeprom_pin_group, &pmic_type);
-#endif
-
-	printf("eeprom_i2c_index :%d\n", eeprom_i2c_index);
-	printf("eeprom_pin_group :%d\n", eeprom_pin_group);
-	printf("pmic_type :%d\n", pmic_type);
-
-	/* init i2c */
 #if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
+	/* init i2c */
 	i2c_init_board();
 #endif
 
@@ -176,8 +182,15 @@ void board_init_f(ulong dummy)
 #ifdef CONFIG_SPL_LOAD_FIT
 int board_fit_config_name_match(const char *name)
 {
-	/* boot using first FIT config */
-	return 0;
+	if (NULL == product_name)
+		product_name = env_get("product_name");
+
+	if ((NULL != product_name) && (0 == strcmp(product_name, name))) {
+		printf("Boot from fit configuration %s\n", name);
+		return 0;
+	}
+	else
+		return -1;
 }
 #endif
 
@@ -260,10 +273,32 @@ static void spl_load_env(void)
 	}
 }
 
+char *get_product_name(void)
+{
+	char *name = NULL;
+
+	int eeprom_i2c_index, eeprom_pin_group, pmic_type, eeprom_addr;
+	load_board_config(&eeprom_i2c_index, &eeprom_pin_group, &pmic_type);
+	eeprom_addr = k1x_eeprom_init(eeprom_i2c_index, eeprom_pin_group);
+	name = calloc(1, 64);
+	if ((eeprom_addr >= 0) && (NULL != name) && (0 == spacemit_eeprom_read(
+		eeprom_addr, name, TLV_CODE_PRODUCT_NAME))) {
+		printf("Get product name from eeprom %s\n", name);
+		return name;
+	}
+
+	if (NULL != name)
+		free(name);
+
+	printf("Use default product name %s\n", env_get("product_name"));
+	return NULL;
+}
+
 void spl_board_init(void)
 {
 	/*load env*/
 	spl_load_env();
+	product_name = get_product_name();
 }
 
 void spl_perform_fixups(struct spl_image_info *spl_image)
