@@ -1113,6 +1113,48 @@ ifeq ($(CONFIG_BINMAN),y)
 	$(call if_changed,binman)
 endif
 
+ifeq ($(CONFIG_SPACEMIT_BUILD_BIN),y)
+	cp $(srctree)/arch/$(ARCH)/dts/*.dtb $(srctree)
+
+	if [ ! -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/scripts/fsbl.yml ] \
+	|| [ ! -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/scripts/bootinfo_spinor.yml ] \
+	|| [ ! -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/scripts/bootinfo_spinand.yml ] \
+	|| [ ! -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/scripts/bootinfo_emmc.yml ] \
+	|| [ ! -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/scripts/bootinfo_sd.yml ] \
+	|| [ ! -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/scripts/uboot_fdt.its ]; then\
+		echo "****************** file not exist ***********************";\
+		exit 1;\
+	fi
+	cp $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/scripts/*.yml $(srctree)
+
+	cp $(srctree)/spl/u-boot-spl.bin $(srctree)
+	python3 $(srctree)/tools/build_binary_file.py \
+	-c $(srctree)/fsbl.yml \
+	-o $(srctree)/FSBL.bin
+
+	python3 $(srctree)/tools/build_binary_file.py \
+	-c $(srctree)/bootinfo_spinor.yml \
+	-o $(srctree)/bootinfo_spinor.bin
+
+	python3 $(srctree)/tools/build_binary_file.py \
+	-c $(srctree)/bootinfo_spinand.yml \
+	-o $(srctree)/bootinfo_spinand.bin
+
+	python3 $(srctree)/tools/build_binary_file.py \
+	-c $(srctree)/bootinfo_emmc.yml \
+	-o $(srctree)/bootinfo_emmc.bin
+
+	python3 $(srctree)/tools/build_binary_file.py \
+	-c $(srctree)/bootinfo_sd.yml \
+	-o $(srctree)/bootinfo_sd.bin
+
+	cp $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/scripts/uboot_fdt.its $(srctree)
+	$(srctree)/tools/mkimage -f $(srctree)/uboot_fdt.its \
+	-r $(srctree)/u-boot.itb
+
+	rm -rf $(srctree)/uboot_fdt.its $(srctree)/*.yml
+endif
+
 # Timestamp file to make sure that binman always runs
 .binman_stamp: FORCE
 	@touch $@

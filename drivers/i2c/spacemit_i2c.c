@@ -362,7 +362,7 @@ typedef enum {
 static struct spacemit_i2c *i2c_base[] = {
 	(struct spacemit_i2c *)0xd4010800,
 	(struct spacemit_i2c *)0xd4011000,
-	(struct spacemit_i2c *)0xd4011200,
+	(struct spacemit_i2c *)0xd4012000,
 	(struct spacemit_i2c *)0xf0614000,
 	(struct spacemit_i2c *)0xd4012800,
 	(struct spacemit_i2c *)0xd4013800,

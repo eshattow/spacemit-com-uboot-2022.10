@@ -47,6 +47,8 @@ fit-dtb.blob*
 /boards.cfg
 /*.log
 
+/key/
+
 itb.fit.fit
 itb.fit.itb
 itb.map

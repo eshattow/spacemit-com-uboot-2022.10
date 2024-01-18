@@ -23,7 +23,6 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		timebase-frequency = <10000000>;
-		u-boot,dm-spl;
 		cpu_0: cpu@0 {
 			compatible = "riscv";
 			device_type = "cpu";
@@ -31,7 +30,6 @@
 			status = "okay";
 			riscv,isa = "rv64imafdcvsu_zicsr_zifencei_zicbom_zihintpause_zba_zbb_zbc_zbs_svpbmt_sstc_sscofpmf";
 			mmu-type = "riscv,sv39";
-			u-boot,dm-spl;
 
 			cpu0_intc: interrupt-controller {
 				#interrupt-cells = <1>;
@@ -139,62 +137,54 @@
 		};
 	};
 
-	clocks {
+	clocks: clocks {
 		#address-cells = <0x2>;
 		#size-cells = <0x2>;
 		ranges;
-		u-boot,dm-spl;
 
 		vctcxo_24: vctcxo_24 {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <24000000>;
 			clock-output-names = "vctcxo_24";
-			u-boot,dm-spl;
 		};
 		vctcxo_3: vctcxo_3 {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <3000000>;
 			clock-output-names = "vctcxo_3";
-			u-boot,dm-spl;
 		};
 		vctcxo_1: vctcxo_1 {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <1000000>;
 			clock-output-names = "vctcxo_1";
-			u-boot,dm-spl;
 		};
 		pll1_vco: pll1_vco {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <24576000>;
 			clock-output-names = "pll1_vco";
-			u-boot,dm-spl;
 		};
 		clk_32k: clk_32k {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <32000>;
 			clock-output-names = "clk_32k";
-			u-boot,dm-spl;
 		};
 		clk_dummy: clk_dummy {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <0>;
 			clock-output-names = "clk_dummy";
-			u-boot,dm-spl;
 		};
 	};
 
-	soc {
+	soc:soc {
 		compatible = "simple-bus";
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
-		u-boot,dm-spl;
 
 		clint0: clint@e4000000 {
 			compatible = "riscv,clint0";
@@ -227,7 +217,6 @@
 			clock-names = "vctcxo_24", "vctcxo_3", "vctcxo_1", "pll1_vco",
 				"clk_32k", "clk_dummy";
 			#clock-cells = <1>;
-			u-boot,dm-spl;
 			status = "okay";
 		};
 
@@ -243,7 +232,6 @@
 				<0x0 0xf0610000 0x0 0x20>;
 			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2";
 			#reset-cells = <1>;
-			u-boot,dm-spl;
 			status = "okay";
 		};
 
@@ -302,7 +290,6 @@
                 };
 
 		uart0: uart@d4017000 {
-			u-boot,dm-spl;
 			compatible = "ns16550";
 			reg = <0x00000000 0xD4017000 0x00000000 0x00000100>;
 			reg-shift = <2>;
@@ -311,7 +298,6 @@
 		};
 
 		dramc: ddr@c0000000 {
-			u-boot,dm-spl;
 			compatible = "spacemit,ddr-ctl";
 			reg = <0x00000000 0xC0000000 0x00000000 0x00400000>;
 		};
@@ -419,7 +405,6 @@
 			clocks = <&ccu CLK_SDH0>,
 					 <&ccu CLK_SDH_AXI>;
 			clock-names = "sdh-io", "sdh-core";
-			u-boot,dm-spl;
 			status = "disabled";
 		};
 
@@ -448,7 +433,6 @@
 			clocks = <&ccu CLK_SDH2>,
 					 <&ccu CLK_SDH_AXI>;
 			clock-names = "sdh-io", "sdh-core";
-			u-boot,dm-spl;
 			status = "disabled";
 		};
 
@@ -698,7 +682,6 @@
 			qspi-pmuap-reg = <0xd4282860>;
 			spi-max-frequency = <26500000>;
 			qspi-id = <4>;
-			u-boot,dm-spl;
 			status = "disabled";
 		};
 

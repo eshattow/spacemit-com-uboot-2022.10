@@ -29,11 +29,16 @@ config FDT_ADD_MEMORY_NODE
 	bool "enable to add memory node to fdt before boot kernel"
 	default n
 
+config SPACEMIT_BUILD_BIN
+	bool "build fsbl.bin for spacemit image"
+	default n
+
 config BOARD_SPECIFIC_OPTIONS # dummy
 	def_bool y
 	select SPACEMIT_X60
 	select BINMAN
 	select FDT_ADD_MEMORY_NODE
+	select SPACEMIT_BUILD_BIN
 	imply AHCI
 	imply SMP
 	imply BOARD_LATE_INIT

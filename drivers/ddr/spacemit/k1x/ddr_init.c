@@ -23,7 +23,7 @@
 #include "ddr_init_fpga.h"
 #endif
 
-#define DDR_CHECK_SIZE			(0x4000)
+#define DDR_CHECK_SIZE			(0x2000)
 #define DDR_CHECK_STEP			(0x2000)
 #define DDR_CHECK_CNT			(0x1000)
 #define TOP_DDR_NUM				1
