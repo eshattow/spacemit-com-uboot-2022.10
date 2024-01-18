@@ -450,6 +450,7 @@ static unsigned int rx_bytes_expected(struct usb_ep *ep)
 	return rx_remain;
 }
 
+#ifndef CONFIG_SPL_BUILD
 static unsigned int tx_bytes_expected(struct usb_ep *ep)
 {
 	int tx_remain = fastboot_data_remaining();
@@ -467,6 +468,7 @@ static unsigned int tx_bytes_expected(struct usb_ep *ep)
 
 	return tx_remain;
 }
+#endif /* CONFIG_SPL_BUILD */
 
 static void rx_handler_dl_image(struct usb_ep *ep, struct usb_request *req)
 {
@@ -504,6 +506,7 @@ static void rx_handler_dl_image(struct usb_ep *ep, struct usb_request *req)
 	usb_ep_queue(ep, req, 0);
 }
 
+#ifndef CONFIG_SPL_BUILD
 static void tx_handler_up_image(struct usb_ep *ep, struct usb_request *in_req)
 {
 	char response[FASTBOOT_RESPONSE_LEN] = {0};
@@ -543,6 +546,7 @@ static void tx_handler_up_image(struct usb_ep *ep, struct usb_request *in_req)
 	in_req->length = transfer_size;
 	usb_ep_queue(ep, in_req, 0);
 }
+#endif /* CONFIG_SPL_BUILD */
 
 static void do_exit_on_complete(struct usb_ep *ep, struct usb_request *req)
 {
@@ -591,12 +595,14 @@ static void rx_handler_command(struct usb_ep *ep, struct usb_request *req)
 		req->length = rx_bytes_expected(ep);
 	}
 
+#ifndef CONFIG_SPL_BUILD
 	if (!strncmp("PUSH", response, 4)) {
 		fastboot_func->in_req->complete = tx_handler_up_image;
 
 		/* must replace 'PUSH' to 'DATA' */
 		strncpy(response, "DATA", 4);
 	}
+#endif /* CONFIG_SPL_BUILD */
 
 	if (!strncmp("OKAY", response, 4)) {
 		switch (cmd) {

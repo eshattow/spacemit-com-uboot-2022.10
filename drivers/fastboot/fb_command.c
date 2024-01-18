@@ -35,11 +35,11 @@ static u32 fastboot_bytes_received;
 static u32 fastboot_bytes_expected;
 
 static void okay(char *, char *);
-static void getvar(char *, char *);
 static void download(char *, char *);
-static void upload(char *, char *);
 
-#if !defined(CONFIG_SPL_BUILD)
+#ifndef CONFIG_SPL_BUILD
+static void getvar(char *, char *);
+static void upload(char *, char *);
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void flash(char *, char *);
 static void erase(char *, char *);
@@ -69,26 +69,28 @@ static void oem_config(char *cmd_parameter, char *response);
 static void run_ucmd(char *, char *);
 static void run_acmd(char *, char *);
 #endif
-#endif /*!defined(CONFIG_SPL_BUILD)*/
+#endif /* CONFIG_SPL_BUILD */
 
 
 static const struct {
 	const char *command;
 	void (*dispatch)(char *cmd_parameter, char *response);
 } commands[FASTBOOT_COMMAND_COUNT] = {
+#ifndef CONFIG_SPL_BUILD
 	[FASTBOOT_COMMAND_GETVAR] = {
 		.command = "getvar",
 		.dispatch = getvar
 	},
+#endif /* CONFIG_SPL_BUILD */
 	[FASTBOOT_COMMAND_DOWNLOAD] = {
 		.command = "download",
 		.dispatch = download
 	},
+#ifndef CONFIG_SPL_BUILD
 	[FASTBOOT_COMMAND_UPLOAD] = {
 		.command = "upload",
 		.dispatch = upload
 	},
-#if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 	[FASTBOOT_COMMAND_FLASH] =  {
 		.command = "flash",
@@ -103,12 +105,12 @@ static const struct {
 		.command = "boot",
 		.dispatch = okay
 	},
-#endif /*!defined(CONFIG_SPL_BUILD)*/
+#endif /* CONFIG_SPL_BUILD */
 	[FASTBOOT_COMMAND_CONTINUE] =  {
 		.command = "continue",
 		.dispatch = okay
 	},
-#if !defined(CONFIG_SPL_BUILD)
+#ifndef CONFIG_SPL_BUILD
 	[FASTBOOT_COMMAND_REBOOT] =  {
 		.command = "reboot",
 		.dispatch = okay
@@ -169,7 +171,7 @@ static const struct {
 		.dispatch = run_acmd,
 	},
 #endif
-#endif /*!defined(CONFIG_SPL_BUILD)*/
+#endif /* CONFIG_SPL_BUILD */
 };
 
 /**
@@ -220,6 +222,7 @@ static void okay(char *cmd_parameter, char *response)
 	fastboot_okay(NULL, response);
 }
 
+#ifndef CONFIG_SPL_BUILD
 /**
  * getvar() - Read a config/version variable
  *
@@ -230,6 +233,7 @@ static void getvar(char *cmd_parameter, char *response)
 {
 	fastboot_getvar(cmd_parameter, response);
 }
+#endif /* CONFIG_SPL_BUILD */
 
 /**
  * fastboot_download() - Start a download transfer from the client
@@ -263,37 +267,6 @@ static void download(char *cmd_parameter, char *response)
 		printf("Starting download of %d bytes\n",
 		       fastboot_bytes_expected);
 		fastboot_response("DATA", response, "%s", cmd_parameter);
-	}
-}
-
-
-/**
- * fastboot_upload() - Start a upload transfer from the host
- *
- * @cmd_parameter: Pointer to command parameter
- * @response: Pointer to fastboot response buffer
- */
-static void upload(char *cmd_parameter, char *response)
-{
-	/*fastboot_bytes_received would record had send byte*/
-	fastboot_bytes_received = 0;
-
-	if (fastboot_bytes_expected == 0) {
-		fastboot_fail("Expected nonzero image size", response);
-		return;
-	}
-	/*
-	 * Nothing to upload yet. Response is of the form:
-	 * [DATA|FAIL]$cmd_parameter
-	 *
-	 * where cmd_parameter is an 8 digit hexadecimal number
-	 */
-	if (fastboot_bytes_expected > fastboot_buf_size) {
-		fastboot_fail(cmd_parameter, response);
-	} else {
-		printf("Starting upload of %d bytes\n",
-		       fastboot_bytes_expected);
-		fastboot_response("PUSH", response, "%08x", fastboot_bytes_expected);
 	}
 }
 
@@ -354,6 +327,55 @@ void fastboot_data_download(const void *fastboot_data,
 
 
 /**
+ * fastboot_data_complete() - Mark current transfer complete
+ *
+ * @response: Pointer to fastboot response buffer
+ *
+ * Set image_size and ${filesize} to the total size of the downloaded image.
+ */
+void fastboot_data_complete(char *response)
+{
+	/* Download complete. Respond with "OKAY" */
+	fastboot_okay(NULL, response);
+	printf("\ndownloading/uploading of %d bytes finished\n", fastboot_bytes_received);
+	image_size = fastboot_bytes_received;
+	env_set_hex("filesize", image_size);
+	fastboot_bytes_expected = 0;
+	fastboot_bytes_received = 0;
+}
+
+#ifndef CONFIG_SPL_BUILD
+/**
+ * fastboot_upload() - Start a upload transfer from the host
+ *
+ * @cmd_parameter: Pointer to command parameter
+ * @response: Pointer to fastboot response buffer
+ */
+static void upload(char *cmd_parameter, char *response)
+{
+	/*fastboot_bytes_received would record had send byte*/
+	fastboot_bytes_received = 0;
+
+	if (fastboot_bytes_expected == 0) {
+		fastboot_fail("Expected nonzero image size", response);
+		return;
+	}
+	/*
+	 * Nothing to upload yet. Response is of the form:
+	 * [DATA|FAIL]$cmd_parameter
+	 *
+	 * where cmd_parameter is an 8 digit hexadecimal number
+	 */
+	if (fastboot_bytes_expected > fastboot_buf_size) {
+		fastboot_fail(cmd_parameter, response);
+	} else {
+		printf("Starting upload of %d bytes\n",
+		       fastboot_bytes_expected);
+		fastboot_response("PUSH", response, "%08x", fastboot_bytes_expected);
+	}
+}
+
+/**
  * fastboot_data_upload() - Copy image data to fastboot_buf_addr.
  *
  * @fastboot_data: Pointer to received fastboot data
@@ -396,25 +418,6 @@ void fastboot_data_upload(const void *fastboot_data,
 }
 
 
-/**
- * fastboot_data_complete() - Mark current transfer complete
- *
- * @response: Pointer to fastboot response buffer
- *
- * Set image_size and ${filesize} to the total size of the downloaded image.
- */
-void fastboot_data_complete(char *response)
-{
-	/* Download complete. Respond with "OKAY" */
-	fastboot_okay(NULL, response);
-	printf("\ndownloading/uploading of %d bytes finished\n", fastboot_bytes_received);
-	image_size = fastboot_bytes_received;
-	env_set_hex("filesize", image_size);
-	fastboot_bytes_expected = 0;
-	fastboot_bytes_received = 0;
-}
-
-#if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 /**
  * flash() - write the downloaded image to the indicated partition.
@@ -763,4 +766,4 @@ static void oem_config(char *cmd_parameter, char *response)
     fastboot_config_access(operation, cmd_str, response);
 }
 #endif
-#endif /*#!defined(CONFIG_SPL_BUILD)*/
+#endif /* CONFIG_SPL_BUILD */
