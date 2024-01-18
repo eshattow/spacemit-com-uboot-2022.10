@@ -899,9 +899,10 @@ static void flush_oem_configuration(char *config, char *response)
 	memset(cmd_str, 0, sizeof(cmd_str));
 	/* save to eeprom */
 	sprintf(cmd_str, "tlv_eeprom write");
-	if (run_command(cmd_str, 0)) {
-		log_err("tlv_eeprom write fail\n");
-	}
+	if (0 == run_command(cmd_str, 0))
+		fastboot_okay(NULL, response);
+	else
+		fastboot_fail("write fail", response);
 }
 
 /**
