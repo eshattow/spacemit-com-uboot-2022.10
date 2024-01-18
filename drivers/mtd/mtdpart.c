@@ -367,7 +367,6 @@ static int part_read_oob(struct mtd_info *mtd, loff_t from,
 	return res;
 }
 
-#ifndef CONFIG_SPL_BUILD
 static int part_read_user_prot_reg(struct mtd_info *mtd, loff_t from,
 		size_t len, size_t *retlen, u_char *buf)
 {
@@ -559,129 +558,6 @@ int del_mtd_partitions(struct mtd_info *master)
 
 	return ret;
 }
-#else
-static int part_read_user_prot_reg(struct mtd_info *mtd, loff_t from,
-		size_t len, size_t *retlen, u_char *buf)
-{
-	return 0;
-}
-
-static int part_get_user_prot_info(struct mtd_info *mtd, size_t len,
-				   size_t *retlen, struct otp_info *buf)
-{
-	return 0;
-}
-
-static int part_read_fact_prot_reg(struct mtd_info *mtd, loff_t from,
-		size_t len, size_t *retlen, u_char *buf)
-{
-	return 0;
-}
-
-static int part_get_fact_prot_info(struct mtd_info *mtd, size_t len,
-				   size_t *retlen, struct otp_info *buf)
-{
-	return 0;
-}
-
-static int part_write(struct mtd_info *mtd, loff_t to, size_t len,
-		size_t *retlen, const u_char *buf)
-{
-	return 0;
-}
-
-static int part_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
-		size_t *retlen, const u_char *buf)
-{
-	return 0;
-}
-
-static int part_write_oob(struct mtd_info *mtd, loff_t to,
-		struct mtd_oob_ops *ops)
-{
-	return 0;
-}
-
-static int part_write_user_prot_reg(struct mtd_info *mtd, loff_t from,
-		size_t len, size_t *retlen, u_char *buf)
-{
-	return 0;
-}
-
-static int part_lock_user_prot_reg(struct mtd_info *mtd, loff_t from,
-		size_t len)
-{
-	return 0;
-}
-
-#ifndef __UBOOT__
-static int part_writev(struct mtd_info *mtd, const struct kvec *vecs,
-		unsigned long count, loff_t to, size_t *retlen)
-{
-	return 0;
-}
-#endif
-
-static int part_erase(struct mtd_info *mtd, struct erase_info *instr)
-{
-	return 0;
-}
-
-static int part_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
-{
-	return 0;
-}
-
-static int part_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
-{
-	return 0;
-}
-
-static int part_is_locked(struct mtd_info *mtd, loff_t ofs, uint64_t len)
-{
-	return 0;
-}
-
-static void part_sync(struct mtd_info *mtd)
-{
-}
-
-#ifndef __UBOOT__
-static int part_suspend(struct mtd_info *mtd)
-{
-	return 0;
-}
-
-static void part_resume(struct mtd_info *mtd)
-{
-	return 0;
-}
-#endif
-
-static int part_block_isreserved(struct mtd_info *mtd, loff_t ofs)
-{
-	return 0;
-}
-
-static int part_block_isbad(struct mtd_info *mtd, loff_t ofs)
-{
-	return 0;
-}
-
-static int part_block_markbad(struct mtd_info *mtd, loff_t ofs)
-{
-	return 0;
-}
-
-static inline void free_partition(struct mtd_info *p)
-{
-}
-
-int del_mtd_partitions(struct mtd_info *master)
-{
-	return 0;
-}
-#endif /* CONFIG_SPL_BUILD */
 
 static struct mtd_info *allocate_partition(struct mtd_info *master,
 					   const struct mtd_partition *part,

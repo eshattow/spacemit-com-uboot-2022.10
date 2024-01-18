@@ -385,7 +385,6 @@ static ssize_t spi_nor_read_data(struct spi_nor *nor, loff_t from, size_t len,
 	return len;
 }
 
-#ifndef CONFIG_SPL_BUILD
 static ssize_t spi_nor_write_data(struct spi_nor *nor, loff_t to, size_t len,
 				  const u_char *buf)
 {
@@ -412,13 +411,6 @@ static ssize_t spi_nor_write_data(struct spi_nor *nor, loff_t to, size_t len,
 
 	return op.data.nbytes;
 }
-#else
-static ssize_t spi_nor_write_data(struct spi_nor *nor, loff_t to, size_t len,
-				  const u_char *buf)
-{
-	return 0;
-}
-#endif /* CONFIG_SPL_BUILD */
 
 /*
  * Read the status register, returning its value in the location
@@ -537,11 +529,6 @@ static int write_sr(struct spi_nor *nor, u8 val)
 	return nor->write_reg(nor, SPINOR_OP_WRSR, nor->cmd_buf, 1);
 }
 
-static struct spi_nor *mtd_to_spi_nor(struct mtd_info *mtd)
-{
-	return mtd->priv;
-}
-
 /*
  * Set write enable latch with Write Enable command.
  * Returns negative if error occurred.
@@ -551,7 +538,6 @@ static int write_enable(struct spi_nor *nor)
 	return nor->write_reg(nor, SPINOR_OP_WREN, NULL, 0);
 }
 
-#ifndef CONFIG_SPL_BUILD
 /*
  * Send write disable instruction to the chip.
  */
@@ -560,6 +546,10 @@ static int write_disable(struct spi_nor *nor)
 	return nor->write_reg(nor, SPINOR_OP_WRDI, NULL, 0);
 }
 
+static struct spi_nor *mtd_to_spi_nor(struct mtd_info *mtd)
+{
+	return mtd->priv;
+}
 
 #ifndef CONFIG_SPI_FLASH_BAR
 static u8 spi_nor_convert_opcode(u8 opcode, const u8 table[][2], size_t size)
@@ -690,21 +680,6 @@ static int set_4byte(struct spi_nor *nor, const struct flash_info *info,
 		return nor->write_reg(nor, SPINOR_OP_BRWR, nor->cmd_buf, 1);
 	}
 }
-#else
-#ifndef CONFIG_SPI_FLASH_BAR
-static void spi_nor_set_4byte_opcodes(struct spi_nor *nor,
-				      const struct flash_info *info)
-{
-}
-#endif /* !CONFIG_SPI_FLASH_BAR */
-
-/* Enable/disable 4-byte addressing mode. */
-static int set_4byte(struct spi_nor *nor, const struct flash_info *info,
-		     int enable)
-{
-	return 0;
-}
-#endif /* CONFIG_SPL_BUILD */
 
 #ifdef CONFIG_SPI_FLASH_SPANSION
 /*
@@ -904,7 +879,6 @@ static int read_bar(struct spi_nor *nor, const struct flash_info *info)
 }
 #endif
 
-#ifndef CONFIG_SPL_BUILD
 /*
  * Initiate the erasure of a single sector. Returns the number of bytes erased
  * on success, a negative error code on error.
@@ -1009,12 +983,6 @@ err:
 
 	return ret;
 }
-#else
-static int spi_nor_erase(struct mtd_info *mtd, struct erase_info *instr)
-{
-	return 0;
-}
-#endif /* CONFIG_SPL_BUILD */
 
 #ifdef CONFIG_SPI_FLASH_SPANSION
 /**
@@ -1707,8 +1675,6 @@ sst_write_err:
 	return ret;
 }
 #endif
-
-#ifndef CONFIG_SPL_BUILD
 /*
  * Write an address range to the nor chip.  Data must be written in
  * FLASH_PAGESIZE chunks.  The address range may be any size provided
@@ -1774,13 +1740,6 @@ write_err:
 #endif
 	return ret;
 }
-#else
-static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
-	size_t *retlen, const u_char *buf)
-{
-	return 0;
-}
-#endif /* CONFIG_SPL_BUILD */
 
 #if defined(CONFIG_SPI_FLASH_MACRONIX) || defined(CONFIG_SPI_FLASH_ISSI)
 /**
@@ -1883,7 +1842,6 @@ static int spansion_quad_enable_volatile(struct spi_nor *nor, u32 addr_base,
  * second byte will be written to the configuration register.
  * Return negative if error occurred.
  */
-#ifndef CONFIG_SPL_BUILD
 static int write_sr_cr(struct spi_nor *nor, u8 *sr_cr)
 {
 	int ret;
@@ -1903,14 +1861,9 @@ static int write_sr_cr(struct spi_nor *nor, u8 *sr_cr)
 			"timeout while writing configuration register\n");
 		return ret;
 	}
+
 	return 0;
 }
-#else
-static int write_sr_cr(struct spi_nor *nor, u8 *sr_cr)
-{
-	return 0;
-}
-#endif /* CONFIG_SPL_BUILD */
 
 /**
  * spansion_read_cr_quad_enable() - set QE bit in Configuration Register.

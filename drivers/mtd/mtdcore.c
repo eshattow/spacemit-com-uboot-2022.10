@@ -430,9 +430,7 @@ int add_mtd_device(struct mtd_info *mtd)
 	}
 #endif
 
-#ifndef CONFIG_SPL_BUILD
 	BUG_ON(mtd->writesize == 0);
-#endif /* CONFIG_SPL_BUILD */
 	mutex_lock(&mtd_table_mutex);
 
 	i = idr_alloc(&mtd_idr, mtd, 0, 0, GFP_KERNEL);
@@ -448,7 +446,6 @@ int add_mtd_device(struct mtd_info *mtd)
 	if (mtd->bitflip_threshold == 0)
 		mtd->bitflip_threshold = mtd->ecc_strength;
 
-#ifndef CONFIG_SPL_BUILD
 	if (is_power_of_2(mtd->erasesize))
 		mtd->erasesize_shift = ffs(mtd->erasesize) - 1;
 	else
@@ -461,7 +458,6 @@ int add_mtd_device(struct mtd_info *mtd)
 
 	mtd->erasesize_mask = (1 << mtd->erasesize_shift) - 1;
 	mtd->writesize_mask = (1 << mtd->writesize_shift) - 1;
-#endif /* CONFIG_SPL_BUILD */
 
 	/* Some chips always power up locked. Unlock them now */
 	if ((mtd->flags & MTD_WRITEABLE) && (mtd->flags & MTD_POWERUP_LOCK)) {
@@ -1130,7 +1126,6 @@ int mtd_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 }
 EXPORT_SYMBOL_GPL(mtd_read_oob);
 
-#ifndef CONFIG_SPL_BUILD
 int mtd_write_oob(struct mtd_info *mtd, loff_t to,
 				struct mtd_oob_ops *ops)
 {
@@ -1668,156 +1663,6 @@ int mtd_block_markbad(struct mtd_info *mtd, loff_t ofs)
 	return mtd->_block_markbad(mtd, ofs);
 }
 EXPORT_SYMBOL_GPL(mtd_block_markbad);
-#else
-int mtd_write_oob(struct mtd_info *mtd, loff_t to,
-				struct mtd_oob_ops *ops)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_write_oob);
-
-
-int mtd_ooblayout_ecc(struct mtd_info *mtd, int section,
-		      struct mtd_oob_region *oobecc)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_ooblayout_ecc);
-
-int mtd_ooblayout_free(struct mtd_info *mtd, int section,
-		       struct mtd_oob_region *oobfree)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_ooblayout_free);
-
-int mtd_ooblayout_find_eccregion(struct mtd_info *mtd, int eccbyte,
-				 int *section,
-				 struct mtd_oob_region *oobregion)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_ooblayout_find_eccregion);
-
-int mtd_ooblayout_get_eccbytes(struct mtd_info *mtd, u8 *eccbuf,
-			       const u8 *oobbuf, int start, int nbytes)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_ooblayout_get_eccbytes);
-
-int mtd_ooblayout_set_eccbytes(struct mtd_info *mtd, const u8 *eccbuf,
-			       u8 *oobbuf, int start, int nbytes)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_ooblayout_set_eccbytes);
-
-int mtd_ooblayout_get_databytes(struct mtd_info *mtd, u8 *databuf,
-				const u8 *oobbuf, int start, int nbytes)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_ooblayout_get_databytes);
-
-int mtd_ooblayout_set_databytes(struct mtd_info *mtd, const u8 *databuf,
-				u8 *oobbuf, int start, int nbytes)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_ooblayout_set_databytes);
-
-int mtd_ooblayout_count_freebytes(struct mtd_info *mtd)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_ooblayout_count_freebytes);
-
-int mtd_ooblayout_count_eccbytes(struct mtd_info *mtd)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_ooblayout_count_eccbytes);
-
-int mtd_get_fact_prot_info(struct mtd_info *mtd, size_t len, size_t *retlen,
-			   struct otp_info *buf)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_get_fact_prot_info);
-
-int mtd_read_fact_prot_reg(struct mtd_info *mtd, loff_t from, size_t len,
-			   size_t *retlen, u_char *buf)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_read_fact_prot_reg);
-
-int mtd_get_user_prot_info(struct mtd_info *mtd, size_t len, size_t *retlen,
-			   struct otp_info *buf)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_get_user_prot_info);
-
-int mtd_read_user_prot_reg(struct mtd_info *mtd, loff_t from, size_t len,
-			   size_t *retlen, u_char *buf)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_read_user_prot_reg);
-
-int mtd_write_user_prot_reg(struct mtd_info *mtd, loff_t to, size_t len,
-			    size_t *retlen, u_char *buf)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_write_user_prot_reg);
-
-int mtd_lock_user_prot_reg(struct mtd_info *mtd, loff_t from, size_t len)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_lock_user_prot_reg);
-
-/* Chip-supported device locking */
-int mtd_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_lock);
-
-int mtd_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_unlock);
-
-int mtd_is_locked(struct mtd_info *mtd, loff_t ofs, uint64_t len)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_is_locked);
-
-int mtd_block_isreserved(struct mtd_info *mtd, loff_t ofs)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_block_isreserved);
-
-int mtd_block_isbad(struct mtd_info *mtd, loff_t ofs)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_block_isbad);
-
-int mtd_block_markbad(struct mtd_info *mtd, loff_t ofs)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(mtd_block_markbad);
-#endif /* CONFIG_SPL_BUILD */
-
 
 #ifndef __UBOOT__
 /*
