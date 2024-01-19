@@ -25,7 +25,7 @@
 #define STORAGE_API_P_ADDR	(0xC0838498)
 #define SDCARD_API_ENTRY	(0xFFE0A548)
 
-extern int k1x_eeprom_init(int bus, int pin);
+extern int k1x_eeprom_init(void);
 extern int spacemit_eeprom_read(uint8_t chip, uint8_t *buffer, uint8_t id);
 char *product_name;
 
@@ -276,10 +276,9 @@ static void spl_load_env(void)
 char *get_product_name(void)
 {
 	char *name = NULL;
+	int eeprom_addr;
 
-	int eeprom_i2c_index, eeprom_pin_group, pmic_type, eeprom_addr;
-	load_board_config(&eeprom_i2c_index, &eeprom_pin_group, &pmic_type);
-	eeprom_addr = k1x_eeprom_init(eeprom_i2c_index, eeprom_pin_group);
+	eeprom_addr = k1x_eeprom_init();
 	name = calloc(1, 64);
 	if ((eeprom_addr >= 0) && (NULL != name) && (0 == spacemit_eeprom_read(
 		eeprom_addr, name, TLV_CODE_PRODUCT_NAME))) {

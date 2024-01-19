@@ -80,10 +80,18 @@ void i2c_set_pinctrl(int bus, int pin)
 		printf("bus or pinctrl wrong\n");
 }
 
-int k1x_eeprom_init(int bus, int pin)
+const uint8_t eeprom_config[][2] = {
+	// eeprom in evb: I2C6, pin group1(GPIO_118, GPIO_119)
+	{2, 0},
+	// eeprom in deb1 & deb2: I2C2, pin group0(GPIO_84, GPIO_85)
+	{6, 1},
+};
+
+int k1x_eeprom_init(void)
 {
 	int offset, ret, saddr, i;
 	char *name;
+	uint8_t bus, pin;
 
 	for(i = 0; i < ARRAY_SIZE(spacemit_i2c_eeprom); i++){
 		name = spacemit_i2c_eeprom[i];
@@ -105,20 +113,29 @@ int k1x_eeprom_init(int bus, int pin)
 		return -EINVAL;
 	}
 
-	i2c_set_pinctrl(bus, pin);
+	for (i = 0; i < ARRAY_SIZE(eeprom_config); i++) {
+		bus = eeprom_config[i][0];
+		pin = eeprom_config[i][1];
+		i2c_set_pinctrl(bus, pin);
 
-	ret = i2c_set_bus_num(bus);
-	if (ret < 0) {
-		printf("%s: %s set i2c bus number error\n", __func__, name);
-		return -EINVAL;
+		ret = i2c_set_bus_num(bus);
+		if (ret < 0) {
+			printf("%s: %s set i2c bus number error\n", __func__, name);
+			continue;
+		}
+
+		ret = i2c_probe(saddr);
+		if (ret < 0) {
+			printf("%s: %s probe i2c(%d) failed\n", __func__, name, bus);
+			continue;
+		}
+		break;
 	}
 
-	ret = i2c_probe(saddr);
-	if (ret < 0) {
-		printf("%s: %s probe i2c failed\n", __func__, name);
+	if (i >= ARRAY_SIZE(eeprom_config))
 		return -EINVAL;
+	else {
+		printf("find eeprom in bus %d, address %d\n", eeprom_config[i][0], saddr);
+		return saddr;
 	}
-
-	return saddr;
 }
-
