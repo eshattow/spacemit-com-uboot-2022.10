@@ -292,9 +292,6 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 
 #ifdef CONFIG_SPACEMIT_FLASH
 	static struct flash_dev *fdev = NULL;
-	/*save crc value to compare after flash image*/
-	u32 crc_val = 0;
-	crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
 
 	if (fdev == NULL){
 		fdev = malloc(sizeof(struct flash_dev));
@@ -341,7 +338,7 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 
 	if (is_sparse_image(download_buffer)) {
 		struct fb_mtd_sparse sparse_priv;
-		struct sparse_storage sparse;
+		struct sparse_storage sparse = { .erase = NULL };
 
 		sparse_priv.mtd = mtd;
 		sparse_priv.part = part;

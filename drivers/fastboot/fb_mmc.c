@@ -162,6 +162,14 @@ static lbaint_t fb_mmc_sparse_write(struct sparse_storage *info,
 	return fb_mmc_blk_write(dev_desc, blk, blkcnt, buffer);
 }
 
+static lbaint_t fb_mmc_sparse_erase(struct sparse_storage *info,
+		lbaint_t blk, lbaint_t blkcnt, const void *buffer)
+{
+	struct fb_mmc_sparse *sparse = info->priv;
+	struct blk_desc *dev_desc = sparse->dev_desc;
+	return fb_mmc_blk_write(dev_desc, blk, blkcnt, NULL);
+}
+
 static lbaint_t fb_mmc_sparse_reserve(struct sparse_storage *info,
 		lbaint_t blk, lbaint_t blkcnt)
 {
@@ -514,7 +522,6 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 	u32 __maybe_unused fsbl_offset = 0;
 	/*save crc value to compare after flash image*/
 	u32 crc_val = 0;
-	crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
 
 	if (fdev == NULL){
 		fdev = malloc(sizeof(struct flash_dev));
@@ -659,7 +666,7 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 
 	if (is_sparse_image(download_buffer)) {
 		struct fb_mmc_sparse sparse_priv;
-		struct sparse_storage sparse;
+		struct sparse_storage sparse = { .erase = NULL };
 		int err;
 
 		sparse_priv.dev_desc = dev_desc;
@@ -668,6 +675,7 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 		sparse.start = info.start;
 		sparse.size = info.size;
 		sparse.write = fb_mmc_sparse_write;
+		sparse.erase = fb_mmc_sparse_erase;
 		sparse.reserve = fb_mmc_sparse_reserve;
 		sparse.mssg = fastboot_fail;
 
@@ -680,6 +688,7 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 		if (!err)
 			fastboot_okay(NULL, response);
 	} else {
+		crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
 		write_raw_image(dev_desc, &info, cmd, download_buffer,
 				download_bytes, response);
 #ifdef CONFIG_SPACEMIT_FLASH

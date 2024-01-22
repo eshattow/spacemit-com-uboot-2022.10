@@ -266,9 +266,22 @@ int write_sparse_image(struct sparse_storage *info,
 
 			for (i = 0; i < blkcnt;) {
 				j = blkcnt - i;
-				if (j > fill_buf_num_blks)
-					j = fill_buf_num_blks;
-				blks = info->write(info, blk, j, fill_buf);
+				if (j > fill_buf_num_blks){
+					if (blk % fill_buf_num_blks && fill_val == 0){
+						/*align blk addr*/
+						j = fill_buf_num_blks - (blk % fill_buf_num_blks);
+					}else{
+						j = fill_buf_num_blks;
+					}
+				}
+
+				if (fill_val == 0 && j == fill_buf_num_blks
+					&& info->erase !=NULL){
+					blks = info->erase(info, blk, j, fill_buf);
+				}else {
+					blks = info->write(info, blk, j, fill_buf);
+				}
+
 				/* blks might be > j (eg. NAND bad-blocks) */
 				if (blks < j) {
 					printf("%s: %s " LBAFU " [%d]\n",
