@@ -629,3 +629,16 @@ ulong board_get_usable_ram_top(ulong total_size)
 	}
 }
 
+#if !defined(CONFIG_SPL_BUILD)
+int board_fit_config_name_match(const char *name)
+{
+	char *product_name = env_get("product_name");
+
+	if ((NULL != product_name) && (0 == strcmp(product_name, name))) {
+		printf("Boot from fit configuration %s\n", name);
+		return 0;
+	}
+	else
+		return -1;
+}
+#endif
