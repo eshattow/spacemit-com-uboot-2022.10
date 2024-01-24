@@ -107,7 +107,7 @@ image:
         - pad, 0xA5, 8
       - file:
           name: fsbl
-          source: u-boot-spl.bin
+          source: ../u-boot-spl.bin
           align: 32
       - signature:
           name: signature1

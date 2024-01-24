@@ -13,26 +13,26 @@
 			arch = "riscv";
 			compression = "none";
 			load = <0x0 0x00200000>;
-			data = /incbin/("./u-boot-nodtb.bin");
+			data = /incbin/("../u-boot-nodtb.bin");
 		};
 
 		fdt_1 {
 			description = "k1_evb";
 			type = "flat_dt";
 			compression = "none";
-			data = /incbin/("./k1-x_evb.dtb");
+			data = /incbin/("../dtb/k1-x_evb.dtb");
 		};
 		fdt_2 {
 			description = "k1_deb1";
 			type = "flat_dt";
 			compression = "none";
-			data = /incbin/("./k1-x_deb1.dtb");
+			data = /incbin/("../dtb/k1-x_deb1.dtb");
 		};
 		fdt_3 {
 			description = "k1_deb2";
 			type = "flat_dt";
 			compression = "none";
-			data = /incbin/("./k1-x_deb2.dtb");
+			data = /incbin/("../dtb/k1-x_deb2.dtb");
 		};
 	};
 
