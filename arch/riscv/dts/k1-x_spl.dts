@@ -135,6 +135,7 @@
 		pinctrl-0 = <&pinctrl_qspi>;
 		u-boot,dm-spl;
 
+		spi-max-frequency = <15140000>;
 		flash@0 {
 			compatible = "jedec,spi-nor";
 			reg = <0>;
