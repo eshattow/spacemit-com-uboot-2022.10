@@ -173,6 +173,7 @@ void board_init_f(ulong dummy)
 	riscv_cpu_setup(NULL, NULL);
 
 	preloader_console_init();
+	printf("boot_mode: %x\n", get_boot_mode());
 
 	ret = spl_board_init_f();
 	if (ret)
