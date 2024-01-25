@@ -381,7 +381,7 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 	if (need_erase) {
 		/*must erase at first when write data to mtd devices*/
 		printf("Erasing MTD partition %s\n", part->name);
-		ret = _fb_mtd_erase(mtd, part, download_bytes);
+		ret = _fb_mtd_erase(mtd, download_bytes);
 		if (ret) {
 			printf("failed erasing from device %s\n", mtd->name);
 			fastboot_fail("failed erasing from device", response);
