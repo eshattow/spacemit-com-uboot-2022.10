@@ -443,13 +443,11 @@ static void flash(char *cmd_parameter, char *response)
 		if (mtd_flash){
 			fastboot_mtd_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
 						response);
-
-			if (!strncmp("OKAY", response, 4))
-				return;
+		}else{
+			/* flash blk dev */
+			fastboot_blk_flash_write(cmd_parameter, fastboot_buf_addr, image_size, response);
 		}
 
-		/* flash blk dev */
-		fastboot_blk_flash_write(cmd_parameter, fastboot_buf_addr, image_size, response);
 		return;
 #endif
 	case BOOT_MODE_EMMC:

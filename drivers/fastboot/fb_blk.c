@@ -212,6 +212,12 @@ void fastboot_blk_flash_write(const char *cmd, void *download_buffer,
 	if (fastboot_blk_get_part_info(cmd, &dev_desc, &info, response) < 0)
 		return;
 
+	if (download_bytes > info.size * info.blksz){
+		printf("download_bytes is greater than part size\n");
+		fastboot_fail("download_bytes is greater than part size", response);
+		return;
+	}
+
 	if (is_sparse_image(download_buffer)) {
 		struct fb_blk_sparse sparse_priv;
 		struct sparse_storage sparse = { .erase = NULL };;

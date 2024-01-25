@@ -664,6 +664,12 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 	    fastboot_mmc_get_part_info(cmd, &dev_desc, &info, response) < 0)
 		return;
 
+	if (download_bytes > info.size * info.blksz){
+		printf("download_bytes is greater than part size\n");
+		fastboot_fail("download_bytes is greater than part size", response);
+		return;
+	}
+
 	if (is_sparse_image(download_buffer)) {
 		struct fb_mmc_sparse sparse_priv;
 		struct sparse_storage sparse = { .erase = NULL };
@@ -688,12 +694,12 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 		if (!err)
 			fastboot_okay(NULL, response);
 	} else {
-		crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
 		write_raw_image(dev_desc, &info, cmd, download_buffer,
 				download_bytes, response);
 #ifdef CONFIG_SPACEMIT_FLASH
 		/*if download and flash div to many time, that the crc is not correct*/
-		printf("write_raw_image, \n");
+		printf("write_raw_image end\n");
+		crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
 		if (check_mmc_image_crc(dev_desc, crc_val, info.start, info.blksz, download_bytes))
 			fastboot_fail("compare crc fail", response);
 #endif

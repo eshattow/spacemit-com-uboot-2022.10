@@ -328,6 +328,12 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 		return;
 	}
 
+	if (download_bytes > mtd->size){
+		printf("download_bytes is greater than part size\n");
+		fastboot_fail("download_bytes is greater than part size", response);
+		return;
+	}
+
 	/*must erase at first when write data to mtd devices*/
 	ret = _fb_mtd_erase(mtd, part);
 	if (ret) {
@@ -361,6 +367,12 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 
 		ret = _fb_mtd_write(mtd, part, download_buffer, 0,
 				     download_bytes, NULL);
+
+		if (ret < 0) {
+			printf("Failed to write mtd part:%s\n", cmd);
+			fastboot_fail("Failed to write mtd part", response);
+			return;
+		}
 
 		printf("........ wrote %u bytes to '%s'\n",
 		       download_bytes, part->name);
