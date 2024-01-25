@@ -18,6 +18,7 @@
 #include <fb_spacemit.h>
 #include <fb_mtd.h>
 #include <fb_blk.h>
+#include <dm.h>
 
 /**
  * image_size - final fastboot image size
@@ -442,13 +443,11 @@ static void flash(char *cmd_parameter, char *response)
 		if (mtd_flash){
 			fastboot_mtd_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
 						response);
-
-			if (!strncmp("OKAY", response, 4))
-				return;
+		}else{
+			/* flash blk dev */
+			fastboot_blk_flash_write(cmd_parameter, fastboot_buf_addr, image_size, response);
 		}
 
-		/* flash blk dev */
-		fastboot_blk_flash_write(cmd_parameter, fastboot_buf_addr, image_size, response);
 		return;
 #endif
 	case BOOT_MODE_EMMC:
@@ -689,6 +688,38 @@ static void oem_bootbus(char *cmd_parameter, char *response)
 
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_READ)
 /**
+ * read_console_log() - Read data from console log buffer
+ *
+ * @fb_buf: Pointer to buffer where data will be copied
+ *
+ * @return: Actual size of data read
+ */
+static u32 read_console_log(char *fb_buf) {
+	char *log_start = gd->console_log.buffer;
+	char *log_end = log_start + LOG_BUFFER_SIZE;
+	char *log_ptr = gd->console_log.read_ptr;
+	u32 read_size = 0;
+
+	while (log_ptr != gd->console_log.write_ptr) {
+		u32 copy_size = (log_ptr < gd->console_log.write_ptr) ?
+						(gd->console_log.write_ptr - log_ptr) :
+						(log_end - log_ptr);
+
+		memcpy(fb_buf + read_size, log_ptr, copy_size);
+		read_size += copy_size;
+		log_ptr += copy_size;
+
+		if (log_ptr == log_end) {
+			log_ptr = log_start;
+		}
+	}
+
+	gd->console_log.read_ptr = log_ptr;
+
+	return read_size;
+}
+
+/**
  * oem_read() - Execute the OEM read command
  *
  * @cmd_parameter: Pointer to command parameter
@@ -704,6 +735,15 @@ static void oem_read(char *cmd_parameter, char *response)
 	if (!part){
 		fastboot_fail("miss part, send command:\
 			fastboot oem read:part [offset]", response);
+		return;
+	}
+
+	if (strcmp(part, "console") == 0) {
+		char *fb_buf = (char *)fastboot_buf_addr;
+		u32 read_size = read_console_log(fb_buf);
+
+		fastboot_bytes_expected = read_size;
+		fastboot_response("OKAY", response, "%08x", read_size);
 		return;
 	}
 

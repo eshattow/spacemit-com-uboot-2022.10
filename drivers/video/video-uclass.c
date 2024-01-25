@@ -21,6 +21,7 @@
 #include <dm/device_compat.h>
 #include <dm/device-internal.h>
 #include <dm/uclass-internal.h>
+#include <splash.h>
 #ifdef CONFIG_SANDBOX
 #include <asm/sdl.h>
 #endif
@@ -337,7 +338,8 @@ static int show_splash(struct udevice *dev)
 	u8 *data = SPLASH_START(u_boot_logo);
 	int ret;
 
-	ret = video_bmp_display(dev, map_to_sysmem(data), -4, 4, true);
+	// Set the position of the center of the framebuffer
+	ret = video_bmp_display(dev, map_to_sysmem(data), BMP_ALIGN_CENTER, BMP_ALIGN_CENTER, true);
 
 	return 0;
 }

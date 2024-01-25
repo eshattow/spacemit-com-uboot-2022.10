@@ -242,6 +242,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 	int combine_len = 1;
 	int combine_size = 0;
 	int combine_len_extra = 0;
+	int off = 0;
 
 	/*init and would remalloc while size is increasing*/
 	combine_str = malloc(combine_len);
@@ -283,7 +284,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			/*only blk dev would not add bootinfo partition*/
 			if (!parse_mtd_partition){
 				if (strlen(node_part) > 0 && !strncmp("bootinfo", node_part, 8)){
-					printf("boot info would not add as partition\n");
+					printf("bootinfo would not add as partition\n");
 					continue;
 				}
 			}
@@ -307,15 +308,14 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 				node_size = "";
 
 			/*make sure that offset would not over than previous size and offset*/
-			int off = transfer_string_to_ul(node_offset);
+			off = transfer_string_to_ul(node_offset);
 
 			if (off > 0 && off < combine_size){
-				printf("offset must larger then previous size and offset\n");
+				printf("offset must larger then previous, off:%x, combine_size:%x\n", off, combine_size);
 				return -5;
 			}
 
 			combine_len += strlen(node_part) + strlen(node_offset) + strlen(node_size) + combine_len_extra;
-			printf("combine_len:%d\n", combine_len);
 			combine_str = realloc(combine_str, combine_len);
 			if (combine_str == NULL){
 				printf("realloc combine_str fail\n");
@@ -323,9 +323,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			}
 
 			/*if next part has define offset, use it offset, or it would caculate front part offset and size*/
-			if (off == 0)
-				combine_size += off;
-			else
+			if (off > 0)
 				combine_size = off;
 
 			if (parse_mtd_partition){
@@ -705,7 +703,7 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer,
 	if (response)
 		fastboot_okay(NULL, response);
 #endif
-	fastboot_okay(NULL, response);
+
 	return;
 }
 #endif

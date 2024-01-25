@@ -251,3 +251,13 @@
 &efuse {
 	status = "okay";
 };
+
+&dpu {
+	status = "okay";
+};
+
+&hdmi {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_hdmi_0>;
+	status = "okay";
+};

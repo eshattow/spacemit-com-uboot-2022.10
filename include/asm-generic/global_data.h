@@ -32,6 +32,13 @@ struct driver_rt;
 
 typedef struct global_data gd_t;
 
+#ifdef CONFIG_FASTBOOT_CMD_OEM_READ
+typedef struct {
+	char *buffer;
+	char *write_ptr;
+	char *read_ptr;
+} console_log_t;
+#endif
 /**
  * struct global_data - global data structure
  */
@@ -482,6 +489,11 @@ struct global_data {
 	 * @dmtag_list: List of DM tags
 	 */
 	struct list_head dmtag_list;
+
+#ifdef CONFIG_FASTBOOT_CMD_OEM_READ
+	console_log_t console_log;
+#endif
+
 };
 #ifndef DO_DEPS_ONLY
 static_assert(sizeof(struct global_data) == GD_SIZE);

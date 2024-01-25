@@ -93,8 +93,6 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_mmc1 &gpio80_pmx_func0>;
 		bus-width = <4>;
-		cd-gpios = <&gpio 80 0>;
-		cd-inverted;
 		cap-sd-highspeed;
 		sdh-phy-module = <0>;
 		status = "okay";
@@ -137,6 +135,7 @@
 		pinctrl-0 = <&pinctrl_qspi>;
 		u-boot,dm-spl;
 
+		spi-max-frequency = <15140000>;
 		flash@0 {
 			compatible = "jedec,spi-nor";
 			reg = <0>;

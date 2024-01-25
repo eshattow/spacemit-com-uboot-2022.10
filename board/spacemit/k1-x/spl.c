@@ -25,6 +25,54 @@
 #define STORAGE_API_P_ADDR	(0xC0838498)
 #define SDCARD_API_ENTRY	(0xFFE0A548)
 
+/* pin mux */
+#define MUX_MODE0       0
+#define MUX_MODE1       1
+#define MUX_MODE2       2
+#define MUX_MODE3       3
+#define MUX_MODE4       4
+#define MUX_MODE5       5
+#define MUX_MODE6       6
+#define MUX_MODE7       7
+
+/* edge detect */
+#define EDGE_NONE       (1 << 6)
+#define EDGE_RISE       (1 << 4)
+#define EDGE_FALL       (1 << 5)
+#define EDGE_BOTH       (3 << 4)
+
+/* driver strength*/
+#define PAD_1V8_DS0     (0 << 11)
+#define PAD_1V8_DS1     (1 << 11)
+#define PAD_1V8_DS2     (2 << 11)
+#define PAD_1V8_DS3     (3 << 11)
+
+/*
+ * notice: !!!
+ * ds2 ---> bit10, ds1 ----> bit12, ds0 ----> bit11
+*/
+#define PAD_3V_DS0      (0 << 10)     /* bit[12:10] 000 */
+#define PAD_3V_DS1      (2 << 10)     /* bit[12:10] 010 */
+#define PAD_3V_DS2      (4 << 10)     /* bit[12:10] 100 */
+#define PAD_3V_DS3      (6 << 10)     /* bit[12:10] 110 */
+#define PAD_3V_DS4      (1 << 10)     /* bit[12:10] 001 */
+#define PAD_3V_DS5      (3 << 10)     /* bit[12:10] 011 */
+#define PAD_3V_DS6      (5 << 10)     /* bit[12:10] 101 */
+#define PAD_3V_DS7      (7 << 10)     /* bit[12:10] 111 */
+
+/* pull up/down */
+#define PULL_DIS        (0 << 13)     /* bit[15:13] 000 */
+#define PULL_UP         (6 << 13)     /* bit[15:13] 110 */
+#define PULL_DOWN       (5 << 13)     /* bit[15:13] 101 */
+
+#define MFPR_MMC1_BASE     0xD401E1B8
+#define MMC1_DATA3_OFFSET  0x00
+#define MMC1_DATA2_OFFSET  0x04
+#define MMC1_DATA1_OFFSET  0x08
+#define MMC1_DATA0_OFFSET  0x0C
+#define MMC1_CMD_OFFSET    0x10
+#define MMC1_CLK_OFFSET    0x14
+
 extern int k1x_eeprom_init(void);
 extern int spacemit_eeprom_read(uint8_t chip, uint8_t *buffer, uint8_t id);
 char *product_name;
@@ -58,6 +106,17 @@ void fix_boot_mode(void)
 {
 	if (0 == readl((void *)BOOT_DEV_FLAG_REG))
 		set_boot_mode(get_boot_storage());
+}
+
+void board_pinctrl_setup(void)
+{
+	//sdcard pinctrl setup
+	writel(MUX_MODE0 | EDGE_NONE | PULL_UP | PAD_3V_DS4, (void __iomem *)MFPR_MMC1_BASE + MMC1_DATA3_OFFSET);
+	writel(MUX_MODE0 | EDGE_NONE | PULL_UP | PAD_3V_DS4, (void __iomem *)MFPR_MMC1_BASE + MMC1_DATA2_OFFSET);
+	writel(MUX_MODE0 | EDGE_NONE | PULL_UP | PAD_3V_DS4, (void __iomem *)MFPR_MMC1_BASE + MMC1_DATA1_OFFSET);
+	writel(MUX_MODE0 | EDGE_NONE | PULL_UP | PAD_3V_DS4, (void __iomem *)MFPR_MMC1_BASE + MMC1_DATA0_OFFSET);
+	writel(MUX_MODE0 | EDGE_NONE | PULL_UP | PAD_3V_DS4, (void __iomem *)MFPR_MMC1_BASE + MMC1_CMD_OFFSET);
+	writel(MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_3V_DS4, (void __iomem *)MFPR_MMC1_BASE + MMC1_CLK_OFFSET);
 }
 
 #if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
@@ -166,6 +225,10 @@ void board_init_f(ulong dummy)
 
 	// fix boot mode after boot rom
 	fix_boot_mode();
+
+	// setup pinctrl
+	board_pinctrl_setup();
+
 	ret = spl_early_init();
 	if (ret)
 		panic("spl_early_init() failed: %d\n", ret);
@@ -173,6 +236,7 @@ void board_init_f(ulong dummy)
 	riscv_cpu_setup(NULL, NULL);
 
 	preloader_console_init();
+	printf("boot_mode: %x\n", get_boot_mode());
 
 	ret = spl_board_init_f();
 	if (ret)
