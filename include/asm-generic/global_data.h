@@ -283,7 +283,7 @@ struct global_data {
 	/**
 	 * @env_buf: buffer for env_get() before reloc
 	 */
-	char env_buf[32];
+	char env_buf[128];
 #ifdef CONFIG_TRACE
 	/**
 	 * @trace_buff: trace buffer
