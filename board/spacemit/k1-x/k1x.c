@@ -33,6 +33,7 @@
 #include <tlv_eeprom.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+static char found_partition[64] = {0};
 
 void set_boot_mode(enum board_boot_mode boot_mode)
 {
@@ -175,12 +176,81 @@ void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev
 		printf("load env_%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
 }
 
+char* parse_mtdparts_and_find_bootfs(void) {
+	const char *mtdparts = env_get("mtdparts");
+	char cmd_buf[256];
+
+	if (!mtdparts) {
+		printf("mtdparts not set\n");
+		return NULL;
+	}
+
+	/* Find the last partition */
+	const char *last_part_start = strrchr(mtdparts, '(');
+	if (last_part_start) {
+		last_part_start++; /* Skip the left parenthesis */
+		const char *end = strchr(last_part_start, ')');
+		if (end && (end - last_part_start < sizeof(found_partition))) {
+			int len = end - last_part_start;
+			strncpy(found_partition, last_part_start, len);
+			found_partition[len] = '\0';
+
+			snprintf(cmd_buf, sizeof(cmd_buf), "ubi part %s", found_partition);
+			if (run_command(cmd_buf, 0) == 0) {
+				/* Check if the bootfs volume exists */
+				snprintf(cmd_buf, sizeof(cmd_buf), "ubi check %s", BOOTFS_NAME);
+				if (run_command(cmd_buf, 0) == 0) {
+					printf("Found bootfs in partition: %s\n", found_partition);
+					return found_partition;
+				}
+			}
+		}
+	}
+
+	printf("bootfs not found in any partition\n");
+	return NULL;
+}
+
 void import_env_from_bootfs(void)
 {
 	u32 boot_mode = get_boot_mode();
 	switch (boot_mode) {
 	case BOOT_MODE_NAND:
+#if CONFIG_IS_ENABLED(ENV_IS_IN_MTD)
 		/*load env from nand bootfs*/
+		const char *bootfs_name = BOOTFS_NAME ;
+		char cmd[128];
+
+		if (!bootfs_name) {
+			printf("bootfs not set\n");
+			return;
+		}
+
+		/* Parse mtdparts to find the partition containing the BOOTFS_NAME volume */
+		char *mtd_partition   = parse_mtdparts_and_find_bootfs();
+		if (!mtd_partition  ) {
+			printf("Bootfs not found in any partition\n");
+			return;
+		}
+
+		sprintf(cmd, "ubifsmount ubi0:%s", bootfs_name);
+		if (run_command(cmd, 0)) {
+			printf("Cannot mount ubifs partition '%s'\n", bootfs_name);
+			return;
+		}
+
+		sprintf(cmd, "ubifsload 0x%x env_%s.txt", CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
+		if (run_command(cmd, 0)) {
+			printf("Failed to load env_%s.txt from bootfs\n", CONFIG_SYS_CONFIG_NAME);
+			return;
+		}
+
+		memset(cmd, '\0', 128);
+		sprintf(cmd, "env import -t 0x%x", CONFIG_SPL_LOAD_FIT_ADDRESS);
+		if (!run_command(cmd, 0)) {
+			printf("Imported environment from 'env_k1-x.txt'\n");
+		}
+#endif
 		break;
 	case BOOT_MODE_NOR:
 #ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
@@ -552,6 +622,10 @@ enum env_location env_get_location(enum env_operation op, int prio)
 
 	u32 boot_mode = get_boot_mode();
 	switch (boot_mode) {
+#ifdef CONFIG_ENV_IS_IN_MTD
+	case BOOT_MODE_NAND:
+		return ENVL_MTD;
+#endif
 #ifdef CONFIG_ENV_IS_IN_NAND
 	case BOOT_MODE_NAND:
 		return ENVL_NAND;

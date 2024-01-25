@@ -289,7 +289,13 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 	struct part_info *part;
 	struct mtd_info *mtd = NULL;
 	int ret;
+	char mtd_partition[20] = {'\0'};
+	char ubi_volume[20] = {'\0'};
+	char *token;
+	char cmd_buf[256];
+	int need_erase = 1;
 
+	printf("Starting fastboot_mtd_flash_write for %s\n", cmd);
 #ifdef CONFIG_SPACEMIT_FLASH
 	static struct flash_dev *fdev = NULL;
 
@@ -307,6 +313,30 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 		memset(fdev->mtd_table, '\0', 10);
 	}
 
+	/* Check commands and process them */
+	if (strchr(cmd, '-') != NULL) {
+		char *cmd_copy = strdup(cmd);
+		token = strtok(cmd_copy, "-");
+		if (token != NULL) {
+			strcpy(mtd_partition, token);
+			cmd = mtd_partition;
+
+			token = strtok(NULL, "-");
+			if (token != NULL) {
+				strcpy(ubi_volume, token);
+			}
+		}
+
+		free(cmd_copy);
+		printf("mtd_partition: %s\n", mtd_partition);
+		printf("ubi_volume: %s\n", ubi_volume);
+		const char *last_erased = env_get("last_erased_partition");
+		need_erase = last_erased == NULL || strcmp(last_erased, mtd_partition) != 0;
+	} else {
+		ubi_volume[0] = '\0';
+		printf("Normal mtd partition ......\n");
+	}
+
 	if (!strncmp(cmd, "mtd", 3)){
 		fastboot_oem_flash_gpt(cmd, fastboot_buf_addr, download_bytes,
 						response, fdev);
@@ -321,24 +351,57 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 		return;
 	}
 #endif
+
 	ret = fb_mtd_lookup(cmd, &mtd, &part);
+	printf("fb_mtd_lookup returned %d for %s\n", ret, cmd);
 	if (ret) {
-		pr_err("invalid mtd device");
+		pr_err("invalid mtd device \n");
 		fastboot_fail("invalid mtd device or partition", response);
 		return;
 	}
 
-	if (download_bytes > mtd->size){
-		printf("download_bytes is greater than part size\n");
-		fastboot_fail("download_bytes is greater than part size", response);
-		return;
+	if (need_erase) {
+		printf("Erasing MTD partition %s\n", part->name);
+		ret = _fb_mtd_erase(mtd, part);
+		if (ret) {
+			printf("failed erasing from device %s\n", mtd->name);
+			fastboot_fail("failed erasing from device", response);
+			return;
+		}
+		env_set("last_erased_partition", mtd_partition);
 	}
+	printf("need_erase: %d\n", need_erase);
 
-	/*must erase at first when write data to mtd devices*/
-	ret = _fb_mtd_erase(mtd, part);
-	if (ret) {
-		printf("failed erasing from device %s", mtd->name);
-		fastboot_fail("failed erasing from device", response);
+	if (ubi_volume[0] != '\0') {
+
+		/* Select NAND device and attach to UBI subsystem */
+		snprintf(cmd_buf, sizeof(cmd_buf), "ubi part %s", mtd_partition);
+		printf("Executing command: %s\n", cmd_buf);
+		run_command(cmd_buf, 0);
+
+		/* Check if UBI volume exists */
+		printf("Checking if UBI volume '%s' exists.\n", ubi_volume);
+		snprintf(cmd_buf, sizeof(cmd_buf), "ubi check %s", ubi_volume);
+		printf("Executing command: %s\n", cmd_buf);
+		int ret = run_command(cmd_buf, 0);
+
+		/* If the UBI volume does not exist, create it */
+		if (ret != 0) {
+			printf("UBI volume '%s' not found. Creating it.\n", ubi_volume);
+			snprintf(cmd_buf, sizeof(cmd_buf), "ubi create %s 0x%X d", ubi_volume, download_bytes);
+			printf("Executing command: %s\n", cmd_buf);
+			run_command(cmd_buf, 0);
+		} else {
+			printf("UBI volume '%s' already exists.\n", ubi_volume);
+		}
+
+		/* Write the downloaded data to the UBI volume */
+		printf("Writing data to UBI volume '%s'.\n", ubi_volume);
+		snprintf(cmd_buf, sizeof(cmd_buf), "ubi write %p %s 0x%X", download_buffer, ubi_volume, download_bytes);
+		printf("Executing command: %s\n", cmd_buf);
+		run_command(cmd_buf, 0);
+
+		fastboot_okay(NULL, response);
 		return;
 	}
 

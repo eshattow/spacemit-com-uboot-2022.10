@@ -317,6 +317,12 @@ static void spl_load_env(void)
 		loc = ENVL_SPI_FLASH;
 		break;
 #endif
+#ifdef CONFIG_ENV_IS_IN_MTD
+	case BOOT_MODE_NAND:
+	case BOOT_MODE_NOR:
+		loc = ENVL_MTD;
+		break;
+#endif
 	default:
 		return;
 	}
