@@ -64,6 +64,9 @@
 				regulator-name = "ldo1";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+				regulator-init-microvolt = <3300000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
 			};
 
 			ldo_24: LDO_REG2 {
