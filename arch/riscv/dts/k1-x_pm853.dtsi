@@ -23,7 +23,6 @@
 				u-boot,dm-spl;
 				regulator-state-mem {
 					regulator-off-in-suspend;
-					u-boot,dm-spl;
 				};
 			};
 
@@ -55,7 +54,6 @@
 				u-boot,dm-spl;
 				regulator-state-mem {
 					regulator-off-in-suspend;
-					u-boot,dm-spl;
 				};
 			};
 
@@ -67,7 +65,6 @@
 				u-boot,dm-spl;
 				regulator-state-mem {
 					regulator-off-in-suspend;
-					u-boot,dm-spl;
 				};
 			};
 
@@ -80,7 +77,6 @@
 				u-boot,dm-spl;
 				regulator-state-mem {
 					regulator-off-in-suspend;
-					u-boot,dm-spl;
 				};
 			};
 
@@ -93,7 +89,6 @@
 				u-boot,dm-spl;
 				regulator-state-mem {
 					regulator-off-in-suspend;
-					u-boot,dm-spl;
 				};
 			};
 
@@ -105,7 +100,6 @@
 				u-boot,dm-spl;
 				regulator-state-mem {
 					regulator-off-in-suspend;
-					u-boot,dm-spl;
 				};
 			};
 
@@ -253,7 +247,6 @@
 				u-boot,dm-spl;
 				regulator-state-mem {
 					regulator-off-in-suspend;
-					u-boot,dm-spl;
 				};
 			};
 		};
