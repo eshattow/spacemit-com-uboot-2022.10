@@ -14,6 +14,9 @@
 			compression = "none";
 			load = <0x0 0x00200000>;
 			data = /incbin/("../u-boot-nodtb.bin");
+			hash-1 {
+				algo = "crc32";
+			};
 		};
 
 		fdt_1 {
@@ -21,18 +24,27 @@
 			type = "flat_dt";
 			compression = "none";
 			data = /incbin/("../dtb/k1-x_evb.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
 		};
 		fdt_2 {
 			description = "k1_deb1";
 			type = "flat_dt";
 			compression = "none";
 			data = /incbin/("../dtb/k1-x_deb1.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
 		};
 		fdt_3 {
 			description = "k1_deb2";
 			type = "flat_dt";
 			compression = "none";
 			data = /incbin/("../dtb/k1-x_deb2.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
 		};
 	};
 

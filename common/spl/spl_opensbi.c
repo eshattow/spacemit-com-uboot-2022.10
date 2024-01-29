@@ -59,7 +59,7 @@ void spl_invoke_opensbi(struct spl_image_info *spl_image)
 	if (ret) {
 		pr_err("Can't find U-Boot node, %d\n", ret);
 #ifdef CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION
-		printf("had defined onother file to load, maybe the uboot node set in it\n");
+		printf("had defined another file to load, maybe the uboot node set in it\n");
 #else
 		hang();
 #endif
