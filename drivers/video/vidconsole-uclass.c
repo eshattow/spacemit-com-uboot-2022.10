@@ -18,6 +18,7 @@
 #include <video_console.h>
 #include <video_font.h>		/* Bitmap font for code page 437 */
 #include <linux/ctype.h>
+#include <cpu_func.h>
 
 /*
  * Structure to describe a console color
@@ -514,6 +515,7 @@ static int vidconsole_output_glyph(struct udevice *dev, char ch)
 int vidconsole_put_char(struct udevice *dev, char ch)
 {
 	struct vidconsole_priv *priv = dev_get_uclass_priv(dev);
+	struct video_priv *vid_priv = dev_get_uclass_priv(dev->parent);
 	int ret;
 
 	if (priv->escape) {
@@ -551,6 +553,11 @@ int vidconsole_put_char(struct udevice *dev, char ch)
 		ret = vidconsole_output_glyph(dev, ch);
 		if (ret < 0)
 			return ret;
+
+		void *start = vid_priv->fb + priv->ycur * vid_priv->line_length;
+		void *end = start + vid_priv->line_length;
+
+		flush_dcache_range((unsigned long)start, (unsigned long)end);
 		break;
 	}
 
@@ -559,6 +566,7 @@ int vidconsole_put_char(struct udevice *dev, char ch)
 
 int vidconsole_put_string(struct udevice *dev, const char *str)
 {
+    struct video_priv *vid_priv = dev_get_uclass_priv(dev->parent);
 	const char *s;
 	int ret;
 
@@ -567,7 +575,10 @@ int vidconsole_put_string(struct udevice *dev, const char *str)
 		if (ret)
 			return ret;
 	}
+	void *start = vid_priv->fb;
+	void *end = start + vid_priv->fb_size;
 
+	flush_dcache_range((unsigned long)start, (unsigned long)end);
 	return 0;
 }
 

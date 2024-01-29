@@ -125,6 +125,7 @@ enum board_boot_mode {
 	"serverip=10.0.92.134\0" \
 	"gatewayip=192.168.1.1\0" \
 	"net_data_path=spacemit_flash_file/net_flash_file/\0" \
+	"splashimage=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
 	BOOTENV_DEVICE_CONFIG \
 	BOOTENV
 
