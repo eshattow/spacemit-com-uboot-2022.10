@@ -29,6 +29,8 @@
 #include <nvme.h>
 #include <tlv_eeprom.h>
 #include <misc.h>
+#include <search.h>
+#include <env_internal.h>
 
 #define EMMC_MAX_BLK_WRITE 16384
 
@@ -457,18 +459,51 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
 void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download_bytes,
 							char *response, struct flash_dev *fdev)
 {
+	char cmdbuf[64] = {'\0'};
+	char *res = NULL;
+	ssize_t len;
+	char *var = NULL;
+	char *tmp_var;
+	char *delim = "\n";
 
-	char cmdbuf[32];
-	memset(cmdbuf, '\0', 32);
+	len = hexport_r(&env_htab, '\n', H_HIDE_DOT, &res, 0, 0, NULL);
+	char *getenvstr;
+	getenvstr = malloc(len+1);
+	if (!getenvstr){
+		printf("malloc getenvstr fail\n");
+		fastboot_fail("malloc getenvstr fail", response);
+	}
+	memcpy(getenvstr, res, len);
+	var = strtok(getenvstr, delim);
+
+	/*delete all of the previous env except mtdparts/mtdids*/
+	while(var!=NULL){
+		tmp_var = malloc(strlen(var) + 1);
+		if (!tmp_var)
+			break;
+
+		memset(tmp_var, 0, strlen(var));
+		strcpy(tmp_var, var);
+		char *tv = tmp_var;
+		char *var_key = strsep(&tv, "=");
+		if (!run_commandf("env exists '%s'", var_key)){
+			if (strncmp("mtdparts", var_key, 8) && strncmp("mtdids", var_key, 6))
+				run_commandf("env delete '%s'", var_key);
+		}
+
+		free(tmp_var);
+		var = strtok(NULL, delim);
+	}
+	free(getenvstr);
 
 	/*load env.bin*/
-	sprintf(cmdbuf, "env import -d -c 0x%lx 0x%lx", (ulong)download_buffer, (ulong)CONFIG_ENV_SIZE);
+	sprintf(cmdbuf, "env import -c 0x%lx 0x%lx", (ulong)download_buffer, (ulong)CONFIG_ENV_SIZE);
 
 	if (run_command(cmdbuf, 0)){
 		printf("can not import env, try to load env.txt\n");
 		memset(cmdbuf, '\0', 32);
 		/*load env.txt*/
-		sprintf(cmdbuf, "env import -d -t 0x%lx", (ulong)download_buffer);
+		sprintf(cmdbuf, "env import -t 0x%lx", (ulong)download_buffer);
 		if (run_command(cmdbuf, 0)){
 			fastboot_fail("Cannot flash env partition", response);
 			return;
