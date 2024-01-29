@@ -811,7 +811,7 @@ u32 fastboot_mmc_read(const char *part, u32 offset,
 
 	/*transfer offset to blk size*/
 	off_blk = (offset / info.blksz) + info.start;
-	size_blk = (info.size - offset) / info.blksz;
+	size_blk = info.size - (offset / info.blksz);
 
 	if (offset % info.blksz)
 		printf("offset should be align to 0x%lx, would change offset to 0x%lx\n",
