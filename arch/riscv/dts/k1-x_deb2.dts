@@ -161,15 +161,11 @@
 	dwc3@c0a00000 {
 		dr_mode = "host";
 		phy_type = "utmi";
-		snps,hsphy_interface = "utmi";
 		snps,dis_enblslpm_quirk;
-		snps,dis-u1u2-quirk;
 		snps,dis-u2-freeclk-exists-quirk;
 		snps,dis-del-phy-power-chg-quirk;
 		snps,dis_u2_susphy_quirk;
 		snps,dis_u3_susphy_quirk;
-		snps,dis_rxdet_inp3_quirk;
-		snps,xhci-trb-ent-quirk;
 	};
 };
 
