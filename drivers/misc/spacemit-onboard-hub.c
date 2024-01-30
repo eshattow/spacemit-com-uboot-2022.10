@@ -71,6 +71,12 @@ static int spacemit_hub_remove(struct udevice *dev)
 	return 0;
 }
 
+static int spacemit_hub_bind(struct udevice *dev)
+{
+	dev_or_flags(dev, DM_FLAG_PROBE_AFTER_BIND);
+	return 0;
+}
+
 static const struct udevice_id spacemit_hub_ids[] = {
 	{.compatible = "spacemit,usb3-hub",},
 	{ /* sentinel */ }
@@ -80,6 +86,7 @@ U_BOOT_DRIVER(spacemit_onboard_hub) = {
 	.name	= "spacemit_onboard_hub",
 	.id	= UCLASS_MISC,
 	.of_match = spacemit_hub_ids,
+	.bind = spacemit_hub_bind,
 	.probe = spacemit_hub_probe,
 	.remove = spacemit_hub_remove,
 	.priv_auto	= sizeof(struct spacemit_hub_priv),
