@@ -22,7 +22,6 @@
 #include <linux/io.h>
 #include <asm/global_data.h>
 #include <part.h>
-#include <env.h>
 #include <env_internal.h>
 #include <asm/arch/ddr.h>
 #include <power/regulator.h>

@@ -837,3 +837,37 @@ u32 fastboot_mmc_read(const char *part, u32 offset,
 	fastboot_response("OKAY", response, "%08x", (u32)(hdr_sectors * info.blksz));
 	return hdr_sectors * info.blksz;
 }
+
+int get_partition_index_by_name(const char *part_name, int *part_index) {
+	struct blk_desc *dev_desc;
+	struct disk_partition part_info;
+	int ret;
+	int dev_index;
+
+	dev_index = mmc_get_env_dev();
+
+	dev_desc = blk_get_dev("mmc", dev_index);
+	if (!dev_desc) {
+		printf("Cannot find MMC device %d\n", dev_index);
+		return -ENODEV;
+	}
+
+	for (int p = 1; ; ++p) {
+		ret = part_get_info(dev_desc, p, &part_info);
+		if (ret == -ENOENT) {
+			break;
+		} else if (ret < 0) {
+			printf("Error getting partition info for partition %d: %d\n", p, ret);
+			return ret;
+		}
+
+		if (strcmp(part_info.name, part_name) == 0) {
+			*part_index = p;
+			return 0;
+		}
+	}
+
+	printf("Cannot find partition: %s\n", part_name);
+	return -ENOENT;
+}
+
