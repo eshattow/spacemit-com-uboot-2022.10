@@ -74,10 +74,10 @@ int fb_mtd_lookup(const char *partname,
 	}
 }
 
-int _fb_mtd_erase(struct mtd_info *mtd, struct part_info *part)
+int _fb_mtd_erase(struct mtd_info *mtd, struct part_info *part, u32 erase_size)
 {
-	bool scrub;
-	u64 len;
+	bool scrub = false;
+	u64 len = 0;
 	struct erase_info erase_op = {};
 	int ret = 0;
 
@@ -85,9 +85,27 @@ int _fb_mtd_erase(struct mtd_info *mtd, struct part_info *part)
 		return -1;
 
 	printf("........ erased mtd part\n");
-	len = mtd->size;
-	scrub = false;
+	if (erase_size > mtd->size){
+		printf("erase size:%x is larger than mtd size:%llx\n", erase_size, mtd->size);
+		return -1;
+	}
 
+	if (!mtd_is_aligned_with_block_size(mtd, mtd->offset)) {
+		printf("mtd offset:%llx is not align to erase_size\n", mtd->offset);
+		return -1;
+	}
+
+	if (!mtd_is_aligned_with_block_size(mtd, erase_size)) {
+		printf("align erase_size to mtd->erase_size:%x\n", mtd->erasesize);
+		erase_size += mtd->erasesize - (erase_size % mtd->erasesize);
+	}
+
+	if (erase_size == 0)
+		len = mtd->size;
+	else
+		len = erase_size;
+
+	scrub = false;
 	erase_op.mtd = mtd;
 	erase_op.addr = 0;
 	erase_op.len = mtd->erasesize;
@@ -361,8 +379,9 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 	}
 
 	if (need_erase) {
+		/*must erase at first when write data to mtd devices*/
 		printf("Erasing MTD partition %s\n", part->name);
-		ret = _fb_mtd_erase(mtd, part);
+		ret = _fb_mtd_erase(mtd, part, download_bytes);
 		if (ret) {
 			printf("failed erasing from device %s\n", mtd->name);
 			fastboot_fail("failed erasing from device", response);
@@ -468,7 +487,7 @@ void fastboot_mtd_flash_erase(const char *cmd, char *response)
 		return;
 	}
 
-	ret = _fb_mtd_erase(mtd, part);
+	ret = _fb_mtd_erase(mtd, part, 0);
 	if (ret) {
 		pr_err("failed erasing from device %s", mtd->name);
 		fastboot_fail("failed erasing from device", response);

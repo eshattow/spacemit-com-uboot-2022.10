@@ -28,7 +28,7 @@ int fb_mtd_lookup(const char *partname, struct mtd_info **mtd,
  * @param part 
  * @return int 
  */
-int _fb_mtd_erase(struct mtd_info *mtd, struct part_info *part);
+int _fb_mtd_erase(struct mtd_info *mtd, struct part_info *part, u32 erase_size);
 
 
 /**

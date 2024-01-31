@@ -133,7 +133,7 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 				pr_err("invalid mtd device\n");
 				return -1;
 			}
-			ret = _fb_mtd_erase(mtd, part);
+			ret = _fb_mtd_erase(mtd, part, CONFIG_ENV_SIZE);
 			if (ret)
 				return -1;
 			ret = _fb_mtd_write(mtd, part, download_buffer, 0, CONFIG_ENV_SIZE, NULL);
