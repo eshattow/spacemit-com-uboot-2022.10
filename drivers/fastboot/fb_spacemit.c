@@ -486,8 +486,11 @@ void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download
 		strcpy(tmp_var, var);
 		char *tv = tmp_var;
 		char *var_key = strsep(&tv, "=");
-		if (!run_commandf("env exists '%s'", var_key)){
-			if (strncmp("mtdparts", var_key, 8) && strncmp("mtdids", var_key, 6))
+
+		if (var_key != NULL && !run_commandf("env exists '%s'", var_key)){
+			debug("del env :%s\n", var_key);
+			if (strncmp("mtdparts", var_key, 8) && strncmp("mtdids", var_key, 6)
+				&& strncmp("serial", var_key, 6))
 				run_commandf("env delete '%s'", var_key);
 		}
 

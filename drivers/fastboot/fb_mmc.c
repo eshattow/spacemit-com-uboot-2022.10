@@ -540,7 +540,7 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 
 	/*flash env*/
 	if (strcmp(cmd, "env") == 0) {
-		printf("flash env \n");
+		printf("flash env to emmc\n");
 		fastboot_oem_flash_env(cmd, fastboot_buf_addr, download_bytes,
 								response, fdev);
 		return;
