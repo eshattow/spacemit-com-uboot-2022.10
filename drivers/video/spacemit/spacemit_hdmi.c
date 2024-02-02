@@ -32,6 +32,8 @@ static int hdmi_enable(struct udevice *dev, int panel_bpp,
 	u32 value;
 
 	// hdmi phy param config
+	#if 0
+
 	writel(0x4d, hdmi_addr + 0x34);
 	writel(0x20200000, hdmi_addr + 0xe8);
 	writel(0x509D453E, hdmi_addr + 0xec);
@@ -43,6 +45,24 @@ static int hdmi_enable(struct udevice *dev, int panel_bpp,
 	debug("%s() hdmi 0xe4 0x%x\n", __func__, value);
 
 	writel(0x30184000, hdmi_addr + 0x28);
+
+	#else
+
+	writel(0xEE40410F, hdmi_addr + 0xe0);
+	writel(0x0000005d, hdmi_addr + 0x34);
+	writel(0x2022C000, hdmi_addr + 0xe8);
+	writel(0x508D414D, hdmi_addr + 0xec);
+
+	writel(0x00000901, hdmi_addr + 0xf0);
+	writel(0x3, hdmi_addr + 0xe4);
+
+	udelay(2);
+	value = readl(hdmi_addr + 0xe4);
+	debug("%s() hdmi 0xe4 0x%x\n", __func__, value);
+
+	writel(0x3018C001, hdmi_addr + 0x28);
+
+	#endif
 
 	udelay(1000);
 
