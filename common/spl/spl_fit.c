@@ -17,6 +17,8 @@
 #include <asm/cache.h>
 #include <asm/global_data.h>
 #include <linux/libfdt.h>
+#include <cpu_func.h>
+#include <linux/kernel.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -249,6 +251,8 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 	const void *data;
 	const void *fit = ctx->fit;
 	bool external_data = false;
+	ulong flush_dcache_addr;
+	ulong flush_lenth;
 
 	if (IS_ENABLED(CONFIG_SPL_FPGA) ||
 	    (IS_ENABLED(CONFIG_SPL_OS_BOOT) && IS_ENABLED(CONFIG_SPL_GZIP))) {
@@ -341,6 +345,10 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 	} else {
 		memcpy(load_ptr, src, length);
 	}
+
+	flush_dcache_addr = round_down((ulong)load_ptr,CONFIG_RISCV_CBOM_BLOCK_SIZE);
+	flush_lenth = round_up(length, CONFIG_RISCV_CBOM_BLOCK_SIZE);
+	flush_dcache_range(flush_dcache_addr, flush_dcache_addr + flush_lenth);
 
 	if (image_info) {
 		ulong entry_point;
