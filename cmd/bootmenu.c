@@ -582,6 +582,23 @@ int menu_show(int bootdelay)
 {
 	int ret;
 
+	ret = run_command("usb start", 0);
+	if (ret != 0) {
+		printf("Error: Failed to execute 'usb start'\n");
+	}
+
+	if (tstc()) {
+		int key = fgetc(stdin);
+		/* 0x62 is the ASCII code for 'b' */
+		if (key == 0x62){
+			printf("Enter boot menu\n");
+		}else{
+			return 0;
+		}
+	}
+	else
+		return 0;
+
 	while (1) {
 		ret = bootmenu_show(bootdelay);
 		bootdelay = -1;
