@@ -260,18 +260,18 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 		TODO:should get partition.json name by searching the folder, and match
 		to the storage type.
 	*/
-	char *temp_fname = malloc(strlen(FLASH_CONFIG_NAME) + strlen(FLASH_IMG_FOLDER) + 2);
+	char *temp_fname = malloc(strlen(FLASH_CONFIG_FILE_NAME) + strlen(FLASH_IMG_FOLDER) + 2);
 	if (!temp_fname){
 		printf("malloc file_name fail\n");
 		return RESULT_FAIL;
 	}
-	memset(temp_fname, '\0', strlen(FLASH_CONFIG_NAME) + strlen(FLASH_IMG_FOLDER) + 2);
+	memset(temp_fname, '\0', strlen(FLASH_CONFIG_FILE_NAME) + strlen(FLASH_IMG_FOLDER) + 2);
 	if (strlen(FLASH_IMG_FOLDER) > 0){
 		strcpy(temp_fname, FLASH_IMG_FOLDER);
 		strcat(temp_fname, "/");
-		strcat(temp_fname, FLASH_CONFIG_NAME);
+		strcat(temp_fname, FLASH_CONFIG_FILE_NAME);
 	}else{
-		strcpy(temp_fname, FLASH_CONFIG_NAME);
+		strcpy(temp_fname, FLASH_CONFIG_FILE_NAME);
 	}
 
 	if (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0) {

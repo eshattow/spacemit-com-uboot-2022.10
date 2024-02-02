@@ -324,8 +324,8 @@ void run_cardfirmware_flash_command(void)
 	if (part_dev > MAX_SEARCH_PARTITIONS)
 		return;
 
-	/*check json file exist or not in sd card*/
-	sprintf(cmd, "fatsize mmc %d:%d %s", MMC_DEV_SD, part_dev, CARD_FLASH_FILE);
+	/*check if flash config file is in sd card*/
+	sprintf(cmd, "fatsize mmc %d:%d %s", MMC_DEV_SD, part_dev, FLASH_CONFIG_FILE_NAME);
 	debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0))
 		run_command("spacemit_flashing mmc", 0);
