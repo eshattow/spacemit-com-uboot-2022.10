@@ -16,14 +16,8 @@
 /*recovery folder name*/
 #define FLASH_IMG_FOLDER ("")
 #define FLASH_IMG_FACTORY_FOLDER ("factory")
-#define FLASH_CONFIG_NAME ("partition_universal.json")
+#define FLASH_CONFIG_FILE_NAME ("partition_universal.json")
 #define FLASH_IMG_PARTNAME ("bootfs")
-
-/*check the file exist or not*/
-#define CARD_FLASH_FILE ("partition_universal.json")
-
-#define FLASH_FSBL0_OFFSET (0x20000)
-#define FLASH_FSBL1_OFFSET (0x60000)
 
 /*if they have different addr, it can define here*/
 #ifdef CONFIG_ENV_OFFSET
