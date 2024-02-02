@@ -370,34 +370,6 @@ void spl_board_init(void)
 	product_name = get_product_name();
 }
 
-void spl_perform_fixups(struct spl_image_info *spl_image)
-{
-	u32 boot_mode = get_boot_mode();
-
-	/*if boot from fastboot, should not change BOOT_DEV_FLAG_REG*/
-	if (boot_mode == BOOT_MODE_USB){
-		printf("boot from fastboot\n");
-		return;
-	}
-	debug("read BOOT_DEV_FLAG_REG:%x\n", boot_mode);
-	switch (spl_image->boot_device) {
-	case BOOT_DEVICE_NOR:
-		boot_mode = BOOT_MODE_NOR;
-		break;
-	case BOOT_DEVICE_NAND:
-		boot_mode = BOOT_MODE_NAND;
-		break;
-	case BOOT_DEVICE_MMC2:
-		boot_mode = BOOT_MODE_EMMC;
-		break;
-	case BOOT_DEVICE_MMC1:
-	default:
-		boot_mode = BOOT_MODE_SD;
-		break;
-	}
-	set_boot_mode(boot_mode);
-}
-
 struct image_header *spl_get_load_buffer(ssize_t offset, size_t size)
 {
 	return map_sysmem(CONFIG_SPL_LOAD_FIT_ADDRESS, 0);
@@ -410,28 +382,25 @@ void board_boot_order(u32 *spl_boot_list)
 	if (boot_mode == BOOT_MODE_USB){
 		spl_boot_list[0] = BOOT_DEVICE_BOARD;
 	}else{
-		spl_boot_list[0] = BOOT_DEVICE_MMC1;
-		if (boot_mode != BOOT_MODE_SD){
-			switch (boot_mode) {
-			case BOOT_MODE_EMMC:
-				spl_boot_list[1] = BOOT_DEVICE_MMC2;
-				break;
-			case BOOT_MODE_NAND:
-				spl_boot_list[1] = BOOT_DEVICE_NAND;
-				break;
-			case BOOT_MODE_NOR:
-				spl_boot_list[1] = BOOT_DEVICE_NOR;
-				break;
-			default:
-				spl_boot_list[1] = BOOT_DEVICE_RAM;
-				break;
-			}
-
-			//reserve for fpga to load/run uboot from ram.
-			spl_boot_list[2] = BOOT_DEVICE_RAM;
-		}else{
-			//reserve for fpga to load/run uboot from ram.
-			spl_boot_list[1] = BOOT_DEVICE_RAM;
+		switch (boot_mode) {
+		case BOOT_MODE_EMMC:
+			spl_boot_list[0] = BOOT_DEVICE_MMC2;
+			break;
+		case BOOT_MODE_NAND:
+			spl_boot_list[0] = BOOT_DEVICE_NAND;
+			break;
+		case BOOT_MODE_NOR:
+			spl_boot_list[0] = BOOT_DEVICE_NOR;
+			break;
+		case BOOT_MODE_SD:
+			spl_boot_list[0] = BOOT_DEVICE_MMC1;
+			break;
+		default:
+			spl_boot_list[0] = BOOT_DEVICE_RAM;
+			break;
 		}
+
+		//reserve for debug/test to load/run uboot from ram.
+		spl_boot_list[1] = BOOT_DEVICE_RAM;
 	}
 }
