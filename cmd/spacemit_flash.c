@@ -67,7 +67,6 @@ static int init_mmc_device(int dev_num)
 /* Detect and classify mmc device */
 static void detect_and_classify_mmc(int dev_num)
 {
-
 	int current_dev_num, err;
 	struct disk_partition info;
 
