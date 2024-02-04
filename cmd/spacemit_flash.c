@@ -460,126 +460,174 @@ void specific_flash_mmc_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 #endif
 }
 
-
-static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
+int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *file_name, char *partition, uint64_t *partition_offset)
 {
-	char load_str[13] = {"\0"};
-	char addr_str[13] = {"\0"};
-	char offset_str[13] = {"\0"};
-	char blk_dev_str[10] = {"\0"};
+	char load_str[20];
+	char addr_str[20];
+	char offset_str[20];
+	char blk_dev_str[16];
 	struct disk_partition info = {0};
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
-	lbaint_t part_start_cnt;
-	u32 image_size = 0;
-	u32 byte_remain = 0;
-	u32 div_times = 0;
-	u32 download_bytes = 0;
-	u32 download_offset = 0;
-	u32 had_download = 0;
+	lbaint_t part_start_addr;
+	uint64_t image_size = 0;
+	uint64_t byte_remain = 0;
+	uint64_t download_offset, download_bytes, bytes_read;
 	u32 crc_value = 0;
+	int div_times, data_source;
 
+	memset(load_str, 0, sizeof(load_str));
+	memset(offset_str, 0, sizeof(offset_str));
 	strcpy(load_str, simple_xtoa((ulong)load_addr));
 	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
 
-	for (int i = 0; i < MAX_PARTITION_NUM; i++) {
-		char *part_name = fdev->parts_info[i].part_name;
-		char *file_name = fdev->parts_info[i].file_name;
-		unsigned long time_start_flash = get_timer(0);
-		download_offset = 0;
-		crc_value = 0;
+	if (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0) {
+		// load data from fat disk
+		data_source = 0;
+		char *const argv_image_size[] = {"fatsize", fdev->device_name, blk_dev_str, file_name};
+		if (do_size(cmdtp, 0, 4, argv_image_size, FS_TYPE_FAT)) {
+			printf("can not find file :%s, \n", file_name);
+			return RESULT_FAIL;
+		}
 
-		if (fdev->parts_info[i].part_name == NULL || strlen(part_name) == 0) {
+		image_size = env_get_hex("filesize", 0);
+		byte_remain = image_size;
+		div_times = (image_size + RECOVERY_LOAD_IMG_SIZE - 1) / RECOVERY_LOAD_IMG_SIZE;
+		debug("\n\ndev_times:%d\n", div_times);
+	} else if (strcmp(fdev->device_name, "net") == 0) {
+		// load data from net with tftp
+		data_source = 1;
+		/* Temporarily, the logic for network fragment download has not been added,
+		so set the number of downloads to 1 and directly download the entire file. */
+		div_times = 1;
+	}
+	else {
+		printf("NOT support data source %s\n", fdev->device_name);
+		return RESULT_FAIL;
+	}
+
+	if (get_part_info(fdev->dev_desc, partition, &info) < 0) {
+		printf("can not get part %s in gpt tabel\n", partition);
+		return RESULT_FAIL;
+	}
+
+	download_offset = 0;
+	crc_value = 0;
+	info.start += *partition_offset;
+
+	/* save the partition start cnt */
+	part_start_addr = info.start;
+	for (int j = 0; j < div_times; j++) {
+		debug("\nflash data count %d\n", j);
+		if (0 == data_source) {
+			download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
+			strcpy(addr_str, simple_xtoa((ulong)download_bytes));
+			strcpy(offset_str, simple_xtoa((ulong)download_offset));
+
+			char *const argv_image[] = {"fatload", fdev->device_name, blk_dev_str,
+										load_str, file_name, addr_str, offset_str};
+			printf("load from %llx, bytes:%llx\n", download_offset, download_bytes);
+			if (do_load(cmdtp, 0, 7, argv_image, FS_TYPE_FAT))
+				return RESULT_FAIL;
+
+			bytes_read = env_get_hex("filesize", 0);
+			printf("read data size %lld\n", bytes_read);
+			if (bytes_read != download_bytes) {
+				printf("download file size is not equal require\n");
+				return RESULT_FAIL;
+			}
+		} else {
+			if (download_file_via_tftp(file_name, load_str) < 0) {
+				printf("Failed to download file via TFTP\n");
+				return RESULT_FAIL;
+			}
+			image_size = download_bytes = env_get_hex("filesize", 0);
+		}
+
+		crc_value = crc32_wd(crc_value, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
+		info.size = (download_bytes + (info.blksz - 1)) / info.blksz;
+		printf("write storage at block: 0x%lx, size: %lx\n", info.start, info.size);
+		if (write_raw_image(fdev->dev_desc, &info, partition, load_addr, download_bytes))
+			return RESULT_FAIL;
+		info.start += info.size;
+		*partition_offset += info.size;
+		download_offset += download_bytes;
+		byte_remain -= download_bytes;
+	}
+
+	/* read from device and check crc */
+	debug("check crc, read %lx, imagesize:%lld\n", part_start_addr, image_size);
+#ifdef CONFIG_FASTBOOT_FLASH_MMC
+	if (check_mmc_image_crc(fdev->dev_desc, crc_value, part_start_addr, info.blksz, image_size)) {
+		printf("check image crc32 fail, \n");
+		return RESULT_FAIL;
+	}
+#endif
+	return RESULT_OK;
+}
+
+static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
+{
+	int ret = RESULT_OK, i, j;
+	uint64_t time_start_flash, partition_offset;
+	char *part_name, *file_name;
+	char blk_dev_str[16], *split_file_name, *name, *extension;
+
+	for (i = 0; i < MAX_PARTITION_NUM; i++) {
+		part_name = fdev->parts_info[i].part_name;
+		file_name = fdev->parts_info[i].file_name;
+		time_start_flash = get_timer(0);
+
+		if (part_name == NULL || strlen(part_name) == 0) {
 			printf("no more partition to flash\n");
 			break;
 		}
 
-		if (fdev->parts_info[i].file_name == NULL || strlen(file_name) == 0) {
+		if (file_name == NULL || strlen(file_name) == 0) {
 			/* if not file not exists, it mean not to flash */
 			printf("file name is null, not to flashing, continue\n");
 			continue;
 		}
+
+		partition_offset = 0;
 		printf("\n\nflash img %s, part_name:%s\n", file_name, part_name);
-
-		if (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0) {
-			char *const argv_image[] = {"fatload", fdev->device_name, blk_dev_str, load_str, file_name};
-			if (do_load(cmdtp, 0, 5, argv_image, FS_TYPE_FAT)) {
-				printf("Failed to load file :%s, \n", file_name);
-				return RESULT_FAIL;
-			}
-
-			char *const argv_image_size[] = {"fatsize", fdev->device_name, blk_dev_str, file_name};
-			if (do_size(cmdtp, 0, 4, argv_image_size, FS_TYPE_FAT)) {
-				printf("can not find file :%s, \n", file_name);
-				return RESULT_FAIL;
-			}
-
-			image_size = env_get_hex("filesize", 0);
-			byte_remain = image_size;
-			div_times = (image_size + RECOVERY_LOAD_IMG_SIZE - 1) / RECOVERY_LOAD_IMG_SIZE;
-			debug("\n\ndev_times:%d\n", div_times);
-
-		} else if (strcmp(fdev->device_name, "net") == 0) {
-			/*  Temporarily, the logic for network fragment download has not been added,
-			so set the number of downloads to 1 and directly download the entire file. */
-			div_times = 1;
-		}
-
-		if (get_part_info(fdev->dev_desc, part_name, &info) < 0) {
-			printf("can not get part %s in gpt tabel\n", part_name);
-			continue;
-		}
-
-		/* save the partition start cnt */
-		part_start_cnt = info.start;
-		for (int j = 0; j < div_times; j++) {
-			debug("\ndownload and flash div %d\n", j);
-			if (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0) {
-				download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
-				strcpy(addr_str, simple_xtoa((ulong)download_bytes));
-				strcpy(offset_str, simple_xtoa((ulong)download_offset));
-
-				char *const argv_image[] = {"fatload", fdev->device_name, blk_dev_str,
-											load_str, file_name, addr_str, offset_str};
-				printf("load from %x, bytes:%x\n", download_offset, download_bytes);
-				if (do_load(cmdtp, 0, 7, argv_image, FS_TYPE_FAT))
-					return RESULT_FAIL;
-
-				had_download = env_get_hex("filesize", 0);
-				printf("had_download:%d\n", had_download);
-				if (had_download != download_bytes) {
-					printf("download file size is not equal require\n");
-					return RESULT_FAIL;
+		// big rootfs image(larger than 4GB) will split to multi files
+		sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+		if ((0 == strcmp(part_name, BIG_IMG_PARTNAME))
+			&& (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0)
+			&& !file_exists(fdev->device_name, blk_dev_str, file_name, FS_TYPE_FAT)) {
+				split_file_name = malloc(strlen(file_name) + 8);
+				extension = file_name;
+				// MUST has only 1 "." inside file name
+				name = strsep(&extension, ".");
+				j = 1;
+				while (1) {
+					sprintf(split_file_name, "%s_%d.%s", name, j, extension);
+					if (file_exists(fdev->device_name, blk_dev_str, split_file_name, FS_TYPE_FAT)) {
+						printf("write %s to device %s\n", split_file_name, fdev->device_name);
+						ret = load_and_flash_file(cmdtp, fdev, split_file_name, part_name, &partition_offset);
+						if (RESULT_OK != ret)
+							break;
+						j++;
+					}
+					else
+						break;
 				}
-			} else if (strcmp(fdev->device_name, "net") == 0) {
-				if (download_file_via_tftp(file_name, load_str) < 0) {
-					printf("Failed to download file via TFTP\n");
-					return RESULT_FAIL;
-				}
-				image_size = download_bytes = env_get_hex("filesize", 0);
-				had_download = download_bytes;
-			}
 
-			crc_value = crc32_wd(crc_value, (const uchar *)load_addr, had_download, CHUNKSZ_CRC32);
-			info.size = (download_bytes + (info.blksz - 1)) / info.blksz;
-			debug("write to mmc start_cnt:%lx, size:%lx\n", info.start, info.size);
-			if (write_raw_image(fdev->dev_desc, &info, part_name, load_addr, download_bytes))
-				return RESULT_FAIL;
-			info.start += info.size;
-			download_offset += download_bytes;
-			byte_remain -= download_bytes;
+				free(split_file_name);				
+			}
+		else
+			ret = load_and_flash_file(cmdtp, fdev, file_name, part_name, &partition_offset);
+
+		if (RESULT_OK != ret) {
+			printf("Write %s to partition %s fail(%d)\n", file_name, part_name, ret);
+			break;
 		}
-		/* read from device and check crc */
-		debug("check crc, read %lx, imagesize:%d\n", part_start_cnt, image_size);
-#ifdef CONFIG_FASTBOOT_FLASH_MMC
-		if (check_mmc_image_crc(fdev->dev_desc, crc_value, part_start_cnt, info.blksz, image_size)) {
-			printf("check image crc32 fail, \n");
-			return RESULT_FAIL;
-		}
-#endif
+
 		time_start_flash = get_timer(time_start_flash);
-		printf("flashing image %s over, use time:%lu ms\n", file_name, time_start_flash);
+		printf("finish image %s flash, consume %lld ms\n", file_name, time_start_flash);
 	}
-	return RESULT_OK;
+
+	return ret;
 }
 
 static int flash_gpt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
