@@ -18,6 +18,7 @@
 #define FLASH_IMG_FACTORY_FOLDER ("factory")
 #define FLASH_CONFIG_FILE_NAME ("partition_universal.json")
 #define FLASH_IMG_PARTNAME ("bootfs")
+#define BIG_IMG_PARTNAME ("rootfs")
 
 /*if they have different addr, it can define here*/
 #ifdef CONFIG_ENV_OFFSET
@@ -36,7 +37,7 @@
 #define BOOT_INFO_EMMC_SPL1_OFFSET (0x0)
 #define BOOT_INFO_EMMC_LIMIT (CONFIG_SPL_SIZE_LIMIT)
 
-typedef enum{
+typedef enum {
 	DEVICE_MMC,
 	DEVICE_USB,
 	DEVICE_NET,
