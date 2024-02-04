@@ -26,7 +26,6 @@ typedef enum {
 	RESERVEDX,
 } lpddr4_density_type;
 
-/* AquilaC DDR */
 typedef enum {
 	DPLL_DIV1,
 	DPLL_DIV2,
