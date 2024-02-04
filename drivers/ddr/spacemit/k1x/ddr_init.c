@@ -117,30 +117,6 @@ ERR_HANDLE:
 extern void lpddr4_silicon_init(uint32_t base, uint32_t data_rate);
 #endif
 
-__maybe_unused static void fix_ddr_data(unsigned long long start, unsigned long long end)
-{
-	unsigned long long value;
-
-	printf("try write 0x%llx ~ 0x%llx ...\n", start, end);
-	for(value=start; value<end; value +=8) {
-		*(unsigned long long *)value = value;
-	}
-}
-
-__maybe_unused static void check_ddr_data(unsigned long long start, unsigned long long end)
-{
-	unsigned long long value;
-
-	printf("checking 0x%llx ~ 0x%llx ...\n", start, end);
-	for(value=start; value<end; value +=8) {
-		if(*(unsigned long long *)value != value) {
-			printf("addr:0x%llx err:0x%llx, should be:0x%llx \n",
-				 value, *(unsigned long long *)value, value);
-		}
-	}
-	printf("checking 0x%llx ~ 0x%llx done\n", start, end);
-}
-
 static uint32_t adjust_cpu_freq(uint64_t cluster, uint32_t freq)
 {
 	uint32_t freq_act=freq, val;
@@ -246,48 +222,12 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	}
 	log_debug("dram init done\n");
 
-/* check dram space */
-
-//#define CHECK_4GB_DDR_ACCESS
-//#define CHECK_8GB_DDR_ACCESS
-#if defined(CHECK_4GB_DDR_ACCESS) || defined (CHECK_8GB_DDR_ACCESS)
-	/* check 0GB~2GB rw */
-	fix_ddr_data(0x1000, 0x7fffffff);
-	check_ddr_data(0x1000, 0x7fffffff);
-
-	/* check 2GB~4GB rw */
-	fix_ddr_data(0x100000000, 0x17fffffff);
-	check_ddr_data(0x100000000, 0x17fffffff);
-
-#if defined(CHECK_8GB_DDR_ACCESS)
-	/* check 4GB~6GB rw */
-	fix_ddr_data(0x180000000, 0x1ffffffff);
-	check_ddr_data(0x180000000, 0x1ffffffff);
-
-	/* check 6GB~8GB rw */
-	fix_ddr_data(0x200000000, 0x27fffffff);
-	check_ddr_data(0x200000000, 0x27fffffff);
-#endif
-
-	/* check 0GB~2GB rw */
-	check_ddr_data(0x1000, 0x7fffffff);
-
-	/* check 2GB~4GB rw */
-	check_ddr_data(0x100000000, 0x17fffffff);
-
-#if defined(CHECK_8GB_DDR_ACCESS)
-	/* check 4GB~8GB rw */
-	check_ddr_data(0x180000000, 0x27fffffff);
-#endif
-
-#endif
-
 	return 0;
 }
 
 static const struct udevice_id spacemit_ddr_ids[] = {
 	{ .compatible = "spacemit,ddr-ctl" },
-	{ /* sentinel */ }
+	{}
 };
 
 U_BOOT_DRIVER(spacemit_ddr) = {
