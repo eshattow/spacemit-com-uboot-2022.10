@@ -796,7 +796,7 @@ u32 fastboot_mmc_read(const char *part, u32 offset,
 	if (do_get_part_info(&dev_desc, part, &info) < 0){
 		if (dev_desc && dev_desc->blksz > 0){
 			info.blksz = dev_desc->blksz;
-			info.size = dev_desc->lba * dev_desc->blksz;
+			info.size = dev_desc->lba;
 			info.start = 0;
 		}else{
 			fastboot_response("OKAY", response, "%08x", 0);
@@ -804,7 +804,7 @@ u32 fastboot_mmc_read(const char *part, u32 offset,
 		}
 	}
 
-	if (offset >= info.size){
+	if (offset >= (info.size * info.blksz)){
 		fastboot_response("OKAY", response, "%08x", 0);
 		return 0;
 	}

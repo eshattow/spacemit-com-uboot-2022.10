@@ -768,7 +768,7 @@ static void oem_read(char *cmd_parameter, char *response)
 		/* if read data from mtd partition success, it would not try to read from blk dev*/
 		if (fastboot_bytes_expected > 0)
 			return;
-
+		printf("read data from blk dev\n");
 		fastboot_bytes_expected = fastboot_blk_read(part, off, fastboot_buf_addr, response);
 
 		return;

@@ -320,7 +320,7 @@ u32 fastboot_blk_read(const char *part, u32 offset,
 	if (do_get_part_info(&dev_desc, part, &info) < 0){
 		if (dev_desc && dev_desc->blksz > 0){
 			info.blksz = dev_desc->blksz;
-			info.size = dev_desc->lba * dev_desc->blksz;
+			info.size = dev_desc->lba;
 			info.start = 0;
 		}else{
 			fastboot_response("OKAY", response, "%08x", 0);
@@ -328,14 +328,15 @@ u32 fastboot_blk_read(const char *part, u32 offset,
 		}
 	}
 
-	if (offset >= info.size){
+	if (offset >= (info.size * info.blksz)){
 		fastboot_response("OKAY", response, "%08x", 0);
 		return 0;
 	}
 
+	printf("info.size:%lx, info.start:%lx\n", info.size, info.start);
 	/*transfer offset to blk size*/
 	off_blk = (offset / info.blksz) + info.start;
-	size_blk = (info.size - offset) / info.blksz;
+	size_blk = info.size - (offset / info.blksz);
 
 	if (offset % info.blksz)
 		printf("offset should be align to 0x%lx, would change offset to 0x%lx\n",
@@ -353,11 +354,11 @@ u32 fastboot_blk_read(const char *part, u32 offset,
 
 	res = blk_dread(dev_desc, off_blk, hdr_sectors, download_buffer);
 	if (res != hdr_sectors) {
-		fastboot_fail("cannot read data from mmc", response);
+		fastboot_fail("cannot read data from blk dev", response);
 		return 0;
 	}
 
 	/*return had read size*/
 	fastboot_response("OKAY", response, "0x%08x", (u32)(hdr_sectors * info.blksz));
-	return size_blk * info.blksz;
+	return hdr_sectors * info.blksz;
 }

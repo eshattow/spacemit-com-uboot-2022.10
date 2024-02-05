@@ -74,7 +74,7 @@ int fb_mtd_lookup(const char *partname,
 	}
 }
 
-int _fb_mtd_erase(struct mtd_info *mtd, struct part_info *part, u32 erase_size)
+int _fb_mtd_erase(struct mtd_info *mtd, u32 erase_size)
 {
 	bool scrub = false;
 	u64 len = 0;
@@ -214,8 +214,7 @@ static int _fb_mtd_rw(struct mtd_info *mtd, ulong sector, ulong count,
 }
 
 
-int _fb_mtd_write(struct mtd_info *mtd, struct part_info *part,
-			  void *buffer, u32 offset,
+int _fb_mtd_write(struct mtd_info *mtd, void *buffer, u32 offset,
 			  size_t length, size_t *written)
 {
 	int ret;
@@ -228,8 +227,7 @@ int _fb_mtd_write(struct mtd_info *mtd, struct part_info *part,
 }
 
 
-int _fb_mtd_read(struct mtd_info *mtd, struct part_info *part,
-			  void *buffer, u32 offset,
+int _fb_mtd_read(struct mtd_info *mtd, void *buffer, u32 offset,
 			  size_t length, size_t *written)
 {
 	int ret;
@@ -248,7 +246,7 @@ static lbaint_t fb_mtd_sparse_write(struct sparse_storage *info,
 	size_t written;
 	int ret;
 
-	ret = _fb_mtd_write(sparse->mtd, sparse->part, (void *)buffer,
+	ret = _fb_mtd_write(sparse->mtd, (void *)buffer,
 			     blk * info->blksz,
 			     blkcnt * info->blksz, &written);
 	if (ret < 0) {
@@ -381,7 +379,7 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 	if (need_erase) {
 		/*must erase at first when write data to mtd devices*/
 		printf("Erasing MTD partition %s\n", part->name);
-		ret = _fb_mtd_erase(mtd, part, download_bytes);
+		ret = _fb_mtd_erase(mtd, download_bytes);
 		if (ret) {
 			printf("failed erasing from device %s\n", mtd->name);
 			fastboot_fail("failed erasing from device", response);
@@ -447,7 +445,7 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 	} else {
 		printf("Flashing raw image at offset \n");
 
-		ret = _fb_mtd_write(mtd, part, download_buffer, 0,
+		ret = _fb_mtd_write(mtd, download_buffer, 0,
 				     download_bytes, NULL);
 
 		if (ret < 0) {
@@ -487,7 +485,7 @@ void fastboot_mtd_flash_erase(const char *cmd, char *response)
 		return;
 	}
 
-	ret = _fb_mtd_erase(mtd, part, 0);
+	ret = _fb_mtd_erase(mtd, 0);
 	if (ret) {
 		pr_err("failed erasing from device %s", mtd->name);
 		fastboot_fail("failed erasing from device", response);
@@ -526,20 +524,17 @@ u32 fastboot_mtd_flash_read(const char *part_name, u32 offset,
 			return 0;
 		}
 
-		printf("get mtd name :%s\n", mtd->name);
-		if (fb_mtd_lookup(mtd->name, &mtd, &part)){
-			printf("can not get the mtd part\n");
-			return 0;
-		}
+		debug("get mtd name :%s, mtd->offset:%llx, %llx\n", mtd->name, mtd->offset, mtd->size);
 	}
 
-	if (offset >= part->size){
+	if (offset >= mtd->size){
 		fastboot_response("OKAY", response, "%08x", 0);
 		return 0;
 	}
+	debug("mtd->offset:%llx, %llx\n", mtd->offset, mtd->size);
 
-	hdr_off = (u32)part->offset + offset;
-	hdr_size = (u32)part->size - offset;
+	hdr_off = offset;
+	hdr_size = (u32)mtd->size - offset;
 
 	/*if size > buffer_size, it would only load buffer_size, and return offset*/
 	if (hdr_size > fastboot_buf_size){
@@ -547,7 +542,7 @@ u32 fastboot_mtd_flash_read(const char *part_name, u32 offset,
 		hdr_size = fastboot_buf_size;
 	}
 
-	ret = _fb_mtd_read(mtd, part, download_buffer, hdr_off, hdr_size, NULL);
+	ret = _fb_mtd_read(mtd, download_buffer, hdr_off, hdr_size, NULL);
 	if (ret){
 		fastboot_fail("cannot read data from mtd dev", response);
 		return -1;
