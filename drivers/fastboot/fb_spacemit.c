@@ -133,10 +133,10 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 				pr_err("invalid mtd device\n");
 				return -1;
 			}
-			ret = _fb_mtd_erase(mtd, part, CONFIG_ENV_SIZE);
+			ret = _fb_mtd_erase(mtd, CONFIG_ENV_SIZE);
 			if (ret)
 				return -1;
-			ret = _fb_mtd_write(mtd, part, download_buffer, 0, CONFIG_ENV_SIZE, NULL);
+			ret = _fb_mtd_write(mtd, download_buffer, 0, CONFIG_ENV_SIZE, NULL);
 			if (ret)
 				printf("can not write env to mtd flash \n");
 		}
@@ -191,25 +191,29 @@ static int _write_mtd_partition(char mtd_table[128], char *response)
 int transfer_string_to_ul(const char *reserve_size)
 {
 	char *ret, *token;
-	char ch[2];
+	char ch[3] = {"\0"};
 	char strnum[10] = {"\0"};
 	u32 get_size = 0;
-	if (reserve_size == NULL || strlen(reserve_size) == 0)
+	const char *get_char = reserve_size;
+
+	if (get_char == NULL || strlen(get_char) == 0)
 		return 0;
 
-	if (!strncmp("-", reserve_size, 1)){
+	if (!strncmp("-", get_char, 1)){
 		return 0;
 	}
 
-	ret = strpbrk(reserve_size, "KMG");
+	ret = strpbrk(get_char, "KMG");
 	if (ret == NULL){
 		printf("can not get char\n");
 		return 0;
 	}
 	strncpy(ch, ret, 1);
 	if (ch[0] == 'K' || ch[0] == 'M' || ch[0] == 'G'){
-		strcpy(strnum, reserve_size);
+		printf("reserve_size:%s, reserve_size len:%ld\n", reserve_size, strlen(reserve_size));
+		strncpy(strnum, reserve_size, strlen(reserve_size));
 		token = strtok(strnum, ch);
+		printf("token:%s, ch:%s\n", token, ch);
 		get_size = simple_strtoul(token, NULL, 0);
 	}else{
 		printf("not support size %s, should use K/M/G\n", reserve_size);
@@ -313,7 +317,8 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			off = transfer_string_to_ul(node_offset);
 
 			if (off > 0 && off < combine_size){
-				printf("offset must larger then previous, off:%x, combine_size:%x\n", off, combine_size);
+				printf("offset must larger then previous, off:%x, combine_size:%x, node_offset:%s\n",
+						off, combine_size, node_offset);
 				return -5;
 			}
 

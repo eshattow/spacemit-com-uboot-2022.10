@@ -13,9 +13,9 @@
 /**
  * @brief find mtd part
  * 
- * @param partname 
- * @param mtd 
- * @param part 
+ * @param partname: mtd part name.
+ * @param mtd: mtd dev.
+ * @param part: mtd dev part info.
  * @return int 
  */
 int fb_mtd_lookup(const char *partname, struct mtd_info **mtd,
@@ -24,26 +24,24 @@ int fb_mtd_lookup(const char *partname, struct mtd_info **mtd,
 /**
  * @brief erase mtd partition
  * 
- * @param mtd 
- * @param part 
+ * @param mtd: mtd dev.
+ * @param erase_size: the size to erase at mtd dev.
  * @return int 
  */
-int _fb_mtd_erase(struct mtd_info *mtd, struct part_info *part, u32 erase_size);
+int _fb_mtd_erase(struct mtd_info *mtd, u32 erase_size);
 
 
 /**
  * @brief write data to mtd part.
  * 
- * @param mtd 
- * @param part 
- * @param buffer 
- * @param offset 
- * @param length 
- * @param written 
+ * @param mtd: mtd dev.
+ * @param buffer: the data would write from buffer.
+ * @param offset: the offset to write to the mtd dev.
+ * @param length: the length to write to the mtd dev.
+ * @param written: the length that had been write to mtd dev.
  * @return int 
  */
-int _fb_mtd_write(struct mtd_info *mtd, struct part_info *part,
-			  void *buffer, u32 offset,
+int _fb_mtd_write(struct mtd_info *mtd, void *buffer, u32 offset,
 			  size_t length, size_t *written);
 
 /**
