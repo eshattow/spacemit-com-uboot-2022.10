@@ -556,7 +556,7 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 
 	/* read from device and check crc */
 	debug("check crc, read %lx, imagesize:%lld\n", part_start_addr, image_size);
-#ifdef CONFIG_FASTBOOT_FLASH_MMC
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 	if (check_mmc_image_crc(fdev->dev_desc, crc_value, part_start_addr, info.blksz, image_size)) {
 		printf("check image crc32 fail, \n");
 		return RESULT_FAIL;
@@ -650,7 +650,7 @@ static int flash_gpt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 
 static int parse_flash_config(struct flash_dev *fdev)
 {
-#ifdef CONFIG_FASTBOOT_FLASH_MMC
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
 	return _parse_flash_config(fdev, load_addr);
 #else
