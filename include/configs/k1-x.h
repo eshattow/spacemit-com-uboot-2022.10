@@ -119,7 +119,6 @@ enum board_boot_mode {
 	"scriptaddr=0x2c100000\0" \
 	"pxefile_addr_r=0x2c200000\0" \
 	"ramdisk_addr_r=0x2c300000\0" \
-	"ethaddr=00:00:23:34:45:66\0" \
 	"ipaddr=192.168.1.15\0" \
 	"netmask=255.255.255.0\0" \
 	"serverip=10.0.92.134\0" \
