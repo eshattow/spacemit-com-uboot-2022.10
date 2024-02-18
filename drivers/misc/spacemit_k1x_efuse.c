@@ -102,6 +102,7 @@ struct spacemit_efuse_plat {
 	struct efuse_data efuse;
 	int efuse_need_reload;
 	int efuse_power_flag;
+	struct udevice *regulator;
 };
 
 static inline int se_clock_on(struct udevice *dev)
@@ -137,40 +138,29 @@ static inline __maybe_unused int se_clock_off(struct udevice *dev)
 	return ret;
 }
 
-static inline __maybe_unused int efuse_power_on(void)
+static inline __maybe_unused int efuse_power_on(struct udevice *dev)
 {
-	struct udevice *rdev;
-	int ret;
+	struct spacemit_efuse_plat *plat = dev_get_plat(dev);
 
-	ret = regulator_get_by_devname("LDO_REG15", &rdev);
-	if (ret) {
-		printf("fail to get regulatore device LDO_REG15\n");
-		ret = regulator_get_by_devname("LDO_REG5", &rdev);
-		if (ret) {
-			printf("fail to get regulatore device LDO_REG5\n");
-			return -1;
-		}
+	if (NULL != plat->regulator) {
+		printf("Power on regulatore device %s\n", plat->regulator->name);
+		regulator_set_value(plat->regulator, 1800000);
+		return regulator_set_enable(plat->regulator, true);
 	}
-
-	return regulator_set_enable(rdev, true);
+	else
+		return -EIO;
 }
 
-static inline __maybe_unused int efuse_power_off(void)
+static inline __maybe_unused int efuse_power_off(struct udevice *dev)
 {
-	struct udevice *rdev;
-	int ret;
+	struct spacemit_efuse_plat *plat = dev_get_plat(dev);
 
-	ret = regulator_get_by_devname("LDO_REG15", &rdev);
-	if (ret) {
-		printf("fail to get regulatore device LDO_REG15\n");
-		ret = regulator_get_by_devname("LDO_REG5", &rdev);
-		if (ret) {
-			printf("fail to get regulatore device LDO_REG5\n");
-			return -1;
-		}
+	if (NULL != plat->regulator) {
+		printf("Power off regulatore device %s\n", plat->regulator->name);
+		return regulator_set_enable(plat->regulator, false);
 	}
-
-	return regulator_set_enable(rdev, false);
+	else
+		return -EIO;
 }
 
 /* load efuse data from efuse bank reg_offset address */
@@ -348,9 +338,9 @@ int efuse_write_bank(struct udevice *dev, int offset, const void *buf, int size)
 		// no need to program if data is NOT changed
 		if (0 != memcmp(efuse_cmp_data, efuse_data, FUSE_BANK_BYTES)) {
 			efuse_write_bank_core(dev, bank_start, (uint32_t*)efuse_data);
-			#ifdef EFUSE_DEBUG
+#ifdef EFUSE_DEBUG
 			print_buffer(0, efuse_data, 1, FUSE_BANK_BYTES, 16);
-			#endif
+#endif
 			efuse_read_bank(dev, bank_start * FUSE_BANK_BYTES,
 							efuse_cmp_data, FUSE_BANK_BYTES);
 			if (0 != memcmp(efuse_cmp_data, efuse_data, FUSE_BANK_BYTES)) {
@@ -391,10 +381,10 @@ static __maybe_unused int spacemit_efuse_program(struct udevice *dev, int offset
 {
 	int ret;
 
-	ret = efuse_power_on();
+	ret = efuse_power_on(dev);
 	if (0 == ret){
 		ret = efuse_write_bank(dev, offset, buf, size);
-		efuse_power_off();
+		efuse_power_off(dev);
 	}
 	return ret;
 }
@@ -405,6 +395,36 @@ static const struct misc_ops spacemit_efuse_ops = {
 	.write = spacemit_efuse_program,
 #endif
 };
+
+static struct udevice* find_efuse_regulator(void)
+{
+	int ret;
+	const char *name;
+	char *path, *path_origin, *regulator_name;
+	struct udevice *rdev = NULL;
+
+	name = fdt_get_alias(gd->fdt_blob, "efuse_power");
+	if (NULL == name) {
+		printf("fail to get alias node efuse_power\n");
+		return NULL;
+	}
+
+	path_origin = strdup(name);
+	path = path_origin;
+	// search the last node in the path
+	while (NULL != path) {
+		regulator_name = strsep(&path, "/");
+	}
+	printf("Find regulator %s\n", regulator_name);
+
+	ret = regulator_get_by_devname(regulator_name, &rdev);
+	if (ret) {
+		printf("fail to get regulatore device %s\n", regulator_name);
+	}
+
+	free(path_origin);
+	return rdev;
+}
 
 static int spacemit_efuse_of_to_plat(struct udevice *dev)
 {
@@ -426,6 +446,7 @@ static int spacemit_efuse_of_to_plat(struct udevice *dev)
 		return ret;
 	}
 
+	plat->regulator = find_efuse_regulator();
 	return 0;
 }
 
