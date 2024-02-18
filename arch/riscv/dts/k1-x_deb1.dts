@@ -10,6 +10,10 @@
 / {
 	model = "spacemit k1-x deb1 board";
 
+	aliases {
+		efuse_power = &ldo_31;
+	};
+
 	memory@0 {
 		device_type = "memory";
 		reg = <0x00000000 0x00000000 0x00000000 0x80000000>;
