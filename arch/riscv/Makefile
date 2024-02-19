@@ -27,11 +27,11 @@ ifeq ($(CONFIG_CMODEL_MEDANY),y)
 	CMODEL = medany
 endif
 
-ifeq ($(CONFIG_TARGET_SPACEMIT_K1X), y)
-	SPACEMIT_ARCH_EXTENTION = _zba_zbb_zbc_zbs_zicsr_zifencei
+ifeq ($(CONFIG_SPACEMIT_X60),y)
+	SPACEMIT_X60_EXTENTION = _zba_zbb_zbc_zbs_zicsr_zifencei
 endif
 
-ARCH_FLAGS = -march=$(ARCH_BASE)$(ARCH_A)$(ARCH_C)$(ARCH_EXTENTION)$(SPACEMIT_ARCH_EXTENTION) -mabi=$(ABI) \
+ARCH_FLAGS = -march=$(ARCH_BASE)$(ARCH_A)$(ARCH_C)$(ARCH_EXTENTION)$(SPACEMIT_X60_EXTENTION) -mabi=$(ABI) \
 		-mcmodel=$(CMODEL)
 
 PLATFORM_CPPFLAGS	+= $(ARCH_FLAGS)
