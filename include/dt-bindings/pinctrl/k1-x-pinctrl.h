@@ -195,4 +195,4 @@
 
 #define K1X_PADCONF(pinid, conf, mux)	((pinid) * 4) (conf) (mux)
 
-#endif /* __DT_BINDINGS_K1PRO_PINCTRL_H */
+#endif /* __DT_BINDINGS_K1X_PINCTRL_H */
