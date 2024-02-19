@@ -14,7 +14,7 @@
 #include <dm.h>
 #include <log.h>
 #include <asm/io.h>
-#include "ccu-spacemit-k1x.h"
+#include "ccu-k1x.h"
 #include "ccu_mix.h"
 #include "ccu_pll.h"
 #include "ccu_ddn.h"

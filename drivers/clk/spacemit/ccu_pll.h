@@ -7,7 +7,7 @@
 #ifndef _CCU_PLL_H_
 #define _CCU_PLL_H_
 
-#include "ccu-spacemit-k1x.h"
+#include "ccu-k1x.h"
 
 #define CCU_CLK_PLL "ccu_clk_pll"
 struct ccu_pll_rate_tbl {
