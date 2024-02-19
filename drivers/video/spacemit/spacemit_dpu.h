@@ -8,6 +8,8 @@
 #define _SPACEMIT_DPU_H_
 #include <clk.h>
 #include <reset.h>
+#include "./dsi/include/spacemit_video_tx.h"
+
 
 #define DPU_INT_REG_24	0x960
 #define DPU_INT_REG_14	0x938
@@ -30,6 +32,17 @@ enum dpu_features {
 	DPU_FEATURE_OUTPUT_10BIT = (1 << 0),
 };
 
+enum {
+	POWER_INVALID = 0,
+	POWER_OFF,
+	POWER_ON,
+};
+
+struct fb_info {
+	struct spacemit_mode_modeinfo mode;
+	struct video_tx_device *tx;
+};
+
 struct spacemit_dpu_priv {
 	void __iomem * regs_dsi;
 	void __iomem * regs_hdmi;
@@ -42,28 +55,6 @@ struct spacemit_dpu_driverdata {
 	u32 features;
 	/* block-specific setters/getters */
 	void (*set_pin_polarity)(struct udevice *, enum dpu_modes, u32);
-};
-
-struct spacemit_mode_modeinfo {
-	const char *name;
-	unsigned int refresh;
-	unsigned int xres;
-	unsigned int yres;
-	unsigned int real_xres;
-	unsigned int real_yres;
-	unsigned int left_margin;
-	unsigned int right_margin;
-	unsigned int upper_margin;
-	unsigned int lower_margin;
-	unsigned int hsync_len;
-	unsigned int vsync_len;
-	unsigned int hsync_invert;
-	unsigned int vsync_invert;
-	unsigned int invert_pixclock;
-	unsigned int pixclock_freq;
-	int pix_fmt_out;
-	uint32_t height; /* screen height in mm */
-	uint32_t width; /* screen width in mm */
 };
 
 #endif

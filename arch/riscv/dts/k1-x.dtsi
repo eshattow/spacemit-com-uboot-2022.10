@@ -706,38 +706,14 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 
-				dpu_out_hdmi: endpoint@0 {
+				dpu_out_mipi: endpoint@0 {
 					reg = <0>;
-					remote-endpoint = <&hdmi_in_dpu>;
-				};
-
-				dpu_out_mipi: endpoint@1 {
-					reg = <1>;
 					remote-endpoint = <&mipi_in_dpu>;
 				};
-			};
-		};
 
-		hdmi: hdmi@c040050 {
-			compatible = "spacemit,hdmi";
-			reg = <0x0 0xC0400500 0x0 0x200>;
-			reg-names = "hdmi";
-			status = "disabled";
-
-			clocks = <&ccu CLK_HDMI>;
-			clock-names = "hmclk";
-			resets = <&reset RESET_HDMI>;
-			reset-names= "hdmi_reset";
-			power-domains = <&pmu K1X_PMU_HDMI_PWR_DOMAIN>;
-
-			ports {
-				hdmi_in: port {
-					#address-cells = <1>;
-					#size-cells = <0>;
-					hdmi_in_dpu: endpoint@0 {
-						reg = <0>;
-						remote-endpoint = <&dpu_out_hdmi>;
-					};
+				dpu_out_hdmi: endpoint@1 {
+					reg = <1>;
+					remote-endpoint = <&hdmi_in_dpu>;
 				};
 			};
 		};
@@ -746,7 +722,6 @@
 			compatible = "spacemit,mipi-dsi";
 			reg = <0x0 0xD421A800 0 0x200>;
 			reg-names = "dsi";
-			status = "disabled";
 
 			clocks = <&ccu CLK_DPU_PXCLK>,
 				<&ccu CLK_DPU_MCLK>,
@@ -754,10 +729,14 @@
 				<&ccu CLK_DPU_ESC>,
 				<&ccu CLK_DPU_BIT>;
 			clock-names = "pxclk", "mclk", "hclk", "escclk", "bitclk";
-			resets = <&reset RESET_LCD_MCLK>,
-					<&reset RESET_LCD>;
-			reset-names= "mclk_reset", "lcd_reset";
+			resets = <&reset RESET_MIPI>,
+				<&reset RESET_LCD_MCLK>,
+				<&reset RESET_DSI_ESC>,
+				<&reset RESET_LCD>;
+			reset-names= "dsi_reset", "mclk_reset", "esc_reset", "lcd_reset";
 			power-domains = <&pmu K1X_PMU_LCD_PWR_DOMAIN>;
+
+			status = "disabled";
 
 			ports {
 				mipi_in: port {
@@ -771,9 +750,32 @@
 			};
 		};
 
-		dsi_host: dsi-host {
-			compatible = "spacemit,dsi-host";
+		panel: panel {
+			  compatible = "spacemit,panel";
+			  status = "disabled";
+		};
+
+		hdmi: hdmi@c0400500 {
+			compatible = "spacemit,hdmi";
+			reg = <0x0 0xC0400500 0x0 0x200>;
+			reg-names = "hdmi";
+			clocks = <&ccu CLK_HDMI>;
+			clock-names = "hmclk";
+			resets = <&reset RESET_HDMI>;
+			reset-names= "hdmi_reset";
+			power-domains = <&pmu K1X_PMU_HDMI_PWR_DOMAIN>;
 			status = "disabled";
+
+			ports {
+				hdmi_in: port {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					hdmi_in_dpu: endpoint@0 {
+						reg = <0>;
+						remote-endpoint = <&dpu_out_hdmi>;
+					};
+				};
+			};
 		};
 
 	};
