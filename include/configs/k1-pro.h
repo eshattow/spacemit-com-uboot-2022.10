@@ -37,6 +37,18 @@
 #define RECOVERY_LOAD_IMG_ADDR (gd->ram_base + 0x400000)
 #define RECOVERY_LOAD_IMG_SIZE (RECOVERY_LOAD_IMG_SIZE_MAX)
 
+#ifndef __ASSEMBLY__
+enum board_boot_mode {
+	BOOT_MODE_NONE = 0,
+	BOOT_MODE_USB = 0x55a,
+	BOOT_MODE_EMMC,
+	BOOT_MODE_NAND,
+	BOOT_MODE_NOR,
+	BOOT_MODE_SD,
+	BOOT_MODE_SHELL = 0x55f,
+};
+#endif
+
 /* Environment options */
 
 #define BOOT_TARGET_DEVICES(func) \
