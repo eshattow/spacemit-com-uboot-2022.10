@@ -18,7 +18,7 @@
 #include <linux/iopoll.h>
 #include <clk.h>
 #include <div64.h>
-#include "k1pro-ccu.h"
+#include "ccu-k1pro.h"
 
 #define UBOOT_DM_CLK_PLL_INT  "k1pro_clk_pll_int"
 #define UBOOT_DM_CLK_PLL_FRAC "k1pro_clk_pll_frac"

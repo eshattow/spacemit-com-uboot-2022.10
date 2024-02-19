@@ -12,7 +12,7 @@
 #include <dm.h>
 #include <log.h>
 #include <asm/io.h>
-#include "k1pro-ccu.h"
+#include "ccu-k1pro.h"
 
 static struct clk* clks[CLK_MAX_NO] = {};
 //parents for mux
