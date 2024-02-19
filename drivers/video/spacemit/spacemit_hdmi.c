@@ -42,7 +42,7 @@ static int hdmi_enable(struct udevice *dev, int panel_bpp,
 
 	udelay(2);
 	value = readl(hdmi_addr + 0xe4);
-	debug("%s() hdmi 0xe4 0x%x\n", __func__, value);
+	pr_debug("%s() hdmi 0xe4 0x%x\n", __func__, value);
 
 	writel(0x30184000, hdmi_addr + 0x28);
 
@@ -58,7 +58,7 @@ static int hdmi_enable(struct udevice *dev, int panel_bpp,
 
 	udelay(2);
 	value = readl(hdmi_addr + 0xe4);
-	debug("%s() hdmi 0xe4 0x%x\n", __func__, value);
+	pr_debug("%s() hdmi 0xe4 0x%x\n", __func__, value);
 
 	writel(0x3018C001, hdmi_addr + 0x28);
 
@@ -116,7 +116,7 @@ static int spacemit_hdmi_probe(struct udevice *dev)
 	}
 
 	rate = clk_get_rate(&priv->hdmi_mclk);
-	debug("%s clk_get_rate hdmi mclk %ld\n", __func__, rate);
+	pr_debug("%s clk_get_rate hdmi mclk %ld\n", __func__, rate);
 
 	return ret;
 

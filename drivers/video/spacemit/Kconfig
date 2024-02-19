@@ -12,7 +12,6 @@ menuconfig VIDEO_SPACEMIT
 config VIDEO_SPACEMIT_MAX_XRES
         int "Maximum horizontal resolution (for memory allocation purposes)"
 	depends on VIDEO_SPACEMIT
-	default 1920 if DISPLAY_SPACEMIT_HDMI
 	default 1920
 	help
 	  The maximum horizontal resolution to support for the framebuffer.
@@ -22,8 +21,7 @@ config VIDEO_SPACEMIT_MAX_XRES
 config VIDEO_SPACEMIT_MAX_YRES
         int "Maximum vertical resolution (for memory allocation purposes)"
 	depends on VIDEO_SPACEMIT
-	default 1080 if DISPLAY_SPACEMIT_HDMI
-	default 1080
+	default 1200
 	help
 	  The maximum vertical resolution to support for the framebuffer.
 	  This configuration is used for reserving/allocating memory for the
@@ -36,5 +34,12 @@ config DISPLAY_SPACEMIT_HDMI
 	depends on VIDEO_SPACEMIT
 	help
 	  This enables High-Definition Multimedia Interface display support.
+
+config DISPLAY_SPACEMIT_MIPI
+	bool "MIPI Port"
+	depends on VIDEO_SPACEMIT
+	help
+	  This enables Mobile Industry Processor Interface(MIPI) display
+	  support.
 
 endif
