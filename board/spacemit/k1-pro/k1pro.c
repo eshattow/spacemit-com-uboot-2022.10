@@ -125,3 +125,7 @@ void k1pro_gmac_init(void)
 	writel(val, (volatile void __iomem *)SYS_GMAC_CFG);
 }
 
+enum board_boot_mode get_boot_pin_select(void)
+{
+	return BOOT_MODE_SD;
+}
