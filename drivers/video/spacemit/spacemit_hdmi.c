@@ -10,7 +10,7 @@
 #include <clk.h>
 #include <display.h>
 #include <dm.h>
-//#include <dw_hdmi.h>
+#include <dw_hdmi.h>
 #include <edid.h>
 #include <regmap.h>
 #include <syscon.h>
@@ -22,6 +22,40 @@
 #include <linux/io.h>
 
 #include "spacemit_hdmi.h"
+
+#define SPACEMIT_HDMI_PHY_STATUS        0xC
+#define SPACEMIT_HDMI_PHY_HPD           0x1000
+
+
+static int hdmi_get_plug_in_status(struct dw_hdmi *hdmi)
+{
+	void __iomem *hdmi_addr;
+	hdmi_addr = ioremap(0xC0400500, 0x200);
+	u32 value;
+
+	pr_debug("%s() \n", __func__);
+	value = readl(hdmi_addr + SPACEMIT_HDMI_PHY_STATUS) & SPACEMIT_HDMI_PHY_HPD;
+
+	return !!value;
+}
+
+static int hdmi_phy_wait_for_hpd(struct dw_hdmi *hdmi)
+{
+	ulong start;
+
+	pr_debug("%s() \n", __func__);
+
+	start = get_timer(0);
+	do {
+		if (hdmi_get_plug_in_status(hdmi)) {
+			pr_info("%s() hdmi get hpd signal \n", __func__);
+			return 0;
+		}
+		udelay(100);
+	} while (get_timer(start) < 100);
+
+	return -1;
+}
 
 
 static int hdmi_enable(struct udevice *dev, int panel_bpp,
@@ -71,7 +105,9 @@ static int hdmi_enable(struct udevice *dev, int panel_bpp,
 
 int hdmi_read_edid(struct udevice *dev, u8 *buf, int buf_size)
 {
-	return 0;
+	struct spacemit_hdmi_priv *priv = dev_get_priv(dev);
+
+	return dw_hdmi_read_edid(&priv->hdmi, buf, buf_size);
 }
 
 static int spacemit_hdmi_of_to_plat(struct udevice *dev)
@@ -85,6 +121,12 @@ static int spacemit_hdmi_probe(struct udevice *dev)
 	struct power_domain pm_domain;
 	unsigned long rate;
 	int ret;
+
+	pr_debug("%s() \n", __func__);
+
+	priv->base = dev_remap_addr_name(dev, "hdmi");
+	if (!priv->base)
+		return -EINVAL;
 
 	ret = power_domain_get(dev, &pm_domain);
 	if (ret) {
@@ -117,6 +159,16 @@ static int spacemit_hdmi_probe(struct udevice *dev)
 
 	rate = clk_get_rate(&priv->hdmi_mclk);
 	pr_debug("%s clk_get_rate hdmi mclk %ld\n", __func__, rate);
+
+
+	priv->hdmi.ioaddr = (ulong)priv->base;
+	priv->hdmi.reg_io_width = 4;
+
+	ret = hdmi_phy_wait_for_hpd(&priv->hdmi);
+	if (ret < 0) {
+		pr_info("hdmi can not get hpd signal\n");
+		return ret;
+	}
 
 	return ret;
 

@@ -31,6 +31,7 @@ if VIDEO_SPACEMIT
 
 config DISPLAY_SPACEMIT_HDMI
 	bool "HDMI port"
+	select VIDEO_DW_HDMI
 	depends on VIDEO_SPACEMIT
 	help
 	  This enables High-Definition Multimedia Interface display support.

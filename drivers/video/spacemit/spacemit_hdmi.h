@@ -10,6 +10,7 @@
 #include <clk.h>
 #include <reset.h>
 
+
 #define HDMI_STATUS				0xc8
 #define m_HOTPLUG				(1 << 7)
 #define m_MASK_INT_HOTPLUG		(1 << 5)
@@ -18,7 +19,7 @@
 
 
 struct spacemit_hdmi_priv {
-	//struct dw_hdmi hdmi;
+	struct dw_hdmi hdmi;
 	void __iomem *base;
 
 	struct clk hdmi_mclk;
