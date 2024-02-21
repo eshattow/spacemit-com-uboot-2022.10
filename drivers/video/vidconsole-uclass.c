@@ -45,6 +45,7 @@ int reverse_video_text_capacity = 1024;
 int console_truetype_fill_rect(struct udevice *dev, int xstart, int ystart, int width, int height, int clr);
 int get_string_dimensions(struct udevice *dev, const char *str, int *width, int *height);
 #endif
+extern int is_direction_key;
 
 int vidconsole_putc_xy(struct udevice *dev, uint x, uint y, char ch)
 {
@@ -90,10 +91,14 @@ static int vidconsole_back(struct udevice *dev)
 	struct vidconsole_ops *ops = vidconsole_get_ops(dev);
 	int ret;
 
-	if (ops->backspace) {
-		ret = ops->backspace(dev);
-		if (ret != -ENOSYS)
-			return ret;
+	if(is_direction_key){
+		is_direction_key = 0;
+	}else {
+		if (ops->backspace) {
+			ret = ops->backspace(dev);
+			if (ret != -ENOSYS)
+				return ret;
+		}
 	}
 
 	priv->xcur_frac -= VID_TO_POS(priv->x_charsize);
