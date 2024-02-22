@@ -232,6 +232,9 @@ int _fb_mtd_read(struct mtd_info *mtd, void *buffer, u32 offset,
 {
 	int ret;
 
+	/*if the length is not align to 4, data cannot be read from nor*/
+	length = roundup(length, 4);
+
 	ret = _fb_mtd_rw(mtd, offset, length, buffer, true);
 	if (ret)
 		return -1;
@@ -310,6 +313,7 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 	char *token;
 	char cmd_buf[256];
 	int need_erase = 1;
+	u32 crc_val = 0;
 
 	printf("Starting fastboot_mtd_flash_write for %s\n", cmd);
 #ifdef CONFIG_SPACEMIT_FLASH
@@ -440,8 +444,6 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 		sparse.priv = &sparse_priv;
 		ret = write_sparse_image(&sparse, cmd, download_buffer,
 					 response);
-		if (!ret)
-			fastboot_okay(NULL, response);
 	} else {
 		printf("Flashing raw image at offset \n");
 
@@ -450,20 +452,24 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 
 		if (ret < 0) {
 			printf("Failed to write mtd part:%s\n", cmd);
-			fastboot_fail("Failed to write mtd part", response);
-			return;
+		}else{
+			printf("........ wrote %u bytes to '%s'\n",
+				download_bytes, part->name);
 		}
 
-		printf("........ wrote %u bytes to '%s'\n",
-		       download_bytes, part->name);
+		printf("check crc\n");
+		crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
+		if (check_mtd_image_crc(mtd, crc_val, download_bytes)){
+			fastboot_fail("compare crc fail", response);
+			return;
+		}
 	}
 
-	if (ret) {
+	if (ret)
 		fastboot_fail("error writing the image", response);
-		return;
-	}
-
-	fastboot_okay(NULL, response);
+	else
+		fastboot_okay(NULL, response);
+	return;
 }
 
 /**

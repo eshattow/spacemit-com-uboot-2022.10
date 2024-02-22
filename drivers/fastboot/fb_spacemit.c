@@ -656,7 +656,7 @@ int fastboot_mmc_flash_offset(u32 start_offset, void *download_buffer,
 	return 0;
 }
 
-int check_mmc_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t part_start_cnt,
+int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t part_start_cnt,
 			ulong blksz, int image_size)
 {
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
@@ -696,6 +696,44 @@ int check_mmc_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 	printf("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
 	return (crc == crc_compare) ? 0 : -1;
 }
+
+int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, int image_size)
+{
+	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
+	u32 div_times = (image_size + RECOVERY_LOAD_IMG_SIZE - 1) / RECOVERY_LOAD_IMG_SIZE;
+	ulong crc = 0;
+	int byte_remain = image_size;
+	int download_bytes = 0;
+	u32 hdr_off = 0;
+	int ret;
+
+	debug("mtd size:%llx, image_size:%x\n", mtd->size, image_size);
+	unsigned long time_start_flash = get_timer(0);
+
+	/*if crc_compare is 0, return 0 directly*/
+	if (!crc_compare)
+		return 0;
+
+	for (int i = 0; i < div_times; i++) {
+		debug("\ndownload and flash div %d\n", i);
+		download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
+		ret = _fb_mtd_read(mtd, load_addr, hdr_off, download_bytes, NULL);
+		if (ret){
+			printf("cannot read data from mtd dev\n");
+			return -1;
+		}
+
+		crc = crc32_wd(crc, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
+		hdr_off += download_bytes;
+		byte_remain -= download_bytes;
+	}
+
+	printf("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
+	time_start_flash = get_timer(time_start_flash);
+	printf("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
+	return (crc == crc_compare) ? 0 : -1;
+}
+
 
 /**
  * @brief flash bootinfo to reserve partition.

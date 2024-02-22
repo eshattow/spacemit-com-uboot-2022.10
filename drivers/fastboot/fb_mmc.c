@@ -700,7 +700,7 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 		/*if download and flash div to many time, that the crc is not correct*/
 		printf("write_raw_image end\n");
 		crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
-		if (check_mmc_image_crc(dev_desc, crc_val, info.start, info.blksz, download_bytes))
+		if (check_blk_image_crc(dev_desc, crc_val, info.start, info.blksz, download_bytes))
 			fastboot_fail("compare crc fail", response);
 #endif
 	}
