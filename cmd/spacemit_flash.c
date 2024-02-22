@@ -25,6 +25,9 @@
 #include <fb_spacemit.h>
 #include <cJSON.h>
 #include <env.h>
+#include <mtd.h>
+#include <fb_mtd.h>
+#include <nvme.h>
 
 static int dev_emmc_num = -1;
 static int dev_sdio_num = -1;
@@ -46,6 +49,97 @@ static void free_flash_dev(struct flash_dev *fdev)
 	free(fdev);
 }
 
+
+static int _write_gpt_partition(struct flash_dev *fdev)
+{
+	__maybe_unused char write_part_command[300] = {"\0"};
+	char *gpt_table_str = NULL;
+
+	u32 boot_mode = get_boot_pin_select();
+
+	if (fdev->gptinfo.gpt_table != NULL && strlen(fdev->gptinfo.gpt_table) > 0){
+		gpt_table_str = malloc(strlen(fdev->gptinfo.gpt_table) + 32);
+		if (gpt_table_str == NULL){
+			return -1;
+		}
+		sprintf(gpt_table_str, "env set -f partitions '%s'", fdev->gptinfo.gpt_table);
+		run_command(gpt_table_str, 0);
+		free(gpt_table_str);
+	}
+
+	switch(boot_mode){
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+		sprintf(write_part_command, "gpt write mmc %x '%s'",
+			CONFIG_FASTBOOT_FLASH_MMC_DEV, fdev->gptinfo.gpt_table);
+		if (run_command(write_part_command, 0)){
+			printf("write gpt fail\n");
+			return -1;
+		}
+		break;
+#endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_SUPPORT_BLOCK_DEV)
+	case BOOT_MODE_NOR:
+	case BOOT_MODE_NAND:
+		printf("write gpt to dev:%s\n", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME);
+
+		/*nvme need scan at first*/
+		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)
+						&& nvme_scan_namespace()){
+			printf("can not can nvme devices!\n");
+			return -1;
+		}
+
+		sprintf(write_part_command, "gpt write %s %x '%s'",
+			CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX,
+			fdev->gptinfo.gpt_table);
+		if (run_command(write_part_command, 0)){
+			printf("write gpt fail\n");
+			return -1;
+		}
+		break;
+#endif
+	default:
+		break;
+	}
+	return 0;
+}
+
+
+static int _write_mtd_partition(char mtd_table[128])
+{
+#ifdef CONFIG_MTD
+	struct mtd_info *mtd;
+	char mtd_ids[36] = {"\0"};
+	char mtd_parts[128] = {"\0"};
+
+	mtd_probe_devices();
+
+	/*
+	try to find the first mtd device, it there have mutil mtd device such as nand and nor,
+	it only use the first one.
+	*/
+	mtd_for_each_device(mtd) {
+		if (!mtd_is_partition(mtd))
+			break;
+	}
+
+	if (mtd == NULL){
+		printf("can not get mtd device\n");
+		return -1;
+	}
+
+	/*to mtd device, it should write mtd table to env.*/
+	sprintf(mtd_ids, "%s=spi-dev", mtd->name);
+	sprintf(mtd_parts, "spi-dev:%s", mtd_table);
+
+	env_set("mtdids", mtd_ids);
+	env_set("mtdparts", mtd_parts);
+#endif
+	return 0;
+}
 
 /* Initialize the mmc device given its number */
 static int init_mmc_device(int dev_num)
@@ -98,19 +192,11 @@ static void detect_and_classify_mmc(int dev_num)
 int check_mmc_exist_and_initialize(void)
 {
 	int mmc_dev_num = get_mmc_num();
-	bool has_emmc = false;
 
 	for (int i = 0; i < mmc_dev_num; i++) {
 		if (init_mmc_device(i) == RESULT_OK) {
 			detect_and_classify_mmc(i);
-			if (dev_emmc_num != -1)
-				has_emmc = true;
 		}
-	}
-
-	if (!has_emmc) {
-		printf("Failed to initialize eMMC device.\n");
-		return RESULT_FAIL;
 	}
 
 	if (dev_sdio_num == -1) {
@@ -162,31 +248,15 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 			retval = RESULT_FAIL;
 			break;
 		}
-		fdev->dev_desc = blk_get_dev("mmc", dev_emmc_num);
-		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
-			printf("get emmc_device faild\n");
-			retval = RESULT_FAIL;
-			break;
-		}
 		fdev->dev_str = strdup(simple_itoa((ulong)dev_sdio_num));
 		fdev->device_name = strdup("mmc");
 		break;
+#endif //CONFIG_MMC
 
-	case DEVICE_USB:
-		/* Initialize eMMC */
-		if (check_mmc_exist_and_initialize() != RESULT_OK) {
-			printf("Failed to initialize eMMC while handling USB.\n");
-			retval = RESULT_FAIL;
-			break;
-		}
-		fdev->dev_desc = blk_get_dev("mmc", dev_emmc_num);
-		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
-			printf("Failed to get eMMC device descriptor while handling USB.\n");
-			retval = RESULT_FAIL;
-			break;
-		}
-		usb_init();
 #ifdef CONFIG_USB_STORAGE
+	case DEVICE_USB:
+		usb_init();
+
 		int device_number = usb_stor_scan(1);
 		if (device_number < 0){
 			printf("No USB storage devices found.\n");
@@ -214,23 +284,11 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 #else
 		printf("USB storage support is not enabled.\n");
 		retval = RESULT_FAIL;
-#endif
 		break;
+#endif //CONFIG_USB_STORAGE
 
 #ifdef CONFIG_CMD_TFTPBOOT
 	case DEVICE_NET:
-		/* Initialize eMMC */
-		if (check_mmc_exist_and_initialize() != RESULT_OK) {
-			printf("Failed to initialize eMMC while handling NET.\n");
-			retval = RESULT_FAIL;
-			break;
-		}
-		fdev->dev_desc = blk_get_dev("mmc", dev_emmc_num);
-		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
-			printf("Failed to get eMMC device descriptor while handling USB.\n");
-			retval = RESULT_FAIL;
-			break;
-		}
 		if (run_command("dhcp", 0) < 0) {
 			printf("Error: DHCP request failed\n");
 			retval = RESULT_FAIL;
@@ -239,9 +297,8 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 
 		fdev->device_name = strdup("net");
 		break;
-#endif
+#endif //CONFIG_CMD_TFTPBOOT
 
-#endif //CONFIG_MMC
 	default:
 		printf("Unknown device type!\n");
 		retval = RESULT_FAIL;
@@ -260,18 +317,18 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 		TODO:should get partition.json name by searching the folder, and match
 		to the storage type.
 	*/
-	char *temp_fname = malloc(strlen(FLASH_CONFIG_FILE_NAME) + strlen(FLASH_IMG_FOLDER) + 2);
+	char *temp_fname = malloc(strlen(fdev->mtd_partition_file) + strlen(FLASH_IMG_FOLDER) + 2);
 	if (!temp_fname){
 		printf("malloc file_name fail\n");
 		return RESULT_FAIL;
 	}
-	memset(temp_fname, '\0', strlen(FLASH_CONFIG_FILE_NAME) + strlen(FLASH_IMG_FOLDER) + 2);
+	memset(temp_fname, '\0', strlen(fdev->mtd_partition_file) + strlen(FLASH_IMG_FOLDER) + 2);
 	if (strlen(FLASH_IMG_FOLDER) > 0){
 		strcpy(temp_fname, FLASH_IMG_FOLDER);
 		strcat(temp_fname, "/");
-		strcat(temp_fname, FLASH_CONFIG_FILE_NAME);
+		strcat(temp_fname, fdev->mtd_partition_file);
 	}else{
-		strcpy(temp_fname, FLASH_CONFIG_FILE_NAME);
+		strcpy(temp_fname, fdev->mtd_partition_file);
 	}
 
 	if (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0) {
@@ -327,9 +384,8 @@ int get_part_info(struct blk_desc *dev_desc, const char *name,
 			return ret;
 	}
 
-	/* Then try dev.hwpart:part */
-	ret = part_get_info_by_dev_and_name_or_num("mmc", name, &dev_desc, info, true);
-	return ret;
+	printf("%s, can not find part info\n", __func__);
+	return -1;
 }
 
 
@@ -365,7 +421,7 @@ static __maybe_unused lbaint_t mmc_blk_write(struct blk_desc *block_dev, lbaint_
 }
 
 
-static int write_raw_image(struct blk_desc *dev_desc,
+int blk_write_raw_image(struct blk_desc *dev_desc,
 		struct disk_partition *info, const char *part_name,
 		void *buffer, u32 download_bytes)
 {
@@ -398,7 +454,26 @@ static int write_raw_image(struct blk_desc *dev_desc,
 	printf("not mmc dev found\n");
 	return RESULT_FAIL;
 #endif
+}
 
+int mtd_write_raw_image(struct mtd_info *mtd, const char *part_name, void *buffer, u32 download_bytes)
+{
+	int ret;
+
+	printf("Erasing MTD partition %s\n", part_name);
+	ret = _fb_mtd_erase(mtd, download_bytes);
+	if (ret) {
+		printf("failed erasing from device %s\n", mtd->name);
+		return RESULT_FAIL;
+	}
+
+	ret = _fb_mtd_write(mtd, buffer, 0, download_bytes, NULL);
+	if (ret < 0) {
+		printf("Failed to write mtd part:%s\n", part_name);
+		return RESULT_FAIL;
+	}
+
+	return 0;
 }
 
 void specific_flash_mmc_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
@@ -467,6 +542,8 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 	char offset_str[20];
 	char blk_dev_str[16];
 	struct disk_partition info = {0};
+	struct mtd_info *mtd = NULL;
+	struct part_info *mtd_part_info = NULL;
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
 	lbaint_t part_start_addr;
 	uint64_t image_size = 0;
@@ -499,15 +576,24 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 		/* Temporarily, the logic for network fragment download has not been added,
 		so set the number of downloads to 1 and directly download the entire file. */
 		div_times = 1;
-	}
-	else {
+	} else {
 		printf("NOT support data source %s\n", fdev->device_name);
 		return RESULT_FAIL;
 	}
 
-	if (get_part_info(fdev->dev_desc, partition, &info) < 0) {
+	if (fdev->blk_write != NULL && get_part_info(fdev->dev_desc, partition, &info) < 0) {
 		printf("can not get part %s in gpt tabel\n", partition);
 		return RESULT_FAIL;
+	}
+	if(fdev->mtd_write != NULL){
+		/*init mtd info*/
+		if(fb_mtd_lookup(partition, &mtd, &mtd_part_info)){
+			printf("invalid mtd device \n");
+			return RESULT_FAIL;
+		}
+		/*update info to mtd dev*/
+		info.start = 0;
+		info.blksz = 1;
 	}
 
 	download_offset = 0;
@@ -546,8 +632,17 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 		crc_value = crc32_wd(crc_value, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
 		info.size = (download_bytes + (info.blksz - 1)) / info.blksz;
 		printf("write storage at block: 0x%lx, size: %lx\n", info.start, info.size);
-		if (write_raw_image(fdev->dev_desc, &info, partition, load_addr, download_bytes))
-			return RESULT_FAIL;
+
+		if (fdev->blk_write != NULL){
+			if (fdev->blk_write(fdev->dev_desc, &info, partition, load_addr, download_bytes)){
+				return RESULT_FAIL;
+			}
+		}else{
+			/*write to mtd dev*/
+			if (fdev->mtd_write(mtd, partition, load_addr, download_bytes))
+				return RESULT_FAIL;
+		}
+
 		info.start += info.size;
 		*partition_offset += info.size;
 		download_offset += download_bytes;
@@ -557,9 +652,17 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 	/* read from device and check crc */
 	debug("check crc, read %lx, imagesize:%lld\n", part_start_addr, image_size);
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
-	if (check_mmc_image_crc(fdev->dev_desc, crc_value, part_start_addr, info.blksz, image_size)) {
-		printf("check image crc32 fail, \n");
-		return RESULT_FAIL;
+
+	if (fdev->blk_write){
+		if (check_blk_image_crc(fdev->dev_desc, crc_value, part_start_addr, info.blksz, image_size)) {
+			printf("check image crc32 fail, \n");
+			return RESULT_FAIL;
+		}
+	}else{
+		if (check_mtd_image_crc(mtd, crc_value, image_size)) {
+			printf("check image crc32 fail, \n");
+			return RESULT_FAIL;
+		}
 	}
 #endif
 	return RESULT_OK;
@@ -630,32 +733,35 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	return ret;
 }
 
-static int flash_gpt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
-{
-	char gpt_command[250] = {"\0"};
-	sprintf(gpt_command, "gpt write mmc %x '%s'", dev_emmc_num, fdev->gptinfo.gpt_table);
-	printf("gpt table command :%s\n", gpt_command);
-	if (run_command(gpt_command, 0))
-		return RESULT_FAIL;
-
-	/*set partition to env*/
-	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
-
-	/*update partition/mtd table to env*/
-	if (_update_partinfo_to_env(load_addr, 0, fdev))
-		return RESULT_FAIL;
-
-	return RESULT_OK;
-}
 
 static int parse_flash_config(struct flash_dev *fdev)
 {
-#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
+	int ret = 0;
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
-	return _parse_flash_config(fdev, load_addr);
-#else
+
+	ret = _parse_flash_config(fdev, load_addr);
+	if (ret){
+		if (ret == -1)
+			printf("parsing config fail\n");
+		if (ret == -5)
+			printf("offset must larger then previous size and offset\n");
+		return ret;
+	}
+
+	if (fdev->gptinfo.gpt_table != NULL && strlen(fdev->gptinfo.gpt_table) > 1 && fdev->gptinfo.fastboot_flash_gpt){
+		_write_gpt_partition(fdev);
+	}
+
+	if (fdev->mtd_table != NULL && strlen(fdev->mtd_table) > 1){
+		_write_mtd_partition(fdev->mtd_table);
+	}
+
+	/*set partition to env*/
+	if (_update_partinfo_to_env(load_addr, 0, fdev)){
+		printf("update part info to env fail\n");
+		return -1;
+	}
 	return 0;
-#endif
 }
 
 /*Attempt to load recovery files from all possible sources*/
@@ -689,19 +795,126 @@ static int load_recovery_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev,
 
 static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 {
-	/*flash gpt as default*/
-	if (flash_gpt(cmdtp, fdev)) {
-		return RESULT_FAIL;
-	}
-	if (flash_image(cmdtp, fdev)) {
-		return RESULT_FAIL;
-	}
+	u32 boot_mode = get_boot_pin_select();
+	switch(boot_mode){
+#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
+	case BOOT_MODE_NOR:
+	case BOOT_MODE_NAND:
+		/*nvme devices need scan at first*/
+		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)){
+			run_command("nvme scan", 0);
+		}
 
-	/*flash other image to specific offset*/
-	specific_flash_mmc_opt(cmdtp, fdev);
+		fdev->dev_desc = blk_get_dev(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
+							 CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX);
+		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
+			printf("get blk faild\n");
+			return -1;
+		}
+
+		if (flash_image(cmdtp, fdev)) {
+			return RESULT_FAIL;
+		}
+
+		break;
+#endif //CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
+
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+#ifdef CONFIG_FASTBOOT_FLASH_MMC_DEV
+		fdev->dev_desc = blk_get_dev("mmc", CONFIG_FASTBOOT_FLASH_MMC_DEV);
+		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
+			printf("get emmc_device faild\n");
+			return -1;
+		}
+
+		if (flash_image(cmdtp, fdev)) {
+			return RESULT_FAIL;
+		}
+		/*if flash to emmc，it should write bootinfo to boot0/boot1*/
+		specific_flash_mmc_opt(cmdtp, fdev);
+		break;
+#endif //CONFIG_FASTBOOT_FLASH_MMC_DEV
+
+	default:
+		return -1;
+	}
 
 	/* all flash operations successed */
 	return RESULT_OK;
+}
+
+
+void get_mtd_partition_file(char *file_name)
+{
+	char tmp_file[30] = {"\0"};
+
+	u32 boot_mode = get_boot_pin_select();
+	switch(boot_mode){
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MTD)
+	case BOOT_MODE_NOR:
+	case BOOT_MODE_NAND:
+		/*if select nor/nand, it would check if mtd dev exists or not*/
+		struct mtd_info *mtd;
+		mtd_probe_devices();
+		mtd_for_each_device(mtd) {
+			if (!mtd_is_partition(mtd)) {
+				if (mtd->size / 0x40000000){
+					sprintf(tmp_file, "partition_%lldG.json", mtd->size / 0x40000000);
+				} else if (mtd->size / 0x100000){
+					sprintf(tmp_file, "partition_%lldM.json", mtd->size / 0x100000);
+				} else if (mtd->size / 0x400){
+					sprintf(tmp_file, "partition_%lldK.json", mtd->size / 0x400);
+				}
+			}
+		}
+		printf("get mtd partition file name:%s, \n", tmp_file);
+		strcpy(file_name, tmp_file);
+		return;
+#endif
+	default:
+		return;
+	}
+}
+
+void get_blk_partition_file(char *file_name)
+{
+	struct blk_desc *dev_desc = NULL;
+	const char *blk_name;
+	int blk_index;
+
+	u32 boot_mode = get_boot_pin_select();
+	switch(boot_mode){
+#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
+	case BOOT_MODE_NOR:
+		blk_name = CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME;
+		blk_index = CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX;
+
+		/*nvme devices need scan at first*/
+		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)){
+			run_command("nvme scan", 0);
+		}
+
+		dev_desc = blk_get_devnum_by_typename(blk_name, blk_index);
+		if (dev_desc != NULL)
+			strcpy(file_name, "partition_universal.json");
+		return;
+#endif //CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
+
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+#ifdef CONFIG_FASTBOOT_FLASH_MMC_DEV
+		blk_name = "mmc";
+		blk_index = CONFIG_FASTBOOT_FLASH_MMC_DEV;
+		dev_desc = blk_get_devnum_by_typename(blk_name, blk_index);
+		if (dev_desc != NULL)
+			strcpy(file_name, "partition_universal.json");
+		return;
+#endif //CONFIG_FASTBOOT_FLASH_MMC_DEV
+
+	default:
+		return;
+	}
 }
 
 static int do_flash_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
@@ -717,31 +930,91 @@ static int do_flash_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const
 	}
 	/*would realloc the size*/
 	fdev->gptinfo.gpt_table = malloc(1);
+	if (!fdev->gptinfo.gpt_table)
+		printf("can not malloc fdev->gptinfo.gpt_table\n");
+
 	fdev->mtd_table = malloc(1);
+	if (!fdev->mtd_table)
+		printf("can not malloc fdev->mtd_table\n");
 
 	memset(fdev, 0, sizeof(struct flash_dev));
+	memset(fdev->mtd_partition_file, '\0', sizeof(fdev->mtd_partition_file));
 
+	/*start flash*/
 	unsigned long time_start_flash = get_timer(0);
 
-	/*Load flash_config.cfg file*/
-	int result = load_recovery_file(cmdtp, fdev, argc, argv);
-	if (result != RESULT_OK) {
-		recovery_show_result(fdev, RESULT_FAIL);
-		return RESULT_FAIL;
+	get_mtd_partition_file(fdev->mtd_partition_file);
+	if (strlen(fdev->mtd_partition_file) > 0){
+		/*flash image to mtd dev*/
+		printf("partition file:%s\n", fdev->mtd_partition_file);
+
+		/*only one write method.*/
+		fdev->mtd_write = mtd_write_raw_image;
+		fdev->blk_write = NULL;
+
+		/*Load flash_config.cfg file*/
+		int result = load_recovery_file(cmdtp, fdev, argc, argv);
+		if (result != RESULT_OK) {
+			recovery_show_result(fdev, RESULT_FAIL);
+			return RESULT_FAIL;
+		}
+
+		/*Parse json file and fill in relevant data structures*/
+		if (parse_flash_config(fdev)) {
+			printf("Failed to parse flash config.\n");
+			recovery_show_result(fdev, RESULT_FAIL);
+			return RESULT_FAIL;
+		}
+
+		/*Perform programming operation based on the provided information*/
+		if (perform_flash_operations(cmdtp, fdev)) {
+			printf("Failed to flash the device.\n");
+			recovery_show_result(fdev, RESULT_FAIL);
+			return RESULT_FAIL;
+		}
 	}
 
-	/*Parse json file and fill in relevant data structures*/
-	if (parse_flash_config(fdev)) {
-		printf("Failed to parse flash config.\n");
-		recovery_show_result(fdev, RESULT_FAIL);
-		return RESULT_FAIL;
-	}
+	memset(fdev->mtd_partition_file, '\0', sizeof(fdev->mtd_partition_file));
+	get_blk_partition_file(fdev->mtd_partition_file);
+	if (strlen(fdev->mtd_partition_file) > 0){
+		/*flash image to blk dev*/
+		printf("partition file:%s\n", fdev->mtd_partition_file);
 
-	/*Perform programming operation based on the provided information*/
-	if (perform_flash_operations(cmdtp, fdev)) {
-		printf("Failed to flash the device.\n");
-		recovery_show_result(fdev, RESULT_FAIL);
-		return RESULT_FAIL;
+		/*clear parts infomation*/
+		for (int i = 0; i < MAX_PARTITION_NUM; i++){
+			if (fdev->parts_info[i].part_name != NULL){
+				free(fdev->parts_info[i].part_name);
+				free(fdev->parts_info[i].file_name);
+				free(fdev->parts_info[i].size);
+			}else{
+				break;
+			}
+		}
+
+		/*only one write method.*/
+		fdev->mtd_write = NULL;
+		fdev->blk_write = blk_write_raw_image;
+
+		/*Load flash_config.cfg file*/
+		int result = load_recovery_file(cmdtp, fdev, argc, argv);
+		if (result != RESULT_OK) {
+			recovery_show_result(fdev, RESULT_FAIL);
+			return RESULT_FAIL;
+		}
+
+		/*Parse json file and fill in relevant data structures*/
+		if (parse_flash_config(fdev)) {
+			printf("Failed to parse flash config.\n");
+			recovery_show_result(fdev, RESULT_FAIL);
+			return RESULT_FAIL;
+		}
+
+		/*Perform programming operation based on the provided information*/
+		if (perform_flash_operations(cmdtp, fdev)) {
+			printf("Failed to flash the device.\n");
+			recovery_show_result(fdev, RESULT_FAIL);
+			return RESULT_FAIL;
+		}
 	}
 
 	ulong time_enc_flash = get_timer(0);

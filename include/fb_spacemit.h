@@ -6,6 +6,8 @@
 #ifndef _FB_SPACEMIT_H_
 #define _FB_SPACEMIT_H_
 
+#include <mtd.h>
+
 /*define max partition number*/
 #define MAX_PARTITION_NUM (20)
 
@@ -16,6 +18,7 @@
 /*recovery folder name*/
 #define FLASH_IMG_FOLDER ("")
 #define FLASH_IMG_FACTORY_FOLDER ("factory")
+/*FLASH_CONFIG_FILE_NAME would used as flag to excute card flash*/
 #define FLASH_CONFIG_FILE_NAME ("partition_universal.json")
 #define FLASH_IMG_PARTNAME ("bootfs")
 #define BIG_IMG_PARTNAME ("rootfs")
@@ -43,8 +46,7 @@ typedef enum {
 	DEVICE_NET,
 } DeviceType;
 
-struct flash_parts_info
-{
+struct flash_parts_info {
 	char *part_name;
 	char *file_name;
 	/*partition size info, such as 128MiB*/
@@ -70,6 +72,20 @@ struct flash_dev {
 	struct disk_partition *d_info;
 	struct blk_desc *dev_desc;
 	char *mtd_table;
+	char mtd_partition_file[30];
+
+	/*mtd write func*/
+	int (*mtd_write)(struct mtd_info *mtd,
+					const char *part_name,
+					void *buffer,
+					u32 download_bytes);
+
+	/*blk write func*/
+	int (*blk_write)(struct blk_desc *block_dev,
+					struct disk_partition *info,
+					const char *part_name,
+					void *buffer,
+					u32 download_bytes);
 };
 
 /**
@@ -128,7 +144,6 @@ enum board_boot_mode get_boot_mode(void);
  */
 enum board_boot_mode get_boot_pin_select(void);
 
-
 /**
  * fastboot_oem_flash_gpt() - parse flash config and write gpt table.
  *
@@ -138,7 +153,7 @@ enum board_boot_mode get_boot_pin_select(void);
  * @response: Pointer to fastboot response buffer
  */
 void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download_bytes,
-			char *response, struct flash_dev *fdev);
+							char *response, struct flash_dev *fdev);
 
 /**
  * fastboot_mmc_flash_offset() - Write fsbl image to eMMC
@@ -149,19 +164,28 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
  */
 int fastboot_mmc_flash_offset(u32 start_offset, void *download_buffer, u32 download_bytes);
 
-
 /**
- * @brief check image crc at emmc. if crc is same it would return RESULT_OK(0).
+ * @brief check image crc at blk dev. if crc is same it would return RESULT_OK(0).
  *
  * @param dev_desc struct blk_desc.
  * @param crc_compare need to be compare crc.
- * @param part_start_cnt read from emmc offset.
+ * @param part_start_cnt read from blk offset.
  * @param blksz normally is 0x200.
  * @param image_size
  * @return int
  */
-int check_mmc_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t part_start_cnt,
-			ulong blksz, int image_size);
+int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t part_start_cnt,
+						ulong blksz, int image_size);
+
+/**
+ * @brief check image crc at mtd dev. if crc is same it would return RESULT_OK(0).
+ *
+ * @param mtd mtd dev.
+ * @param crc_compare need to be compare crc.
+ * @param image_size
+ * @return int
+*/
+int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, int image_size);
 
 /**
  * @brief transfer the string of size 'KiB' or 'MiB' to u32 type.
@@ -171,7 +195,6 @@ int check_mmc_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
  */
 int transfer_string_to_ul(const char *reserve_size);
 
-
 /**
  * @brief parse the flash_config and save partition info
  *
@@ -179,7 +202,6 @@ int transfer_string_to_ul(const char *reserve_size);
  * @return int , return 0 if parse config success.
  */
 int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr);
-
 
 /**
  * @brief update env to storage.
@@ -191,7 +213,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr);
  * @return int
  */
 int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
-								 struct flash_dev *fdev);
+							struct flash_dev *fdev);
 
 /**
  * @brief flash env to reserve partition.
@@ -203,8 +225,7 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
  * @param fdev
  */
 void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download_bytes,
-			char *response, struct flash_dev *fdev);
-
+							char *response, struct flash_dev *fdev);
 
 /**
  * @brief flash bootinfo to reserve partition.
@@ -216,8 +237,7 @@ void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download
  * @param fdev
  */
 void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 download_bytes,
-			char *response, struct flash_dev *fdev);
-
+								 char *response, struct flash_dev *fdev);
 
 /**
  * @brief flash mmc boot option
@@ -229,9 +249,9 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer, u32 dow
  * @return int
  */
 int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
-							int hwpart, u32 buff_sz, u32 offset);
+					  int hwpart, u32 buff_sz, u32 offset);
 
-char* parse_mtdparts_and_find_bootfs(void);
+char *parse_mtdparts_and_find_bootfs(void);
 int get_partition_index_by_name(const char *part_name, int *part_index);
 
 #endif

@@ -38,10 +38,23 @@ int _fb_mtd_erase(struct mtd_info *mtd, u32 erase_size);
  * @param buffer: the data would write from buffer.
  * @param offset: the offset to write to the mtd dev.
  * @param length: the length to write to the mtd dev.
- * @param written: the length that had been write to mtd dev.
+ * @param written
  * @return int 
  */
 int _fb_mtd_write(struct mtd_info *mtd, void *buffer, u32 offset,
+			  size_t length, size_t *written);
+
+/**
+ * @brief read data to mtd part.
+ * 
+ * @param mtd: mtd dev.
+ * @param buffer: the data would read to buffer.
+ * @param offset: the offset to read from the mtd dev.
+ * @param length: the length to read from the mtd dev.
+ * @param written
+ * @return int 
+ */
+int _fb_mtd_read(struct mtd_info *mtd, void *buffer, u32 offset,
 			  size_t length, size_t *written);
 
 /**
