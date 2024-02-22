@@ -677,7 +677,6 @@ void clear_screen_colour_bg(struct udevice *dev) {
 	}
 
 	/* Ensure the changes are written to the frame buffer */
-	flush_dcache_range((unsigned long)vid_priv->fb, (unsigned long)(vid_priv->fb + width * height * VNBYTES(vid_priv->bpix)));
 	video_sync(dev->parent, false);
 }
 #endif

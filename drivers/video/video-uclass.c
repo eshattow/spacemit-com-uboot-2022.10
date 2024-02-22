@@ -214,6 +214,14 @@ int video_sync(struct udevice *vid, bool force)
 		sandbox_sdl_sync(priv->fb);
 		last_sync = get_timer(0);
 	}
+#elif defined(CONFIG_RISCV) && !CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
+	struct video_priv *priv = dev_get_uclass_priv(vid);
+
+	if (priv->flush_dcache) {
+		ulong flush_dcache_addr = round_down((ulong)priv->fb, CONFIG_RISCV_CBOM_BLOCK_SIZE);
+		ulong flush_length = round_up((ulong)priv->fb + priv->fb_size - flush_dcache_addr, CONFIG_RISCV_CBOM_BLOCK_SIZE);
+		flush_dcache_range(flush_dcache_addr, flush_dcache_addr + flush_length);
+	}
 #endif
 	return 0;
 }
