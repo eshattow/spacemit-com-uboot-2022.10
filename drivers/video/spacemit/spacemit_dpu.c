@@ -339,7 +339,12 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 			return ret;
 		}
 
-		spacemit_panel_init();
+		ret = spacemit_panel_init();
+		if (ret) {
+			pr_info("%s: Failed to init panel\n", __func__);
+			return ret;
+		}
+
 		spacemit_mode = &fbi.mode;
 		uc_priv->xsize = spacemit_mode->xres;
 		uc_priv->ysize = spacemit_mode->yres;
