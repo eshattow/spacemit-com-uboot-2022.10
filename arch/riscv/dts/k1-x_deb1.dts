@@ -147,22 +147,22 @@
 };
 
 &usb2phy {
-	status = "disabled";
+	status = "okay";
 };
 
 &combphy {
-	status = "disabled";
+	status = "okay";
 };
 
 &usb3hub {
 	usb-gpios = <&gpio 97 0>;	/* gpio_97 for usb3 pwren */
 	hub-gpios = <&gpio 123 0>;	/* usb3 hub en */
 	reset-gpios = <&gpio 124 0>;	/* usb3 hub rst*/
-	status = "disabled";
+	status = "okay";
 };
 
 &usbdrd3 {
-	status = "disabled";
+	status = "okay";
 	dwc3@c0a00000 {
 		dr_mode = "host";
 		phy_type = "utmi";
