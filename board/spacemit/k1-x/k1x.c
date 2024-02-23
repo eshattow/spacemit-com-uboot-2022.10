@@ -33,6 +33,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
+extern int is_hdmi_connected;
 
 void set_boot_mode(enum board_boot_mode boot_mode)
 {
@@ -571,6 +572,10 @@ int board_late_init(void)
 
 	/*import env.txt from bootfs*/
 	import_env_from_bootfs();
+
+	if (is_hdmi_connected < 0) {
+		env_set("stdout", "serial");
+	}
 
 	setenv_boot_mode();
 

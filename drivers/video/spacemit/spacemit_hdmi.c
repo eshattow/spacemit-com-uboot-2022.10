@@ -25,7 +25,7 @@
 
 #define SPACEMIT_HDMI_PHY_STATUS        0xC
 #define SPACEMIT_HDMI_PHY_HPD           0x1000
-
+int is_hdmi_connected;
 
 static int hdmi_get_plug_in_status(struct dw_hdmi *hdmi)
 {
@@ -165,6 +165,7 @@ static int spacemit_hdmi_probe(struct udevice *dev)
 	priv->hdmi.reg_io_width = 4;
 
 	ret = hdmi_phy_wait_for_hpd(&priv->hdmi);
+	is_hdmi_connected = ret;
 	if (ret < 0) {
 		pr_info("hdmi can not get hpd signal\n");
 		return ret;
