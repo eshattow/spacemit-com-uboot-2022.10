@@ -346,7 +346,7 @@ static void spacemit_reset_set(struct reset_ctl *rst,
 	u32 value;
 	struct spacemit_reset *reset = dev_get_priv(rst->dev);
 
-	printf("[RESET]spacemit_reset_set assert=%d, id=%d \r\n", assert, id);
+	pr_info("[RESET]spacemit_reset_set assert=%d, id=%d \r\n", assert, id);
 	value = spacemit_reset_read(reset, id);
 	if(assert == true) {
 		value &= ~ reset->signals[id].mask;
@@ -388,7 +388,7 @@ static int spacemit_reset_deassert(struct reset_ctl *rst)
 static int spacemit_k1x_reset_probe(struct udevice *dev)
 {
 	struct spacemit_reset *reset = dev_get_priv(dev);
-	printf("[RESET]probe start \r\n");
+	pr_info("[RESET]probe start \r\n");
 
 	reset->mpmu_base = (void __iomem *)dev_remap_addr_index(dev, 0);
 	if (!reset->mpmu_base) {
@@ -438,7 +438,7 @@ static int spacemit_k1x_reset_probe(struct udevice *dev)
 		goto out;
 	}
 	reset->signals = k1x_reset_signals;
-	printf("[RESET]probe finish \r\n");
+	pr_info("[RESET]probe finish \r\n");
 out:
 	return 0;
 }

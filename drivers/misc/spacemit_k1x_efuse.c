@@ -143,7 +143,7 @@ static inline __maybe_unused int efuse_power_on(struct udevice *dev)
 	struct spacemit_efuse_plat *plat = dev_get_plat(dev);
 
 	if (NULL != plat->regulator) {
-		printf("Power on regulatore device %s\n", plat->regulator->name);
+		pr_info("Power on regulatore device %s\n", plat->regulator->name);
 		regulator_set_value(plat->regulator, 1800000);
 		return regulator_set_enable(plat->regulator, true);
 	}
@@ -156,7 +156,7 @@ static inline __maybe_unused int efuse_power_off(struct udevice *dev)
 	struct spacemit_efuse_plat *plat = dev_get_plat(dev);
 
 	if (NULL != plat->regulator) {
-		printf("Power off regulatore device %s\n", plat->regulator->name);
+		pr_info("Power off regulatore device %s\n", plat->regulator->name);
 		return regulator_set_enable(plat->regulator, false);
 	}
 	else
@@ -405,7 +405,7 @@ static struct udevice* find_efuse_regulator(void)
 
 	name = fdt_get_alias(gd->fdt_blob, "efuse_power");
 	if (NULL == name) {
-		printf("fail to get alias node efuse_power\n");
+		pr_err("fail to get alias node efuse_power\n");
 		return NULL;
 	}
 
@@ -415,11 +415,11 @@ static struct udevice* find_efuse_regulator(void)
 	while (NULL != path) {
 		regulator_name = strsep(&path, "/");
 	}
-	printf("Find regulator %s\n", regulator_name);
+	pr_debug("Find regulator %s\n", regulator_name);
 
 	ret = regulator_get_by_devname(regulator_name, &rdev);
 	if (ret) {
-		printf("fail to get regulatore device %s\n", regulator_name);
+		pr_err("fail to get regulatore device %s\n", regulator_name);
 	}
 
 	free(path_origin);
@@ -475,18 +475,18 @@ static int dump_efuses(struct cmd_tbl *cmdtp, int flag, int argc, char *const ar
 	ret = uclass_get_device_by_driver(UCLASS_MISC,
 			DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
 	if (ret) {
-		printf("%s: no misc-device found\n", __func__);
+		pr_err("%s: no misc-device found\n", __func__);
 		return 0;
 	}
 
 	for (i = 0; i < FUSE_MAX_BANK_NUM; i++) {
 		ret = misc_read(dev, i * FUSE_BANK_BYTES, fuses, sizeof(fuses));
 		if (ret < 0) {
-			printf("%s: misc_read failed\n", __func__);
+			pr_err("%s: misc_read failed\n", __func__);
 			return 0;
 		}
 
-		printf("efuse bank %d:\n", i);
+		pr_info("efuse bank %d:\n", i);
 		print_buffer(0, fuses, 1, FUSE_BANK_BYTES, 16);
 	}
 

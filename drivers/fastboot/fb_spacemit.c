@@ -68,7 +68,7 @@ static int _write_gpt_partition(struct flash_dev *fdev, char *response)
 #if CONFIG_IS_ENABLED(FASTBOOT_SUPPORT_BLOCK_DEV)
 	case BOOT_MODE_NOR:
 	case BOOT_MODE_NAND:
-		printf("write gpt to dev:%s\n", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME);
+		pr_info("write gpt to dev:%s\n", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME);
 
 		/*nvme need scan at first*/
 		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)
@@ -122,7 +122,7 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 	case BOOT_MODE_NOR:
 	case BOOT_MODE_NAND:
 		if (strlen(fdev->mtd_table) > 0){
-			printf("updata mtd env, table:%s\n", fdev->mtd_table);
+			pr_info("updata mtd env, table:%s\n", fdev->mtd_table);
 
 			/* find env partition and write env data to mtd part*/
 			struct part_info *part;
@@ -137,8 +137,9 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 			if (ret)
 				return -1;
 			ret = _fb_mtd_write(mtd, download_buffer, 0, CONFIG_ENV_SIZE, NULL);
-			if (ret)
-				printf("can not write env to mtd flash \n");
+			if (ret){
+				pr_err("can not write env to mtd flash\n");
+			}
 		}
 		break;
 #endif
@@ -205,18 +206,18 @@ int transfer_string_to_ul(const char *reserve_size)
 
 	ret = strpbrk(get_char, "KMG");
 	if (ret == NULL){
-		printf("can not get char\n");
+		pr_debug("can not get char\n");
 		return 0;
 	}
 	strncpy(ch, ret, 1);
 	if (ch[0] == 'K' || ch[0] == 'M' || ch[0] == 'G'){
-		printf("reserve_size:%s, reserve_size len:%ld\n", reserve_size, strlen(reserve_size));
+		pr_debug("reserve_size:%s, reserve_size len:%ld\n", reserve_size, strlen(reserve_size));
 		strncpy(strnum, reserve_size, strlen(reserve_size));
 		token = strtok(strnum, ch);
-		printf("token:%s, ch:%s\n", token, ch);
+		pr_debug("token:%s, ch:%s\n", token, ch);
 		get_size = simple_strtoul(token, NULL, 0);
 	}else{
-		printf("not support size %s, should use K/M/G\n", reserve_size);
+		pr_debug("not support size %s, should use K/M/G\n", reserve_size);
 		return 0;
 	}
 
@@ -256,7 +257,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 
 	json_root = cJSON_Parse(load_flash_addr);
 	if (!json_root){
-		printf("can not parse json, check your flash_config.cfg is json format or not\n");
+		pr_err("can not parse json, check your flash_config.cfg is json format or not\n");
 		return -1;
 	}
 
@@ -290,7 +291,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			/*only blk dev would not add bootinfo partition*/
 			if (!parse_mtd_partition){
 				if (strlen(node_part) > 0 && !strncmp("bootinfo", node_part, 8)){
-					printf("bootinfo would not add as partition\n");
+					pr_info("bootinfo would not add as partition\n");
 					continue;
 				}
 			}
@@ -317,15 +318,14 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			off = transfer_string_to_ul(node_offset);
 
 			if (off > 0 && off < combine_size){
-				printf("offset must larger then previous, off:%x, combine_size:%x, node_offset:%s\n",
-						off, combine_size, node_offset);
+				pr_err("offset must larger then previous, off:%x, combine_size:%x\n", off, combine_size);
 				return -5;
 			}
 
 			combine_len += strlen(node_part) + strlen(node_offset) + strlen(node_size) + combine_len_extra;
 			combine_str = realloc(combine_str, combine_len);
 			if (combine_str == NULL){
-				printf("realloc combine_str fail\n");
+				pr_err("realloc combine_str fail\n");
 				return -1;
 			}
 
@@ -351,7 +351,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			/*after finish recovery, it would free the malloc paramenter at func recovery_show_result*/
 			fdev->parts_info[part_index].part_name = malloc(strlen(node_part));
 			if (!fdev->parts_info[part_index].part_name){
-				printf("malloc part_name fail\n");
+				pr_err("malloc part_name fail\n");
 				result = RESULT_FAIL;
 				goto free_cjson;
 			}
@@ -359,7 +359,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 
 			fdev->parts_info[part_index].size = malloc(strlen(node_size));
 			if (!fdev->parts_info[part_index].size){
-				printf("malloc size fail\n");
+				pr_err("malloc size fail\n");
 				result = RESULT_FAIL;
 				goto free_cjson;
 			}
@@ -367,12 +367,12 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			strcpy(fdev->parts_info[part_index].size, node_size);
 
 			if (node_file == NULL){
-				printf("not set file name, set to null\n");
+				pr_err("not set file name, set to null\n");
 				fdev->parts_info[part_index].file_name = NULL;
 			}else{
 				fdev->parts_info[part_index].file_name = malloc(strlen(node_file) + strlen(FLASH_IMG_FOLDER) + 2);
 				if (!fdev->parts_info[part_index].file_name){
-					printf("malloc file_name fail\n");
+					pr_err("malloc file_name fail\n");
 					result = RESULT_FAIL;
 					goto free_cjson;
 				}
@@ -385,13 +385,13 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 				}
 			}
 
-			printf("part info %s, %s\n", \
+			pr_info("part info %s, %s\n", \
 				fdev->parts_info[part_index].part_name, \
 				fdev->parts_info[part_index].file_name);
 			part_index++;
 		}
 	}else{
-		printf("do not get partition info, check the input file\n");
+		pr_err("do not get partition info, check the input file\n");
 		return -1;
 	}
 	if (parse_mtd_partition){
@@ -426,8 +426,9 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
 
 	ret = _parse_flash_config(fdev, (void *)fastboot_buf_addr);
 	if (ret){
-		if (ret == -1)
-			printf("parsing config fail\n");
+		if (ret == -1){
+			pr_err("parsing config fail\n");
+		}
 		if (ret == -5)
 			fastboot_fail("offset must larger then previous size and offset", response);
 		return;
@@ -470,7 +471,7 @@ void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download
 	sprintf(cmdbuf, "env import -c 0x%lx 0x%lx", (ulong)download_buffer, (ulong)CONFIG_ENV_SIZE);
 
 	if (run_command(cmdbuf, 0)){
-		printf("can not import env, try to load env.txt\n");
+		pr_err("can not import env, try to load env.txt\n");
 		memset(cmdbuf, '\0', 32);
 		/*load env.txt*/
 		sprintf(cmdbuf, "env import -t 0x%lx", (ulong)download_buffer);
@@ -540,7 +541,7 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 	}
 
 	if (buffer) { /* flash */
-		printf("%s, %p\n", __func__, buffer);
+		pr_debug("%s, %p\n", __func__, buffer);
 		/* determine number of blocks to write */
 		blksz = dev_desc->blksz;
 		blkcnt = ((buff_sz + (blksz - 1)) & ~(blksz - 1));
@@ -564,7 +565,7 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 			return -1;
 		}
 
-		printf("........ wrote %lu bytes to EMMC_BOOT%d\n",
+		pr_debug("........ wrote %lu bytes to EMMC_BOOT%d\n",
 			   blkcnt * blksz, hwpart);
 	}
 
@@ -597,7 +598,7 @@ int fastboot_mmc_flash_offset(u32 start_offset, void *download_buffer,
 	if(info.blksz == 0)
 		return -1;
 	if (!download_bytes){
-		printf("it should run command 'fastboot stage fsbl.bin' before run flash fsbl\n");
+		pr_err("it should run command 'fastboot stage fsbl.bin' before run flash fsbl\n");
 		return -1;
 	}
 
@@ -613,7 +614,7 @@ int fastboot_mmc_flash_offset(u32 start_offset, void *download_buffer,
 			return -1;
 	}
 
-	printf("........ wrote 0x%lx sector bytes to blk offset 0x%lx\n", blkcnt, info.start);
+	pr_debug("........ wrote 0x%lx sector bytes to blk offset 0x%lx\n", blkcnt, info.start);
 #endif
 	return 0;
 }
@@ -634,7 +635,7 @@ int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 		return 0;
 
 	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
-		printf("invalid mmc device\n");
+		pr_err("invalid mmc device\n");
 		return -1;
 	}
 
@@ -645,7 +646,7 @@ int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 		blk_size = (download_bytes + (blksz - 1)) / blksz;
 		n = blk_dread(dev_desc, part_start_cnt, blk_size, load_addr);
 		if (n != blk_size) {
-			printf("mmc read blk not equal it should be\n");
+			pr_err("mmc read blk not equal it should be\n");
 			return -1;
 		}
 		crc = crc32_wd(crc, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
@@ -653,9 +654,9 @@ int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 		byte_remain -= download_bytes;
 	}
 
-	printf("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
+	pr_debug("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
 	time_start_flash = get_timer(time_start_flash);
-	printf("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
+	pr_debug("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
 	return (crc == crc_compare) ? 0 : -1;
 }
 
@@ -681,7 +682,7 @@ int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, int image_size)
 		download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
 		ret = _fb_mtd_read(mtd, load_addr, hdr_off, download_bytes, NULL);
 		if (ret){
-			printf("cannot read data from mtd dev\n");
+			pr_err("cannot read data from mtd dev\n");
 			return -1;
 		}
 
@@ -690,9 +691,9 @@ int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, int image_size)
 		byte_remain -= download_bytes;
 	}
 
-	printf("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
+	pr_debug("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
 	time_start_flash = get_timer(time_start_flash);
-	printf("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
+	pr_debug("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
 	return (crc == crc_compare) ? 0 : -1;
 }
 
@@ -736,7 +737,7 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer,
 	boot_info->crc32 = crc32_wd(0, (const uchar *)boot_info, 0x40, CHUNKSZ_CRC32);
 
 	/*flash bootinfo*/
-	printf("bootinfo:%p, boot_info->crc32:%x, sizeof(boot_info):%lx, download_buffer:%p\n", boot_info, boot_info->crc32, sizeof(boot_info), download_buffer);
+	pr_info("bootinfo:%p, boot_info->crc32:%x, sizeof(boot_info):%lx, download_buffer:%p\n", boot_info, boot_info->crc32, sizeof(boot_info), download_buffer);
 
 	if (flash_mmc_boot_op(dev_desc, download_buffer, 1, sizeof(boot_info), 0)){
 		if (response)
@@ -913,7 +914,7 @@ static void write_oem_configuration(char *config, char *response)
 	dest = strsep(&config, ":");
 	key = strsep(&dest, "@");
 	value = config;
-	printf("try to set config info for %s: %s@%s\n", key, value, dest);
+	pr_info("try to set config info for %s: %s@%s\n", key, value, dest);
 
 	if (0 == strcmp(dest, "eeprom"))
 		config_write = write_config_info_to_eeprom;

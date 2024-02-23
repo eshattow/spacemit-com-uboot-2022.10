@@ -47,7 +47,7 @@ enum board_boot_mode get_boot_pin_select(void)
 	/*if not set boot mode, try to return boot pin select*/
 	u32 boot_select = readl((void *)BOOT_PIN_SELECT) & BOOT_STRAP_BIT_STORAGE_MASK;
 	boot_select = boot_select >> BOOT_STRAP_BIT_OFFSET;
-	debug("boot_select:%x\n", boot_select);
+	pr_debug("boot_select:%x\n", boot_select);
 
 	/*select spl boot device:
  
@@ -74,7 +74,7 @@ enum board_boot_mode get_boot_mode(void)
 {
 	/*if usb boot or has set boot mode, return boot mode*/
 	u32 boot_mode = readl((void *)BOOT_DEV_FLAG_REG);
-	debug("%s, boot_mode:%x\n", __func__, boot_mode);
+	pr_debug("%s, boot_mode:%x\n", __func__, boot_mode);
 
 	switch (boot_mode) {
 	case BOOT_MODE_USB:
@@ -100,7 +100,7 @@ int mmc_get_env_dev(void)
 {
 	u32 boot_mode = 0;
 	boot_mode = get_boot_mode();
-	debug("%s, uboot boot_mode:%x\n", __func__, boot_mode);
+	pr_debug("%s, uboot boot_mode:%x\n", __func__, boot_mode);
 
 	if (boot_mode == BOOT_MODE_EMMC)
 		return MMC_DEV_EMMC;
@@ -154,7 +154,7 @@ void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev
 		if (err)
 			continue;
 		if (!strcmp(BOOTFS_NAME, info.name)){
-			debug("match info.name:%s\n", info.name);
+			pr_debug("match info.name:%s\n", info.name);
 			break;
 		}
 	}
@@ -167,15 +167,16 @@ void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev
 	/*load env.txt and import to uboot*/
 	sprintf(cmd, "fatload %s %d:%d 0x%x env_%s.txt", dev_name,
 			dev, part, CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
-	debug("cmd:%s\n", cmd);
+	pr_debug("cmd:%s\n", cmd);
 	if (run_command(cmd, 0))
 		return;
 
 	memset(cmd, '\0', 128);
 	sprintf(cmd, "env import -t 0x%x", CONFIG_SPL_LOAD_FIT_ADDRESS);
-	debug("cmd:%s\n", cmd);
-	if (!run_command(cmd, 0))
-		printf("load env_%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
+	pr_debug("cmd:%s\n", cmd);
+	if (!run_command(cmd, 0)){
+		pr_info("load env_%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
+	}
 }
 
 char* parse_mtdparts_and_find_bootfs(void) {
@@ -183,7 +184,7 @@ char* parse_mtdparts_and_find_bootfs(void) {
 	char cmd_buf[256];
 
 	if (!mtdparts) {
-		printf("mtdparts not set\n");
+		pr_debug("mtdparts not set\n");
 		return NULL;
 	}
 
@@ -202,14 +203,14 @@ char* parse_mtdparts_and_find_bootfs(void) {
 				/* Check if the bootfs volume exists */
 				snprintf(cmd_buf, sizeof(cmd_buf), "ubi check %s", BOOTFS_NAME);
 				if (run_command(cmd_buf, 0) == 0) {
-					printf("Found bootfs in partition: %s\n", found_partition);
+					pr_info("Found bootfs in partition: %s\n", found_partition);
 					return found_partition;
 				}
 			}
 		}
 	}
 
-	printf("bootfs not found in any partition\n");
+	pr_debug("bootfs not found in any partition\n");
 	return NULL;
 }
 
@@ -224,33 +225,33 @@ void import_env_from_bootfs(void)
 		char cmd[128];
 
 		if (!bootfs_name) {
-			printf("bootfs not set\n");
+			pr_err("bootfs not set\n");
 			return;
 		}
 
 		/* Parse mtdparts to find the partition containing the BOOTFS_NAME volume */
 		char *mtd_partition   = parse_mtdparts_and_find_bootfs();
 		if (!mtd_partition  ) {
-			printf("Bootfs not found in any partition\n");
+			pr_err("Bootfs not found in any partition\n");
 			return;
 		}
 
 		sprintf(cmd, "ubifsmount ubi0:%s", bootfs_name);
 		if (run_command(cmd, 0)) {
-			printf("Cannot mount ubifs partition '%s'\n", bootfs_name);
+			pr_err("Cannot mount ubifs partition '%s'\n", bootfs_name);
 			return;
 		}
 
 		sprintf(cmd, "ubifsload 0x%x env_%s.txt", CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
 		if (run_command(cmd, 0)) {
-			printf("Failed to load env_%s.txt from bootfs\n", CONFIG_SYS_CONFIG_NAME);
+			pr_err("Failed to load env_%s.txt from bootfs\n", CONFIG_SYS_CONFIG_NAME);
 			return;
 		}
 
 		memset(cmd, '\0', 128);
 		sprintf(cmd, "env import -t 0x%x", CONFIG_SPL_LOAD_FIT_ADDRESS);
 		if (!run_command(cmd, 0)) {
-			printf("Imported environment from 'env_k1-x.txt'\n");
+			pr_err("Imported environment from 'env_k1-x.txt'\n");
 		}
 #endif
 		break;
@@ -261,7 +262,7 @@ void import_env_from_bootfs(void)
 		/*nvme need scan at first*/
 		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)
 						&& run_command("nvme scan", 0)){
-			printf("can not can nvme devices!\n");
+			pr_err("can not find any nvme devices!\n");
 			return;
 		}
 
@@ -285,7 +286,7 @@ void import_env_from_bootfs(void)
 		dev = mmc_get_env_dev();
 		mmc = find_mmc_device(dev);
 		if (!mmc) {
-			printf("Cannot find mmc device\n");
+			pr_err("Cannot find mmc device\n");
 			return;
 		}
 		if (mmc_init(mmc)){
@@ -329,7 +330,7 @@ void run_cardfirmware_flash_command(void)
 
 	/*check if flash config file is in sd card*/
 	sprintf(cmd, "fatsize mmc %d:%d %s", MMC_DEV_SD, part_dev, FLASH_CONFIG_FILE_NAME);
-	debug("cmd:%s\n", cmd);
+	pr_debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0))
 		run_command("spacemit_flashing mmc", 0);
 #endif
@@ -373,7 +374,7 @@ void read_from_eeprom(struct tlvinfo_tlv **tlv_data, u8 tcode)
 
 	ret = read_tlvinfo_tlv_eeprom(eeprom_data, &tlv_hdr, &tlv_entry, 0);
 	if (ret < 0) {
-		printf("read tlvinfo from eeprom failed!\n");
+		pr_err("read tlvinfo from eeprom failed!\n");
 		return;
 	}
 
@@ -402,7 +403,7 @@ void set_env_ethaddr(void)
 	/* get mac address from eeprom */
 	ret = mac_read_from_eeprom();
 	if (ret < 0) {
-		printf("read mac address from eeprom failed!\n");
+		pr_err("read mac address from eeprom failed!\n");
 		return ;
 	}
 
@@ -410,7 +411,7 @@ void set_env_ethaddr(void)
 	ethaddr_valid = eth_env_get_enetaddr("ethaddr", mac_addr);
 	eth1addr_valid = eth_env_get_enetaddr("eth1addr", mac1_addr);
 	if (ethaddr_valid && eth1addr_valid) {
-		printf("valid ethaddr: %02x:%02x:%02x:%02x:%02x:%02x\n",
+		pr_info("valid ethaddr: %02x:%02x:%02x:%02x:%02x:%02x\n",
 			mac_addr[0], mac_addr[1], mac_addr[2],
 			mac_addr[3], mac_addr[4], mac_addr[5]);
 		return ;
@@ -457,19 +458,19 @@ void set_dev_serial_no(void)
 				tlv_entry->value[3] | tlv_entry->value[4] | tlv_entry->value[5] |
 				tlv_entry->value[6] | tlv_entry->value[7] | tlv_entry->value[8] |
 				tlv_entry->value[9] | tlv_entry->value[10] | tlv_entry->value[11]) {
-				printf("Serial number is valid.\n");
+				pr_err("Serial number is valid.\n");
 				return ;
 			}
 	}
 
-	printf("Generate rand serial number:\n");
+	pr_info("Generate rand serial number:\n");
 	/* Generate rand serial number */
 	seed = get_ticks();
 	for (i = 0; i < 6; i++) {
 		sn[i] = rand_r(&seed);
-		printf("%02x", sn[i]);
+		pr_info("%02x", sn[i]);
 	}
-	printf("\n");
+	pr_info("\n");
 
 	/* save serial number to eeprom */
 	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x23 %02x%02x%02x%02x%02x%02x", \
@@ -502,7 +503,7 @@ void refresh_config_info(void)
 	for (i = 0; i < ARRAY_SIZE(info); i++){
 		read_from_eeprom(&tlv_info, info[i].m_code);
 		if (tlv_info == NULL){
-			printf("can not find tlv data:%s\n", info[i].m_name);
+			pr_err("can not find tlv data:%s\n", info[i].m_name);
 			continue;
 		}
 
@@ -522,7 +523,7 @@ void refresh_config_info(void)
 	for (i = 0; i < ARRAY_SIZE(version); i++){
 		read_from_eeprom(&tlv_info, version[i].m_code);
 		if (tlv_info == NULL){
-			printf("can not find tlv data:%s\n", version[i].m_name);
+			pr_err("can not find tlv data:%s\n", version[i].m_name);
 			continue;
 		}
 
@@ -540,7 +541,7 @@ int board_init(void)
 
 	ret = regulators_enable_boot_on(true);
 	if (ret)
-		debug("%s: Cannot enable boot on regulator\n", __func__);
+		pr_debug("%s: Cannot enable boot on regulator\n", __func__);
 #endif
 	return 0;
 }
@@ -568,7 +569,7 @@ int board_late_init(void)
 
 	ret = run_uboot_shell();
 	if (!ret) {
-		printf("reboot into uboot shell\n");
+		pr_info("reboot into uboot shell\n");
 		return 0;
 	}
 
@@ -592,14 +593,14 @@ int board_late_init(void)
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
-		debug("No chosen node found, can't get kernel start address\n");
+		pr_debug("No chosen node found, can't get kernel start address\n");
 		return 0;
 	}
 
 	ret = ofnode_read_u64(chosen_node, "riscv,kernel-start",
 				  (u64 *)&kernel_start);
 	if (ret) {
-		debug("Can't find kernel start address in device tree\n");
+		pr_debug("Can't find kernel start address in device tree\n");
 		return 0;
 	}
 
@@ -663,7 +664,7 @@ int misc_init_r(void)
 
 	ret = ddr_freq_max();
 	if(ret < 0) {
-		debug("%s: Try to adjust ddr freq failed!\n", __func__);
+		pr_debug("%s: Try to adjust ddr freq failed!\n", __func__);
 		return ret;
 	}
 #endif
@@ -717,7 +718,7 @@ int board_fit_config_name_match(const char *name)
 	char *product_name = env_get("product_name");
 
 	if ((NULL != product_name) && (0 == strcmp(product_name, name))) {
-		printf("Boot from fit configuration %s\n", name);
+		pr_debug("Boot from fit configuration %s\n", name);
 		return 0;
 	}
 	else

@@ -15,7 +15,7 @@ void set_emmc_splash_location(struct splash_location *locations) {
 	char devpart_str[16];
 
 	if (get_partition_index_by_name(BOOTFS_NAME, &part_index) < 0) {
-		printf("Failed to get partition index for %s\n", BOOTFS_NAME);
+		pr_err("Failed to get partition index for %s\n", BOOTFS_NAME);
 		return;
 	}
 
@@ -33,7 +33,7 @@ void set_mmc_splash_location(struct splash_location *locations) {
 	char devpart_str[16];
 
 	if (get_partition_index_by_name(BOOTFS_NAME, &part_index) < 0) {
-		printf("Failed to get partition index for %s\n", BOOTFS_NAME);
+		pr_err("Failed to get partition index for %s\n", BOOTFS_NAME);
 		return;
 	}
 
@@ -53,13 +53,13 @@ void set_nor_splash_location(struct splash_location *locations) {
 	char devpart_str[16];
 
 	if (run_command("nvme scan", 0)) {
-		printf("Cannot scan NVMe devices!\n");
+		pr_err("Cannot scan NVMe devices!\n");
 		return;
 	}
 
 	dev_desc = blk_get_dev("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX);
 	if (!dev_desc) {
-		printf("Cannot find NVMe device\n");
+		pr_err("Cannot find NVMe device\n");
 		return;
 	}
 
@@ -75,7 +75,7 @@ void set_nor_splash_location(struct splash_location *locations) {
 	}
 
 	if (part > MAX_SEARCH_PARTITIONS) {
-		printf("Failed to find bootfs on NOR\n");
+		pr_err("Failed to find bootfs on NOR\n");
 		return;
 	}
 
@@ -97,7 +97,7 @@ void set_nand_splash_location(struct splash_location *locations)
 		locations[0].mtdpart = strdup(nand_part);
 		locations[0].ubivol = strdup(BOOTFS_NAME);
 	} else {
-		printf("Failed to find bootfs on NAND\n");
+		pr_err("Failed to find bootfs on NAND\n");
 	}
 }
 
@@ -121,7 +121,7 @@ int load_splash_screen(void) {
 			set_nor_splash_location(splash_locations);
 			break;
 		default:
-			printf("Unsupported boot mode for splash screen\n");
+			pr_err("Unsupported boot mode for splash screen\n");
 			break;
 	}
 
@@ -150,7 +150,7 @@ int splash_screen_prepare(void)
 	case BOOT_MODE_SHELL:
 	case BOOT_MODE_USB:
 	default:
-		printf("Cannot support showing bootlogo in this boot mode!\n");
+		pr_err("Cannot support showing bootlogo in this boot mode!\n");
 		break;
 	}
 

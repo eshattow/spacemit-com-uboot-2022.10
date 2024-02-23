@@ -231,31 +231,31 @@ static int __board_pmic_init(const char *name)
 
 	offset = fdt_node_offset_by_compatible(gd->fdt_blob, -1, name);
 	if (offset < 0) {
-		printf("%s Get %s node error\n", __func__, name);
+		pr_info("%s Get %s node error\n", __func__, name);
 		return -EINVAL;
 	}
 
 	saddr = fdtdec_get_uint(gd->fdt_blob, offset, "reg", 0);
 	if (!saddr) {
-		printf("%s: %s Node has no reg\n", __func__, name);
+		pr_info("%s: %s Node has no reg\n", __func__, name);
 		return -EINVAL;
 	}
 
 	bus = fdtdec_get_uint(gd->fdt_blob, offset, "bus", 0);
 	if (!bus) {
-		printf("%s: %s Node has no bus\n", __func__, name);
+		pr_info("%s: %s Node has no bus\n", __func__, name);
 		return -EINVAL;
 	}
 
 	ret = i2c_set_bus_num(bus);
 	if (ret < 0) {
-		printf("%s: %s set i2c bus number error\n", __func__, name);
+		pr_info("%s: %s set i2c bus number error\n", __func__, name);
 		return -EINVAL;
 	}
 
 	ret = i2c_probe(saddr);
 	if (ret < 0) {
-//		printf("%s: %s probe i2c failed\n", __func__, name);
+//		pr_info("%s: %s probe i2c failed\n", __func__, name);
 		return -EINVAL;
 	}
 

@@ -144,7 +144,7 @@ static int spl_mmc_get_device_index(u32 boot_device)
 	}
 
 #ifdef CONFIG_SPL_LIBCOMMON_SUPPORT
-	printf("spl: unsupported mmc boot device.\n");
+	pr_debug("spl: unsupported mmc boot device.\n");
 #endif
 
 	return -ENODEV;
@@ -165,7 +165,7 @@ static int spl_mmc_find_device(struct mmc **mmcp, u32 boot_device)
 #endif /* DM_MMC */
 	if (err) {
 #ifdef CONFIG_SPL_LIBCOMMON_SUPPORT
-		printf("spl: could not initialize mmc. error: %d\n", err);
+		pr_err("spl: could not initialize mmc. error: %d\n", err);
 #endif
 		return err;
 	}
@@ -173,7 +173,7 @@ static int spl_mmc_find_device(struct mmc **mmcp, u32 boot_device)
 	err = *mmcp ? 0 : -ENODEV;
 	if (err) {
 #ifdef CONFIG_SPL_LIBCOMMON_SUPPORT
-		printf("spl: could not find mmc device %d. error: %d\n",
+		pr_err("spl: could not find mmc device %d. error: %d\n",
 		       mmc_dev, err);
 #endif
 		return err;
@@ -325,7 +325,7 @@ static int spl_mmc_do_fs_boot(struct spl_image_info *spl_image,
 				break;
 			}
 		}
-		printf("Using first bootable partition: %d\n", partition);
+		pr_debug("Using first bootable partition: %d\n", partition);
 		if (partition == CONFIG_SYS_MMCSD_FS_BOOT_PARTITION) {
 			return -ENOSYS;
 		}
@@ -461,7 +461,7 @@ int spl_mmc_load(struct spl_image_info *spl_image,
 		if (err) {
 			mmc = NULL;
 #ifdef CONFIG_SPL_LIBCOMMON_SUPPORT
-			printf("spl: mmc init failed with error: %d\n", err);
+			pr_err("spl: mmc init failed with error: %d\n", err);
 #endif
 			return err;
 		}
@@ -522,15 +522,16 @@ int spl_mmc_load(struct spl_image_info *spl_image,
 		debug("spl: mmc boot mode: fs\n");
 
 #ifdef CONFIG_SPL_FS_LOAD_OTHERS_FILES_NAME
-		printf("load other itb file\n");
+		pr_debug("load other itb file\n");
 		const char *other_filename = CONFIG_SPL_FS_LOAD_OTHERS_FILES_NAME;
 
 		/* if load other file file, it should not return fail directory, and
 			try to load the normal bootfile.
 		*/
 		load_others_res = spl_mmc_do_fs_boot(spl_image, bootdev, mmc, other_filename);
-		if (load_others_res)
-			printf("load other file fail, try to load the normal boot file\n");
+		if (load_others_res){
+			pr_debug("load other file fail, try to load the normal boot file\n");
+		}
 
 #endif
 		err = spl_mmc_do_fs_boot(spl_image, bootdev, mmc, filename);

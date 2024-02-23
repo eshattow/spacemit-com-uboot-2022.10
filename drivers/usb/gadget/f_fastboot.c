@@ -200,7 +200,7 @@ static void fastboot_complete(struct usb_ep *ep, struct usb_request *req)
 	int status = req->status;
 	if (!status)
 		return;
-	printf("status: %d ep '%s' trans: %d\n", status, ep->name, req->actual);
+	pr_debug("status: %d ep '%s' trans: %d\n", status, ep->name, req->actual);
 }
 
 static int fastboot_bind(struct usb_configuration *c, struct usb_function *f)
@@ -409,8 +409,9 @@ static int fastboot_tx_write(const char *buffer, unsigned int buffer_size)
 	usb_ep_dequeue(fastboot_func->in_ep, in_req);
 
 	ret = usb_ep_queue(fastboot_func->in_ep, in_req, 0);
-	if (ret)
-		printf("Error %d on queue\n", ret);
+	if (ret){
+		pr_err("Error %d on queue\n", ret);
+	}
 	return 0;
 }
 
@@ -476,7 +477,7 @@ static void rx_handler_dl_image(struct usb_ep *ep, struct usb_request *req)
 	unsigned int buffer_size = req->actual;
 
 	if (req->status != 0) {
-		printf("Bad status: %d\n", req->status);
+		pr_debug("Bad status: %d\n", req->status);
 		return;
 	}
 
@@ -513,7 +514,7 @@ static void tx_handler_up_image(struct usb_ep *ep, struct usb_request *in_req)
 	unsigned int transfer_size = tx_bytes_expected(ep);
 
 	if (in_req->status != 0) {
-		printf("Bad status: %d\n", in_req->status);
+		pr_debug("Bad status: %d\n", in_req->status);
 		return;
 	}
 
