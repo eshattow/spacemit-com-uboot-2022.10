@@ -465,44 +465,6 @@ void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download
 							char *response, struct flash_dev *fdev)
 {
 	char cmdbuf[64] = {'\0'};
-	char *res = NULL;
-	ssize_t len;
-	char *var = NULL;
-	char *tmp_var;
-	char *delim = "\n";
-
-	len = hexport_r(&env_htab, '\n', H_HIDE_DOT, &res, 0, 0, NULL);
-	char *getenvstr;
-	getenvstr = malloc(len+1);
-	if (!getenvstr){
-		printf("malloc getenvstr fail\n");
-		fastboot_fail("malloc getenvstr fail", response);
-	}
-	memcpy(getenvstr, res, len);
-	var = strtok(getenvstr, delim);
-
-	/*delete all of the previous env except mtdparts/mtdids*/
-	while(var!=NULL){
-		tmp_var = malloc(strlen(var) + 1);
-		if (!tmp_var)
-			break;
-
-		memset(tmp_var, 0, strlen(var));
-		strcpy(tmp_var, var);
-		char *tv = tmp_var;
-		char *var_key = strsep(&tv, "=");
-
-		if (var_key != NULL && !run_commandf("env exists '%s'", var_key)){
-			debug("del env :%s\n", var_key);
-			if (strncmp("mtdparts", var_key, 8) && strncmp("mtdids", var_key, 6)
-				&& strncmp("serial", var_key, 6))
-				run_commandf("env delete '%s'", var_key);
-		}
-
-		free(tmp_var);
-		var = strtok(NULL, delim);
-	}
-	free(getenvstr);
 
 	/*load env.bin*/
 	sprintf(cmdbuf, "env import -c 0x%lx 0x%lx", (ulong)download_buffer, (ulong)CONFIG_ENV_SIZE);
