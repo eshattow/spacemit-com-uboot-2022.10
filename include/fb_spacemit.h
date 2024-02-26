@@ -46,6 +46,11 @@ typedef enum {
 	DEVICE_NET,
 } DeviceType;
 
+struct flash_volume_image {
+	char *name;
+	char *file_name;
+};
+
 struct flash_parts_info {
 	char *part_name;
 	char *file_name;
@@ -55,6 +60,8 @@ struct flash_parts_info {
 	  for fsbl and the partition is not available.
 	*/
 	bool hidden;
+	struct flash_volume_image *volume_images;
+	int volume_images_count;
 };
 
 struct gpt_info {

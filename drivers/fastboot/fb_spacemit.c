@@ -302,6 +302,24 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			else
 				node_file = "";
 
+			cJSON *cj_volume_images = cJSON_GetObjectItem(arraypart, "volume_images");
+			if (cj_volume_images) {
+				int volume_count = cJSON_GetArraySize(cj_volume_images);
+				fdev->parts_info[part_index].volume_images = malloc(volume_count * sizeof(struct flash_volume_image));
+				fdev->parts_info[part_index].volume_images_count = volume_count;
+
+				int volume_index = 0;
+				cJSON *cj_volume_image = NULL;
+				cJSON_ArrayForEach(cj_volume_image, cj_volume_images) {
+					const char *volume_name = cj_volume_image->string;
+					const char *image_file = cj_volume_image->valuestring;
+
+					fdev->parts_info[part_index].volume_images[volume_index].name = strdup(volume_name);
+					fdev->parts_info[part_index].volume_images[volume_index].file_name = strdup(image_file);
+					volume_index++;
+				}
+			}
+
 			cJSON *cj_offset = cJSON_GetObjectItem(arraypart, "offset");
 			if (cj_offset && cj_offset->type == cJSON_String)
 				node_offset = cj_offset->valuestring;
@@ -385,9 +403,14 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 				}
 			}
 
-			pr_info("part info %s, %s\n", \
-				fdev->parts_info[part_index].part_name, \
-				fdev->parts_info[part_index].file_name);
+			pr_info("Part info: %s, %s\n", fdev->parts_info[part_index].part_name, fdev->parts_info[part_index].file_name ? fdev->parts_info[part_index].file_name : "None");
+			if (fdev->parts_info[part_index].volume_images_count > 0) {
+				for (int j = 0; j < fdev->parts_info[part_index].volume_images_count; j++) {
+					pr_info("Volume name: %s, Image file: %s\n",
+						fdev->parts_info[part_index].volume_images[j].name,
+						fdev->parts_info[part_index].volume_images[j].file_name);
+				}
+			}
 			part_index++;
 		}
 	}else{
