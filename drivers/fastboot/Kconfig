@@ -272,8 +272,20 @@ config FASTBOOT_SUPPORT_BLOCK_DEV_INDEX
 config FASTBOOT_CMD_OEM_CONFIG_ACCESS
 	bool "Enable the 'oem config' command"
 	help
-	  Add support for the "oem config" command from a client. This command
-	  include read, write configuration.
+	  Add support for the "oem config:read/write/flush" command from a fastboot client. This command
+	  include configuration read, write and flush operation.
+
+config FASTBOOT_CMD_OEM_ENV_ACCESS
+	bool "Enable the 'oem env' command"
+	help
+	  Add support for the "oem env:get/set" command from a fastboot client. This command
+	  include read, write and delete env variabes.
+
+config SPL_FASTBOOT_CMD_OEM_ENV_ACCESS
+	bool "Enable the 'oem env' command in SPL"
+	help
+	  Add support for the "oem env:get/set" command from a fastboot client. This command
+	  include read, write env variabes in SPL stage.
 
 endif # FASTBOOT
 

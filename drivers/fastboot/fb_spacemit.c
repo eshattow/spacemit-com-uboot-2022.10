@@ -778,17 +778,17 @@ static int write_config_info_to_eeprom(uint32_t id, char *value)
 
 	cmd_str = malloc(256);
 	if (NULL == cmd_str) {
-		log_err("malloc buffer for cmd string fail\n");
+		pr_err("malloc buffer for cmd string fail\n");
 		return -1;
 	}
 
-	log_info("write data to EEPROM, ID:%d, string:%s\n", id, value);
+	pr_info("write data to EEPROM, ID:%d, string:%s\n", id, value);
 	/* read eeprom */
 	memset(cmd_str, 0, 256);
 	sprintf(cmd_str, "tlv_eeprom read");
 	if (run_command(cmd_str, 0)) {
 		free(cmd_str);
-		log_err("tlv_eeprom read fail\n");
+		pr_err("tlv_eeprom read fail\n");
 		return 1;
 	}
 
@@ -797,7 +797,7 @@ static int write_config_info_to_eeprom(uint32_t id, char *value)
 	sprintf(cmd_str, "tlv_eeprom set %d '%s'", id, value);
 	if (run_command(cmd_str, 0)) {
 		free(cmd_str);
-		log_err("tlv_eeprom set %s to %d fail\n", value, id);
+		pr_err("tlv_eeprom set %s to %d fail\n", value, id);
 		return 2;
 	}
 
@@ -827,7 +827,7 @@ static int write_config_info_to_efuse(uint32_t id, char *value)
 	else if (TLV_CODE_EEPROM_PIN_GROUP == id)
 		fuses[0] |= (dectoul(value, NULL) & 0x03) << 4;
 	else {
-		log_err("NOT support efuse ID %d\n", id);
+		pr_err("NOT support efuse ID %d\n", id);
 		return EFAULT;
 	}
 
@@ -856,15 +856,22 @@ static void read_oem_configuration(char *config, char *response)
 	int i = 0, j;
 
 	ack = malloc(256);
+	if (NULL == ack) {
+		pr_err("malloc buffer for ack fail\n");
+		return;
+	}
+
 	temp = malloc(256);
-	if ((NULL == ack) || (NULL == temp)) {
-		log_err("malloc buffer for ack and temp fail\n");
+	if (NULL == temp) {
+		free(ack);
+		pr_err("malloc buffer for temp fail\n");
+		return;
 	}
 	memset(ack, 0, 256);
 
 	key = strsep(&config, ",");
 	while (NULL != key) {
-		log_debug("try to find config info for %s\n", key);
+		pr_debug("try to find config info for %s\n", key);
 		info = get_config_info(key);
 		if (NULL != info) {
 			value = env_get(key);
@@ -964,6 +971,99 @@ void fastboot_config_access(char *operation, char *config, char *response)
 		write_oem_configuration(config, response);
 	else if (0 == strcmp(operation, "flush"))
 		flush_oem_configuration(config, response);
+	else
+		fastboot_fail("NOT support", response);
+}
+#endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_ENV_ACCESS)
+#if defined(CONFIG_SPL_BUILD)
+extern char *product_name;
+static void read_oem_env(char *env, char *response)
+{
+	char *key = env;
+	char *value = NULL;
+
+	if (NULL != key) {
+		pr_debug("try to find env info for %s\n", key);
+		if ((0 == strcmp(key, "product_name")) && (NULL != product_name))
+			value = product_name;
+		else
+			value = env_get(key);
+	}
+
+	if (NULL != value) {
+		fastboot_okay(value, response);
+	} else {
+		fastboot_fail("NOT exist", response);
+	}
+}
+
+static void write_oem_env(char *env, char *response)
+{
+	char *key, *value = env;
+
+	key = strsep(&value, ":");
+	if ((NULL != key) && (NULL != value) && (0 == strcmp(key, "product_name"))) {
+		pr_debug("try to set env %s to %s\n", key, value);
+		// NOT support env_set API in SPL stage
+		if (NULL != product_name)
+			free(product_name);
+		product_name = strdup(value);
+		fastboot_okay(NULL, response);
+	} else {
+		fastboot_fail("NOT support", response);
+	}
+}
+#else
+static void read_oem_env(char *env, char *response)
+{
+	char *key = env;
+	char *value = NULL;
+
+	if (NULL != key) {
+		pr_debug("try to find env info for %s\n", key);
+		value = env_get(key);
+	}
+
+	if (NULL != value) {
+		fastboot_okay(value, response);
+	} else {
+		fastboot_fail("NOT exist", response);
+	}
+}
+
+static void write_oem_env(char *env, char *response)
+{
+	char *key, *value = env;
+
+	key = strsep(&value, ":");
+	if ((NULL != key) && (NULL != value)) {
+		pr_debug("try to set env %s to %s\n", key, value);
+		env_set(key, value);
+		fastboot_okay(NULL, response);
+	} else {
+		fastboot_fail("NOT support", response);
+	}
+}
+#endif
+
+/**
+ * fastboot_env_access() - Access env variables.
+ *
+ * @operation: Pointer to env operation string
+ *			  get: read env
+ *			  set: write env
+ * @env: Pointer to env string
+ *			  if is read operation, then
+ * @response: Pointer to fastboot response buffer
+ */
+void fastboot_env_access(char *operation, char *env, char *response)
+{
+	if (0 == strcmp(operation, "get"))
+		read_oem_env(env, response);
+	else if (0 == strcmp(operation, "set"))
+		write_oem_env(env, response);
 	else
 		fastboot_fail("NOT support", response);
 }
