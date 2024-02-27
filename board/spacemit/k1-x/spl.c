@@ -246,10 +246,13 @@ void board_init_f(ulong dummy)
 #ifdef CONFIG_SPL_LOAD_FIT
 int board_fit_config_name_match(const char *name)
 {
-	if (NULL == product_name)
-		product_name = env_get("product_name");
+	char *buildin_name;
 
-	if ((NULL != product_name) && (0 == strcmp(product_name, name))) {
+	buildin_name = product_name;
+	if (NULL == buildin_name)
+		buildin_name = env_get("product_name");
+
+	if ((NULL != buildin_name) && (0 == strcmp(buildin_name, name))) {
 		printf("Boot from fit configuration %s\n", name);
 		return 0;
 	}
