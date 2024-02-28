@@ -38,16 +38,19 @@ static u32 fastboot_bytes_expected;
 static void okay(char *, char *);
 static void getvar(char *, char *);
 static void download(char *, char *);
-static void upload(char *, char *);
 
-#if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void flash(char *, char *);
 static void erase(char *, char *);
 #endif
+
+#if !defined(CONFIG_SPL_BUILD)
+static void upload(char *, char *);
 static void reboot_bootloader(char *, char *);
 static void reboot_fastbootd(char *, char *);
 static void reboot_recovery(char *, char *);
+#endif
+
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_FORMAT)
 static void oem_format(char *, char *);
 #endif
@@ -66,11 +69,14 @@ static void oem_read(char *cmd_parameter, char *response);
 static void oem_config(char *cmd_parameter, char *response);
 #endif
 
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_ENV_ACCESS)
+static void oem_env(char *cmd_parameter, char *response);
+#endif
+
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
 static void run_ucmd(char *, char *);
 static void run_acmd(char *, char *);
 #endif
-#endif /*!defined(CONFIG_SPL_BUILD)*/
 
 
 static const struct {
@@ -85,11 +91,11 @@ static const struct {
 		.command = "download",
 		.dispatch = download
 	},
+#if !defined(CONFIG_SPL_BUILD)
 	[FASTBOOT_COMMAND_UPLOAD] = {
 		.command = "upload",
 		.dispatch = upload
 	},
-#if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 	[FASTBOOT_COMMAND_FLASH] =  {
 		.command = "flash",
@@ -130,6 +136,7 @@ static const struct {
 		.command = "set_active",
 		.dispatch = okay
 	},
+#endif /*!defined(CONFIG_SPL_BUILD)*/
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_FORMAT)
 	[FASTBOOT_COMMAND_OEM_FORMAT] = {
 		.command = "oem format",
@@ -160,6 +167,12 @@ static const struct {
 		.dispatch = oem_config,
 	},
 #endif
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_ENV_ACCESS)
+	[FASTBOOT_COMMAND_ENV_ACCESS] = {
+		.command = "oem env",
+		.dispatch = oem_env,
+	},
+#endif
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
 	[FASTBOOT_COMMAND_UCMD] = {
 		.command = "UCmd",
@@ -170,7 +183,6 @@ static const struct {
 		.dispatch = run_acmd,
 	},
 #endif
-#endif /*!defined(CONFIG_SPL_BUILD)*/
 };
 
 /**
@@ -261,13 +273,13 @@ static void download(char *cmd_parameter, char *response)
 	if (fastboot_bytes_expected > fastboot_buf_size) {
 		fastboot_fail(cmd_parameter, response);
 	} else {
-		printf("Starting download of %d bytes\n",
+		pr_debug("Starting download of %d bytes\n",
 		       fastboot_bytes_expected);
 		fastboot_response("DATA", response, "%s", cmd_parameter);
 	}
 }
 
-
+#if !defined(CONFIG_SPL_BUILD)
 /**
  * fastboot_upload() - Start a upload transfer from the host
  *
@@ -292,12 +304,12 @@ static void upload(char *cmd_parameter, char *response)
 	if (fastboot_bytes_expected > fastboot_buf_size) {
 		fastboot_fail(cmd_parameter, response);
 	} else {
-		printf("Starting upload of %d bytes\n",
+		pr_debug("Starting upload of %d bytes\n",
 		       fastboot_bytes_expected);
 		fastboot_response("PUSH", response, "%08x", fastboot_bytes_expected);
 	}
 }
-
+#endif
 
 /**
  * fastboot_data_remaining() - return bytes remaining in current transfer
@@ -408,14 +420,13 @@ void fastboot_data_complete(char *response)
 {
 	/* Download complete. Respond with "OKAY" */
 	fastboot_okay(NULL, response);
-	printf("\ndownloading/uploading of %d bytes finished\n", fastboot_bytes_received);
+	pr_debug("\ndownloading/uploading of %d bytes finished\n", fastboot_bytes_received);
 	image_size = fastboot_bytes_received;
 	env_set_hex("filesize", image_size);
 	fastboot_bytes_expected = 0;
 	fastboot_bytes_received = 0;
 }
 
-#if !defined(CONFIG_SPL_BUILD)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 /**
  * flash() - write the downloaded image to the indicated partition.
@@ -566,6 +577,7 @@ static void run_acmd(char *cmd_parameter, char *response)
 }
 #endif
 
+#if !defined(CONFIG_SPL_BUILD)
 /**
  * reboot_bootloader() - Sets reboot bootloader flag.
  *
@@ -607,6 +619,7 @@ static void reboot_recovery(char *cmd_parameter, char *response)
 	else
 		fastboot_okay(NULL, response);
 }
+#endif
 
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_FORMAT)
 /**
@@ -651,7 +664,7 @@ static void oem_partconf(char *cmd_parameter, char *response)
 	/* execute 'mmc partconfg' command with cmd_parameter arguments*/
 	snprintf(cmdbuf, sizeof(cmdbuf), "mmc partconf %x %s 0",
 		 CONFIG_FASTBOOT_FLASH_MMC_DEV, cmd_parameter);
-	printf("Execute: %s\n", cmdbuf);
+	pr_debug("Execute: %s\n", cmdbuf);
 	if (run_command(cmdbuf, 0))
 		fastboot_fail("Cannot set oem partconf", response);
 	else
@@ -678,7 +691,7 @@ static void oem_bootbus(char *cmd_parameter, char *response)
 	/* execute 'mmc bootbus' command with cmd_parameter arguments*/
 	snprintf(cmdbuf, sizeof(cmdbuf), "mmc bootbus %x %s",
 		 CONFIG_FASTBOOT_FLASH_MMC_DEV, cmd_parameter);
-	printf("Execute: %s\n", cmdbuf);
+	pr_debug("Execute: %s\n", cmdbuf);
 	if (run_command(cmdbuf, 0))
 		fastboot_fail("Cannot set oem bootbus", response);
 	else
@@ -749,7 +762,7 @@ static void oem_read(char *cmd_parameter, char *response)
 
 	offset_str = strsep(&cmd_str, " ");
 	if (!offset_str){
-		printf("miss offset, would set offset to 0\n");
+		pr_info("miss offset, would set offset to 0\n");
 		off = 0;
 	}else{
 		off = simple_strtoul(offset_str, NULL, 0);
@@ -768,7 +781,7 @@ static void oem_read(char *cmd_parameter, char *response)
 		/* if read data from mtd partition success, it would not try to read from blk dev*/
 		if (fastboot_bytes_expected > 0)
 			return;
-		printf("read data from blk dev\n");
+		pr_debug("read data from blk dev\n");
 		fastboot_bytes_expected = fastboot_blk_read(part, off, fastboot_buf_addr, response);
 
 		return;
@@ -803,4 +816,22 @@ static void oem_config(char *cmd_parameter, char *response)
     fastboot_config_access(operation, cmd_str, response);
 }
 #endif
-#endif /*#!defined(CONFIG_SPL_BUILD)*/
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_ENV_ACCESS)
+void fastboot_env_access(char *operation, char *env, char *response);
+/**
+ * oem_env() - Execute the OEM env operation command
+ *
+ * @cmd_parameter: Pointer to command parameter
+ * @response: Pointer to fastboot response buffer
+ */
+static void oem_env(char *cmd_parameter, char *response)
+{
+    char *cmd_str, *operation;
+
+	cmd_str = cmd_parameter;
+	operation = strsep(&cmd_str, " ");
+
+    fastboot_env_access(operation, cmd_str, response);
+}
+#endif

@@ -57,9 +57,9 @@ void spl_invoke_opensbi(struct spl_image_info *spl_image)
 	/* Find U-Boot image in /fit-images */
 	ret = spl_opensbi_find_uboot_node(spl_image->fdt_addr, &uboot_node);
 	if (ret) {
-		pr_err("Can't find U-Boot node, %d\n", ret);
+		debug("Can't find U-Boot node, %d\n", ret);
 #ifdef CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION
-		printf("had defined another file to load, maybe the uboot node set in it\n");
+		debug("had defined another file to load, maybe the uboot node set in it\n");
 #else
 		hang();
 #endif

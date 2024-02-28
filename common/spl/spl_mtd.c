@@ -45,7 +45,7 @@ static int spl_mtd_read(struct mtd_info *mtd, ulong sector, ulong count, void *b
 	debug("sector:%lx, count:%lx, buffer:%lx\n", sector, count, (ulong)buffer);
 	start_off = sector;
 	if (!mtd_is_aligned_with_min_io_size(mtd, start_off)) {
-		printf("Offset not aligned with a page (0x%x)\n",
+		pr_debug("Offset not aligned with a page (0x%x)\n",
 		       mtd->writesize);
 		return ret;
 	}
@@ -84,7 +84,7 @@ static int spl_mtd_read(struct mtd_info *mtd, ulong sector, ulong count, void *b
 
 		ret = mtd_read_oob(mtd, off, &io_op);
 		if (ret) {
-			printf("Failure while %s at offset 0x%llx\n",
+			pr_debug("Failure while %s at offset 0x%llx\n",
 			       read ? "reading" : "writing", off);
 			break;
 		}
@@ -125,7 +125,7 @@ static int mtd_load_image(struct spl_image_info *spl_image,
 	len = sizeof(*header);
 	if (!mtd_is_aligned_with_min_io_size(mtd, len)) {
 		len = round_up(len, mtd->writesize);
-		printf("Size not on a page boundary (0x%x), rounding to 0x%lx\n",
+		pr_debug("Size not on a page boundary (0x%x), rounding to 0x%lx\n",
 		       mtd->writesize, len);
 	}
 

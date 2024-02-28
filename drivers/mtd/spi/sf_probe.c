@@ -32,7 +32,7 @@ static int spi_flash_probe_slave(struct spi_flash *flash)
 
 	/* Setup spi_slave */
 	if (!spi) {
-		printf("SF: Failed to set up slave\n");
+		pr_err("SF: Failed to set up slave\n");
 		return -ENODEV;
 	}
 
@@ -177,14 +177,14 @@ int spacemit_spinor_bind(struct udevice *dev)
 	ret = blk_create_devicef(parent_dev, "nor_blk", "blk", IF_TYPE_NOR,
 							 dev_seq(dev), SPI_NOR_BLOCK_SIZE, 0, &bdev);
 	if (ret) {
-		printf("Cannot create block device\n");
+		pr_err("Cannot create block device\n");
 		return ret;
 	}
 
 	// Obtain the block device descriptor
 	bdesc = dev_get_uclass_plat(bdev);
 	if (!bdesc) {
-		printf("Failed to get block device descriptor\n");
+		pr_err("Failed to get block device descriptor\n");
 		return -ENODEV;
 	}
 

@@ -25,7 +25,7 @@ static ulong spl_fastboot_load_read(struct spl_load_info *load, ulong sector,
 {
 	ulong addr;
 
-	debug("%s: sector %lx, count %lx, buf %lx\n",
+	pr_debug("%s: sector %lx, count %lx, buf %lx\n",
 	      __func__, sector, count, (ulong)buf);
 
 	addr = (ulong)CONFIG_SPL_LOAD_FIT_ADDRESS + sector;
@@ -98,12 +98,12 @@ static int spl_fastboot_load_image(struct spl_image_info *spl_image,
 	    image_get_magic(header) == FDT_MAGIC) {
 		struct spl_load_info load;
 
-		debug("Found FIT\n");
+		pr_debug("Found FIT\n");
 		load.bl_len = 1;
 		load.read = spl_fastboot_load_read;
 		spl_load_simple_fit(spl_image, &load, 0, header);
 	}else{
-		debug("not support legacy image\n");
+		pr_debug("not support legacy image\n");
 		return -1;
 	}
 	return 0;

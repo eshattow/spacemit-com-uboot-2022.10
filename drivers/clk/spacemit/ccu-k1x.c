@@ -1589,7 +1589,7 @@ static int spacemit_k1x_ccu_probe(struct udevice *dev)
 	struct spacemit_k1x_clk *clk_info = &k1x_clock_controller;
 	struct spacemit_clk_table *clks = &spacemit_k1x_clks;
 
-	printf("init clock start \n");
+	pr_debug("init clock start \n");
 
 	clk_info->mpmu_base = (void __iomem *)dev_remap_addr_index(dev, 0);
 	if (!clk_info->mpmu_base) {
@@ -1653,7 +1653,7 @@ static int spacemit_k1x_ccu_probe(struct udevice *dev)
 	ccu_clk_dm(CLK_DUMMY, dev_get_clk_ptr(clk_dummy.dev));
 
 	ret = spacemit_ccu_probe(clk_info, clks);
-	printf("init clock finish ret=%d \n", ret);
+	pr_debug("init clock finish ret=%d \n", ret);
 	if (!ret)
 		return 0;
 out:

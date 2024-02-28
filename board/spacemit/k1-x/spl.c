@@ -186,17 +186,15 @@ void load_board_config(int *eeprom_i2c_index, int *eeprom_pin_group, int *pmic_t
 	load_board_config_from_efuse(eeprom_i2c_index, eeprom_pin_group, pmic_type);
 #endif
 
-	printf("eeprom_i2c_index :%d\n", *eeprom_i2c_index);
-	printf("eeprom_pin_group :%d\n", *eeprom_pin_group);
-	printf("pmic_type :%d\n", *pmic_type);
+	pr_debug("eeprom_i2c_index :%d\n", *eeprom_i2c_index);
+	pr_debug("eeprom_pin_group :%d\n", *eeprom_pin_group);
+	pr_debug("pmic_type :%d\n", *pmic_type);
 }
 
 int spl_board_init_f(void)
 {
 	int ret;
 	struct udevice *dev;
-
-	debug("%s\n", __FUNCTION__);
 
 #if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
 	/* init i2c */
@@ -210,7 +208,7 @@ int spl_board_init_f(void)
 	/* DDR init */
 	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
 	if (ret) {
-		debug("DRAM init failed: %d\n", ret);
+		pr_err("DRAM init failed: %d\n", ret);
 		return ret;
 	}
 
@@ -236,7 +234,7 @@ void board_init_f(ulong dummy)
 	riscv_cpu_setup(NULL, NULL);
 
 	preloader_console_init();
-	printf("boot_mode: %x\n", get_boot_mode());
+	pr_debug("boot_mode: %x\n", get_boot_mode());
 
 	ret = spl_board_init_f();
 	if (ret)
@@ -246,11 +244,14 @@ void board_init_f(ulong dummy)
 #ifdef CONFIG_SPL_LOAD_FIT
 int board_fit_config_name_match(const char *name)
 {
-	if (NULL == product_name)
-		product_name = env_get("product_name");
+	char *buildin_name;
 
-	if ((NULL != product_name) && (0 == strcmp(product_name, name))) {
-		printf("Boot from fit configuration %s\n", name);
+	buildin_name = product_name;
+	if (NULL == buildin_name)
+		buildin_name = env_get("product_name");
+
+	if ((NULL != buildin_name) && (0 == strcmp(buildin_name, name))) {
+		pr_debug("Boot from fit configuration %s\n", name);
 		return 0;
 	}
 	else
@@ -283,7 +284,7 @@ static struct env_driver *spl_env_driver_lookup(enum env_operation op, enum env_
 
 	drv = _spl_env_driver_lookup(loc);
 	if (!drv) {
-		debug("%s: No environment driver for location %d\n", __func__, loc);
+		pr_debug("%s: No environment driver for location %d\n", __func__, loc);
 		return NULL;
 	}
 
@@ -329,15 +330,15 @@ static void spl_load_env(void)
 
 	drv = spl_env_driver_lookup(ENVOP_INIT, loc);
 	if (!drv){
-		printf("%s, can not load env from storage\n", __func__);
+		pr_err("%s, can not load env from storage\n", __func__);
 		return;
 	}
 
 	ret = drv->load();
 	if (!ret){
-		printf("has init env successful\n");
+		pr_info("has init env successful\n");
 	}else{
-		printf("load env from storage fail, would use default env\n");
+		pr_err("load env from storage fail, would use default env\n");
 		/*if load env from storage fail, it should not write bootmode to reg*/
 		boot_mode = BOOT_MODE_NONE;
 	}
@@ -352,14 +353,14 @@ char *get_product_name(void)
 	name = calloc(1, 64);
 	if ((eeprom_addr >= 0) && (NULL != name) && (0 == spacemit_eeprom_read(
 		eeprom_addr, name, TLV_CODE_PRODUCT_NAME))) {
-		printf("Get product name from eeprom %s\n", name);
+		pr_info("Get product name from eeprom %s\n", name);
 		return name;
 	}
 
 	if (NULL != name)
 		free(name);
 
-	printf("Use default product name %s\n", env_get("product_name"));
+	pr_debug("Use default product name %s\n", env_get("product_name"));
 	return NULL;
 }
 
@@ -378,7 +379,7 @@ struct image_header *spl_get_load_buffer(ssize_t offset, size_t size)
 void board_boot_order(u32 *spl_boot_list)
 {
 	u32 boot_mode = get_boot_mode();
-	debug("boot_mode:%x\n", boot_mode);
+	pr_debug("boot_mode:%x\n", boot_mode);
 	if (boot_mode == BOOT_MODE_USB){
 		spl_boot_list[0] = BOOT_DEVICE_BOARD;
 	}else{

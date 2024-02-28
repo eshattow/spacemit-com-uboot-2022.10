@@ -161,7 +161,7 @@ static u32 format_size(u32 density, u32 io_width)
 		size = 2048;
 		break;
 	default:
-		printf("donot support such density=0x%x device\n", density);
+		pr_err("donot support such density=0x%x device\n", density);
 		return -EINVAL;
 	}
 	if (io_width == 1)
@@ -194,7 +194,7 @@ u32 ddr_get_density(void)
 	cs1_size += mr8_cs11 ? format_size(((mr8_cs11 >> 2) & 0xf), io_width_cs11) : 0;
 
 	ddr_size = cs0_size + cs1_size;
-	printf("DDR size = %d MB\n", ddr_size);
+	pr_debug("DDR size = %d MB\n", ddr_size);
 
 	return ddr_size;
 }
@@ -204,7 +204,7 @@ uint32_t get_manufacture_id(void)
 	uint32_t mr5;
 
 	mr5 = mode_register_read(5, 0, 0);
-	printf("MR5 = 0x%x\n",mr5);
+	pr_debug("MR5 = 0x%x\n",mr5);
 	return (mr5&0xff);
 }
 
@@ -213,7 +213,7 @@ uint32_t get_ddr_rev_id(void)
 	uint32_t mr6;
 
 	mr6 = mode_register_read(6, 0, 0);
-	printf("MR6 = 0x%x\n",mr6);
+	pr_debug("MR6 = 0x%x\n",mr6);
 	return (mr6&0xff);
 }
 static int get_cur_freq_level(void)
@@ -264,7 +264,7 @@ static int dfc_bypass_conf(struct dfc_level_config *cfg)
 	}
 
 	if (timeout <= 0) {
-		printf("error: switch to bypass clk fail. bypass_sel: %d\n", bypass_sel);
+		pr_err("error: switch to bypass clk fail. bypass_sel: %d\n", bypass_sel);
 		return -EBUSY;
 	}
 
@@ -278,7 +278,7 @@ static int dfc_level_cfg(struct dfc_level_config *cfg)
 	void __iomem *reg;
 
 	if (level > MAX_FREQ_LV) {
-		printf("%s: invalid freq level: 0x%x.\n", __func__, level);
+		pr_err("%s: invalid freq level: 0x%x.\n", __func__, level);
 		return -EINVAL;
 	}
 
@@ -310,7 +310,7 @@ static int ddr_vftbl_cfg(void)
 	for (i = 0; i < MAX_FREQ_LV; i++) {
 		ret = dfc_level_cfg(&freq_levels[i]);
 		if (ret < 0) {
-			printf("%s: config freq table failed, %d\n", __func__, ret);
+			pr_err("%s: config freq table failed, %d\n", __func__, ret);
 			return ret;
 		}
 	}
@@ -364,7 +364,7 @@ static int ddrc_freq_chg(u32 level)
 	u32 timeout;
 
 	if (level >= MAX_FREQ_LV) {
-		printf("%s: invalid %d freq level\n", __func__, level);
+		pr_err("%s: invalid %d freq level\n", __func__, level);
 		return -EINVAL;
 	}
 
@@ -377,7 +377,7 @@ static int ddrc_freq_chg(u32 level)
 	}
 
 	if (!timeout) {
-		printf("%s: another dfc is in pregress. status:0x%x\n", __func__, readl((void __iomem *)DFC_STATUS));
+		pr_err("%s: another dfc is in pregress. status:0x%x\n", __func__, readl((void __iomem *)DFC_STATUS));
 		return -EBUSY;
 	}
 
@@ -392,7 +392,7 @@ static int ddrc_freq_chg(u32 level)
 	}
 
 	if (!timeout) {
-		printf("dfc error! status:0x%x\n", readl((void __iomem *)DFC_STATUS));
+		pr_err("dfc error! status:0x%x\n", readl((void __iomem *)DFC_STATUS));
 		return -EBUSY;
 	}
 
@@ -412,7 +412,7 @@ static int wait_freq_change_done(void)
 	}
 
 	if (!timeout) {
-		printf("%s: timeout! can not wait dfc done interrupt\n", __func__);
+		pr_err("%s: timeout! can not wait dfc done interrupt\n", __func__);
 		return -EBUSY;
 	}
 
@@ -431,7 +431,7 @@ static int ddr_freq_init(void)
 	#ifdef CONFIG_K1_X_BOARD_ASIC
 	ret = ddr_vftbl_cfg();
 	if (ret < 0) {
-		printf("%s failed!\n", __func__);
+		pr_err("%s failed!\n", __func__);
 		return ret;
 	}
 	#endif
@@ -447,7 +447,7 @@ static int ddr_freq_change(u32 freq_level)
 
 	ret = ddr_freq_init();
 	if (ret < 0) {
-		printf("ddr_freq_init failed: %d\n", -ret);
+		pr_err("ddr_freq_init failed: %d\n", -ret);
 		return ret;
 	}
 
@@ -464,21 +464,21 @@ static int ddr_freq_change(u32 freq_level)
 	enable_dfc_int(true);
 	ret = ddrc_freq_chg(freq_level);
 	if (ret < 0) {
-		printf("%s: ddrc_freq_chg fail. ret = %d\n", __func__, ret);
+		pr_err("%s: ddrc_freq_chg fail. ret = %d\n", __func__, ret);
 		return ret;
 	}
 
 	/* wait for frequency change done */
 	ret = wait_freq_change_done();
 	if (ret < 0) {
-		printf("%s: wait_freq_change_done timeout. ret = %d\n", __func__, ret);
+		pr_err("%s: wait_freq_change_done timeout. ret = %d\n", __func__, ret);
 		return ret;
 	}
 
 	clear_dfc_int_status();
 	enable_dfc_int(false);
 
-	printf("%s: ddr frequency change from level %d to %d\n", __func__, freq_curr, get_cur_freq_level());
+	pr_debug("%s: ddr frequency change from level %d to %d\n", __func__, freq_curr, get_cur_freq_level());
 
 	return 0;
 }
@@ -512,7 +512,7 @@ int do_ddr_freq(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 	}
 
 	ddr_freq_change(freq_level);
-	printf("dram frequency level is %u\n", get_cur_freq_level());
+	pr_debug("dram frequency level is %u\n", get_cur_freq_level());
 
 	return CMD_RET_SUCCESS;
 }

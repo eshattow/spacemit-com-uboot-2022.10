@@ -215,7 +215,7 @@ static int __i2c_read(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen,
 	      "len=0x%02x)\n", chip, *addr, alen, len);
 
 	if (len == 0) {
-		printf("reading zero byte is invalid\n");
+		pr_err("reading zero byte is invalid\n");
 		return -EINVAL;
 	}
 
@@ -629,7 +629,7 @@ static int spacemit_i2c_probe(struct udevice *bus)
 	priv->base = (void *)devfdt_get_addr_ptr(bus);
 	ret = dev_read_u32(bus, "clock-frequency", &priv->clk_rate);
         if (ret) {
-                printf("Default to 100kHz\n");
+                pr_debug("Default to 100kHz\n");
 		/* default clock rate: 100k */
                 priv->clk_rate = 100000;
         }

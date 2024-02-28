@@ -197,8 +197,8 @@ static void __maybe_unused dump_sdh_regs(struct sdhci_host *host, u8 is_emmc)
 	} while (spacemit_reg[i] != 0xFFF);
 	len += sprintf(buf + len, "\n");
 
-	printf("%s", cur_com_reg);
-	printf("%s", cur_pri_reg);
+	pr_debug("%s", cur_com_reg);
+	pr_debug("%s", cur_pri_reg);
 }
 
 static void spacemit_mmc_phy_init(struct sdhci_host *host)
@@ -226,7 +226,7 @@ static void spacemit_mmc_phy_init(struct sdhci_host *host)
 			value = sdhci_readl(host, SDHC_PHY_FUNC_REG);
 			value |= PHY_TEST_EN;
 			sdhci_writel (host, value, SDHC_PHY_FUNC_REG);
-			printf("%s: mmc phy bypass.\n", host->name);
+			pr_debug("%s: mmc phy bypass.\n", host->name);
 		} else {
 			/* use phy func mode */
 			value = sdhci_readl(host, SDHC_PHY_CTRL_REG);
@@ -236,10 +236,10 @@ static void spacemit_mmc_phy_init(struct sdhci_host *host)
 			value = sdhci_readl(host, SDHC_PHY_PADCFG_REG);
 			value |= (1 << RX_BIAS_CTRL_SHIFT);
 			sdhci_writel(host, value, SDHC_PHY_PADCFG_REG);
-			printf("%s: use mmc phy func.\n", host->name);
+			pr_debug("%s: use mmc phy func.\n", host->name);
 		}
 	} else {
-		printf("%s: not support phy module.\n", host->name);
+		pr_debug("%s: not support phy module.\n", host->name);
 		value = sdhci_readl (host, SDHC_TX_CFG_REG);
 		value |= TX_INT_CLK_SEL;
 		sdhci_writel (host, value, SDHC_TX_CFG_REG);
@@ -273,8 +273,9 @@ int spacemit_set_sdh_74_clk(struct udevice *dev)
 		udelay(10);
 		count++;
 	}
-	if (count >= MAX_WAIT_COUNT)
-		printf("%s: 74 clk wait timeout(%d)\n", host->name, count);
+	if (count >= MAX_WAIT_COUNT){
+		pr_err("%s: 74 clk wait timeout(%d)\n", host->name, count);
+	}
 	return 0;
 }
 
@@ -351,7 +352,7 @@ static int spacemit_sdhci_phy_dll_init(struct sdhci_host *host)
 		udelay(10);
 	}
 	if (i == 100) {
-		printf("%s: phy dll lock timeout\n", host->name);
+		pr_err("%s: phy dll lock timeout\n", host->name);
 		return 1;
 	}
 
@@ -445,7 +446,7 @@ static int spacemit_sdhci_probe(struct udevice *dev)
 	/* emmc phy bypass if need */
 	spacemit_mmc_phy_init(host);
 
-	printf("%s: probe done.\n", host->name);
+	pr_info("%s: probe done.\n", host->name);
 	return ret;
 }
 

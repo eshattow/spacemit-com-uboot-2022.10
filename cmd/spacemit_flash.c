@@ -227,11 +227,10 @@ int download_file_via_tftp(char *file_name, char *load_addr) {
 	sprintf(full_path, "%s%s", tftp_path_prefix, file_name);
 	sprintf(cmd_buffer, "tftpboot %s %s:%s", load_addr, tftp_server_ip, full_path);
 
-	if (run_command(cmd_buffer, 0) < 0) {
+	if (run_command(cmd_buffer, 0)) {
 		printf("Error: TFTP download failed\n");
 		return -1;
 	}
-
 	return 0;
 }
 
@@ -255,32 +254,36 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 
 #ifdef CONFIG_USB_STORAGE
 	case DEVICE_USB:
-		usb_init();
+		static bool usb_init_flag = false;
+		if (!usb_init_flag){
+			usb_init();
+			int device_number = usb_stor_scan(1);
+			if (device_number < 0){
+				printf("No USB storage devices found.\n");
+				retval = RESULT_FAIL;
+				break;
+			}
+			fdev->dev_str = strdup(simple_itoa((ulong)device_number));
+			fdev->device_name = strdup("usb");
+			usb_init_flag = true;
 
-		int device_number = usb_stor_scan(1);
-		if (device_number < 0){
-			printf("No USB storage devices found.\n");
-			retval = RESULT_FAIL;
-			break;
-		}
-		fdev->dev_str = strdup(simple_itoa((ulong)device_number));
-		fdev->device_name = strdup("usb");
+			char cmd[128];
+			for (u32 p = 1; p <= MAX_SEARCH_PARTITIONS; p++){
+				sprintf(cmd, "fatls usb %d:%d", device_number, p);
+				if (!run_command(cmd, 0))
+				{
+					bootfs_part_index = p;
+					break;
+				}
+			}
 
-		char cmd[128];
-		for (u32 p = 1; p <= MAX_SEARCH_PARTITIONS; p++){
-			sprintf(cmd, "fatls usb %d:%d", device_number, p);
-			if (!run_command(cmd, 0))
-			{
-				bootfs_part_index = p;
+			if (bootfs_part_index == 0){
+				printf("No valid filesystem found in any partition on USB.\n");
+				retval = RESULT_FAIL;
 				break;
 			}
 		}
-
-		if (bootfs_part_index == 0){
-			printf("No valid filesystem found in any partition on USB.\n");
-			retval = RESULT_FAIL;
-			break;
-		}
+		break;
 #else
 		printf("USB storage support is not enabled.\n");
 		retval = RESULT_FAIL;
@@ -289,7 +292,7 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 
 #ifdef CONFIG_CMD_TFTPBOOT
 	case DEVICE_NET:
-		if (run_command("dhcp", 0) < 0) {
+		if (run_command("dhcp", 0)) {
 			printf("Error: DHCP request failed\n");
 			retval = RESULT_FAIL;
 			break;

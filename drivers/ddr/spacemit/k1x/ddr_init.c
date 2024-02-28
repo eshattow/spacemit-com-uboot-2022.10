@@ -40,7 +40,7 @@ static int test_pattern(fdt_addr_t base, fdt_size_t size)
 	check_size = (DDR_CHECK_SIZE / DDR_CHECK_STEP) * DDR_CHECK_CNT;
 	ddr_data = malloc(check_size);
 	if (!ddr_data) {
-		printf("test zone malloc fail size 0x%llx\n", check_size);
+		pr_err("test zone malloc fail size 0x%llx\n", check_size);
 		return -1;
 	}
 
@@ -66,7 +66,7 @@ static int test_pattern(fdt_addr_t base, fdt_size_t size)
 	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
 		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
 			if (readl((void*)addr + offset) != (uint32_t)(addr + offset)) {
-				printf("ddr check error %x vs %x\n", (uint32_t)(addr + offset), readl((void*)addr + offset));
+				pr_debug("ddr check error %x vs %x\n", (uint32_t)(addr + offset), readl((void*)addr + offset));
 				err++;
 				if (err > 10)
 					goto ERR_HANDLE;
@@ -87,7 +87,7 @@ static int test_pattern(fdt_addr_t base, fdt_size_t size)
 	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
 		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
 			if (readl((void*)addr + offset) != (~(uint32_t)(addr + offset))) {
-				printf("ddr check error %x vs %x\n", (uint32_t)(~(addr + offset)), readl((void*)addr + offset));
+				pr_debug("ddr check error %x vs %x\n", (uint32_t)(~(addr + offset)), readl((void*)addr + offset));
 				err++;
 				if (err > 10)
 					goto ERR_HANDLE;
@@ -190,25 +190,25 @@ static int spacemit_ddr_probe(struct udevice *dev)
 
 	cpu = cpu_get_current_dev();
 	if(dev_read_u32u(cpu, "boot_freq_cluster0", &cpu_freq)) {
-		printf("boot_freq_cluster0 not configured, use 1228000 as default!\n");
+		pr_debug("boot_freq_cluster0 not configured, use 1228000 as default!\n");
 		cpu_freq = 1228000;
 	}
 	cpu_freq = adjust_cpu_freq(0, cpu_freq);
-	printf("adjust cluster-0 frequency to %u ...	[done]\n", cpu_freq);
+	pr_info("adjust cluster-0 frequency to %u ...	[done]\n", cpu_freq);
 
 	if(dev_read_u32u(cpu, "boot_freq_cluster1", &cpu_freq)) {
-		printf("boot_freq_cluster1 not configured, use 1228000 as default!\n");
+		pr_debug("boot_freq_cluster1 not configured, use 1228000 as default!\n");
 		cpu_freq = 614000;
 	}
 	cpu_freq = adjust_cpu_freq(1, cpu_freq);
-	printf("adjust cluster-1 frequency to %u ...	[done]\n", cpu_freq);
+	pr_info("adjust cluster-1 frequency to %u ...	[done]\n", cpu_freq);
 
 	/* check if dram data-rate is configued in dts */
 	if(dev_read_u32u(dev, "datarate", &ddr_datarate)) {
-		printf("ddr data rate not configed in dts, use 1200 as default!\n");
+		pr_info("ddr data rate not configed in dts, use 1200 as default!\n");
 		ddr_datarate = 1200;
 	} else {
-		printf("ddr data rate is %u configured in dts\n", ddr_datarate);
+		pr_info("ddr data rate is %u configured in dts\n", ddr_datarate);
 	}
 
 	/* init dram */
@@ -220,7 +220,7 @@ static int spacemit_ddr_probe(struct udevice *dev)
 		log_err("dram init failed!\n");
 		return -EIO;
 	}
-	log_debug("dram init done\n");
+	pr_debug("dram init done\n");
 
 	return 0;
 }

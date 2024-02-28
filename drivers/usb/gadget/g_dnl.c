@@ -328,7 +328,7 @@ int g_dnl_register(const char *name)
 
 	ret = usb_composite_register(&g_dnl_driver);
 	if (ret) {
-		printf("%s: failed!, error: %d\n", __func__, ret);
+		pr_err("%s: failed!, error: %d\n", __func__, ret);
 		return ret;
 	}
 	return 0;

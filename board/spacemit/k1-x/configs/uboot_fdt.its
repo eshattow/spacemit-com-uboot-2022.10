@@ -46,6 +46,15 @@
 				algo = "crc32";
 			};
 		};
+		fdt_4 {
+                        description = "k1_hs450";
+                        type = "flat_dt";
+                        compression = "none";
+                        data = /incbin/("../dtb/k1-x_hs450.dtb");
+                        hash-1 {
+                                algo = "crc32";
+                        };
+                };
 	};
 
 	configurations {
@@ -65,5 +74,10 @@
 			loadables = "uboot";
 			fdt = "fdt_3";
 		};
+		conf_4 {
+                        description = "k1_hs450";
+                        loadables = "uboot";
+                        fdt = "fdt_4";
+                };
 	};
 };

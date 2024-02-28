@@ -536,7 +536,7 @@ static int mv_ep_queue(struct usb_ep *ep,
 		 * but could if bugs were introduced later, and this error
 		 * check will save a lot of debugging time.
 		 */
-		printf("%s: ep0 transaction already in progress\n", __func__);
+		pr_err("%s: ep0 transaction already in progress\n", __func__);
 		return -EPROTO;
 	}
 
@@ -599,10 +599,11 @@ static void mv_set_ptc(struct mv_udc *udc, u32 mode)
 
 static void mv_udc_testmode(struct mv_udc *udc, u16 index)
 {
-	if (index <= TEST_FORCE_EN)
+	if (index <= TEST_FORCE_EN){
 		mv_set_ptc(udc, index);
-	else
-		printf("This test mode(%d) is not supported\n", index);
+	}else{
+		pr_debug("This test mode(%d) is not supported\n", index);
+	}
 }
 
 static void handle_ep_complete(struct mv_ep *ep)
@@ -620,7 +621,7 @@ static void handle_ep_complete(struct mv_ep *ep)
 
 	len = (item->info >> 16) & 0x7fff;
 	if (item->info & 0xff)
-		printf("EP%d/%s FAIL info=%x pg0=%x\n",
+		pr_debug("EP%d/%s FAIL info=%x pg0=%x\n",
 		       num, in ? "in" : "out", item->info, item->page0);
 
 	mv_req = list_first_entry(&ep->queue, struct mv_req, queue);
@@ -658,7 +659,7 @@ static void handle_ep_complete(struct mv_ep *ep)
 		case WAIT_FOR_OUT_STATUS:
 			ep0_state = WAIT_FOR_SETUP;
 			if (testmode == USB_DEVICE_TEST_MODE) {
-				printf("enter test mode too!!!\n");
+				pr_debug("enter test mode too!!!\n");
 				mv_udc_testmode(udc, windex);
 				windex = 0x0;
 				testmode = 0x0;
@@ -691,7 +692,7 @@ static void handle_setup(void)
 	mv_invalidate_qh(0);
 	memcpy(&r, head->setup_data, sizeof(struct usb_ctrlrequest));
 	writel(EPT_RX(0), &udc->epsetupstat);
-	printf("handle setup %s, 0x%x, 0x%x index 0x%x value 0x%x length 0x%x\n",
+	pr_debug("handle setup %s, 0x%x, 0x%x index 0x%x value 0x%x length 0x%x\n",
 	    reqname(r.bRequest), r.bRequestType, r.bRequest, r.wIndex,
 	    r.wValue, r.wLength);
 
@@ -731,7 +732,7 @@ static void handle_setup(void)
 
 	case SETUP(USB_RECIP_DEVICE, USB_REQ_SET_FEATURE):
 		if (r.wValue == USB_DEVICE_TEST_MODE) {
-			printf("enter test mode\n");
+			pr_debug("enter test mode\n");
 			testmode = r.wValue;
 			windex = (r.wIndex >> 8);
 		}
@@ -743,7 +744,7 @@ static void handle_setup(void)
 
 	case SETUP(USB_RECIP_DEVICE, USB_REQ_CLEAR_FEATURE):
 		if (r.wValue == USB_DEVICE_TEST_MODE) {
-			printf("leave test mode\n");
+			pr_debug("leave test mode\n");
 			mv_udc_testmode(udc, TEST_DISABLE);
 		}
 		return;
@@ -856,15 +857,17 @@ void udc_irq(void)
 	if (n == 0)
 		return;
 
-	if (n & STS_SEI)
-		printf("-- system error -- \n");
+	if (n & STS_SEI){
+		pr_debug("-- system error -- \n");
+	}
 
 	if (n & STS_URI) {
 		DBG("-- reset --:epsetupstat= 0x%x\n", readl(&udc->epsetupstat));
 		stop_activity();
 	}
-	if (n & STS_SLI)
-		printf("-- suspend --\n");
+	if (n & STS_SLI){
+		pr_debug("-- suspend --\n");
+	}
 
 	if (n & STS_PCI) {
 		int max = 64;
@@ -939,7 +942,7 @@ static int mv_pullup(struct usb_gadget *gadget, int is_on)
 	struct mv_udc *udc = (struct mv_udc *)controller.ctrl->hccr;
 	u32 value;
 
-	printf("k1xci_udc: pullup %d \n", is_on);
+	pr_debug("k1xci_udc: pullup %d \n", is_on);
 
 	if (is_on) {
 		/* RESET */
@@ -1055,7 +1058,7 @@ static int mvudc_probe(void)
 		return -ENOMEM;
 	}
 
-	printf("k1xci_udc probe\n");
+	pr_debug("k1xci_udc probe\n");
 
 	return 0;
 }
@@ -1064,7 +1067,7 @@ void usbphy_init(void)
 {
 	uint32_t loops, temp;
 
-	printf("k1xci_udc: phy_init \n");
+	pr_debug("k1xci_udc: phy_init \n");
 	reg32_modify(PMUA_USB_CLK_RES_CTRL, 0, PMUA_USB_CLK_RES_CTRL_USB_AXICLK_EN);
 	reg32_modify(PMUA_USB_CLK_RES_CTRL, PMUA_USB_CLK_RES_CTRL_USB_AXI_RST, 0);
 	reg32_modify(PMUA_USB_CLK_RES_CTRL, 0, PMUA_USB_CLK_RES_CTRL_USB_AXI_RST);
@@ -1079,8 +1082,9 @@ void usbphy_init(void)
 		udelay(5);
 	} while(--loops);
 
-	if (loops == 0)
-		printf("Wait PHY_REG01[PLLREADY] timeout \n");
+	if (loops == 0){
+		pr_debug("Wait PHY_REG01[PLLREADY] timeout \n");
+	}
 
 	reg32_write(USB2_PHY_REG01, 0x60ef);
 	reg32_write(USB2_PHY_REG0D, 0x1c);

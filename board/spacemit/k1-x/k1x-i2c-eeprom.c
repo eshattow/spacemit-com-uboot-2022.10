@@ -47,7 +47,7 @@ int spacemit_eeprom_read(uint8_t chip, uint8_t *buffer, uint8_t id)
 		tlv.length = *len;
 
 		if (tlv.length == 0) {
-			printf("Error: wrong tlv length\n");
+			pr_err("Error: wrong tlv length\n");
 			return -1;
 		}
 
@@ -60,7 +60,7 @@ int spacemit_eeprom_read(uint8_t chip, uint8_t *buffer, uint8_t id)
 		}
 	}
 
-	printf("No 0x%x tlv type in eeprom\n", id);
+	pr_info("No 0x%x tlv type in eeprom\n", id);
 	return -2;
 }
 
@@ -77,7 +77,7 @@ void i2c_set_pinctrl(int bus, int pin)
 		//gpio119
 		writel(MUX_MODE2 | EDGE_NONE | PULL_UP | PAD_1V8_DS2, (void __iomem *)0xd401e22c);
 	}else
-		printf("bus or pinctrl wrong\n");
+		pr_err("bus or pinctrl wrong\n");
 }
 
 const uint8_t eeprom_config[][2] = {
@@ -97,19 +97,19 @@ int k1x_eeprom_init(void)
 		name = spacemit_i2c_eeprom[i];
 		offset = fdt_node_offset_by_compatible(gd->fdt_blob, -1, name);
 		if(offset > 0){
-			printf("Get %s node \n", name);
+			pr_info("Get %s node \n", name);
 			break;
 		}
 	}
 
 	if (offset < 0) {
-		printf("%s Get eeprom node error\n", __func__);
+		pr_err("%s Get eeprom node error\n", __func__);
 		return -EINVAL;
 	}
 
 	saddr = fdtdec_get_uint(gd->fdt_blob, offset, "reg", 0);
 	if (!saddr) {
-		printf("%s: %s Node has no reg\n", __func__, name);
+		pr_err("%s: %s Node has no reg\n", __func__, name);
 		return -EINVAL;
 	}
 
@@ -120,13 +120,13 @@ int k1x_eeprom_init(void)
 
 		ret = i2c_set_bus_num(bus);
 		if (ret < 0) {
-			printf("%s: %s set i2c bus number error\n", __func__, name);
+			pr_err("%s: %s set i2c bus number error\n", __func__, name);
 			continue;
 		}
 
 		ret = i2c_probe(saddr);
 		if (ret < 0) {
-			printf("%s: %s probe i2c(%d) failed\n", __func__, name, bus);
+			pr_err("%s: %s probe i2c(%d) failed\n", __func__, name, bus);
 			continue;
 		}
 		break;
@@ -135,7 +135,7 @@ int k1x_eeprom_init(void)
 	if (i >= ARRAY_SIZE(eeprom_config))
 		return -EINVAL;
 	else {
-		printf("find eeprom in bus %d, address %d\n", eeprom_config[i][0], saddr);
+		pr_info("find eeprom in bus %d, address %d\n", eeprom_config[i][0], saddr);
 		return saddr;
 	}
 }

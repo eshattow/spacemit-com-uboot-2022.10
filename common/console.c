@@ -60,7 +60,7 @@ static int on_console(const char *name, const char *value, enum env_op op,
 
 	case env_op_delete:
 		if ((flags & H_FORCE) == 0)
-			printf("Can't delete \"%s\"\n", name);
+			pr_err("Can't delete \"%s\"\n", name);
 		return 1;
 
 	default:
