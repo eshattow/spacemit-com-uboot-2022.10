@@ -110,25 +110,6 @@
 		u-boot,dm-spl;
 	};
 
-	twsi6@d4018800 {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_i2c6_1>;
-		status = "okay";
-		u-boot,dm-spl;
-
-		eeprom@50{
-			compatible = "atmel,24c02";
-			u-boot,dm-spl;
-			reg = <0x50>;
-			bus = <6>;
-			#address-cells = <1>;
-			#size-cells = <1>;
-			status = "okay";
-		};
-	};
-
 	spi@d420c000 {
 		status = "okay";
 		pinctrl-names = "default";
