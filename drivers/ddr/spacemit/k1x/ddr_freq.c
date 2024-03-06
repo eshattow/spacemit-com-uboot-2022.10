@@ -493,17 +493,23 @@ int ddr_freq_max(void)
 int do_ddr_freq(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
 	u32 freq_level;
+	int i;
 
 	if (argc <= 1 || argc > 2) {
 		/* invalid parameter, report error */
 		return CMD_RET_USAGE;
 	}
 
-        if (!strcmp(argv[0], "list")) {
+	if (0 == strcmp(argv[1], "list")) {
 		/* show valid frequency list */
+		printf("support frequency list as shown below:\n");
+		for (i = 0; i < ARRAY_SIZE(freq_levels); i++) {
+			printf("Frequency level: %d, data rate: %dMT/s\n",
+				freq_levels[i].freq_lv, freq_levels[i].data_rate);
+		}
 
-                return CMD_RET_SUCCESS;
-        }
+		return CMD_RET_SUCCESS;
+	}
 
 	freq_level = simple_strtoul(argv[1], NULL, 0);
 	if(freq_level >= MAX_FREQ_LV) {
@@ -512,7 +518,7 @@ int do_ddr_freq(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 	}
 
 	ddr_freq_change(freq_level);
-	pr_debug("dram frequency level is %u\n", get_cur_freq_level());
+	printf("Change DDR data rate to %dMT/s\n", freq_levels[get_cur_freq_level()].data_rate);
 
 	return CMD_RET_SUCCESS;
 }
@@ -520,6 +526,6 @@ int do_ddr_freq(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 U_BOOT_CMD(
 	ddrfreq, CONFIG_SYS_MAXARGS, 1, do_ddr_freq,
 	"Adjusting the DRAM working frequency",
-	"ddrfreq list	- display the valid frequncy points"
+	"ddrfreq list	- display the valid frequncy points\n"
 	"ddrfreq [0~7]	- adjust dram working frequency to level[0~7]"
 );
