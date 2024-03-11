@@ -127,6 +127,9 @@ enum board_boot_mode {
 	"splashimage=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
 	"splashpos=m,m\0" \
 	"splashfile=k1-x.bmp\0" \
+	"stderr=serial\0" \
+	"stdin=serial,usbkbd\0" \
+	"stdout=serial,vidconsole\0" \
 	BOOTENV_DEVICE_CONFIG \
 	BOOTENV
 
