@@ -564,7 +564,7 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 	}
 
 	if (buffer) { /* flash */
-		pr_debug("%s, %p\n", __func__, buffer);
+		pr_info("%s, %p\n", __func__, buffer);
 		/* determine number of blocks to write */
 		blksz = dev_desc->blksz;
 		blkcnt = ((buff_sz + (blksz - 1)) & ~(blksz - 1));
@@ -588,7 +588,7 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 			return -1;
 		}
 
-		pr_debug("........ wrote %lu bytes to EMMC_BOOT%d\n",
+		pr_info("........ wrote %lu bytes to EMMC_BOOT%d\n",
 			   blkcnt * blksz, hwpart);
 	}
 
@@ -637,7 +637,7 @@ int fastboot_mmc_flash_offset(u32 start_offset, void *download_buffer,
 			return -1;
 	}
 
-	pr_debug("........ wrote 0x%lx sector bytes to blk offset 0x%lx\n", blkcnt, info.start);
+	pr_info("........ wrote 0x%lx sector bytes to blk offset 0x%lx\n", blkcnt, info.start);
 #endif
 	return 0;
 }
@@ -677,9 +677,9 @@ int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 		byte_remain -= download_bytes;
 	}
 
-	pr_debug("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
+	pr_info("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
 	time_start_flash = get_timer(time_start_flash);
-	pr_debug("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
+	pr_info("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
 	return (crc == crc_compare) ? 0 : -1;
 }
 
@@ -714,9 +714,9 @@ int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, int image_size)
 		byte_remain -= download_bytes;
 	}
 
-	pr_debug("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
+	pr_info("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
 	time_start_flash = get_timer(time_start_flash);
-	pr_debug("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
+	pr_info("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
 	return (crc == crc_compare) ? 0 : -1;
 }
 
