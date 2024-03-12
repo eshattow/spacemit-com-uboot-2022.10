@@ -64,6 +64,15 @@
                                 algo = "crc32";
                         };
                 };
+		fdt_6 {
+			description = "k1_MINI-PC";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k1-x_MINI-PC.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -93,5 +102,10 @@
                         loadables = "uboot";
                         fdt = "fdt_5";
                 };
+		conf_6 {
+			description = "k1_MINI-PC";
+			loadables = "uboot";
+			fdt = "fdt_6";
+		};
 	};
 };
