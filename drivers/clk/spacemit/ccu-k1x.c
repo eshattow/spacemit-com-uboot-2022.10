@@ -1434,6 +1434,7 @@ struct spacemit_clk_init_rate init_rate_tbl[] = {
 #else
 	{CLK_PMUA_ACLK, 307200000},
 	{CLK_APB,	102400000},
+	{CLK_SLOW_UART1, 14745600},
 #endif
 };
 
