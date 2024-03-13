@@ -125,7 +125,7 @@ void dev_print (struct blk_desc *dev_desc)
 	lba512_t lba512; /* number of blocks if 512bytes block size */
 
 	if (dev_desc->type == DEV_TYPE_UNKNOWN) {
-		puts ("not available\n");
+		pr_crit ("not available\n");
 		return;
 	}
 
@@ -160,36 +160,36 @@ void dev_print (struct blk_desc *dev_desc)
 		pr_crit("%s VirtIO Block Device\n", dev_desc->vendor);
 		break;
 	case IF_TYPE_DOC:
-		puts("device type DOC\n");
+		pr_crit("device type DOC\n");
 		return;
 	case IF_TYPE_UNKNOWN:
-		puts("device type unknown\n");
+		pr_crit("device type unknown\n");
 		return;
 	default:
 		pr_crit("Unhandled device type: %i\n", dev_desc->if_type);
 		return;
 	}
-	puts ("            Type: ");
+	pr_crit ("            Type: ");
 	if (dev_desc->removable)
-		puts ("Removable ");
+		pr_crit ("Removable ");
 	switch (dev_desc->type & 0x1F) {
 	case DEV_TYPE_HARDDISK:
-		puts ("Hard Disk");
+		pr_crit ("Hard Disk");
 		break;
 	case DEV_TYPE_CDROM:
-		puts ("CD ROM");
+		pr_crit ("CD ROM");
 		break;
 	case DEV_TYPE_OPDISK:
-		puts ("Optical Device");
+		pr_crit ("Optical Device");
 		break;
 	case DEV_TYPE_TAPE:
-		puts ("Tape");
+		pr_crit ("Tape");
 		break;
 	default:
 		pr_crit ("# %02X #", dev_desc->type & 0x1F);
 		break;
 	}
-	puts ("\n");
+	pr_crit ("\n");
 	if (dev_desc->lba > 0L && dev_desc->blksz > 0L) {
 		ulong mb, mb_quot, mb_rem, gb, gb_quot, gb_rem;
 		lbaint_t lba;
@@ -226,7 +226,7 @@ void dev_print (struct blk_desc *dev_desc)
 			dev_desc->blksz);
 #endif
 	} else {
-		puts ("            Capacity: not available\n");
+		pr_crit ("            Capacity: not available\n");
 	}
 }
 #endif
@@ -262,46 +262,46 @@ static void print_part_header(const char *type, struct blk_desc *dev_desc)
 	CONFIG_IS_ENABLED(ISO_PARTITION) || \
 	CONFIG_IS_ENABLED(AMIGA_PARTITION) || \
 	CONFIG_IS_ENABLED(EFI_PARTITION)
-	puts ("\nPartition Map for ");
+	pr_crit ("\nPartition Map for ");
 	switch (dev_desc->if_type) {
 	case IF_TYPE_IDE:
-		puts ("IDE");
+		pr_crit ("IDE");
 		break;
 	case IF_TYPE_SATA:
-		puts ("SATA");
+		pr_crit ("SATA");
 		break;
 	case IF_TYPE_SCSI:
-		puts ("SCSI");
+		pr_crit ("SCSI");
 		break;
 	case IF_TYPE_ATAPI:
-		puts ("ATAPI");
+		pr_crit ("ATAPI");
 		break;
 	case IF_TYPE_USB:
-		puts ("USB");
+		pr_crit ("USB");
 		break;
 	case IF_TYPE_DOC:
-		puts ("DOC");
+		pr_crit ("DOC");
 		break;
 	case IF_TYPE_MMC:
-		puts ("MMC");
+		pr_crit ("MMC");
 		break;
 	case IF_TYPE_HOST:
-		puts ("HOST");
+		pr_crit ("HOST");
 		break;
 	case IF_TYPE_NVME:
-		puts ("NVMe");
+		pr_crit ("NVMe");
 		break;
 	case IF_TYPE_PVBLOCK:
-		puts("PV BLOCK");
+		pr_crit("PV BLOCK");
 		break;
 	case IF_TYPE_VIRTIO:
-		puts("VirtIO");
+		pr_crit("VirtIO");
 		break;
 	case IF_TYPE_EFI_MEDIA:
-		puts("EFI");
+		pr_crit("EFI");
 		break;
 	default:
-		puts("UNKNOWN");
+		pr_crit("UNKNOWN");
 		break;
 	}
 	pr_crit (" device %d  --   Partition Type: %s\n\n",
@@ -320,7 +320,7 @@ void part_print(struct blk_desc *dev_desc)
 		return;
 	}
 
-	pr_crit("## Testing for valid %s partition ##\n", drv->name);
+	PRINTF("## Testing for valid %s partition ##\n", drv->name);
 	print_part_header(drv->name, dev_desc);
 	if (drv->print)
 		drv->print(dev_desc);
@@ -349,12 +349,12 @@ int part_get_info(struct blk_desc *dev_desc, int part,
 		return -EPROTONOSUPPORT;
 	}
 	if (!drv->get_info) {
-		pr_err("## Driver %s does not have the get_info() method\n",
+		PRINTF("## Driver %s does not have the get_info() method\n",
 		       drv->name);
 		return -ENOSYS;
 	}
 	if (drv->get_info(dev_desc, part, info) == 0) {
-		pr_err("## Valid %s partition found ##\n", drv->name);
+		PRINTF("## Valid %s partition found ##\n", drv->name);
 		return 0;
 	}
 #endif /* CONFIG_HAVE_BLOCK_DEVICE */
@@ -402,7 +402,7 @@ int blk_get_device_by_str(const char *ifname, const char *dev_hwpart_str,
 
 	dev = hextoul(dev_str, &ep);
 	if (*ep) {
-		pr_err("** Bad device specification %s %s **\n",
+		PRINTF("** Bad device specification %s %s **\n",
 		       ifname, dev_str);
 		dev = -EINVAL;
 		goto cleanup;
@@ -528,7 +528,7 @@ int blk_get_device_part_str(const char *ifname, const char *dev_part_str,
 	/* Look up the device */
 	dev = blk_get_device_by_str(ifname, dev_str, dev_desc);
 	if (dev < 0) {
-		pr_err("** Bad device specification %s %s **\n",
+		PRINTF("** Bad device specification %s %s **\n",
 		       ifname, dev_str);
 		ret = dev;
 		goto cleanup;
