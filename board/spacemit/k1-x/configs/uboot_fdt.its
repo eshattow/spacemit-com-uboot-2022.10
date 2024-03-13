@@ -73,6 +73,15 @@
 				algo = "crc32";
 			};
 		};
+		fdt_7 {
+                        description = "k1_mingo";
+                        type = "flat_dt";
+                        compression = "none";
+                        data = /incbin/("../dtb/k1-x_mingo.dtb");
+                        hash-1 {
+                                algo = "crc32";
+                        };
+                };
 	};
 
 	configurations {
@@ -107,5 +116,10 @@
 			loadables = "uboot";
 			fdt = "fdt_6";
 		};
+		conf_7 {
+                        description = "k1_mingo";
+                        loadables = "uboot";
+                        fdt = "fdt_7";
+                };
 	};
 };
