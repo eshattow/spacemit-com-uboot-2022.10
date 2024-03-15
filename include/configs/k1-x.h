@@ -126,7 +126,7 @@ enum board_boot_mode {
 	"net_data_path=spacemit_flash_file/net_flash_file/\0" \
 	"splashimage=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
 	"splashpos=m,m\0" \
-	"splashfile=k1-x.bmp\0" \
+	"splashfile=bianbu.bmp\0" \
 	"stderr=serial\0" \
 	"stdin=serial,usbkbd\0" \
 	"stdout=serial,vidconsole\0" \
