@@ -55,6 +55,33 @@
                                 algo = "crc32";
                         };
                 };
+                fdt_5 {
+                        description = "k1_kx312";
+                        type = "flat_dt";
+                        compression = "none";
+                        data = /incbin/("../dtb/k1-x_kx312.dtb");
+                        hash-1 {
+                                algo = "crc32";
+                        };
+                };
+		fdt_6 {
+			description = "k1_MINI-PC";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k1-x_MINI-PC.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
+		fdt_7 {
+                        description = "k1_mingo";
+                        type = "flat_dt";
+                        compression = "none";
+                        data = /incbin/("../dtb/k1-x_mingo.dtb");
+                        hash-1 {
+                                algo = "crc32";
+                        };
+                };
 	};
 
 	configurations {
@@ -78,6 +105,21 @@
                         description = "k1_hs450";
                         loadables = "uboot";
                         fdt = "fdt_4";
+                };
+                conf_5 {
+                        description = "k1_kx312";
+                        loadables = "uboot";
+                        fdt = "fdt_5";
+                };
+		conf_6 {
+			description = "k1_MINI-PC";
+			loadables = "uboot";
+			fdt = "fdt_6";
+		};
+		conf_7 {
+                        description = "k1_mingo";
+                        loadables = "uboot";
+                        fdt = "fdt_7";
                 };
 	};
 };

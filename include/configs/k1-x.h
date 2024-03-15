@@ -17,8 +17,8 @@
 #define CONFIG_SYS_SDRAM_BASE	(SYS_DRAM_OFFS + SEC_IMG_SIZE)
 
 #define RISCV_MMODE_TIMERBASE	0xE4000000
-#define RISCV_MMODE_TIMER_FREQ	1000000
-#define RISCV_SMODE_TIMER_FREQ	1000000
+#define RISCV_MMODE_TIMER_FREQ	24000000
+#define RISCV_SMODE_TIMER_FREQ	24000000
 
 #define CONFIG_IPADDR		10.0.92.253
 #define CONFIG_SERVERIP		10.0.92.134
@@ -127,6 +127,9 @@ enum board_boot_mode {
 	"splashimage=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
 	"splashpos=m,m\0" \
 	"splashfile=k1-x.bmp\0" \
+	"stderr=serial\0" \
+	"stdin=serial,usbkbd\0" \
+	"stdout=serial,vidconsole\0" \
 	BOOTENV_DEVICE_CONFIG \
 	BOOTENV
 

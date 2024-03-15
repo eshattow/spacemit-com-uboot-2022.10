@@ -671,6 +671,49 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 	return RESULT_OK;
 }
 
+int flash_volume_from_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, const char *volume_name, const char *file_name, const char *partition, uint64_t *partition_offset) {
+	char blk_dev_str[32];
+	uint64_t image_size = 0;
+	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
+    char cmd_buf[256];
+
+	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+
+	sprintf(cmd_buf, "fatload %s %s %lx %s", fdev->device_name, blk_dev_str, (ulong)load_addr, file_name);
+	if (run_command(cmd_buf, 0) != 0) {
+		printf("Failed to load file %s\n", file_name);
+		return RESULT_FAIL;
+	}
+
+	image_size = env_get_hex("filesize", 0);
+	printf("Loaded %s, size: %llu bytes\n", file_name, image_size);
+
+	printf("Creating and writing to UBI volume: %s\n", volume_name);
+
+	sprintf(cmd_buf, "ubi part %s", partition);
+	if (run_command(cmd_buf, 0) != 0) {
+		printf("Failed to select MTD partition %s\n", partition);
+		return RESULT_FAIL;
+	}
+
+	sprintf(cmd_buf, "ubi check %s", volume_name);
+	if (run_command(cmd_buf, 0) != 0) {
+		sprintf(cmd_buf, "ubi create %s %llx dynamic", volume_name, image_size);
+		if (run_command(cmd_buf, 0) != 0) {
+			printf("Failed to create UBI volume %s\n", volume_name);
+			return RESULT_FAIL;
+		}
+	}
+
+	sprintf(cmd_buf, "ubi write %lx %s %llx", (ulong)load_addr, volume_name, image_size);
+	if (run_command(cmd_buf, 0) != 0) {
+		printf("Failed to write to UBI volume %s\n", volume_name);
+		return RESULT_FAIL;
+	}
+
+	return RESULT_OK;
+}
+
 static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 {
 	int ret = RESULT_OK, i, j;
@@ -688,49 +731,67 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 			break;
 		}
 
-		if (file_name == NULL || strlen(file_name) == 0) {
+		if ((file_name == NULL || strlen(file_name) == 0) && (fdev->parts_info[i].volume_images_count == 0)) {
 			/* if not file not exists, it mean not to flash */
 			printf("file name is null, not to flashing, continue\n");
 			continue;
 		}
 
-		partition_offset = 0;
-		printf("\n\nflash img %s, part_name:%s\n", file_name, part_name);
-		// big rootfs image(larger than 4GB) will split to multi files
-		sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
-		if ((0 == strcmp(part_name, BIG_IMG_PARTNAME))
-			&& (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0)
-			&& !file_exists(fdev->device_name, blk_dev_str, file_name, FS_TYPE_FAT)) {
-				split_file_name = malloc(strlen(file_name) + 8);
-				extension = file_name;
-				// MUST has only 1 "." inside file name
-				name = strsep(&extension, ".");
-				j = 1;
-				while (1) {
-					sprintf(split_file_name, "%s_%d.%s", name, j, extension);
-					if (file_exists(fdev->device_name, blk_dev_str, split_file_name, FS_TYPE_FAT)) {
-						printf("write %s to device %s\n", split_file_name, fdev->device_name);
-						ret = load_and_flash_file(cmdtp, fdev, split_file_name, part_name, &partition_offset);
-						if (RESULT_OK != ret)
+		if (fdev->parts_info[i].volume_images_count == 0) {
+			partition_offset = 0;
+			printf("\n\nFlashing part: %s, file:%s\n", part_name, file_name);
+			// big rootfs image(larger than 4GB) will split to multi files except flash to nand.
+			sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+			if ((0 == strcmp(part_name, BIG_IMG_PARTNAME))
+				&& (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0)
+				&& !file_exists(fdev->device_name, blk_dev_str, file_name, FS_TYPE_FAT)) {
+					split_file_name = malloc(strlen(file_name) + 8);
+					extension = file_name;
+					// MUST has only 1 "." inside file name
+					name = strsep(&extension, ".");
+					j = 1;
+					while (1) {
+						sprintf(split_file_name, "%s_%d.%s", name, j, extension);
+						if (file_exists(fdev->device_name, blk_dev_str, split_file_name, FS_TYPE_FAT)) {
+							printf("write %s to device %s\n", split_file_name, fdev->device_name);
+							ret = load_and_flash_file(cmdtp, fdev, split_file_name, part_name, &partition_offset);
+							if (RESULT_OK != ret)
+								break;
+							j++;
+						}
+						else
 							break;
-						j++;
 					}
-					else
-						break;
+
+					free(split_file_name);
+				}
+			else{
+				ret = load_and_flash_file(cmdtp, fdev, file_name, part_name, &partition_offset);
+			}
+
+			if (RESULT_OK != ret) {
+				printf("Write %s to partition %s fail(%d)\n", file_name, part_name, ret);
+				break;
+			}
+			time_start_flash = get_timer(time_start_flash);
+			printf("finish image %s flash, consume %lld ms\n", file_name, time_start_flash);
+		} else if (fdev->parts_info[i].volume_images_count > 0) {
+			for (j = 0; j < fdev->parts_info[i].volume_images_count; ++j) {
+				const char *volume_name = fdev->parts_info[i].volume_images[j].name;
+				char *volume_file_name = fdev->parts_info[i].volume_images[j].file_name;
+
+				printf("\n\nFlashing volume %s with file %s\n", volume_name, volume_file_name);
+				ret = flash_volume_from_file(cmdtp, fdev, volume_name, volume_file_name, part_name, &partition_offset);
+				if (ret != RESULT_OK) {
+					printf("Failed to flash volume %s from file %s\n", volume_name, volume_file_name);
+					break;
 				}
 
-				free(split_file_name);				
+				time_start_flash = get_timer(time_start_flash);
+				printf("finish image %s flash, consume %lld ms\n", file_name, time_start_flash);
 			}
-		else
-			ret = load_and_flash_file(cmdtp, fdev, file_name, part_name, &partition_offset);
-
-		if (RESULT_OK != ret) {
-			printf("Write %s to partition %s fail(%d)\n", file_name, part_name, ret);
-			break;
 		}
 
-		time_start_flash = get_timer(time_start_flash);
-		printf("finish image %s flash, consume %lld ms\n", file_name, time_start_flash);
 	}
 
 	return ret;
@@ -802,7 +863,6 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 	switch(boot_mode){
 #ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
 	case BOOT_MODE_NOR:
-	case BOOT_MODE_NAND:
 		/*nvme devices need scan at first*/
 		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)){
 			run_command("nvme scan", 0);
@@ -821,6 +881,13 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 
 		break;
 #endif //CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
+
+	case BOOT_MODE_NAND:
+		if (flash_image(cmdtp, fdev)) {
+			return RESULT_FAIL;
+		}
+
+		break;
 
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
@@ -903,7 +970,8 @@ void get_blk_partition_file(char *file_name)
 			strcpy(file_name, "partition_universal.json");
 		return;
 #endif //CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
-
+	case BOOT_MODE_NAND:
+		return;
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
 #ifdef CONFIG_FASTBOOT_FLASH_MMC_DEV

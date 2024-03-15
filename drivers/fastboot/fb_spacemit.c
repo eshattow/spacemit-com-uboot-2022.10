@@ -302,6 +302,24 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			else
 				node_file = "";
 
+			cJSON *cj_volume_images = cJSON_GetObjectItem(arraypart, "volume_images");
+			if (cj_volume_images) {
+				int volume_count = cJSON_GetArraySize(cj_volume_images);
+				fdev->parts_info[part_index].volume_images = malloc(volume_count * sizeof(struct flash_volume_image));
+				fdev->parts_info[part_index].volume_images_count = volume_count;
+
+				int volume_index = 0;
+				cJSON *cj_volume_image = NULL;
+				cJSON_ArrayForEach(cj_volume_image, cj_volume_images) {
+					const char *volume_name = cj_volume_image->string;
+					const char *image_file = cj_volume_image->valuestring;
+
+					fdev->parts_info[part_index].volume_images[volume_index].name = strdup(volume_name);
+					fdev->parts_info[part_index].volume_images[volume_index].file_name = strdup(image_file);
+					volume_index++;
+				}
+			}
+
 			cJSON *cj_offset = cJSON_GetObjectItem(arraypart, "offset");
 			if (cj_offset && cj_offset->type == cJSON_String)
 				node_offset = cj_offset->valuestring;
@@ -385,9 +403,14 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 				}
 			}
 
-			pr_info("part info %s, %s\n", \
-				fdev->parts_info[part_index].part_name, \
-				fdev->parts_info[part_index].file_name);
+			pr_info("Part info: %s, %s\n", fdev->parts_info[part_index].part_name, fdev->parts_info[part_index].file_name ? fdev->parts_info[part_index].file_name : "None");
+			if (fdev->parts_info[part_index].volume_images_count > 0) {
+				for (int j = 0; j < fdev->parts_info[part_index].volume_images_count; j++) {
+					pr_info("Volume name: %s, Image file: %s\n",
+						fdev->parts_info[part_index].volume_images[j].name,
+						fdev->parts_info[part_index].volume_images[j].file_name);
+				}
+			}
 			part_index++;
 		}
 	}else{
@@ -541,7 +564,7 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 	}
 
 	if (buffer) { /* flash */
-		pr_debug("%s, %p\n", __func__, buffer);
+		pr_info("%s, %p\n", __func__, buffer);
 		/* determine number of blocks to write */
 		blksz = dev_desc->blksz;
 		blkcnt = ((buff_sz + (blksz - 1)) & ~(blksz - 1));
@@ -565,7 +588,7 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 			return -1;
 		}
 
-		pr_debug("........ wrote %lu bytes to EMMC_BOOT%d\n",
+		pr_info("........ wrote %lu bytes to EMMC_BOOT%d\n",
 			   blkcnt * blksz, hwpart);
 	}
 
@@ -614,7 +637,7 @@ int fastboot_mmc_flash_offset(u32 start_offset, void *download_buffer,
 			return -1;
 	}
 
-	pr_debug("........ wrote 0x%lx sector bytes to blk offset 0x%lx\n", blkcnt, info.start);
+	pr_info("........ wrote 0x%lx sector bytes to blk offset 0x%lx\n", blkcnt, info.start);
 #endif
 	return 0;
 }
@@ -654,9 +677,9 @@ int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 		byte_remain -= download_bytes;
 	}
 
-	pr_debug("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
+	pr_info("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
 	time_start_flash = get_timer(time_start_flash);
-	pr_debug("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
+	pr_info("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
 	return (crc == crc_compare) ? 0 : -1;
 }
 
@@ -691,9 +714,9 @@ int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, int image_size)
 		byte_remain -= download_bytes;
 	}
 
-	pr_debug("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
+	pr_info("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
 	time_start_flash = get_timer(time_start_flash);
-	pr_debug("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
+	pr_info("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
 	return (crc == crc_compare) ? 0 : -1;
 }
 
