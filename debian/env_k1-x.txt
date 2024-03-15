@@ -114,9 +114,9 @@ nor_boot=echo "Try to boot from NVMe ..."; \
 set_mmc_args=setenv bootargs "${bootargs}" root=${mmc_root} rootwait rootfstype=${mmc_rootfstype};
 
 mmc_loadknl=echo "Loading kernel ..."; \
-            fatload mmc ${boot_devnum}:${bootfs_part} ${knl_addr} ${knl_name}; \
-            fatload mmc ${boot_devnum}:${bootfs_part} ${ramdisk_addr} ${ramdisk_name}; \
-            fatload mmc ${boot_devnum}:${bootfs_part} ${dtb_addr} ${dtb_name};
+            load mmc ${boot_devnum}:${bootfs_part} ${knl_addr} ${knl_name}; \
+            load mmc ${boot_devnum}:${bootfs_part} ${ramdisk_addr} ${ramdisk_name}; \
+            load mmc ${boot_devnum}:${bootfs_part} ${dtb_addr} ${dtb_name};
 
 
 mmc_boot=echo "Try to boot from MMC${boot_devnum} ..."; \
