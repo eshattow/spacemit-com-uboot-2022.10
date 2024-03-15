@@ -9,19 +9,19 @@ cmd_build_spl_platform = \
 	cp $(srctree)/$3 \
 		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/ && \
 	python3 $(srctree)/tools/build_binary_file.py \
-		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/fsbl.yml \
+		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/fsbl.json \
 		-o $(srctree)/FSBL.bin; \
 	python3 $(srctree)/tools/build_binary_file.py \
-		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_spinor.yml \
+		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_spinor.json \
 		-o $(srctree)/bootinfo_spinor.bin; \
 	python3 $(srctree)/tools/build_binary_file.py \
-		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_spinand.yml \
+		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_spinand.json \
 		-o $(srctree)/bootinfo_spinand.bin; \
 	python3 $(srctree)/tools/build_binary_file.py \
-		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_emmc.yml \
+		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_emmc.json \
 		-o $(srctree)/bootinfo_emmc.bin; \
 	python3 $(srctree)/tools/build_binary_file.py \
-		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_sd.yml \
+		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_sd.json \
 		-o $(srctree)/bootinfo_sd.bin && \
 	rm -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-spl.bin
 
