@@ -36,6 +36,7 @@ static char found_partition[64] = {0};
 #ifdef CONFIG_DISPLAY_SPACEMIT_HDMI
 extern int is_hdmi_connected;
 #endif
+void refresh_config_info(void);
 
 void set_boot_mode(enum board_boot_mode boot_mode)
 {
@@ -123,6 +124,9 @@ void run_fastboot_command(void)
 
 		char *cmd_para = "fastboot 0";
 		run_command(cmd_para, 0);
+
+		/*read from eeprom and update info to env*/
+		refresh_config_info();
 	}
 }
 
@@ -591,9 +595,6 @@ int board_late_init(void)
 #endif
 
 	setenv_boot_mode();
-
-	/*read from eeprom and update info to env*/
-	refresh_config_info();
 
 	/*save ram size to env, transfer to MB*/
 	sprintf(ram_size_str, "mem=%dMB", (int)(gd->ram_size / SZ_1MB));
