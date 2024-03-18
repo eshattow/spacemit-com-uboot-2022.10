@@ -248,7 +248,7 @@ int board_fit_config_name_match(const char *name)
 
 	buildin_name = product_name;
 	if (NULL == buildin_name)
-		buildin_name = env_get("product_name");
+		buildin_name = DEFAULT_PRODUCT_NAME;
 
 	if ((NULL != buildin_name) && (0 == strcmp(buildin_name, name))) {
 		pr_debug("Boot from fit configuration %s\n", name);
@@ -360,7 +360,7 @@ char *get_product_name(void)
 	if (NULL != name)
 		free(name);
 
-	pr_debug("Use default product name %s\n", env_get("product_name"));
+	pr_debug("Use default product name %s\n", DEFAULT_PRODUCT_NAME);
 	return NULL;
 }
 

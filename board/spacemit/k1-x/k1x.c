@@ -557,6 +557,9 @@ int board_late_init(void)
 		device_bind_driver(gd->dm_root, "spacemit_sysreset",
 					"spacemit_sysreset", NULL);
 
+	// it MAY be NULL when did NOT load build-in env and eeprom is empty
+	if (NULL == env_get("product_name"))
+		env_set("product_name", DEFAULT_PRODUCT_NAME);
 	set_env_ethaddr();
 	set_dev_serial_no();
 

@@ -25,6 +25,8 @@
 #define CONFIG_GATEWAYIP	10.0.92.1
 #define CONFIG_NETMASK		255.255.255.0
 
+#define DEFAULT_PRODUCT_NAME	"k1_deb1"
+
 #define K1X_SPL_BOOT_LOAD_ADDR	(0x20200000)
 
 /*
@@ -99,7 +101,7 @@ enum board_boot_mode {
 	"qemu "
 
 #define BOOTENV_DEVICE_CONFIG \
-	"product_name=k1_deb1\0" \
+	"product_name=" DEFAULT_PRODUCT_NAME "\0" \
 	"serial#=123456789ABC\0" \
 	"manufacturer=" CONFIG_SYS_VENDOR "\0" \
 	"manufacture_date=01/16/2023 11:02:20\0" \
