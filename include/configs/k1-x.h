@@ -112,6 +112,7 @@ enum board_boot_mode {
 	"eeprom_pin_group=" __stringify(K1_DEFALT_EEPROM_PIN_GROUP) "\0"
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
+	"stdout_flash=serial,vidconsole\0" \
 	"kernel_addr_r=0x24000000\0" \
 	"kernel_comp_addr_r=0x28000000\0" \
 	"kernel_comp_size=0x4000000\0" \
@@ -127,8 +128,8 @@ enum board_boot_mode {
 	"splashpos=m,m\0" \
 	"splashfile=bianbu.bmp\0" \
 	"stderr=serial\0" \
-	"stdin=serial,usbkbd\0" \
-	"stdout=serial,vidconsole\0" \
+	"stdin=serial\0" \
+	"stdout=serial\0" \
 	BOOTENV_DEVICE_CONFIG
 
 
