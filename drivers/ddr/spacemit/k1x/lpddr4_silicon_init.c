@@ -14,12 +14,13 @@
 #include <init.h>
 #include <log.h>
 #include <ram.h>
-#include <asm/cache.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <dm/device_compat.h>
 #include <linux/sizes.h>
 #include "ddr_init_asic.h"
+#include <mapmem.h>
+#include <u-boot/crc.h>
 
 #define BOOT_PP		0
 #define PMUA_REG_BASE	0xd4282800
@@ -906,12 +907,11 @@ __maybe_unused static int printf_no_output(const char *fmt, ...)
         return 0;
 }
 
-static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp)
+static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp, void *input)
 {
 	u64 to_traning_param[10];
 	int (*func)(const char*, ...) = printf;
 	void (*training)(void* param);
-	unsigned long flush_lenth;
 
 	#if !(LOGLEVEL > 0)
 	func = printf_no_output;
@@ -921,11 +921,8 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp)
 	to_traning_param[1] = cs_num;
 	to_traning_param[2] = boot_pp;
 	to_traning_param[3] = (u64)func;
-	memcpy((void*)0xC0832000, lpddr4_training_img, sizeof(lpddr4_training_img));
-
-	flush_lenth = round_up(sizeof(lpddr4_training_img), CONFIG_RISCV_CBOM_BLOCK_SIZE);
-	flush_dcache_range(0xC0832000, 0xC0832000 + flush_lenth);
-	training = (void (*)(void * param))0xC0832000;
+	to_traning_param[4] = (u64)input;
+	training = (void (*)(void * param))lpddr4_training_img;
 	training(to_traning_param);
 }
 
@@ -933,25 +930,29 @@ void lpddr4_silicon_init(u32 ddr_base, u32 data_rate)
 {
 	unsigned fp=0;
 	unsigned cs_num=2;
+	struct ddr_training_info_t *info;
+
+	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
 
 	top_Common_config();
 	top_DDR_MC_Phy_Device_Init(ddr_base,cs_num,0);
 	if (ddr_get_density() == 4096) {
 		adjust_mapping(ddr_base);
 	}
-	LogMsg(0,"ddr density: %u \n", ddr_get_density());
+	pr_info("ddr density: %u \n", ddr_get_density());
 
 	ddr_dfc_table_init(0xF0000000);
 	init_table_mc_a0(0xF0000000);
-	top_training_fp_all(ddr_base,cs_num,0);
+
+	top_training_fp_all(ddr_base,cs_num,0, info->para);
 
 	fp=1;
 	ddr_dfc(fp);
-	top_training_fp_all(ddr_base,cs_num,fp);
+	top_training_fp_all(ddr_base,cs_num,fp, info->para);
 
 	fp=2;
 	ddr_dfc(fp);
-	top_training_fp_all(ddr_base,cs_num,fp);
+	top_training_fp_all(ddr_base,cs_num,fp, info->para);
 
 	/* change dram frequency */
 	switch(data_rate) {

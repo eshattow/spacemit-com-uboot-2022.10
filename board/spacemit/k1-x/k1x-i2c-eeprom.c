@@ -93,9 +93,12 @@ static uint32_t i2c_get_pinctrl(uint32_t reg_addr)
 
 int k1x_eeprom_init(void)
 {
-	int saddr, i;
+	static int saddr = -1, i;
 	uint8_t bus;
 	uint32_t scl_pin_backup, sda_pin_backup;
+
+	if (saddr >= 0)
+		return saddr;
 
 	for (i = 0; i < ARRAY_SIZE(eeprom_info); i++) {
 		bus = eeprom_info[i].bus;

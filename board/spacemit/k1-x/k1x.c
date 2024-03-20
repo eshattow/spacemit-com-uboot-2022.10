@@ -30,6 +30,7 @@
 #include <i2c.h>
 #include <linux/delay.h>
 #include <tlv_eeprom.h>
+#include <u-boot/crc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
@@ -96,6 +97,16 @@ enum board_boot_mode get_boot_mode(void)
 	return get_boot_pin_select();
 }
 
+enum board_boot_mode get_boot_storage(void)
+{
+	enum board_boot_mode boot_storage = get_boot_mode();
+
+	// save to card only when boot from card
+	if (BOOT_MODE_SD != boot_storage)
+		boot_storage =  get_boot_pin_select();
+
+	return boot_storage;
+}
 
 int mmc_get_env_dev(void)
 {
@@ -109,6 +120,69 @@ int mmc_get_env_dev(void)
 		return MMC_DEV_SD;
 }
 
+static bool write_boot_storage_emmc(ulong byte_addr, ulong byte_size, void *buff)
+{
+	struct blk_desc *dev_desc = blk_get_dev("mmc", MMC_DEV_EMMC);
+
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+		pr_err("invalid mmc device\n");
+		return false;
+	}
+
+	blk_dselect_hwpart(dev_desc, 0);
+	pr_info("write %ldbyte to emmc address %ld\n", byte_size, byte_addr);
+	blk_dwrite(dev_desc,
+		byte_addr / dev_desc->blksz,
+		byte_size / dev_desc->blksz, buff);
+	return true;
+}
+
+static bool write_boot_storage_sdcard(ulong byte_addr, ulong byte_size, void *buff)
+{
+	struct blk_desc *dev_desc = blk_get_dev("mmc", MMC_DEV_SD);
+
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+		pr_err("invalid sd device\n");
+		return false;
+	}
+
+	pr_info("write %ldbyte to sdcard address %ld\n", byte_size, byte_addr);
+	blk_dwrite(dev_desc,
+		byte_addr / dev_desc->blksz,
+		byte_size / dev_desc->blksz, buff);
+	return true;
+}
+
+static const struct boot_storage_op storage_write[] = {
+	{BOOT_MODE_EMMC, 256 * 512, NULL, write_boot_storage_emmc},
+	{BOOT_MODE_SD, 256 * 512, NULL, write_boot_storage_sdcard},
+};
+
+static bool write_training_info(void *buff, ulong byte_size)
+{
+	int i;
+	// save data to boot storage
+	enum board_boot_mode boot_storage = get_boot_storage();
+
+	for (i = 0; i < ARRAY_SIZE(storage_write); i++) {
+		if (boot_storage == storage_write[i].boot_storage)
+			return storage_write[i].write(storage_write[i].address, byte_size, buff);
+	}
+
+	return false;
+}
+
+static void save_ddr_training_info(void)
+{
+	struct ddr_training_info_t *info;
+	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
+
+	if ((DDR_TRAINING_INFO_MAGIC == info->magic) &&
+		(info->crc32 == crc32(0, (const uchar *)info->para, sizeof(*info) - 8))) {
+		// save DDR training info to boot storage
+		write_training_info(info, sizeof(*info));
+	}
+}
 
 void run_fastboot_command(void)
 {
@@ -564,6 +638,7 @@ int board_late_init(void)
 	char ram_size_str[16] = {"\0"};
 	int ret;
 
+	save_ddr_training_info();
 	if (IS_ENABLED(CONFIG_SYSRESET_SPACEMIT))
 		device_bind_driver(gd->dm_root, "spacemit_sysreset",
 					"spacemit_sysreset", NULL);
