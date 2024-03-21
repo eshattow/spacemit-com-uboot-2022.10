@@ -407,9 +407,6 @@ static void spacemit_reset_set(struct reset_ctl *rst,
 {
 	u32 value;
 	struct spacemit_reset *reset = dev_get_priv(rst->dev);
-#ifdef CONFIG_SPL_BUILD
-	id = transfer_reset_id_to_spl(id);
-#endif
 
 	pr_info("[RESET]spacemit_reset_set assert=%d, id=%d \r\n", assert, id);
 	value = spacemit_reset_read(reset, id);
@@ -427,6 +424,7 @@ static void spacemit_reset_set(struct reset_ctl *rst,
 static int spacemit_reset_update(struct reset_ctl *rst, bool assert)
 {
 #ifdef CONFIG_SPL_BUILD
+	rst->id = transfer_reset_id_to_spl(rst->id);
 	if(rst->id < RESET_TWSI6_SPL || rst->id >= RESET_NUMBER_SPL)
 		return 0;
 
