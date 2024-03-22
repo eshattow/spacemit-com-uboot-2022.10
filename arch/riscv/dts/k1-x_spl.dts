@@ -12,7 +12,6 @@
 	model = "spacemit k1-x spl";
 
 	chosen {
-		bootargs = "earlycon=sbi console=ttyS0,115200 debug loglevel=8,initcall_debug=1 rdinit=/init.tmp";
 		stdout-path = "serial0:115200n8";
 		u-boot,dm-spl;
 	};

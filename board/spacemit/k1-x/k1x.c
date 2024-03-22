@@ -36,6 +36,7 @@ static char found_partition[64] = {0};
 #ifdef CONFIG_DISPLAY_SPACEMIT_HDMI
 extern int is_hdmi_connected;
 #endif
+void refresh_config_info(void);
 
 void set_boot_mode(enum board_boot_mode boot_mode)
 {
@@ -116,11 +117,16 @@ void run_fastboot_command(void)
 	/*if define BOOT_MODE_USB flag in BOOT_CIU_DEBUG_REG0, it would excute fastboot*/
 	u32 cui_flasg = readl((void *)BOOT_CIU_DEBUG_REG0);
 	if (boot_mode == BOOT_MODE_USB || cui_flasg == BOOT_MODE_USB){
+		/* show flash log*/
+		env_set("stdout", env_get("stdout_flash"));
 		/*would reset debug_reg0*/
 		writel(0, (void *)BOOT_CIU_DEBUG_REG0);
 
 		char *cmd_para = "fastboot 0";
 		run_command(cmd_para, 0);
+
+		/*read from eeprom and update info to env*/
+		refresh_config_info();
 	}
 }
 
@@ -331,8 +337,11 @@ void run_cardfirmware_flash_command(void)
 	/*check if flash config file is in sd card*/
 	sprintf(cmd, "fatsize mmc %d:%d %s", MMC_DEV_SD, part_dev, FLASH_CONFIG_FILE_NAME);
 	pr_debug("cmd:%s\n", cmd);
-	if (!run_command(cmd, 0))
+	if (!run_command(cmd, 0)){
+		/* show flash log*/
+		env_set("stdout", env_get("stdout_flash"));
 		run_command("spacemit_flashing mmc", 0);
+	}
 #endif
 	return;
 }
@@ -586,9 +595,6 @@ int board_late_init(void)
 #endif
 
 	setenv_boot_mode();
-
-	/*read from eeprom and update info to env*/
-	refresh_config_info();
 
 	/*save ram size to env, transfer to MB*/
 	sprintf(ram_size_str, "mem=%dMB", (int)(gd->ram_size / SZ_1MB));
