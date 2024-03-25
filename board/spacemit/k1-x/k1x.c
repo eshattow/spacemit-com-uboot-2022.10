@@ -171,6 +171,7 @@ void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev
 	env_set("bootfs_devname", dev_name);
 
 	/*load env.txt and import to uboot*/
+	memset((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, 0, CONFIG_ENV_SIZE);
 	sprintf(cmd, "fatload %s %d:%d 0x%x env_%s.txt", dev_name,
 			dev, part, CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
 	pr_debug("cmd:%s\n", cmd);
@@ -248,6 +249,7 @@ void import_env_from_bootfs(void)
 			return;
 		}
 
+		memset((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, 0, CONFIG_ENV_SIZE);
 		sprintf(cmd, "ubifsload 0x%x env_%s.txt", CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
 		if (run_command(cmd, 0)) {
 			pr_err("Failed to load env_%s.txt from bootfs\n", CONFIG_SYS_CONFIG_NAME);

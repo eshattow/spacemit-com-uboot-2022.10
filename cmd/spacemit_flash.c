@@ -821,7 +821,7 @@ static int parse_flash_config(struct flash_dev *fdev)
 	}
 
 	/*set partition to env*/
-	if (_update_partinfo_to_env(load_addr, 0, fdev)){
+	if (_clear_env_part(load_addr, 0, fdev)){
 		printf("update part info to env fail\n");
 		return -1;
 	}

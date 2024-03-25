@@ -95,17 +95,16 @@ static int _write_gpt_partition(struct flash_dev *fdev, char *response)
 	return 0;
 }
 
-int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
+int _clear_env_part(void *download_buffer, u32 download_bytes,
 								 struct flash_dev *fdev)
 {
 	u32 boot_mode = get_boot_pin_select();
-	char cmdbuf[64] = {"\0"};
 
-
-	sprintf(cmdbuf, "env export -c -s 0x%lx 0x%lx", (ulong)CONFIG_ENV_SIZE, (ulong)download_buffer);
-	if (run_command(cmdbuf, 0)){
-		return -1;
-	}
+	/* char cmdbuf[64] = {"\0"}; */
+	/* sprintf(cmdbuf, "env export -c -s 0x%lx 0x%lx", (ulong)CONFIG_ENV_SIZE, (ulong)download_buffer); */
+	/* if (run_command(cmdbuf, 0)){ */
+	/* 	return -1; */
+	/* } */
 
 	switch(boot_mode){
 #ifdef CONFIG_ENV_IS_IN_MMC
@@ -113,7 +112,9 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 	case BOOT_MODE_SD:
 		/*write to emmc default offset*/
 		debug("write env to mmc offset:%lx\n", (ulong)FLASH_ENV_OFFSET_MMC);
-		//maybe it could just use env save command
+
+		/*should not write env to env part*/
+		memset(download_buffer, 0, CONFIG_ENV_SIZE);
 		fastboot_mmc_flash_offset((u32)FLASH_ENV_OFFSET_MMC, download_buffer, (u32)CONFIG_ENV_SIZE);
 		break;
 #endif
@@ -136,10 +137,12 @@ int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
 			ret = _fb_mtd_erase(mtd, CONFIG_ENV_SIZE);
 			if (ret)
 				return -1;
-			ret = _fb_mtd_write(mtd, download_buffer, 0, CONFIG_ENV_SIZE, NULL);
-			if (ret){
-				pr_err("can not write env to mtd flash\n");
-			}
+
+			/*should not write env to env part*/
+			/* ret = _fb_mtd_write(mtd, download_buffer, 0, CONFIG_ENV_SIZE, NULL); */
+			/* if (ret){ */
+			/* 	pr_err("can not write env to mtd flash\n"); */
+			/* } */
 		}
 		break;
 #endif
@@ -466,8 +469,8 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
 	}
 
 	/*set partition to env*/
-	if (_update_partinfo_to_env(download_buffer, download_bytes, fdev)){
-		fastboot_fail("update part info to env fail", response);
+	if (_clear_env_part(download_buffer, download_bytes, fdev)){
+		fastboot_fail("clear env fail", response);
 		return;
 	}
 
@@ -504,8 +507,8 @@ void fastboot_oem_flash_env(const char *cmd, void *download_buffer, u32 download
 		}
 	}
 
-	if (_update_partinfo_to_env(download_buffer, download_bytes, fdev)){
-		fastboot_fail("update part info to env fail", response);
+	if (_clear_env_part(download_buffer, download_bytes, fdev)){
+		fastboot_fail("clear env fail", response);
 		return;
 	}
 

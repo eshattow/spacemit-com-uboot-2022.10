@@ -364,12 +364,12 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 	}
 
 	/*flash env*/
-	if (strcmp(cmd, "env") == 0) {
-		printf("flash env \n");
-		fastboot_oem_flash_env(cmd, fastboot_buf_addr, download_bytes,
-								response, fdev);
-		return;
-	}
+	/*if (strcmp(cmd, "env") == 0) {*/
+	/*	printf("flash env \n");*/
+	/*	fastboot_oem_flash_env(cmd, fastboot_buf_addr, download_bytes,*/
+	/*							response, fdev);*/
+	/*	return;*/
+	/*}*/
 #endif
 
 	ret = fb_mtd_lookup(cmd, &mtd, &part);

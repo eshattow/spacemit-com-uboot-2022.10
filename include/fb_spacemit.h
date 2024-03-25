@@ -219,7 +219,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr);
  * @param fdev
  * @return int
  */
-int _update_partinfo_to_env(void *download_buffer, u32 download_bytes,
+int _clear_env_part(void *download_buffer, u32 download_bytes,
 							struct flash_dev *fdev);
 
 /**
