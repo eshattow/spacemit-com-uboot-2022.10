@@ -695,15 +695,16 @@ int dram_init_banksize(void)
 {
 	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
 
+	memset(gd->bd->bi_dram, 0, sizeof(gd->bd->bi_dram));
 	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
 	if(dram_size > SZ_2GB) {
 		gd->bd->bi_dram[0].size = SZ_2G;
-		gd->bd->bi_dram[1].start = 0x100000000;
-		gd->bd->bi_dram[1].size = dram_size - SZ_2G;
+		if (CONFIG_NR_DRAM_BANKS > 1) {
+			gd->bd->bi_dram[1].start = 0x100000000;
+			gd->bd->bi_dram[1].size = dram_size - SZ_2G;
+		}
 	} else {
 		gd->bd->bi_dram[0].size = dram_size;
-		gd->bd->bi_dram[1].start = 0;
-		gd->bd->bi_dram[1].size = 0;
 	}
 
 	return 0;

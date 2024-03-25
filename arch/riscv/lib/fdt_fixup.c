@@ -213,6 +213,9 @@ int arch_fixup_fdt(void *blob)
 	} while(nodeoffset >= 0);
 
 	for (int bank_index = CONFIG_NR_DRAM_BANKS - 1; bank_index >= 0; bank_index--){
+		if (0 == gd->bd->bi_dram[bank_index].size)
+			continue;
+
 		memset(memstart, 0, 32);
 		sprintf(memstart, "memory@%llx", gd->bd->bi_dram[bank_index].start);
 
