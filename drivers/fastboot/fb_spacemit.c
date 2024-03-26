@@ -645,19 +645,69 @@ int fastboot_mmc_flash_offset(u32 start_offset, void *download_buffer,
 	return 0;
 }
 
-int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t part_start_cnt,
+
+u64 checksum64(u64 *baseaddr, u64 size)
+{
+	u64 sum = 0;
+	u64 i, cachelines;
+	u64 dwords, bytes;
+	u8 *data;
+
+	// each cache line has 64bytes
+	cachelines = size / 64;
+	bytes = size % 64;
+	dwords = bytes / 8;
+	bytes = bytes % 8;
+
+	for (i = 0; i < cachelines; i++) {
+		u64 val1 = *(baseaddr + 0);
+		u64 val2 = *(baseaddr + 1);
+		u64 val3 = *(baseaddr + 2);
+		u64 val4 = *(baseaddr + 3);
+		u64 val5 = *(baseaddr + 4);
+		u64 val6 = *(baseaddr + 5);
+		u64 val7 = *(baseaddr + 6);
+		u64 val8 = *(baseaddr + 7);
+
+		sum += val1;
+		sum += val2;
+		sum += val3;
+		sum += val4;
+		sum += val5;
+		sum += val6;
+		sum += val7;
+		sum += val8;
+		baseaddr += 8;
+	}
+
+	/*calculate the rest of dowrd*/
+	for (i = 0; i < dwords; i++) {
+		sum += *baseaddr;
+		baseaddr++;
+	}
+
+	data = (u8*)baseaddr;
+	/*calculate the rest of byte*/
+	for (i = 0; i < bytes; i++) {
+		sum += data[i];
+	}
+
+	return sum;
+}
+
+int compare_blk_image_val(struct blk_desc *dev_desc, u64 compare_val, lbaint_t part_start_cnt,
 			ulong blksz, uint64_t image_size)
 {
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
 	u32 div_times = (image_size + RECOVERY_LOAD_IMG_SIZE - 1) / RECOVERY_LOAD_IMG_SIZE;
-	ulong crc = 0;
+	u64 calculate = 0;
 	uint64_t byte_remain = image_size;
 	uint64_t download_bytes = 0;
 	u32 blk_size, n;
 	unsigned long time_start_flash = get_timer(0);
 
-	/*if crc_compare is 0, return 0 directly*/
-	if (!crc_compare)
+	/*if compare_val is 0, return 0 directly*/
+	if (!compare_val)
 		return 0;
 
 	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
@@ -666,7 +716,7 @@ int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 	}
 
 	for (int i = 0; i < div_times; i++) {
-		debug("\ndownload and flash div %d\n", i);
+		pr_info("\ndownload and flash div %d\n", i);
 		download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
 
 		blk_size = (download_bytes + (blksz - 1)) / blksz;
@@ -675,22 +725,25 @@ int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
 			pr_err("mmc read blk not equal it should be\n");
 			return -1;
 		}
-		crc = crc32_wd(crc, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
+		// calculate = crc32_wd(crc, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
+		calculate += checksum64(load_addr, download_bytes);
+
 		part_start_cnt += blk_size;
 		byte_remain -= download_bytes;
 	}
 
-	pr_info("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
+	pr_info("get calculate value:%llx, compare calculate:%llx\n", calculate, compare_val);
 	time_start_flash = get_timer(time_start_flash);
-	pr_info("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
-	return (crc == crc_compare) ? 0 : -1;
+	pr_info("\ncompare over, use time:%lu ms\n\n", time_start_flash);
+	return (calculate == compare_val) ? 0 : -1;
 }
 
-int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, uint64_t image_size)
+
+int compare_mtd_image_val(struct mtd_info *mtd, u64 compare_val, uint64_t image_size)
 {
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
 	u32 div_times = (image_size + RECOVERY_LOAD_IMG_SIZE - 1) / RECOVERY_LOAD_IMG_SIZE;
-	ulong crc = 0;
+	u64 calculate = 0;
 	uint64_t byte_remain = image_size;
 	uint64_t download_bytes = 0;
 	u32 hdr_off = 0;
@@ -699,12 +752,12 @@ int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, uint64_t image_
 	debug("mtd size:%llx, image_size:%llx\n", mtd->size, image_size);
 	unsigned long time_start_flash = get_timer(0);
 
-	/*if crc_compare is 0, return 0 directly*/
-	if (!crc_compare)
+	/*if compare_val is 0, return 0 directly*/
+	if (!compare_val)
 		return 0;
 
 	for (int i = 0; i < div_times; i++) {
-		debug("\ndownload and flash div %d\n", i);
+		pr_info("\ndownload and flash div %d\n", i);
 		download_bytes = byte_remain > RECOVERY_LOAD_IMG_SIZE ? RECOVERY_LOAD_IMG_SIZE : byte_remain;
 		ret = _fb_mtd_read(mtd, load_addr, hdr_off, download_bytes, NULL);
 		if (ret){
@@ -712,15 +765,16 @@ int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, uint64_t image_
 			return -1;
 		}
 
-		crc = crc32_wd(crc, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
+		// calculate = crc32_wd(calculate, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
+		calculate += checksum64(load_addr, download_bytes);
 		hdr_off += download_bytes;
 		byte_remain -= download_bytes;
 	}
 
-	pr_info("get crc value:%lx, compare crc:%lx\n", crc, crc_compare);
+	pr_info("get calculate value:%llx, compare calculate:%llx\n", calculate, compare_val);
 	time_start_flash = get_timer(time_start_flash);
-	pr_info("compare crc32 over, use time:%lu ms\n\n", time_start_flash);
-	return (crc == crc_compare) ? 0 : -1;
+	pr_info("compare over, use time:%lu ms\n\n", time_start_flash);
+	return (calculate == compare_val) ? 0 : -1;
 }
 
 

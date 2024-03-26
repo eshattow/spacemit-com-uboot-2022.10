@@ -552,7 +552,7 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 	uint64_t image_size = 0;
 	uint64_t byte_remain = 0;
 	uint64_t download_offset, download_bytes, bytes_read;
-	u32 crc_value = 0;
+	u64 compare_value = 0;
 	int div_times, data_source;
 
 	memset(load_str, 0, sizeof(load_str));
@@ -572,7 +572,7 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 		image_size = env_get_hex("filesize", 0);
 		byte_remain = image_size;
 		div_times = (image_size + RECOVERY_LOAD_IMG_SIZE - 1) / RECOVERY_LOAD_IMG_SIZE;
-		debug("\n\ndev_times:%d\n", div_times);
+		pr_info("\n\ndev_times:%d\n", div_times);
 	} else if (strcmp(fdev->device_name, "net") == 0) {
 		// load data from net with tftp
 		data_source = 1;
@@ -600,7 +600,7 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 	}
 
 	download_offset = 0;
-	crc_value = 0;
+	compare_value = 0;
 	info.start += *partition_offset;
 
 	/* save the partition start cnt */
@@ -632,7 +632,8 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 			image_size = download_bytes = env_get_hex("filesize", 0);
 		}
 
-		crc_value = crc32_wd(crc_value, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
+		// compare_value = crc32_wd(compare_value, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
+		compare_value += checksum64(load_addr, download_bytes);
 		info.size = (download_bytes + (info.blksz - 1)) / info.blksz;
 		printf("write storage at block: 0x%lx, size: %lx\n", info.start, info.size);
 
@@ -657,12 +658,12 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 
 	if (fdev->blk_write){
-		if (check_blk_image_crc(fdev->dev_desc, crc_value, part_start_addr, info.blksz, image_size)) {
+		if (compare_blk_image_val(fdev->dev_desc, compare_value, part_start_addr, info.blksz, image_size)) {
 			printf("check image crc32 fail, \n");
 			return RESULT_FAIL;
 		}
 	}else{
-		if (check_mtd_image_crc(mtd, crc_value, image_size)) {
+		if (compare_mtd_image_val(mtd, compare_value, image_size)) {
 			printf("check image crc32 fail, \n");
 			return RESULT_FAIL;
 		}

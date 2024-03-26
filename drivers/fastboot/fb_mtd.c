@@ -313,7 +313,7 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 	char *token;
 	char cmd_buf[256];
 	int need_erase = 1;
-	u32 crc_val = 0;
+	u64 compare_val = 0;
 
 	printf("Starting fastboot_mtd_flash_write for %s\n", cmd);
 #ifdef CONFIG_SPACEMIT_FLASH
@@ -457,9 +457,10 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 				download_bytes, part->name);
 		}
 
-		printf("check crc\n");
-		crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
-		if (check_mtd_image_crc(mtd, crc_val, download_bytes)){
+		pr_info("compare data valid\n");
+		// crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
+		compare_val += checksum64(download_buffer, download_bytes);
+		if (compare_mtd_image_val(mtd, compare_val, download_bytes)){
 			fastboot_fail("compare crc fail", response);
 			return;
 		}
