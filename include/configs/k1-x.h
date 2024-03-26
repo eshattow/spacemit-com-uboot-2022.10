@@ -127,9 +127,6 @@ enum board_boot_mode {
 	"splashimage=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
 	"splashpos=m,m\0" \
 	"splashfile=bianbu.bmp\0" \
-	"stderr=serial\0" \
-	"stdin=serial\0" \
-	"stdout=serial\0" \
 	BOOTENV_DEVICE_CONFIG
 
 
