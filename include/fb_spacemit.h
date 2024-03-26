@@ -182,7 +182,7 @@ int fastboot_mmc_flash_offset(u32 start_offset, void *download_buffer, u32 downl
  * @return int
  */
 int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t part_start_cnt,
-						ulong blksz, int image_size);
+						ulong blksz, uint64_t image_size);
 
 /**
  * @brief check image crc at mtd dev. if crc is same it would return RESULT_OK(0).
@@ -192,7 +192,7 @@ int check_blk_image_crc(struct blk_desc *dev_desc, ulong crc_compare, lbaint_t p
  * @param image_size
  * @return int
 */
-int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, int image_size);
+int check_mtd_image_crc(struct mtd_info *mtd, ulong crc_compare, uint64_t image_size);
 
 /**
  * @brief transfer the string of size 'KiB' or 'MiB' to u32 type.
