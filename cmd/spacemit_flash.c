@@ -1095,7 +1095,7 @@ static int do_flash_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const
 }
 
 U_BOOT_CMD(
-	spacemit_flashing, 2, 1, do_flash_image,
+	flash_image, 2, 1, do_flash_image,
 	"flash image from specified source",
 	"<source>\n"
 	"    - <source>: mmc | usb | net\n"

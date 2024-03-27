@@ -342,7 +342,7 @@ void run_cardfirmware_flash_command(void)
 	if (!run_command(cmd, 0)){
 		/* show flash log*/
 		env_set("stdout", env_get("stdout_flash"));
-		run_command("spacemit_flashing mmc", 0);
+		run_command("flash_image mmc", 0);
 	}
 #endif
 	return;
