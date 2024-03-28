@@ -342,6 +342,7 @@ static const struct ccu_pll_rate_tbl pll2_rate_tbl[] = {
 	PLL_RATE(3000000000UL, 0x66, 0xdd, 0x50, 0x00, 0x3f, 0xe00000),
 	PLL_RATE(3200000000UL, 0x67, 0xdd, 0x50, 0x00, 0x43, 0xeaaaab),
 	PLL_RATE(2457600000UL, 0x64, 0xdd, 0x50, 0x00, 0x33, 0x0ccccd),
+	PLL_RATE(2800000000UL, 0x66, 0xdd, 0x50, 0x00, 0x3a, 0x155555),
 };
 
 static const struct ccu_pll_rate_tbl pll3_rate_tbl[] = {
@@ -1624,6 +1625,14 @@ int spacemit_ccu_probe(struct spacemit_k1x_clk *clk_info,
 		clk->id = i;
 		ccu_common_init(clk, clk_info, clks);
 	}
+#ifndef CONFIG_SPL_BUILD
+	//init pll2 freq
+	if (clk_info->pll2_freq) {
+		struct clk *clk =clks->clks[CLK_PLL2];
+		if (clk)
+			clk_set_rate(clk, clk_info->pll2_freq);
+	}
+#endif
 	//init clk default rate
 	for (i = 0; i < ARRAY_SIZE(init_rate_tbl); i++) {
 		struct clk *clk =clks->clks[init_rate_tbl[i].clk_id];
@@ -1732,7 +1741,7 @@ static int spacemit_k1x_ccu_probe(struct udevice *dev)
 	ccu_clk_dm(CLK_DUMMY, dev_get_clk_ptr(clk_dummy.dev));
 #endif
 
-
+	clk_info->pll2_freq = dev_read_u32_default(dev, "pll2-freq", 0);
 	ret = spacemit_ccu_probe(clk_info, clks);
 	pr_debug("init clock finish ret=%d \n", ret);
 	if (!ret)
