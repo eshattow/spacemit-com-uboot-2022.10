@@ -72,15 +72,29 @@ struct gpt_info {
 	bool fastboot_flash_gpt;
 };
 
+enum mtd_size_type {
+	MTD_SIZE_G = 0,
+	MTD_SIZE_M,
+	MTD_SIZE_K,
+};
+struct _mtd_size_info {
+	/*save mtd size type such as G/M/K*/
+	u32 size_type;
+	u32 size;
+};
+
 struct flash_dev {
 	char *device_name;
-	char *dev_str;
+	u32 dev_index;
 	struct flash_parts_info parts_info[MAX_PARTITION_NUM];
 	struct gpt_info gptinfo;
 	struct disk_partition *d_info;
 	struct blk_desc *dev_desc;
 	char *mtd_table;
-	char mtd_partition_file[30];
+
+	/*mtdinfo would use to try to find suitable patition file*/
+	char partition_file_name[30];
+	struct _mtd_size_info mtdinfo;
 
 	/*mtd write func*/
 	int (*mtd_write)(struct mtd_info *mtd,

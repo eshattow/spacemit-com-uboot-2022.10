@@ -33,6 +33,8 @@ static int dev_emmc_num = -1;
 static int dev_sdio_num = -1;
 static u32 bootfs_part_index = 0;
 
+void recovery_show_result(struct flash_dev *fdev, int ret);
+
 static void free_flash_dev(struct flash_dev *fdev)
 {
 	for (int i = 0; i < MAX_PARTITION_NUM; i++){
@@ -234,6 +236,80 @@ int download_file_via_tftp(char *file_name, char *load_addr) {
 	return 0;
 }
 
+static int _find_partition_file(struct flash_dev *fdev, char *tmp_file, char *temp_fname, u32 temp_fname_size)
+{
+	if (strlen(FLASH_IMG_FOLDER) > 0){
+		strcpy(temp_fname, FLASH_IMG_FOLDER);
+		strcat(temp_fname, "/");
+		strcat(temp_fname, tmp_file);
+	}else{
+		strcpy(temp_fname, tmp_file);
+	}
+	if (!run_commandf("fatsize %s %d:%d %s", fdev->device_name, fdev->dev_index,
+										bootfs_part_index, temp_fname)){
+		/*has find partition file name*/
+		return 0;
+	}else{
+		memset(tmp_file, '\0', 30);
+		memset(temp_fname, '\0', temp_fname_size);
+	}
+	return -1;
+}
+
+static int find_mtd_partition_file(struct flash_dev *fdev, char *temp_fname, u32 temp_fname_size)
+{
+	char tmp_file[30] = {"\0"};
+	u32 mtd_size = fdev->mtdinfo.size;
+	bool nand_flag = false;
+	memset(temp_fname, '\0', temp_fname_size);
+
+	switch (fdev->mtdinfo.size_type) {
+	case MTD_SIZE_G:
+		while (mtd_size/2){
+			mtd_size /= 2;
+			sprintf(tmp_file, "partition_%dG.json", mtd_size);
+			if (!_find_partition_file(fdev, tmp_file, temp_fname, temp_fname_size))
+				return 0;
+		}
+
+		/*retry to find until 64M*/
+		mtd_size = 1024;
+
+		/*if can not find at type G, try to find type M, should not break*/
+		/*break;*/
+	case MTD_SIZE_M:
+		if (mtd_size >= 64)
+			nand_flag = true;
+
+		while (mtd_size/2){
+			mtd_size /= 2;
+			if (nand_flag && mtd_size < 64){
+				pr_err("can not find suitable nand partition file\n");
+				return -1;
+			}
+			sprintf(tmp_file, "partition_%dM.json", mtd_size);
+			if (!_find_partition_file(fdev, tmp_file, temp_fname, temp_fname_size))
+				return 0;
+		}
+
+		/*retry to find type K patition file*/
+		mtd_size = 1024;
+		/*break;*/
+	case MTD_SIZE_K:
+		while (mtd_size/2){
+			mtd_size /= 2;
+			sprintf(tmp_file, "partition_%dK.json", mtd_size);
+			if (!_find_partition_file(fdev, tmp_file, temp_fname, temp_fname_size))
+				return 0;
+		}
+
+	default:
+		pr_err("undefine mtd size type, return fail\n");
+		return -1;
+	}
+}
+
+
 static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 			int device_type, struct flash_dev *fdev)
 {
@@ -247,7 +323,7 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 			retval = RESULT_FAIL;
 			break;
 		}
-		fdev->dev_str = strdup(simple_itoa((ulong)dev_sdio_num));
+		fdev->dev_index = dev_sdio_num;
 		fdev->device_name = strdup("mmc");
 		break;
 #endif //CONFIG_MMC
@@ -263,7 +339,7 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 				retval = RESULT_FAIL;
 				break;
 			}
-			fdev->dev_str = strdup(simple_itoa((ulong)device_number));
+			fdev->dev_index = device_number;
 			fdev->device_name = strdup("usb");
 			usb_init_flag = true;
 
@@ -314,29 +390,38 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 	}
 
 	debug("device_name: %s\n", fdev->device_name);
-	debug("dev_str: %s\n", fdev->dev_str);
+	debug("dev_index: %d\n", fdev->dev_index);
 
-	/*
-		TODO:should get partition.json name by searching the folder, and match
-		to the storage type.
-	*/
-	char *temp_fname = malloc(strlen(fdev->mtd_partition_file) + strlen(FLASH_IMG_FOLDER) + 2);
+	u32 temp_fname_size = strlen(fdev->partition_file_name) + strlen(FLASH_IMG_FOLDER) + 2;
+	char *temp_fname = malloc(temp_fname_size);
 	if (!temp_fname){
 		printf("malloc file_name fail\n");
 		return RESULT_FAIL;
 	}
-	memset(temp_fname, '\0', strlen(fdev->mtd_partition_file) + strlen(FLASH_IMG_FOLDER) + 2);
+	memset(temp_fname, '\0', temp_fname_size);
 	if (strlen(FLASH_IMG_FOLDER) > 0){
 		strcpy(temp_fname, FLASH_IMG_FOLDER);
 		strcat(temp_fname, "/");
-		strcat(temp_fname, fdev->mtd_partition_file);
+		strcat(temp_fname, fdev->partition_file_name);
 	}else{
-		strcpy(temp_fname, fdev->mtd_partition_file);
+		strcpy(temp_fname, fdev->partition_file_name);
 	}
 
 	if (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0) {
 
-		sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+		/*would try to detect mtd partition file exists or not*/
+		if (strcmp(FLASH_CONFIG_FILE_NAME, fdev->partition_file_name) &&
+			run_commandf("fatsize %s %d:%d %s", fdev->device_name, fdev->dev_index,
+                                                bootfs_part_index, temp_fname)) {
+			/*can not find mtd partition file, would try to find suitable file*/
+			if (find_mtd_partition_file(fdev, temp_fname, temp_fname_size)){
+				pr_err("can not find suitable partition file\n");
+				recovery_show_result(fdev, RESULT_FAIL);
+			}
+			printf("find temp_fname:%s\n", temp_fname);
+		}
+
+		sprintf(blk_dev_str, "%d:%d", fdev->dev_index, bootfs_part_index);
 		char *fat_argv[] = {"fatload", fdev->device_name, blk_dev_str, load_str, temp_fname};
 
 		if (do_load(cmdtp, 0, 5, fat_argv, FS_TYPE_FAT)) {
@@ -486,7 +571,7 @@ void specific_flash_mmc_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 	char file_name[50] = {"\0"};
 	u32 image_size = 0;
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
-	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+	sprintf(blk_dev_str, "%d:%d", fdev->dev_index, bootfs_part_index);
 
 	/*flash emmc info to boot0*/
 	fastboot_oem_flash_bootinfo(NULL, load_addr, image_size, NULL, fdev);
@@ -558,7 +643,7 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 	memset(load_str, 0, sizeof(load_str));
 	memset(offset_str, 0, sizeof(offset_str));
 	strcpy(load_str, simple_xtoa((ulong)load_addr));
-	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+	sprintf(blk_dev_str, "%d:%d", fdev->dev_index, bootfs_part_index);
 
 	if (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0) {
 		// load data from fat disk
@@ -678,7 +763,7 @@ int flash_volume_from_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, const 
 	void *load_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR, 0);
     char cmd_buf[256];
 
-	sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+	sprintf(blk_dev_str, "%d:%d", fdev->dev_index, bootfs_part_index);
 
 	sprintf(cmd_buf, "fatload %s %s %lx %s", fdev->device_name, blk_dev_str, (ulong)load_addr, file_name);
 	if (run_command(cmd_buf, 0) != 0) {
@@ -742,7 +827,7 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 			partition_offset = 0;
 			printf("\n\nFlashing part: %s, file:%s\n", part_name, file_name);
 			// big rootfs image(larger than 4GB) will split to multi files except flash to nand.
-			sprintf(blk_dev_str, "%s:%d", fdev->dev_str, bootfs_part_index);
+			sprintf(blk_dev_str, "%d:%d", fdev->dev_index, bootfs_part_index);
 			if ((0 == strcmp(part_name, BIG_IMG_PARTNAME))
 				&& (strcmp(fdev->device_name, "mmc") == 0 || strcmp(fdev->device_name, "usb") == 0)
 				&& !file_exists(fdev->device_name, blk_dev_str, file_name, FS_TYPE_FAT)) {
@@ -915,8 +1000,7 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 	return RESULT_OK;
 }
 
-
-void get_mtd_partition_file(char *file_name)
+void get_mtd_partition_file(struct flash_dev *fdev)
 {
 	char tmp_file[30] = {"\0"};
 
@@ -932,15 +1016,21 @@ void get_mtd_partition_file(char *file_name)
 			if (!mtd_is_partition(mtd)) {
 				if (mtd->size / 0x40000000){
 					sprintf(tmp_file, "partition_%lldG.json", mtd->size / 0x40000000);
+					fdev->mtdinfo.size_type = MTD_SIZE_G;
+					fdev->mtdinfo.size = mtd->size / 0x40000000;
 				} else if (mtd->size / 0x100000){
 					sprintf(tmp_file, "partition_%lldM.json", mtd->size / 0x100000);
+					fdev->mtdinfo.size_type = MTD_SIZE_M;
+					fdev->mtdinfo.size = mtd->size / 0x100000;
 				} else if (mtd->size / 0x400){
 					sprintf(tmp_file, "partition_%lldK.json", mtd->size / 0x400);
+					fdev->mtdinfo.size_type = MTD_SIZE_K;
+					fdev->mtdinfo.size = mtd->size / 0x400;
 				}
 			}
 		}
-		printf("get mtd partition file name:%s, \n", tmp_file);
-		strcpy(file_name, tmp_file);
+		pr_info("get mtd partition file name:%s, \n", tmp_file);
+		strcpy(fdev->partition_file_name, tmp_file);
 		return;
 #endif
 	default:
@@ -968,7 +1058,7 @@ void get_blk_partition_file(char *file_name)
 
 		dev_desc = blk_get_devnum_by_typename(blk_name, blk_index);
 		if (dev_desc != NULL)
-			strcpy(file_name, "partition_universal.json");
+			strcpy(file_name, FLASH_CONFIG_FILE_NAME);
 		return;
 #endif //CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
 	case BOOT_MODE_NAND:
@@ -980,7 +1070,7 @@ void get_blk_partition_file(char *file_name)
 		blk_index = CONFIG_FASTBOOT_FLASH_MMC_DEV;
 		dev_desc = blk_get_devnum_by_typename(blk_name, blk_index);
 		if (dev_desc != NULL)
-			strcpy(file_name, "partition_universal.json");
+			strcpy(file_name, FLASH_CONFIG_FILE_NAME);
 		return;
 #endif //CONFIG_FASTBOOT_FLASH_MMC_DEV
 
@@ -1010,21 +1100,21 @@ static int do_flash_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const
 		printf("can not malloc fdev->mtd_table\n");
 
 	memset(fdev, 0, sizeof(struct flash_dev));
-	memset(fdev->mtd_partition_file, '\0', sizeof(fdev->mtd_partition_file));
+	memset(fdev->partition_file_name, '\0', sizeof(fdev->partition_file_name));
 
 	/*start flash*/
 	unsigned long time_start_flash = get_timer(0);
 
-	get_mtd_partition_file(fdev->mtd_partition_file);
-	if (strlen(fdev->mtd_partition_file) > 0){
+	get_mtd_partition_file(fdev);
+	if (strlen(fdev->partition_file_name) > 0){
 		/*flash image to mtd dev*/
-		printf("partition file:%s\n", fdev->mtd_partition_file);
+		printf("partition file:%s\n", fdev->partition_file_name);
 
 		/*only one write method.*/
 		fdev->mtd_write = mtd_write_raw_image;
 		fdev->blk_write = NULL;
 
-		/*Load flash_config.cfg file*/
+		/*Load partitino.json file*/
 		int result = load_recovery_file(cmdtp, fdev, argc, argv);
 		if (result != RESULT_OK) {
 			recovery_show_result(fdev, RESULT_FAIL);
@@ -1046,11 +1136,11 @@ static int do_flash_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const
 		}
 	}
 
-	memset(fdev->mtd_partition_file, '\0', sizeof(fdev->mtd_partition_file));
-	get_blk_partition_file(fdev->mtd_partition_file);
-	if (strlen(fdev->mtd_partition_file) > 0){
+	memset(fdev->partition_file_name, '\0', sizeof(fdev->partition_file_name));
+	get_blk_partition_file(fdev->partition_file_name);
+	if (strlen(fdev->partition_file_name) > 0){
 		/*flash image to blk dev*/
-		printf("partition file:%s\n", fdev->mtd_partition_file);
+		printf("partition file:%s\n", fdev->partition_file_name);
 
 		/*clear parts infomation*/
 		for (int i = 0; i < MAX_PARTITION_NUM; i++){
@@ -1067,7 +1157,7 @@ static int do_flash_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const
 		fdev->mtd_write = NULL;
 		fdev->blk_write = blk_write_raw_image;
 
-		/*Load flash_config.cfg file*/
+		/*Load partition.json file*/
 		int result = load_recovery_file(cmdtp, fdev, argc, argv);
 		if (result != RESULT_OK) {
 			recovery_show_result(fdev, RESULT_FAIL);
