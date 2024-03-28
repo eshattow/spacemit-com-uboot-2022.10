@@ -335,8 +335,8 @@ static ulong read_boot_storage_sdcard(ulong byte_addr, ulong byte_size, void *bu
 }
 
 static const struct boot_storage_op storage_read[] = {
-	{BOOT_MODE_EMMC, 256 * 512, read_boot_storage_emmc, NULL},
-	{BOOT_MODE_SD, 256 * 512, read_boot_storage_sdcard, NULL},
+	{BOOT_MODE_EMMC, 128 * 512, read_boot_storage_emmc, NULL},
+	{BOOT_MODE_SD, 128 * 512, read_boot_storage_sdcard, NULL},
 };
 
 static ulong read_training_info(void *buff, ulong byte_size)
