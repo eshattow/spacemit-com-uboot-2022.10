@@ -63,6 +63,7 @@ struct spacemit_k1x_clk {
 	void __iomem *ddrc_base;
 	void __iomem *audio_ctrl_base;
 	void __iomem *apbc2_base;
+	u32 pll2_freq;
 };
 
 /* u-boot-spl would used this clk */

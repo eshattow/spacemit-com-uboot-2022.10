@@ -30,6 +30,7 @@
 #include <i2c.h>
 #include <linux/delay.h>
 #include <tlv_eeprom.h>
+#include <u-boot/crc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
@@ -96,6 +97,16 @@ enum board_boot_mode get_boot_mode(void)
 	return get_boot_pin_select();
 }
 
+enum board_boot_mode get_boot_storage(void)
+{
+	enum board_boot_mode boot_storage = get_boot_mode();
+
+	// save to card only when boot from card
+	if (BOOT_MODE_SD != boot_storage)
+		boot_storage =  get_boot_pin_select();
+
+	return boot_storage;
+}
 
 int mmc_get_env_dev(void)
 {
@@ -109,6 +120,69 @@ int mmc_get_env_dev(void)
 		return MMC_DEV_SD;
 }
 
+static bool write_boot_storage_emmc(ulong byte_addr, ulong byte_size, void *buff)
+{
+	struct blk_desc *dev_desc = blk_get_dev("mmc", MMC_DEV_EMMC);
+
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+		pr_err("invalid mmc device\n");
+		return false;
+	}
+
+	blk_dselect_hwpart(dev_desc, 0);
+	pr_info("write %ldbyte to emmc address %ld\n", byte_size, byte_addr);
+	blk_dwrite(dev_desc,
+		byte_addr / dev_desc->blksz,
+		byte_size / dev_desc->blksz, buff);
+	return true;
+}
+
+static bool write_boot_storage_sdcard(ulong byte_addr, ulong byte_size, void *buff)
+{
+	struct blk_desc *dev_desc = blk_get_dev("mmc", MMC_DEV_SD);
+
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+		pr_err("invalid sd device\n");
+		return false;
+	}
+
+	pr_info("write %ldbyte to sdcard address %ld\n", byte_size, byte_addr);
+	blk_dwrite(dev_desc,
+		byte_addr / dev_desc->blksz,
+		byte_size / dev_desc->blksz, buff);
+	return true;
+}
+
+static const struct boot_storage_op storage_write[] = {
+	{BOOT_MODE_EMMC, 256 * 512, NULL, write_boot_storage_emmc},
+	{BOOT_MODE_SD, 256 * 512, NULL, write_boot_storage_sdcard},
+};
+
+static bool write_training_info(void *buff, ulong byte_size)
+{
+	int i;
+	// save data to boot storage
+	enum board_boot_mode boot_storage = get_boot_storage();
+
+	for (i = 0; i < ARRAY_SIZE(storage_write); i++) {
+		if (boot_storage == storage_write[i].boot_storage)
+			return storage_write[i].write(storage_write[i].address, byte_size, buff);
+	}
+
+	return false;
+}
+
+static void save_ddr_training_info(void)
+{
+	struct ddr_training_info_t *info;
+	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
+
+	if ((DDR_TRAINING_INFO_MAGIC == info->magic) &&
+		(info->crc32 == crc32(0, (const uchar *)info->para, sizeof(*info) - 8))) {
+		// save DDR training info to boot storage
+		write_training_info(info, sizeof(*info));
+	}
+}
 
 void run_fastboot_command(void)
 {
@@ -171,6 +245,7 @@ void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev
 	env_set("bootfs_devname", dev_name);
 
 	/*load env.txt and import to uboot*/
+	memset((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, 0, CONFIG_ENV_SIZE);
 	sprintf(cmd, "fatload %s %d:%d 0x%x env_%s.txt", dev_name,
 			dev, part, CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
 	pr_debug("cmd:%s\n", cmd);
@@ -248,6 +323,7 @@ void import_env_from_bootfs(void)
 			return;
 		}
 
+		memset((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, 0, CONFIG_ENV_SIZE);
 		sprintf(cmd, "ubifsload 0x%x env_%s.txt", CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
 		if (run_command(cmd, 0)) {
 			pr_err("Failed to load env_%s.txt from bootfs\n", CONFIG_SYS_CONFIG_NAME);
@@ -340,7 +416,7 @@ void run_cardfirmware_flash_command(void)
 	if (!run_command(cmd, 0)){
 		/* show flash log*/
 		env_set("stdout", env_get("stdout_flash"));
-		run_command("spacemit_flashing mmc", 0);
+		run_command("flash_image mmc", 0);
 	}
 #endif
 	return;
@@ -562,6 +638,7 @@ int board_late_init(void)
 	char ram_size_str[16] = {"\0"};
 	int ret;
 
+	save_ddr_training_info();
 	if (IS_ENABLED(CONFIG_SYSRESET_SPACEMIT))
 		device_bind_driver(gd->dm_root, "spacemit_sysreset",
 					"spacemit_sysreset", NULL);
@@ -695,15 +772,16 @@ int dram_init_banksize(void)
 {
 	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
 
+	memset(gd->bd->bi_dram, 0, sizeof(gd->bd->bi_dram));
 	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
 	if(dram_size > SZ_2GB) {
 		gd->bd->bi_dram[0].size = SZ_2G;
-		gd->bd->bi_dram[1].start = 0x100000000;
-		gd->bd->bi_dram[1].size = dram_size - SZ_2G;
+		if (CONFIG_NR_DRAM_BANKS > 1) {
+			gd->bd->bi_dram[1].start = 0x100000000;
+			gd->bd->bi_dram[1].size = dram_size - SZ_2G;
+		}
 	} else {
 		gd->bd->bi_dram[0].size = dram_size;
-		gd->bd->bi_dram[1].start = 0;
-		gd->bd->bi_dram[1].size = 0;
 	}
 
 	return 0;

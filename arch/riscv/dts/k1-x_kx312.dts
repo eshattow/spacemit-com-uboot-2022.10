@@ -41,6 +41,10 @@
 	timebase-frequency = <24000000>;
 };
 
+&ccu {
+	pll2-freq = <2800000000>;
+};
+
 &uart0 {
 	status = "okay";
 };

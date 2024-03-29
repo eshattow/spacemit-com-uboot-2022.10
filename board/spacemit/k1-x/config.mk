@@ -55,13 +55,13 @@ MRPROPER_DIRS += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb
 u-boot.itb: u-boot-nodtb.bin u-boot-dtb.bin u-boot.dtb FORCE
 	$(call if_changed,build_itb,$@)
 
-INPUTS-y += u-boot-env-default.bin
-u-boot-env-default.bin: u-boot-nodtb.bin FORCE
-	$(call if_changed,build_default_env,$@)
-
 ifneq ($(CONFIG_SPL_BUILD),)
 INPUTS-y += FSBL.bin
 
 FSBL.bin: spl/u-boot-spl.bin FORCE
 	$(call if_changed,build_spl_platform,$@,$<)
+else
+INPUTS-y += u-boot-env-default.bin
+u-boot-env-default.bin: u-boot-nodtb.bin FORCE
+	$(call if_changed,build_default_env,$@)
 endif

@@ -28,6 +28,13 @@
 #define DEFAULT_PRODUCT_NAME	"k1_deb1"
 
 #define K1X_SPL_BOOT_LOAD_ADDR	(0x20200000)
+#define DDR_TRAINING_DATA_BASE	(0xc0829000)
+
+// sram buffer address that save the DDR software training result
+#define DDR_TRAINING_INFO_BUFF	(0xC0800000)
+#define DDR_TRAINING_INFO_SAVE_ADDR	(0)
+// magic string: "DDRT"
+#define DDR_TRAINING_INFO_MAGIC	(0x54524444)
 
 /*
  use (ram_base+4MB offset) as the address to loading image.
@@ -68,6 +75,8 @@
 #define TLV_CODE_EEPROM_PIN_GROUP	0x82
 
 #ifndef __ASSEMBLY__
+#include "linux/types.h"
+
 enum board_boot_mode {
 	BOOT_MODE_NONE = 0,
 	BOOT_MODE_USB = 0x55a,
@@ -76,6 +85,24 @@ enum board_boot_mode {
 	BOOT_MODE_NOR,
 	BOOT_MODE_SD,
 	BOOT_MODE_SHELL = 0x55f,
+};
+
+struct ddr_training_info_t {
+	uint32_t magic;
+	uint32_t crc32;
+	uint64_t chipid;
+	uint64_t mac_addr;
+	uint8_t reserved[40];
+	uint8_t para[1024];
+	uint8_t reserved2[448];
+};
+
+struct boot_storage_op
+{
+	uint32_t boot_storage;
+	uint32_t address;
+	ulong (*read)(ulong byte_addr, ulong byte_size, void *buff);
+	bool (*write)(ulong byte_addr, ulong byte_size, void *buff);
 };
 #endif
 
@@ -127,9 +154,6 @@ enum board_boot_mode {
 	"splashimage=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
 	"splashpos=m,m\0" \
 	"splashfile=bianbu.bmp\0" \
-	"stderr=serial\0" \
-	"stdin=serial\0" \
-	"stdout=serial\0" \
 	BOOTENV_DEVICE_CONFIG
 
 
