@@ -9,7 +9,7 @@ loglevel=loglevel=8
 #partitions/mtdparts/mtdids would set while flashing env.bin
 partitions=
 mtdids=nor0=spi-dev
-mtdparts=spi-dev:64K@0K(bootinfo),256K@64K(fsbl),128K@512K(env),384K@640K(opensbi),1M@2M(uboot)
+mtdparts=spi-dev:128K@0K(bootinfo),256K@128K(fsbl),64K@384K(env),192K@448K(opensbi),-@640K(uboot)
 
 # Nand flash rootfs device
 nand_root=ubi0:rootfs
