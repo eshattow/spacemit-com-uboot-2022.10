@@ -154,8 +154,8 @@ static bool write_boot_storage_sdcard(ulong byte_addr, ulong byte_size, void *bu
 }
 
 static const struct boot_storage_op storage_write[] = {
-	{BOOT_MODE_EMMC, 256 * 512, NULL, write_boot_storage_emmc},
-	{BOOT_MODE_SD, 256 * 512, NULL, write_boot_storage_sdcard},
+	{BOOT_MODE_EMMC, 128 * 512, NULL, write_boot_storage_emmc},
+	{BOOT_MODE_SD, 128 * 512, NULL, write_boot_storage_sdcard},
 };
 
 static bool write_training_info(void *buff, ulong byte_size)
