@@ -24,6 +24,7 @@
 #include <u-boot/crc.h>
 #include <cpu_func.h>
 #include <dt-bindings/soc/spacemit-k1x.h>
+#include <display_options.h>
 
 #define GEN_CNT			(0xD5001000)
 #define STORAGE_API_P_ADDR	(0xC0838498)
@@ -81,6 +82,7 @@ extern int k1x_eeprom_init(void);
 extern int spacemit_eeprom_read(uint8_t chip, uint8_t *buffer, uint8_t id);
 extern bool get_mac_address(uint64_t *mac_addr);
 extern enum board_boot_mode get_boot_storage(void);
+extern int spl_mtd_read(struct mtd_info *mtd, ulong sector, ulong count, void *buf);
 char *product_name;
 
 int timer_init(void)
@@ -334,9 +336,25 @@ static ulong read_boot_storage_sdcard(ulong byte_addr, ulong byte_size, void *bu
 	return dev_desc->blksz * ret;
 }
 
+static ulong read_boot_storage_spinor(ulong byte_addr, ulong byte_size, void *buff)
+{
+	struct mtd_info *mtd;
+	const char* part = "private";
+
+	mtd_probe_devices();
+	mtd = get_mtd_device_nm(part);
+	if ((NULL != mtd) && (0 == spl_mtd_read(mtd, byte_addr, byte_size, buff))) {
+		// print_buffer(0, buff, 1, byte_size, 16);
+		return byte_size;
+	}
+	else
+		return 0;
+}
+
 static const struct boot_storage_op storage_read[] = {
-	{BOOT_MODE_EMMC, 128 * 512, read_boot_storage_emmc, NULL},
-	{BOOT_MODE_SD, 128 * 512, read_boot_storage_sdcard, NULL},
+	{BOOT_MODE_EMMC, 0x10000, read_boot_storage_emmc, NULL},
+	{BOOT_MODE_SD, 0x10000, read_boot_storage_sdcard, NULL},
+	{BOOT_MODE_NOR, 0, read_boot_storage_spinor, NULL},
 };
 
 static ulong read_training_info(void *buff, ulong byte_size)

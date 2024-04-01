@@ -31,6 +31,7 @@
 #include <linux/delay.h>
 #include <tlv_eeprom.h>
 #include <u-boot/crc.h>
+#include <fb_mtd.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
@@ -153,9 +154,26 @@ static bool write_boot_storage_sdcard(ulong byte_addr, ulong byte_size, void *bu
 	return true;
 }
 
+static bool write_boot_storage_spinor(ulong byte_addr, ulong byte_size, void *buff)
+{
+	struct mtd_info *mtd;
+	const char* part = "private";
+
+	mtd_probe_devices();
+	mtd = get_mtd_device_nm(part);
+	if ((NULL != mtd) && (0 == _fb_mtd_erase(mtd, byte_size))
+		&& (0 == _fb_mtd_write(mtd, buff, byte_addr, byte_size, NULL))) {
+		pr_info("write %ldbyte to spinor partition %s @offset %ld\n", byte_size, part, byte_addr);
+		return true;
+	}
+	else
+		return false;
+}
+
 static const struct boot_storage_op storage_write[] = {
-	{BOOT_MODE_EMMC, 128 * 512, NULL, write_boot_storage_emmc},
-	{BOOT_MODE_SD, 128 * 512, NULL, write_boot_storage_sdcard},
+	{BOOT_MODE_EMMC, 0x10000, NULL, write_boot_storage_emmc},
+	{BOOT_MODE_SD, 0x10000, NULL, write_boot_storage_sdcard},
+	{BOOT_MODE_NOR, 0, NULL, write_boot_storage_spinor},
 };
 
 static bool write_training_info(void *buff, ulong byte_size)
