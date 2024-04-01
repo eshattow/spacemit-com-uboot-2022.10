@@ -259,6 +259,8 @@ static void getvar_mtd_size(char *var_parameter, char *response)
 
 			}
 		}
+		fastboot_fail("flash to mtd dev but can not get mtd size", response);
+		return;
 #endif
 	default:
 		fastboot_okay("NULL", response);

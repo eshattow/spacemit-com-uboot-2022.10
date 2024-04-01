@@ -457,7 +457,7 @@ void fastboot_mtd_flash_write(const char *cmd, void *download_buffer,
 				download_bytes, part->name);
 		}
 
-		pr_info("compare data valid\n");
+		pr_info("compare data valid or not\n");
 		// crc_val = crc32_wd(crc_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
 		compare_val += checksum64(download_buffer, download_bytes);
 		if (compare_mtd_image_val(mtd, compare_val, download_bytes)){
