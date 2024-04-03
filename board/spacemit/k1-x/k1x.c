@@ -443,6 +443,10 @@ void setenv_boot_mode(void)
 		env_set("boot_device", "mmc");
 		env_set("boot_devnum", simple_itoa(MMC_DEV_SD));
 		break;
+	case BOOT_MODE_USB:
+		// for fastboot image download and run test
+		env_set("bootcmd", CONFIG_BOOTCOMMAND);
+		break;
 	default:
 		env_set("boot_device", "");
 		break;
