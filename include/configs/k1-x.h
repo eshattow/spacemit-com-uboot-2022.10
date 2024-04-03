@@ -140,12 +140,12 @@ struct boot_storage_op
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"stdout_flash=serial,vidconsole\0" \
-	"kernel_addr_r=0x24000000\0" \
-	"kernel_comp_addr_r=0x28000000\0" \
+	"kernel_addr_r=0x01400000\0" \
+	"kernel_comp_addr_r=0x18000000\0" \
 	"kernel_comp_size=0x4000000\0" \
 	"scriptaddr=0x2c100000\0" \
-	"pxefile_addr_r=0x2c200000\0" \
-	"ramdisk_addr_r=0x2c300000\0" \
+	"pxefile_addr_r=0x0c200000\0" \
+	"ramdisk_addr_r=0x0c300000\0" \
 	"ipaddr=192.168.1.15\0" \
 	"netmask=255.255.255.0\0" \
 	"serverip=10.0.92.134\0" \
