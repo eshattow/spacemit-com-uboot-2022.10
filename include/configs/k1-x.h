@@ -35,6 +35,8 @@
 #define DDR_TRAINING_INFO_SAVE_ADDR	(0)
 // magic string: "DDRT"
 #define DDR_TRAINING_INFO_MAGIC	(0x54524444)
+// ddr training software version: xx.xx.xxxx
+#define DDR_TRAINING_INFO_VER	(0x00010000)
 
 /*
  use (ram_base+4MB offset) as the address to loading image.
@@ -92,7 +94,8 @@ struct ddr_training_info_t {
 	uint32_t crc32;
 	uint64_t chipid;
 	uint64_t mac_addr;
-	uint8_t reserved[40];
+	uint32_t version;
+	uint8_t reserved[36];
 	uint8_t para[1024];
 	uint8_t reserved2[448];
 };

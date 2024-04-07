@@ -367,6 +367,7 @@ bool restore_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 		(DDR_TRAINING_INFO_MAGIC != info->magic) ||
 		(chipid != info->chipid) ||
 		(mac_addr != info->mac_addr) ||
+		(DDR_TRAINING_INFO_VER != info->version) ||
 		(info->crc32 != crc32(0, (const uchar *)info->para, sizeof(*info) - 8))) {
 		// clear magic, set invalid
 		memset(info, 0, sizeof(*info));
@@ -395,6 +396,7 @@ void update_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 		info->magic = DDR_TRAINING_INFO_MAGIC;
 		info->chipid = chipid;
 		info->mac_addr = mac_addr;
+		info->version = DDR_TRAINING_INFO_VER;
 		info->crc32 = crc32(0, (const uchar *)info->para, sizeof(*info) - 8);
 	}
 
