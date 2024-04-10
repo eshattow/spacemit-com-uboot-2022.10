@@ -265,7 +265,7 @@ void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev
 
 	/*load env.txt and import to uboot*/
 	memset((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, 0, CONFIG_ENV_SIZE);
-	sprintf(cmd, "fatload %s %d:%d 0x%x env_%s.txt", dev_name,
+	sprintf(cmd, "load %s %d:%d 0x%x env_%s.txt", dev_name,
 			dev, part, CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
 	pr_debug("cmd:%s\n", cmd);
 	if (run_command(cmd, 0))
