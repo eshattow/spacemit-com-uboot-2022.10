@@ -237,3 +237,25 @@
 &efuse {
 	status = "okay";
 };
+
+&dpu {
+	status = "okay";
+};
+
+&hdmi {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_hdmi_0>;
+	status = "okay";
+};
+
+&mipi_dsi {
+	status = "disabled";
+};
+
+&panel {
+	dcp-gpios = <&gpio 82 0>;
+	dcn-gpios = <&gpio 83 0>;
+	bl-gpios = <&gpio 44 0>;
+	reset-gpios = <&gpio 81 0>;
+	status = "disabled";
+};

@@ -47,7 +47,7 @@ knl_addr=0x40000000
 ramdisk_addr=0x50000000
 knl_name=vmlinuz-6.1.15
 ramdisk_name=initrd.img-6.1.15
-dtb_name=k1-x_evb.dtb
+dtb_name=spacemit/k1-x_deb1.dtb
 dtb_addr=0x28000000
 mdio_intf=
 phyaddr0=1
@@ -68,6 +68,8 @@ dtb_env=if test -n "${product_name}"; then \
                     setenv dtb_name spacemit/k1-x_deb1.dtb; \
                 elif test "${product_name}" = k1_deb2; then \
                     setenv dtb_name spacemit/k1-x_deb2.dtb; \
+                elif test "${product_name}" = k1_kx312; then \
+                    setenv dtb_name spacemit/k1-x_kx312.dtb; \
                 else \
                     echo "Unknow product_name: ${product_name}, loads default dtb: ${dtb_name}"; \
                 fi; \

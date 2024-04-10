@@ -35,6 +35,8 @@
 #define DDR_TRAINING_INFO_SAVE_ADDR	(0)
 // magic string: "DDRT"
 #define DDR_TRAINING_INFO_MAGIC	(0x54524444)
+// ddr training software version: xx.xx.xxxx
+#define DDR_TRAINING_INFO_VER	(0x00010000)
 
 /*
  use (ram_base+4MB offset) as the address to loading image.
@@ -92,7 +94,8 @@ struct ddr_training_info_t {
 	uint32_t crc32;
 	uint64_t chipid;
 	uint64_t mac_addr;
-	uint8_t reserved[40];
+	uint32_t version;
+	uint8_t reserved[36];
 	uint8_t para[1024];
 	uint8_t reserved2[448];
 };
@@ -138,14 +141,13 @@ struct boot_storage_op
 	"eeprom_i2c_index=" __stringify(K1_DEFALT_EEPROM_I2C_INDEX) "\0" \
 	"eeprom_pin_group=" __stringify(K1_DEFALT_EEPROM_PIN_GROUP) "\0"
 
+/*if env not use for spl, please define to board/spacemit/k1-x/k1-x.env */
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"stdout_flash=serial,vidconsole\0" \
-	"kernel_addr_r=0x24000000\0" \
-	"kernel_comp_addr_r=0x28000000\0" \
+	"kernel_comp_addr_r=0x18000000\0" \
 	"kernel_comp_size=0x4000000\0" \
 	"scriptaddr=0x2c100000\0" \
-	"pxefile_addr_r=0x2c200000\0" \
-	"ramdisk_addr_r=0x2c300000\0" \
+	"pxefile_addr_r=0x0c200000\0" \
 	"ipaddr=192.168.1.15\0" \
 	"netmask=255.255.255.0\0" \
 	"serverip=10.0.92.134\0" \

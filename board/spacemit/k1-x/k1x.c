@@ -31,13 +31,15 @@
 #include <linux/delay.h>
 #include <tlv_eeprom.h>
 #include <u-boot/crc.h>
+#include <fb_mtd.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
 #ifdef CONFIG_DISPLAY_SPACEMIT_HDMI
 extern int is_hdmi_connected;
 #endif
-void refresh_config_info(void);
+void refresh_config_info(u8 *eeprom_data);
+int mac_read_from_buffer(u8 *eeprom_data);
 
 void set_boot_mode(enum board_boot_mode boot_mode)
 {
@@ -153,9 +155,26 @@ static bool write_boot_storage_sdcard(ulong byte_addr, ulong byte_size, void *bu
 	return true;
 }
 
+static bool write_boot_storage_spinor(ulong byte_addr, ulong byte_size, void *buff)
+{
+	struct mtd_info *mtd;
+	const char* part = "private";
+
+	mtd_probe_devices();
+	mtd = get_mtd_device_nm(part);
+	if ((NULL != mtd) && (0 == _fb_mtd_erase(mtd, byte_size))
+		&& (0 == _fb_mtd_write(mtd, buff, byte_addr, byte_size, NULL))) {
+		pr_info("write %ldbyte to spinor partition %s @offset %ld\n", byte_size, part, byte_addr);
+		return true;
+	}
+	else
+		return false;
+}
+
 static const struct boot_storage_op storage_write[] = {
-	{BOOT_MODE_EMMC, 128 * 512, NULL, write_boot_storage_emmc},
-	{BOOT_MODE_SD, 128 * 512, NULL, write_boot_storage_sdcard},
+	{BOOT_MODE_EMMC, 0x10000, NULL, write_boot_storage_emmc},
+	{BOOT_MODE_SD, 0x10000, NULL, write_boot_storage_sdcard},
+	{BOOT_MODE_NOR, 0, NULL, write_boot_storage_spinor},
 };
 
 static bool write_training_info(void *buff, ulong byte_size)
@@ -200,7 +219,7 @@ void run_fastboot_command(void)
 		run_command(cmd_para, 0);
 
 		/*read from eeprom and update info to env*/
-		refresh_config_info();
+		refresh_config_info(NULL);
 	}
 }
 
@@ -246,7 +265,7 @@ void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev
 
 	/*load env.txt and import to uboot*/
 	memset((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, 0, CONFIG_ENV_SIZE);
-	sprintf(cmd, "fatload %s %d:%d 0x%x env_%s.txt", dev_name,
+	sprintf(cmd, "load %s %d:%d 0x%x env_%s.txt", dev_name,
 			dev, part, CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
 	pr_debug("cmd:%s\n", cmd);
 	if (run_command(cmd, 0))
@@ -443,6 +462,10 @@ void setenv_boot_mode(void)
 		env_set("boot_device", "mmc");
 		env_set("boot_devnum", simple_itoa(MMC_DEV_SD));
 		break;
+	case BOOT_MODE_USB:
+		// for fastboot image download and run test
+		env_set("bootcmd", CONFIG_BOOTCOMMAND);
+		break;
 	default:
 		env_set("boot_device", "");
 		break;
@@ -479,17 +502,104 @@ void read_from_eeprom(struct tlvinfo_tlv **tlv_data, u8 tcode)
 	return;
 }
 
-void set_env_ethaddr(void)
+struct tlvinfo_tlv *find_tlv_in_buffer(u8 *eeprom_data, u8 tcode)
 {
-	int ret = 0, ethaddr_valid = 0, eth1addr_valid = 0;
+	struct tlvinfo_header *hdr = (struct tlvinfo_header *)eeprom_data;
+	int total_length = be16_to_cpu(hdr->totallen);
+	u8 *tlv_end = eeprom_data + sizeof(struct tlvinfo_header) + total_length;
+	u8 *ptr = eeprom_data + sizeof(struct tlvinfo_header);
+
+	while (ptr < tlv_end) {
+		struct tlvinfo_tlv *tlv = (struct tlvinfo_tlv *)ptr;
+
+		if (tlv->type == tcode) {
+			return tlv;
+		}
+
+		ptr += sizeof(struct tlvinfo_tlv) + tlv->length;
+	}
+
+	return NULL;
+}
+
+int mac_read_from_buffer(u8 *eeprom_data) {
+	unsigned int i;
+	struct tlvinfo_tlv *mac_size_tlv;
+	struct tlvinfo_tlv *mac_base_tlv;
+	int maccount;
+	u8 macbase[6];
+	struct tlvinfo_header *eeprom_hdr = (struct tlvinfo_header *)eeprom_data;
+
+	pr_info("EEPROM: ");
+
+	mac_size_tlv = find_tlv_in_buffer(eeprom_data, TLV_CODE_MAC_SIZE);
+	maccount = 1;
+	if (mac_size_tlv) {
+		maccount = (mac_size_tlv->value[0] << 8) | mac_size_tlv->value[1];
+	}
+
+	mac_base_tlv = find_tlv_in_buffer(eeprom_data, TLV_CODE_MAC_BASE);
+	if (mac_base_tlv) {
+		memcpy(macbase, mac_base_tlv->value, 6);
+	} else {
+		memset(macbase, 0, sizeof(macbase));
+	}
+
+	for (i = 0; i < maccount; i++) {
+		if (is_valid_ethaddr(macbase)) {
+			char ethaddr[18];
+			char enetvar[11];
+
+			sprintf(ethaddr, "%02X:%02X:%02X:%02X:%02X:%02X",
+				macbase[0], macbase[1], macbase[2],
+				macbase[3], macbase[4], macbase[5]);
+			sprintf(enetvar, i ? "eth%daddr" : "ethaddr", i);
+			/* Only initialize environment variables that are blank
+			 * (i.e. have not yet been set)
+			 */
+			if (!env_get(enetvar))
+				env_set(enetvar, ethaddr);
+
+			macbase[5]++;
+			if (macbase[5] == 0) {
+				macbase[4]++;
+				if (macbase[4] == 0) {
+					macbase[3]++;
+					if (macbase[3] == 0) {
+						macbase[0] = 0;
+						macbase[1] = 0;
+						macbase[2] = 0;
+					}
+				}
+			}
+		}
+	}
+
+	printf("%s v%u len=%u\n", eeprom_hdr->signature, eeprom_hdr->version,
+	       be16_to_cpu(eeprom_hdr->totallen));
+
+	return 0;
+}
+
+void set_env_ethaddr(u8 *eeprom_data) {
+	int ethaddr_valid = 0, eth1addr_valid = 0;
 	uint8_t mac_addr[6], mac1_addr[6];
 	char cmd_str[128] = {0};
 
-	/* get mac address from eeprom */
-	ret = mac_read_from_eeprom();
-	if (ret < 0) {
-		pr_err("read mac address from eeprom failed!\n");
-		return ;
+	/* Determine source of MAC address and attempt to read it */
+	if (eeprom_data != NULL) {
+		// Attempt to read MAC address from buffer
+
+		if (mac_read_from_buffer(eeprom_data) < 0) {
+			pr_err("Failed to set MAC addresses from EEPROM buffer.\n");
+			return;
+		}
+	} else {
+		// Attempt to read MAC address from EEPROM
+		if (mac_read_from_eeprom() < 0) {
+			pr_err("Read MAC address from EEPROM failed!\n");
+			return;
+		}
 	}
 
 	/* check ethaddr valid */
@@ -529,7 +639,7 @@ void set_env_ethaddr(void)
 	run_command(cmd_str, 0);
 }
 
-void set_dev_serial_no(void)
+void set_dev_serial_no(uint8_t *eeprom_data)
 {
 	u8 sn[6] = {0};
 	char cmd_str[128] = {0};
@@ -537,15 +647,19 @@ void set_dev_serial_no(void)
 	int i = 0;
 	unsigned int seed = 0;
 
-	read_from_eeprom(&tlv_entry, TLV_CODE_SERIAL_NUMBER);
+	// Decide where to read the serial number from
+	if (eeprom_data != NULL) {
+		tlv_entry = find_tlv_in_buffer(eeprom_data, TLV_CODE_SERIAL_NUMBER);
+	} else {
+		read_from_eeprom(&tlv_entry, TLV_CODE_SERIAL_NUMBER);
+	}
 	if (tlv_entry && tlv_entry->length == 12) {
-			if (tlv_entry->value[0] | tlv_entry->value[1] | tlv_entry->value[2] |
-				tlv_entry->value[3] | tlv_entry->value[4] | tlv_entry->value[5] |
-				tlv_entry->value[6] | tlv_entry->value[7] | tlv_entry->value[8] |
-				tlv_entry->value[9] | tlv_entry->value[10] | tlv_entry->value[11]) {
+		for (i = 0; i < 12; i++) {
+			if (tlv_entry->value[i] != 0) {
 				pr_err("Serial number is valid.\n");
-				return ;
+				return;
 			}
+		}
 	}
 
 	pr_info("Generate rand serial number:\n");
@@ -572,51 +686,49 @@ struct code_desc_info {
 	char	*m_name;
 };
 
-void refresh_config_info(void)
-{
+void refresh_config_info(u8 *eeprom_data) {
 	struct tlvinfo_tlv *tlv_info = NULL;
 	char *strval;
 	int i;
 
-	struct code_desc_info info[] = {
+	struct code_desc_info {
+		u8    m_code;
+		char *m_name;
+	} info[] = {
 		{ TLV_CODE_PRODUCT_NAME,   "product_name"},
 		{ TLV_CODE_SERIAL_NUMBER,  "serial#"},
 		{ TLV_CODE_MANUF_DATE,     "manufacture_date"},
 		{ TLV_CODE_MANUF_NAME,     "manufacturer"},
-	};
-
-	for (i = 0; i < ARRAY_SIZE(info); i++){
-		read_from_eeprom(&tlv_info, info[i].m_code);
-		if (tlv_info == NULL){
-			pr_err("can not find tlv data:%s\n", info[i].m_name);
-			continue;
-		}
-
-		strval = malloc(tlv_info->length + 1);
-		memset(strval, 0, tlv_info->length + 1);
-		strncpy(strval, tlv_info->value, tlv_info->length);
-		env_set(info[i].m_name, strval);
-		free(strval);
-	}
-
-	struct code_desc_info version[] = {
 		{ TLV_CODE_DEVICE_VERSION, "device_version"},
 		{ 0x40,                    "sdk_version"},
 	};
 
-	strval = malloc(64);
-	for (i = 0; i < ARRAY_SIZE(version); i++){
-		read_from_eeprom(&tlv_info, version[i].m_code);
-		if (tlv_info == NULL){
-			pr_err("can not find tlv data:%s\n", version[i].m_name);
-			continue;
+	for (i = 0; i < ARRAY_SIZE(info); i++) {
+		if (eeprom_data != NULL) {
+			tlv_info = find_tlv_in_buffer(eeprom_data, info[i].m_code);
 		}
 
-		memset(strval, 0, 64);
-		sprintf(strval, "%d", *tlv_info->value);
-		env_set(version[i].m_name, strval);
+		if (tlv_info != NULL) {
+			if (info[i].m_code == TLV_CODE_DEVICE_VERSION || info[i].m_code == 0x40) {
+				// Convert the numeric value to string
+				strval = malloc(64);
+				int num = 0;
+				for (int j = 0; j < tlv_info->length && j < sizeof(num); j++) {
+					num = (num << 8) | tlv_info->value[j];
+				}
+				sprintf(strval, "%d", num);
+			} else {
+				// Copy the value directly as string
+				strval = malloc(tlv_info->length + 1);
+				memcpy(strval, tlv_info->value, tlv_info->length);
+				strval[tlv_info->length] = '\0';
+			}
+			env_set(info[i].m_name, strval);
+			free(strval);
+		} else {
+			pr_err("Cannot find TLV data: %s\n", info[i].m_name);
+		}
 	}
-	free(strval);
 }
 
 int board_init(void)
@@ -637,6 +749,9 @@ int board_late_init(void)
 	ofnode chosen_node;
 	char ram_size_str[16] = {"\0"};
 	int ret;
+	u8 *eeprom_data;
+	struct tlvinfo_header *tlv_hdr = NULL;
+	struct tlvinfo_tlv *first_entry = NULL;
 
 	save_ddr_training_info();
 	if (IS_ENABLED(CONFIG_SYSRESET_SPACEMIT))
@@ -646,11 +761,24 @@ int board_late_init(void)
 	// it MAY be NULL when did NOT load build-in env and eeprom is empty
 	if (NULL == env_get("product_name"))
 		env_set("product_name", DEFAULT_PRODUCT_NAME);
-	set_env_ethaddr();
-	set_dev_serial_no();
 
-	/*read from eeprom and update info to env*/
-	refresh_config_info();
+	eeprom_data = memalign(ARCH_DMA_MINALIGN, TLV_INFO_MAX_LEN);
+	if (!eeprom_data) {
+		pr_err("Failed to allocate memory for EEPROM data\n");
+		return -ENOMEM;
+	}
+	if (read_tlvinfo_tlv_eeprom(eeprom_data, &tlv_hdr, &first_entry, 0) < 0) {
+		pr_err("Failed to read all EEPROM data\n");
+	}
+	if (tlv_hdr != NULL && first_entry != NULL && is_valid_tlvinfo_header(tlv_hdr)) {
+		set_env_ethaddr(eeprom_data);
+		set_dev_serial_no(eeprom_data);
+		refresh_config_info(eeprom_data);
+	} else {
+		set_env_ethaddr(NULL);
+		set_dev_serial_no(NULL);
+		refresh_config_info(NULL);
+	}
 
 	run_fastboot_command();
 
@@ -747,11 +875,20 @@ int misc_init_r(void)
 {
 #ifdef CONFIG_DYNAMIC_DDR_CLK_FREQ
 	int ret;
+	char cmd[32];
 
 	ret = ddr_freq_max();
 	if(ret < 0) {
 		pr_debug("%s: Try to adjust ddr freq failed!\n", __func__);
 		return ret;
+	}
+
+	// change DDR data rate to 2400MT/s and set
+	sprintf(cmd, "ddrfreq %d", 6);
+	pr_debug("cmd:%s\n", cmd);
+	if (run_command(cmd, 0)) {
+			pr_err("DDR frequency change fail\n");
+			return -1;
 	}
 #endif
 
