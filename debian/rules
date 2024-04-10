@@ -8,6 +8,6 @@ export ARCH=riscv
 override_dh_auto_build:
 	make k1_defconfig
 	make -j$(nproc)
-	./tools/mkenvimage -s 0x4000 -o env.bin debian/env_k1-x.txt
+	cp -f u-boot-env-default.bin env.bin
 
 override_dh_auto_test-indep:
