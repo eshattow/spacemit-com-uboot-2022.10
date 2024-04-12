@@ -706,6 +706,8 @@ void refresh_config_info(u8 *eeprom_data) {
 	for (i = 0; i < ARRAY_SIZE(info); i++) {
 		if (eeprom_data != NULL) {
 			tlv_info = find_tlv_in_buffer(eeprom_data, info[i].m_code);
+		} else {
+			read_from_eeprom(&tlv_info, info[i].m_code);
 		}
 
 		if (tlv_info != NULL) {
