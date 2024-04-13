@@ -60,6 +60,10 @@ void dcache_enable(void);
 void dcache_disable(void);
 void mmu_disable(void);
 int mmu_status(void);
+void branch_predict_enable(void);
+void branch_predict_disable(void);
+void prefetch_enable(void);
+void prefetch_disable(void);
 
 /* arch/$(ARCH)/lib/cache.c */
 void enable_caches(void);
