@@ -381,7 +381,9 @@ bool restore_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 	pr_debug("mac_addr %llx\n", mac_addr);
 
 	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
-	if ((sizeof(*info) != read_training_info(info, sizeof(*info))) ||
+	// Force to do DDR software training while in USB download mode or info is invalid
+	if ((BOOT_MODE_USB == get_boot_mode()) ||
+		(sizeof(*info) != read_training_info(info, sizeof(*info))) ||
 		(DDR_TRAINING_INFO_MAGIC != info->magic) ||
 		(chipid != info->chipid) ||
 		(mac_addr != info->mac_addr) ||
