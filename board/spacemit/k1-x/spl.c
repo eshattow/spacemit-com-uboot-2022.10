@@ -450,10 +450,10 @@ int spl_board_init_f(void)
 	// restore prevous saved ddr training info data
 	flag = restore_ddr_training_info(chipid, mac_addr);
 	if (!flag) {
-		// flush data and stack
-		flush_dcache_range(CONFIG_SPL_BSS_START_ADDR, CONFIG_SPL_STACK);
 		icache_disable();
 		dcache_disable();
+		// flush data and stack
+		flush_dcache_range(CONFIG_SPL_BSS_START_ADDR, CONFIG_SPL_STACK);
 	}
 
 	/* DDR init */
