@@ -381,7 +381,9 @@ bool restore_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 	pr_debug("mac_addr %llx\n", mac_addr);
 
 	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
-	if ((sizeof(*info) != read_training_info(info, sizeof(*info))) ||
+	// Force to do DDR software training while in USB download mode or info is invalid
+	if ((BOOT_MODE_USB == get_boot_mode()) ||
+		(sizeof(*info) != read_training_info(info, sizeof(*info))) ||
 		(DDR_TRAINING_INFO_MAGIC != info->magic) ||
 		(chipid != info->chipid) ||
 		(mac_addr != info->mac_addr) ||
@@ -448,10 +450,10 @@ int spl_board_init_f(void)
 	// restore prevous saved ddr training info data
 	flag = restore_ddr_training_info(chipid, mac_addr);
 	if (!flag) {
-		// flush data and stack
-		flush_dcache_range(CONFIG_SPL_BSS_START_ADDR, CONFIG_SPL_STACK);
 		icache_disable();
 		dcache_disable();
+		// flush data and stack
+		flush_dcache_range(CONFIG_SPL_BSS_START_ADDR, CONFIG_SPL_STACK);
 	}
 
 	/* DDR init */
@@ -506,7 +508,7 @@ int board_fit_config_name_match(const char *name)
 		buildin_name = DEFAULT_PRODUCT_NAME;
 
 	if ((NULL != buildin_name) && (0 == strcmp(buildin_name, name))) {
-		pr_debug("Boot from fit configuration %s\n", name);
+		log_emerg("Boot from fit configuration %s\n", name);
 		return 0;
 	}
 	else
