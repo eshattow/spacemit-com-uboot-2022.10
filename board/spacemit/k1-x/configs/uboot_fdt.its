@@ -83,7 +83,7 @@
                         };
                 };
 		fdt_8 {
-			description = "k1_MUSE-N1";
+			description = "k1-x_MUSE-N1";
 			type = "flat_dt";
 			compression = "none";
 			data = /incbin/("../dtb/k1-x_MUSE-N1.dtb");
@@ -131,7 +131,7 @@
                         fdt = "fdt_7";
                 };
 		conf_8 {
-			description = "k1_MUSE-N1";
+			description = "k1-x_MUSE-N1";
 			loadables = "uboot";
 			fdt = "fdt_8";
 		};

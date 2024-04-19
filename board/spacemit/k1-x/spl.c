@@ -508,7 +508,7 @@ int board_fit_config_name_match(const char *name)
 		buildin_name = DEFAULT_PRODUCT_NAME;
 
 	if ((NULL != buildin_name) && (0 == strcmp(buildin_name, name))) {
-		pr_debug("Boot from fit configuration %s\n", name);
+		log_emerg("Boot from fit configuration %s\n", name);
 		return 0;
 	}
 	else
