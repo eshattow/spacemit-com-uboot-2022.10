@@ -91,6 +91,15 @@
 				algo = "crc32";
 			};
 		};
+		fdt_9 {
+                        description = "k1-x_MUSE-Pi";
+                        type = "flat_dt";
+                        compression = "none";
+                        data = /incbin/("../dtb/k1-x_MUSE-Pi.dtb");
+                        hash-1 {
+                                algo = "crc32";
+                        };
+                };
 	};
 
 	configurations {
@@ -135,5 +144,10 @@
 			loadables = "uboot";
 			fdt = "fdt_8";
 		};
+		conf_9 {
+                        description = "k1-x_MUSE-Pi";
+                        loadables = "uboot";
+                        fdt = "fdt_9";
+                };
 	};
 };
