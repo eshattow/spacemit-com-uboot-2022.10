@@ -26,10 +26,7 @@
 
 	usb3hub:usb3hub {
 		compatible = "spacemit,usb-hub";
-		hub-gpios = <
-			&gpio 123 0	/* usb3 hub en */
-			&gpio 124 0>;	/* usb3 hub rst*/
-		vbus-gpios = <&gpio 97 0>;	/* gpio_97 for usb3 hub output vbus */
+		vbus-gpios = <&gpio 127 0>;	/* gpio_97 for usb3 hub output vbus */
 		regulator-force-boot-off;
 		status = "okay";
 	};
