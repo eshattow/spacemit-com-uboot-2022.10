@@ -623,12 +623,22 @@ char *get_product_name(void)
 {
 	char *name = NULL;
 	int eeprom_addr;
+	char tmp_name[64];
 
 	eeprom_addr = k1x_eeprom_init();
 	name = calloc(1, 64);
 	if ((eeprom_addr >= 0) && (NULL != name) && (0 == spacemit_eeprom_read(
 		eeprom_addr, name, TLV_CODE_PRODUCT_NAME))) {
 		pr_info("Get product name from eeprom %s\n", name);
+
+		/*
+			be compatible to previous format name,
+			such as: k1_deb1 -> k1-x_deb1
+		*/
+		if (strncmp(name, CONFIG_SYS_BOARD, 4)){
+			sprintf(tmp_name, "%s_%s", CONFIG_SYS_BOARD, &name[3]);
+			strcpy(name, tmp_name);
+		}
 		return name;
 	}
 

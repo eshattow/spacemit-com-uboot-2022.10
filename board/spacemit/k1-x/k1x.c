@@ -690,6 +690,7 @@ void refresh_config_info(u8 *eeprom_data) {
 	struct tlvinfo_tlv *tlv_info = NULL;
 	char *strval;
 	int i;
+	char tmp_name[64];
 
 	struct code_desc_info {
 		u8    m_code;
@@ -724,6 +725,15 @@ void refresh_config_info(u8 *eeprom_data) {
 				strval = malloc(tlv_info->length + 1);
 				memcpy(strval, tlv_info->value, tlv_info->length);
 				strval[tlv_info->length] = '\0';
+
+				/*
+					be compatible to previous format name,
+					such as: k1_deb1 -> k1-x_deb1
+				*/
+				if (info[i].m_code == TLV_CODE_PRODUCT_NAME && strncmp(strval, CONFIG_SYS_BOARD, 4)){
+					sprintf(tmp_name, "%s_%s", CONFIG_SYS_BOARD, &strval[3]);
+					strcpy(strval, tmp_name);
+				}
 			}
 			env_set(info[i].m_name, strval);
 			free(strval);
