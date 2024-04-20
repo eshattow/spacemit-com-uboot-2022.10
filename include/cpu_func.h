@@ -71,6 +71,7 @@ void flush_cache(unsigned long addr, unsigned long size);
 void flush_dcache_all(void);
 void flush_dcache_range(unsigned long start, unsigned long stop);
 void invalidate_dcache_range(unsigned long start, unsigned long stop);
+void clean_dcache_range(unsigned long start, unsigned long stop);
 void invalidate_dcache_all(void);
 void invalidate_icache_all(void);
 

@@ -184,3 +184,14 @@ void flush_dcache_range(unsigned long start, unsigned long end)
 		start += CONFIG_RISCV_CBOM_BLOCK_SIZE;
 	}
 }
+
+void clean_dcache_range(unsigned long start, unsigned long end)
+{
+	if (!check_cache_range(start, end))
+		return;
+
+	while (start < end) {
+		cbo_clean(start);
+		start += CONFIG_RISCV_CBOM_BLOCK_SIZE;
+	}
+}
