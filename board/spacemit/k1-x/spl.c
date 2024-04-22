@@ -397,7 +397,7 @@ bool restore_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 
 	flush_start = round_down((size_t)info, CONFIG_RISCV_CBOM_BLOCK_SIZE);
 	flush_lenth = round_up(sizeof(*info), CONFIG_RISCV_CBOM_BLOCK_SIZE);
-	clean_dcache_range(flush_start, flush_start + flush_lenth);
+	flush_dcache_range(flush_start, flush_start + flush_lenth);
 	return success;
 }
 
@@ -423,7 +423,7 @@ void update_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 
 	// flush_start = round_down((size_t)info, CONFIG_RISCV_CBOM_BLOCK_SIZE);
 	// flush_lenth = round_up(sizeof(*info), CONFIG_RISCV_CBOM_BLOCK_SIZE);
-	// clean_dcache_range(flush_start, flush_start + flush_lenth);
+	// flush_dcache_range(flush_start, flush_start + flush_lenth);
 }
 
 int spl_board_init_f(void)
@@ -453,7 +453,7 @@ int spl_board_init_f(void)
 	if (!flag) {
 		// flush data and stack
 		flush_dcache_range(CONFIG_SPL_BSS_START_ADDR, CONFIG_SPL_STACK);
-		clean_dcache_range(round_down((size_t)__data_start, CONFIG_RISCV_CBOM_BLOCK_SIZE),
+		flush_dcache_range(round_down((size_t)__data_start, CONFIG_RISCV_CBOM_BLOCK_SIZE),
 		 	round_up((size_t)__data_end, CONFIG_RISCV_CBOM_BLOCK_SIZE));
 		icache_disable();
 		dcache_disable();
