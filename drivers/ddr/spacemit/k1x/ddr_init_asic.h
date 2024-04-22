@@ -41,6 +41,38 @@
 #define TOP_AP_ALLOW_SPD_CHG		18
 #define TOP_DDR_FREQ_CHG_REQ		22
 
+// emu for device density
+typedef enum {
+	BANK_2 = 0,
+	BANK_4,
+	BANK_8,
+	BANK_RESERVED,
+} bank_num;
+
+typedef enum {
+	ROW_11 = 1,
+	ROW_12,
+	ROW_13,
+	ROW_14,
+	ROW_15,
+	ROW_16,
+	ROW_17,
+	ROW_18,
+} row_num;
+
+typedef enum {
+	COL_8 = 1,
+	COL_9,
+	COL_10,
+	COL_11,
+	COL_12,
+} col_num;
+
+typedef enum {
+	IO_X16 = 0,
+	IO_X8,
+} io_width;
+
 static const unsigned char __attribute__((section(".ddr_training"))) lpddr4_training_img[] = {
 	0x79, 0x71, 0x06, 0xf4, 0x22, 0xf0, 0x00, 0x18, 0x23, 0x3c, 0xa4, 0xfc,
 	0x83, 0x37, 0x84, 0xfd, 0x9c, 0x63, 0x23, 0x26, 0xf4, 0xfe, 0x83, 0x37,
