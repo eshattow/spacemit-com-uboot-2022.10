@@ -35,6 +35,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
+extern u32 ddr_cs_num;
 #ifdef CONFIG_DISPLAY_SPACEMIT_HDMI
 extern int is_hdmi_connected;
 #endif
@@ -197,10 +198,24 @@ static void save_ddr_training_info(void)
 	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
 
 	if ((DDR_TRAINING_INFO_MAGIC == info->magic) &&
-		(info->crc32 == crc32(0, (const uchar *)info->para, sizeof(*info) - 8))) {
+		(info->crc32 == crc32(0, (const uchar *)&info->chipid, sizeof(*info) - 8))) {
 		// save DDR training info to boot storage
 		write_training_info(info, sizeof(*info));
 	}
+}
+
+void get_ddr_config_info(void)
+{
+	struct ddr_training_info_t *info;
+	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
+
+	if ((DDR_TRAINING_INFO_MAGIC == info->magic) &&
+		(info->crc32 == crc32(0, (const uchar *)&info->chipid, sizeof(*info) - 8))) {
+		// get DDR cs number that is update in spl stage
+		ddr_cs_num = info->cs_num;
+	}
+	else
+		ddr_cs_num = DDR_CS_NUM;
 }
 
 void run_fastboot_command(void)
@@ -911,6 +926,7 @@ int misc_init_r(void)
 
 int dram_init(void)
 {
+	get_ddr_config_info();
 	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
 
 	gd->ram_base = CONFIG_SYS_SDRAM_BASE;

@@ -1029,31 +1029,32 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp, void *inp
 void lpddr4_silicon_init(u32 ddr_base, u32 data_rate)
 {
 	u32 fp=0;
-	u32 size_mb, mr8_value;
+	u32 size_mb, mr8_value, cs_num;;
 	struct ddr_training_info_t *info;
 
+	cs_num = ddr_cs_num;
 	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
 	top_Common_config();
 
-	top_DDR_MC_Phy_Device_Init(ddr_base, ddr_cs_num, 0);
+	top_DDR_MC_Phy_Device_Init(ddr_base, cs_num, 0);
 
 	size_mb = ddr_get_density();
 	mr8_value = ddr_get_mr8();
-	adjust_mapping(ddr_base, ddr_cs_num, size_mb, mr8_value);
+	adjust_mapping(ddr_base, cs_num, size_mb, mr8_value);
 	LogMsg(0,"ddr density: %u MB \n", size_mb);
 
 	ddr_dfc_table_init(0xF0000000);
 	init_table_mc_a0(0xF0000000);
 
-	top_training_fp_all(ddr_base, ddr_cs_num, 0, info->para);
+	top_training_fp_all(ddr_base, cs_num, 0, info->para);
 
 	fp=1;
 	ddr_dfc(fp);
-	top_training_fp_all(ddr_base, ddr_cs_num, fp, info->para);
+	top_training_fp_all(ddr_base, cs_num, fp, info->para);
 
 	fp=2;
 	ddr_dfc(fp);
-	top_training_fp_all(ddr_base, ddr_cs_num, fp, info->para);
+	top_training_fp_all(ddr_base, cs_num, fp, info->para);
 
 	/* change dram frequency */
 	switch(data_rate) {

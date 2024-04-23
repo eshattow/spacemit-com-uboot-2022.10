@@ -38,7 +38,7 @@
 // ddr training software version: xx.xx.xxxx
 #define DDR_TRAINING_INFO_VER	(0x00010000)
 // default ddr channel number
-#define DDR_CS_NUM	(2)
+#define DDR_CS_NUM	(1)
 
 /*
  use (ram_base+4MB offset) as the address to loading image.
@@ -74,6 +74,8 @@
 #define K1_DEFALT_EEPROM_PIN_GROUP	0
 
 #define TLV_CODE_SDK_VERSION		0x40
+#define TLV_CODE_DDR_CSNUM		0x41
+
 #define TLV_CODE_PMIC_TYPE		0x80
 #define TLV_CODE_EEPROM_I2C_INDEX	0x81
 #define TLV_CODE_EEPROM_PIN_GROUP	0x82
@@ -97,7 +99,8 @@ struct ddr_training_info_t {
 	uint64_t chipid;
 	uint64_t mac_addr;
 	uint32_t version;
-	uint8_t reserved[36];
+	uint32_t cs_num;
+	uint8_t reserved[32];
 	uint8_t para[1024];
 	uint8_t reserved2[448];
 };
