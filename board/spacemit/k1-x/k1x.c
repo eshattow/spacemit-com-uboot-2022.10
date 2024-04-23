@@ -192,7 +192,7 @@ static bool write_training_info(void *buff, ulong byte_size)
 	return false;
 }
 
-static void save_ddr_training_info(void)
+void save_ddr_training_info(void)
 {
 	struct ddr_training_info_t *info;
 	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
@@ -782,7 +782,7 @@ int board_late_init(void)
 	struct tlvinfo_header *tlv_hdr = NULL;
 	struct tlvinfo_tlv *first_entry = NULL;
 
-	save_ddr_training_info();
+	// save_ddr_training_info();
 	if (IS_ENABLED(CONFIG_SYSRESET_SPACEMIT))
 		device_bind_driver(gd->dm_root, "spacemit_sysreset",
 					"spacemit_sysreset", NULL);

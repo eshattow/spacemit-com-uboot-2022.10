@@ -445,7 +445,7 @@ int spl_board_init_f(void)
 	int ret;
 	struct udevice *dev;
 	bool flag;
-	uint64_t chipid = 0, mac_addr = 0;
+	// uint64_t chipid = 0, mac_addr = 0;
 
 #if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
 	/* init i2c */
@@ -458,16 +458,17 @@ int spl_board_init_f(void)
 
 	raise_cpu_frequency();
 #if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
-	load_chipid_from_efuse(&chipid);
+	// load_chipid_from_efuse(&chipid);
 #endif
-	get_mac_address(&mac_addr);
+	// get_mac_address(&mac_addr);
 
 	// if fail to get ddr cs number from eeprom, update it from dts node
 	if (!get_ddr_cs_number(&ddr_cs_num))
 		ddr_cs_num = 0;
 
 	// restore prevous saved ddr training info data
-	flag = restore_ddr_training_info(chipid, mac_addr);
+	// flag = restore_ddr_training_info(chipid, mac_addr);
+	flag = true;
 	if (!flag) {
 		// flush data and stack
 		flush_dcache_range(CONFIG_SPL_BSS_START_ADDR, CONFIG_SPL_STACK);
@@ -490,7 +491,7 @@ int spl_board_init_f(void)
 		dcache_enable();
 	}
 
-	update_ddr_training_info(chipid, mac_addr);
+	// update_ddr_training_info(chipid, mac_addr);
 	update_ddr_config_info(ddr_cs_num);
 	timer_init();
 

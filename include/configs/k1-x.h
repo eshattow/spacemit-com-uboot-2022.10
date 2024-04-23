@@ -28,7 +28,7 @@
 #define DEFAULT_PRODUCT_NAME	"k1-x_deb1"
 
 #define K1X_SPL_BOOT_LOAD_ADDR	(0x20200000)
-#define DDR_TRAINING_DATA_BASE	(0xc0829000)
+#define DDR_TRAINING_DATA_BASE	(0xc0832000)
 
 // sram buffer address that save the DDR software training result
 #define DDR_TRAINING_INFO_BUFF	(0xC0800000)
