@@ -686,22 +686,24 @@ struct code_desc_info {
 	char	*m_name;
 };
 
-void refresh_config_info(u8 *eeprom_data) {
+void refresh_config_info(u8 *eeprom_data)
+{
 	struct tlvinfo_tlv *tlv_info = NULL;
 	char *strval;
 	int i;
 	char tmp_name[64];
 
-	struct code_desc_info {
+	const struct code_desc_info {
 		u8    m_code;
+		u8    is_data;
 		char *m_name;
 	} info[] = {
-		{ TLV_CODE_PRODUCT_NAME,   "product_name"},
-		{ TLV_CODE_SERIAL_NUMBER,  "serial#"},
-		{ TLV_CODE_MANUF_DATE,     "manufacture_date"},
-		{ TLV_CODE_MANUF_NAME,     "manufacturer"},
-		{ TLV_CODE_DEVICE_VERSION, "device_version"},
-		{ 0x40,                    "sdk_version"},
+		{ TLV_CODE_PRODUCT_NAME,   false, "product_name"},
+		{ TLV_CODE_SERIAL_NUMBER,  false, "serial#"},
+		{ TLV_CODE_MANUF_DATE,     false, "manufacture_date"},
+		{ TLV_CODE_MANUF_NAME,     false, "manufacturer"},
+		{ TLV_CODE_DEVICE_VERSION, true,  "device_version"},
+		{ TLV_CODE_SDK_VERSION,    true,  "sdk_version"},
 	};
 
 	for (i = 0; i < ARRAY_SIZE(info); i++) {
@@ -712,7 +714,7 @@ void refresh_config_info(u8 *eeprom_data) {
 		}
 
 		if (tlv_info != NULL) {
-			if (info[i].m_code == TLV_CODE_DEVICE_VERSION || info[i].m_code == 0x40) {
+			if (info[i].is_data) {
 				// Convert the numeric value to string
 				strval = malloc(64);
 				int num = 0;
