@@ -866,7 +866,6 @@ static int write_config_info_to_eeprom(uint32_t id, char *value)
 
 	pr_info("write data to EEPROM, ID:%d, string:%s\n", id, value);
 	/* read eeprom */
-	memset(cmd_str, 0, 256);
 	sprintf(cmd_str, "tlv_eeprom read");
 	if (run_command(cmd_str, 0)) {
 		free(cmd_str);
@@ -874,13 +873,18 @@ static int write_config_info_to_eeprom(uint32_t id, char *value)
 		return 1;
 	}
 
-	memset(cmd_str, 0, 256);
 	// update eeprom data, need add '' for value string that may have space inside
 	sprintf(cmd_str, "tlv_eeprom set %d '%s'", id, value);
 	if (run_command(cmd_str, 0)) {
 		free(cmd_str);
 		pr_err("tlv_eeprom set %s to %d fail\n", value, id);
 		return 2;
+	}
+
+	if (run_command("tlv_eeprom write", 0)) {
+		free(cmd_str);
+		pr_err("tlv_eeprom write fail\n");
+		return 3;
 	}
 
 	free(cmd_str);
@@ -1024,15 +1028,7 @@ static void write_oem_configuration(char *config, char *response)
 
 static void flush_oem_configuration(char *config, char *response)
 {
-	char cmd_str[32];
-
-	memset(cmd_str, 0, sizeof(cmd_str));
-	/* save to eeprom */
-	sprintf(cmd_str, "tlv_eeprom write");
-	if (0 == run_command(cmd_str, 0))
-		fastboot_okay(NULL, response);
-	else
-		fastboot_fail("write fail", response);
+	fastboot_okay(NULL, response);
 }
 
 /**
