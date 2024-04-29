@@ -284,6 +284,8 @@ int flash_mmc_boot_op(struct blk_desc *dev_desc, void *buffer,
 
 char *parse_mtdparts_and_find_bootfs(void);
 int get_partition_index_by_name(const char *part_name, int *part_index);
-
 int check_gzip_format(const unsigned char *src, unsigned long len);
+int clear_eeprom(u32 dev, u32 erase_size);
+void clear_storage_data(char *cmd_parameter, char *response);
+
 #endif

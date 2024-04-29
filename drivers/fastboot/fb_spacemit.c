@@ -1180,3 +1180,131 @@ int check_gzip_format(const unsigned char *src, unsigned long len)
 	}
 	return i;
 }
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_ERASE)
+/*boot0,boot1 would erase 128KB size*/
+#define ERASE_BOOT_SIZE (0x100)
+
+int clear_emmc(lbaint_t blkcnt)
+{
+	struct blk_desc *dev_desc;
+	struct mmc *mmc;
+	u32 n;
+
+	mmc_init_device(MMC_DEV_EMMC);
+	mmc = find_mmc_device(MMC_DEV_EMMC);
+	if (!mmc){
+		pr_err("can not get mmc dev\n");
+		return -1;
+	}
+	if (mmc_init(mmc)){
+		pr_err("can not init mmc\n");
+		return -1;
+	}
+
+	dev_desc = mmc_get_blk_desc(mmc);
+	if (!dev_desc){
+		pr_err("can not get blk dev of emmc\n");
+		return -1;
+	}
+
+	n = blk_derase(dev_desc, 0, blkcnt);
+	if (n != blkcnt){
+		pr_err("erase size %lx fail\n", blkcnt);
+		return -1;
+	}
+
+	/* erase boot0/boot1 partition*/
+	if (mmc_set_part_conf(mmc, 0, 0, 1) ||
+			ERASE_BOOT_SIZE != blk_derase(dev_desc, 0, ERASE_BOOT_SIZE)){
+		pr_err("erase boot0 fail\n");
+		return -1;
+	}
+	if (mmc_set_part_conf(mmc, 0, 0, 2) ||
+			ERASE_BOOT_SIZE != blk_derase(dev_desc, 0, ERASE_BOOT_SIZE)){
+		pr_err("erase boot1 fail\n");
+		return -1;
+	}
+	return 0;
+}
+
+int clear_mtd(char *mtd_dev, u32 erase_size)
+{
+	static struct mtd_info *mtd = NULL;
+	int ret;
+
+	if (mtd == NULL){
+		pr_info("mtd is not init\n");
+		mtd_probe_devices();
+	}
+	mtd = get_mtd_device_nm(mtd_dev);
+	if (IS_ERR_OR_NULL(mtd)){
+		pr_info("MTD device %s not found\n", mtd_dev);
+		return -1;
+	}
+
+	erase_size = round_up(erase_size, mtd->erasesize);
+	ret = _fb_mtd_erase(mtd, erase_size);
+	if (ret)
+		return -1;
+	return 0;
+}
+
+#define DEFAULT_EEPROM_ERASE_SIZE (256)
+#define DEFAULT_EEPROM_DEV (0)
+#define DEFAULT_EMMC_ERASE_SIZE (0x10000000)
+#define DEFAULT_MTD_ERASE_SIZE (0x100000)
+void clear_storage_data(char *cmd_parameter, char *response)
+{
+	char *cmd_str, *operation;
+	u32 erase_size;
+
+	cmd_str = cmd_parameter;
+	operation = strsep(&cmd_str, " ");
+	if (cmd_str != NULL){
+		pr_info("get erase size:%s\n", cmd_str);
+		erase_size = hextoul(cmd_str, NULL);
+	}else {
+		pr_info("has not define erase size, use default size\n");
+		erase_size = 0;
+	}
+
+	if (!strncmp("eeprom", operation, 6)){
+		erase_size = (erase_size == 0) ? DEFAULT_EEPROM_ERASE_SIZE : erase_size;
+		pr_info("erase eeprom, erase size:%x\n", erase_size);
+		if (clear_eeprom(DEFAULT_EEPROM_DEV, erase_size))
+			fastboot_fail("erase eeprom fail", response);
+		else
+			fastboot_okay(NULL, response);
+		return;
+	} else if (!strncmp("emmc", operation, 4)){
+		erase_size = (erase_size == 0) ? DEFAULT_EMMC_ERASE_SIZE : erase_size;
+		pr_info("erase emmc, erase size:%x\n", erase_size);
+
+		if (clear_emmc(erase_size/512))
+			fastboot_fail("erase emmc fail", response);
+		else
+			fastboot_okay(NULL, response);
+		return;
+	}
+
+	erase_size = (erase_size == 0) ? DEFAULT_MTD_ERASE_SIZE : erase_size;
+	if (!strncmp("nor", operation, 3)){
+		if (clear_mtd("nor0", erase_size))
+			fastboot_fail("erase nor fail", response);
+		else
+			fastboot_okay(NULL, response);
+		return;
+	} else if (!strncmp("nand", operation, 4)){
+		if (clear_mtd("spi-nand0", erase_size))
+			fastboot_fail("erase nand fail", response);
+		else
+			fastboot_okay(NULL, response);
+		return;
+	}
+
+	fastboot_response("FAIL", response, "not support erase operation:%s", operation);
+	return;
+}
+
+#endif /*CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_ERASE)*/
