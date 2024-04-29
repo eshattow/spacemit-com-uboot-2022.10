@@ -140,26 +140,32 @@ static int spacemit_hdmi_probe(struct udevice *dev)
 		return ret;
 	}
 
+	ret = reset_get_by_name(dev, "hdmi_reset", &priv->hdmi_reset);
+	if (ret) {
+		pr_err("reset_get_by_name hdmi reset failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = reset_deassert(&priv->hdmi_reset);
+	if (ret) {
+		pr_err("reset_assert hdmi reset failed: %d\n", ret);
+		return ret;
+	}
+
 	ret = clk_enable(&priv->hdmi_mclk);
 	if (ret < 0) {
 		pr_err("clk_enable hdmi mclk failed: %d\n", ret);
 		return ret;
 	}
 
-	ret = reset_get_by_name(dev, "hdmi_reset", &priv->hdmi_reset);
-	if (ret) {
-		pr_err("reset_get_by_name hdmi reset failed: %d\n", ret);
+	ret = clk_set_rate(&priv->hdmi_mclk, 491520000);
+	if (ret < 0) {
+		pr_err("clk_set_rate mipi dsi mclk failed: %d\n", ret);
 		return ret;
-	}
-	ret = reset_deassert(&priv->hdmi_reset);
-	if (ret) {
-		pr_err("reset_assert hdmi reset failed: %d\n", ret);
-		goto free_reset;
 	}
 
 	rate = clk_get_rate(&priv->hdmi_mclk);
 	pr_debug("%s clk_get_rate hdmi mclk %ld\n", __func__, rate);
-
 
 	priv->hdmi.ioaddr = (ulong)priv->base;
 	priv->hdmi.reg_io_width = 4;
@@ -170,11 +176,6 @@ static int spacemit_hdmi_probe(struct udevice *dev)
 		pr_info("hdmi can not get hpd signal\n");
 		return ret;
 	}
-
-	return ret;
-
-free_reset:
-	clk_disable(&priv->hdmi_mclk);
 
 	return 0;
 }
