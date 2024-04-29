@@ -218,7 +218,7 @@ void fastboot_blk_flash_write(const char *cmd, void *download_buffer,
 	if (fastboot_blk_get_part_info(cmd, &dev_desc, &info, response) < 0)
 		return;
 
-	if (gzip_parse_header((uchar *)download_buffer, src_len) >= 0) {
+	if (check_gzip_format((uchar *)download_buffer, src_len) >= 0) {
 		/*is gzip data and equal part name*/
 		gzip_image = true;
 		if (strcmp(cmd, part_name_t)){

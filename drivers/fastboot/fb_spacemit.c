@@ -1146,3 +1146,37 @@ void fastboot_env_access(char *operation, char *env, char *response)
 		fastboot_fail("NOT support", response);
 }
 #endif
+
+#define GZIP_HEADER_HEAD_CRC		2
+#define GZIP_HEADER_EXTRA_FIELD		4
+#define GZIP_HEADER_ORIG_NAME		8
+#define GZIP_HEADER_COMMENT		0x10
+#define GZIP_HEADER_RESERVED		0xe0
+#define GZIP_HEADER_DEFLATED		8
+int check_gzip_format(const unsigned char *src, unsigned long len)
+{
+	int i, flags;
+
+	/* skip header */
+	i = 10;
+	flags = src[3];
+	if (src[2] != GZIP_HEADER_DEFLATED || (flags & GZIP_HEADER_RESERVED) != 0) {
+		pr_info("is not gzipped data\n");
+		return (-1);
+	}
+	if ((flags & GZIP_HEADER_EXTRA_FIELD) != 0)
+		i = 12 + src[10] + (src[11] << 8);
+	if ((flags & GZIP_HEADER_ORIG_NAME) != 0)
+		while (src[i++] != 0)
+			;
+	if ((flags & GZIP_HEADER_COMMENT) != 0)
+		while (src[i++] != 0)
+			;
+	if ((flags & GZIP_HEADER_HEAD_CRC) != 0)
+		i += 2;
+	if (i >= len) {
+		pr_info("gunzip out of data in header\n");
+		return (-1);
+	}
+	return i;
+}
