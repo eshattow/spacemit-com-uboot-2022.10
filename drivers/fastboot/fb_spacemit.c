@@ -832,7 +832,11 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer,
 }
 #endif
 
-#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS)
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS) && defined(CONFIG_SPL_BUILD)
+extern int get_tlvinfo_from_eeprom(int tcode, char *buf);
+extern int set_val_to_tlvinfo(int tcode, char *valvoid);
+extern int write_tlvinfo_to_eeprom(void);
+
 struct oem_config_info
 {
 	const char *name;
@@ -844,6 +848,7 @@ const struct oem_config_info config_info[] = {
 	{ "product_name", TLV_CODE_PRODUCT_NAME, 16, NULL },
 	{ "serial#", TLV_CODE_SERIAL_NUMBER, 12, NULL },
 	{ "ethaddr", TLV_CODE_MAC_BASE, 17, NULL },
+	{ "ethsize", TLV_CODE_MAC_SIZE, 6, NULL },/*size must equal or less than 65535*/
 	{ "manufacture_date", TLV_CODE_MANUF_DATE, 19, NULL },
 	{ "device_version", TLV_CODE_DEVICE_VERSION, 3, NULL },
 	{ "manufacturer", TLV_CODE_MANUF_NAME, 32, NULL },
@@ -856,39 +861,10 @@ const struct oem_config_info config_info[] = {
 
 static int write_config_info_to_eeprom(uint32_t id, char *value)
 {
-	char *cmd_str;
-
-	cmd_str = malloc(256);
-	if (NULL == cmd_str) {
-		pr_err("malloc buffer for cmd string fail\n");
+	if (set_val_to_tlvinfo(id, value) == 0)
+		return 0;
+	else
 		return -1;
-	}
-
-	pr_info("write data to EEPROM, ID:%d, string:%s\n", id, value);
-	/* read eeprom */
-	sprintf(cmd_str, "tlv_eeprom read");
-	if (run_command(cmd_str, 0)) {
-		free(cmd_str);
-		pr_err("tlv_eeprom read fail\n");
-		return 1;
-	}
-
-	// update eeprom data, need add '' for value string that may have space inside
-	sprintf(cmd_str, "tlv_eeprom set %d '%s'", id, value);
-	if (run_command(cmd_str, 0)) {
-		free(cmd_str);
-		pr_err("tlv_eeprom set %s to %d fail\n", value, id);
-		return 2;
-	}
-
-	if (run_command("tlv_eeprom write", 0)) {
-		free(cmd_str);
-		pr_err("tlv_eeprom write fail\n");
-		return 3;
-	}
-
-	free(cmd_str);
-	return 0;
 }
 
 #if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
@@ -936,58 +912,27 @@ static struct oem_config_info* get_config_info(char *key)
 
 static void read_oem_configuration(char *config, char *response)
 {
-	char *key;
 	struct oem_config_info* info;
-	char *ack, *value, *temp;
-	int i = 0, j;
+	char *ack;
 
-	ack = malloc(256);
+	ack = calloc(0, 256);
 	if (NULL == ack) {
 		pr_err("malloc buffer for ack fail\n");
 		return;
 	}
 
-	temp = malloc(256);
-	if (NULL == temp) {
-		free(ack);
-		pr_err("malloc buffer for temp fail\n");
-		return;
-	}
-	memset(ack, 0, 256);
-
-	key = strsep(&config, ",");
-	while (NULL != key) {
-		pr_debug("try to find config info for %s\n", key);
-		info = get_config_info(key);
-		if (NULL != info) {
-			value = env_get(key);
-			if (NULL != info->convert)
-				value = info->convert(value);
-			// make sure value string is NOT exceed temp buffer
-			if ((NULL != value) && (strlen(value) < 128)) {
-				memset(temp, 0, 256);
-				sprintf(temp, "%s", value);
-				j = strlen(temp);
-				if ((i + j) < 256) {
-					// add comma between two info dictionary
-					if (0 != i)
-						ack[i++] = ',';
-					memcpy(ack + i, temp, j);
-					i += j;
-				}
-			}
+	info = get_config_info(config);
+	if (NULL != info){
+		pr_info("%s, %x, \n", info->name, info->id);
+		if (get_tlvinfo_from_eeprom(info->id, ack) == 0){
+			fastboot_okay(ack, response);
+		}else{
+			fastboot_fail("key NOT exist", response);
 		}
-		key = strsep(&config, ",");
+	}else{
+		fastboot_fail("key NOT exist", response);
 	}
-
-	if (0 != i) {
-		fastboot_okay(ack, response);
-	} else {
-		fastboot_fail("NOT exist", response);
-	}
-
 	free(ack);
-	free(temp);
 }
 
 static void write_oem_configuration(char *config, char *response)
@@ -1028,7 +973,10 @@ static void write_oem_configuration(char *config, char *response)
 
 static void flush_oem_configuration(char *config, char *response)
 {
-	fastboot_okay(NULL, response);
+	if (0 == write_tlvinfo_to_eeprom())
+		fastboot_okay(NULL, response);
+	else
+		fastboot_fail("write fail", response);
 }
 
 /**
@@ -1052,7 +1000,7 @@ void fastboot_config_access(char *operation, char *config, char *response)
 	else
 		fastboot_fail("NOT support", response);
 }
-#endif
+#endif /*CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS)*/
 
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_ENV_ACCESS)
 #if defined(CONFIG_SPL_BUILD)
