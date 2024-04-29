@@ -640,6 +640,9 @@ void set_env_ethaddr(u8 *eeprom_data) {
 	eth_env_set_enetaddr("ethaddr", mac_addr);
 	eth_env_set_enetaddr("eth1addr", mac1_addr);
 
+	/*must read before set/write to eeprom using tlv_eeprom command*/
+	run_command("tlv_eeprom", 0);
+
 	/* save mac address to eeprom */
 	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x24 %02x:%02x:%02x:%02x:%02x:%02x", \
 			mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
@@ -685,6 +688,9 @@ void set_dev_serial_no(uint8_t *eeprom_data)
 		pr_info("%02x", sn[i]);
 	}
 	pr_info("\n");
+
+	/*must read before set/write to eeprom using tlv_eeprom command*/
+	run_command("tlv_eeprom", 0);
 
 	/* save serial number to eeprom */
 	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x23 %02x%02x%02x%02x%02x%02x", \
