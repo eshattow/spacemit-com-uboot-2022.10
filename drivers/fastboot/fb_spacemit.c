@@ -35,32 +35,38 @@
 #define EMMC_MAX_BLK_WRITE 16384
 
 #if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
-static int _write_gpt_partition(struct flash_dev *fdev, char *response)
+int _write_gpt_partition(struct flash_dev *fdev)
 {
-	__maybe_unused char write_part_command[300] = {"\0"};
 	char *gpt_table_str = NULL;
+	int ret = 0;
 
 	u32 boot_mode = get_boot_pin_select();
 
 	if (fdev->gptinfo.gpt_table != NULL && strlen(fdev->gptinfo.gpt_table) > 0){
 		gpt_table_str = malloc(strlen(fdev->gptinfo.gpt_table) + 32);
 		if (gpt_table_str == NULL){
+			pr_err("malloc size fail\n");
 			return -1;
 		}
 		sprintf(gpt_table_str, "env set -f partitions '%s'", fdev->gptinfo.gpt_table);
 		run_command(gpt_table_str, 0);
-		free(gpt_table_str);
+	} else{
+		pr_info("parse gpt table is NULL, do nothing");
+		return 0;
 	}
+
+	memset(gpt_table_str, 0, strlen(fdev->gptinfo.gpt_table) + 32);
 
 	switch(boot_mode){
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
-		sprintf(write_part_command, "gpt write mmc %x '%s'",
+		sprintf(gpt_table_str, "gpt write mmc %x '%s'",
 			CONFIG_FASTBOOT_FLASH_MMC_DEV, fdev->gptinfo.gpt_table);
-		if (run_command(write_part_command, 0)){
-			fastboot_fail("write gpt fail", response);
-			return -1;
+		if (run_command(gpt_table_str, 0)){
+			pr_err("write gpt fail");
+			ret = -1;
+			goto err;
 		}
 		break;
 #endif
@@ -73,26 +79,31 @@ static int _write_gpt_partition(struct flash_dev *fdev, char *response)
 		/*nvme need scan at first*/
 		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)
 						&& nvme_scan_namespace()){
-			fastboot_fail("can not can nvme devices!", response);
-			return -1;
+			pr_err("can not can nvme devices!");
+			ret = -1;
+			goto err;
 		}
 
-		sprintf(write_part_command, "gpt write %s %x '%s'",
+		sprintf(gpt_table_str, "gpt write %s %x '%s'",
 			CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX,
 			fdev->gptinfo.gpt_table);
-		if (run_command(write_part_command, 0)){
-			fastboot_fail("write gpt fail", response);
-			return -1;
+		if (run_command(gpt_table_str, 0)){
+			pr_err("write gpt fail");
+			ret = -1;
+			goto err;
 		}
 		break;
 #endif
 	default:
-		break;
+		pr_err("no dev to write gpt table, check your env\n");
+		ret = -1;
+		goto err;
 	}
+	pr_info("parse gpt/mtd table okay");
+err:
+	free(gpt_table_str);
 
-
-	fastboot_okay("parse gpt/mtd table okay", response);
-	return 0;
+	return ret;
 }
 
 int _clear_env_part(void *download_buffer, u32 download_bytes,
@@ -152,12 +163,18 @@ int _clear_env_part(void *download_buffer, u32 download_bytes,
 	return 0;
 }
 
-static int _write_mtd_partition(char mtd_table[128], char *response)
+int _write_mtd_partition(struct flash_dev *fdev)
 {
 #ifdef CONFIG_MTD
 	struct mtd_info *mtd;
 	char mtd_ids[36] = {"\0"};
-	char mtd_parts[128] = {"\0"};
+	char *mtd_parts = NULL;
+
+	mtd_parts = malloc(strlen(fdev->mtd_table) + 32);
+	if (mtd_parts == NULL){
+		pr_err("malloc size fail\n");
+		return -1;
+	}
 
 	mtd_probe_devices();
 
@@ -171,18 +188,20 @@ static int _write_mtd_partition(char mtd_table[128], char *response)
 	}
 
 	if (mtd == NULL){
-		fastboot_fail("can not get mtd device", response);
+		pr_err("can not get mtd device");
+		free(mtd_parts);
 		return -1;
 	}
 
 	/*to mtd device, it should write mtd table to env.*/
 	sprintf(mtd_ids, "%s=spi-dev", mtd->name);
-	sprintf(mtd_parts, "spi-dev:%s", mtd_table);
+	sprintf(mtd_parts, "spi-dev:%s", fdev->mtd_table);
 
 	env_set("mtdids", mtd_ids);
 	env_set("mtdparts", mtd_parts);
+
 #endif
-	fastboot_okay("parse gpt/mtd table okay", response);
+	pr_info("parse gpt/mtd table okay");
 	return 0;
 }
 
@@ -256,8 +275,10 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 
 	/*init and would remalloc while size is increasing*/
 	combine_str = malloc(combine_len);
-	memset(combine_str, '\0', combine_len);
+	if (combine_str == NULL)
+		return -1;
 
+	memset(combine_str, '\0', combine_len);
 	json_root = cJSON_Parse(load_flash_addr);
 	if (!json_root){
 		pr_err("can not parse json, check your flash_config.cfg is json format or not\n");
@@ -461,11 +482,17 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
 	}
 
 	if (strlen(fdev->gptinfo.gpt_table) > 0 && fdev->gptinfo.fastboot_flash_gpt){
-		_write_gpt_partition(fdev, response);
+		if (_write_gpt_partition(fdev)){
+			fastboot_fail("write gpt tabel fail", response);
+			return;
+		}
 	}
 
 	if (strlen(fdev->mtd_table) > 0){
-		_write_mtd_partition(fdev->mtd_table, response);
+		if (_write_mtd_partition(fdev)){
+			fastboot_fail("write mtd tabel fail", response);
+			return;
+		}
 	}
 
 	/*set partition to env*/
