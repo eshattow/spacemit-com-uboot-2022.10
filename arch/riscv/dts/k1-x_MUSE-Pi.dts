@@ -257,7 +257,7 @@
 	status = "okay";
 };
 
-/*&qspi {
+&qspi {
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_qspi>;
@@ -270,7 +270,7 @@
 		broken-flash-reset;
 		status = "okay";
 	};
-};*/
+};
 
 &efuse {
 	status = "okay";
