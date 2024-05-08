@@ -269,6 +269,12 @@ config FASTBOOT_SUPPORT_BLOCK_DEV_INDEX
 	help
 	  The block device number.
 
+config FASTBOOT_CMD_OEM_CONFIG_ACCESS
+	bool "Enable the 'oem config' command"
+	help
+	  Add support for the "oem config:read/write/flush" command from a fastboot client. This command
+	  include configuration read, write and flush operation.
+
 config SPL_FASTBOOT_CMD_OEM_CONFIG_ACCESS
 	bool "Enable the 'oem config' command in SPL"
 	help

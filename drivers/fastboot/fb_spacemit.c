@@ -859,10 +859,14 @@ void fastboot_oem_flash_bootinfo(const char *cmd, void *download_buffer,
 }
 #endif
 
-#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS) && defined(CONFIG_SPL_BUILD)
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS)
+#if defined(CONFIG_SPL_BUILD)
 extern int get_tlvinfo_from_eeprom(int tcode, char *buf);
 extern int set_val_to_tlvinfo(int tcode, char *valvoid);
 extern int write_tlvinfo_to_eeprom(void);
+#else
+static bool tlvinfo_init = false;
+#endif
 
 struct oem_config_info
 {
@@ -888,7 +892,15 @@ const struct oem_config_info config_info[] = {
 
 static int write_config_info_to_eeprom(uint32_t id, char *value)
 {
+#if defined(CONFIG_SPL_BUILD)
 	if (set_val_to_tlvinfo(id, value) == 0)
+#else
+	if (!tlvinfo_init){
+		run_command("tlv_eeprom", 0);
+		tlvinfo_init = true;
+	}
+	if (run_commandf("tlv_eeprom set 0x%x %s", id, value) == 0)
+#endif
 		return 0;
 	else
 		return -1;
@@ -951,7 +963,13 @@ static void read_oem_configuration(char *config, char *response)
 	info = get_config_info(config);
 	if (NULL != info){
 		pr_info("%s, %x, \n", info->name, info->id);
+#if defined(CONFIG_SPL_BUILD)
 		if (get_tlvinfo_from_eeprom(info->id, ack) == 0){
+#else
+		char *tmp_str = env_get(info->name);
+		if (tmp_str != NULL){
+			strcpy(ack, tmp_str);
+#endif
 			fastboot_okay(ack, response);
 		}else{
 			fastboot_fail("key NOT exist", response);
@@ -1000,7 +1018,15 @@ static void write_oem_configuration(char *config, char *response)
 
 static void flush_oem_configuration(char *config, char *response)
 {
+#if defined(CONFIG_SPL_BUILD)
 	if (0 == write_tlvinfo_to_eeprom())
+#else
+	if (!tlvinfo_init){
+		run_command("tlv_eeprom", 0);
+		tlvinfo_init = true;
+	}
+	if (run_command("tlv_eeprom write", 0) == 0)
+#endif
 		fastboot_okay(NULL, response);
 	else
 		fastboot_fail("write fail", response);
