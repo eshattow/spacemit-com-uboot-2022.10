@@ -1273,7 +1273,11 @@ void clear_storage_data(char *cmd_parameter, char *response)
 	if (!strncmp("eeprom", operation, 6)){
 		erase_size = (erase_size == 0) ? DEFAULT_EEPROM_ERASE_SIZE : erase_size;
 		pr_info("erase eeprom, erase size:%x\n", erase_size);
+#if defined(CONFIG_SPL_BUILD)
 		if (clear_eeprom(DEFAULT_EEPROM_DEV, erase_size))
+#else
+		if (run_command("tlv_eeprom;tlv_eeprom erase;tlv_eeprom write", 0))
+#endif
 			fastboot_fail("erase eeprom fail", response);
 		else
 			fastboot_okay(NULL, response);
