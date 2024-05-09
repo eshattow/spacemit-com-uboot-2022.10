@@ -640,6 +640,9 @@ void set_env_ethaddr(u8 *eeprom_data) {
 	eth_env_set_enetaddr("ethaddr", mac_addr);
 	eth_env_set_enetaddr("eth1addr", mac1_addr);
 
+	/*must read before set/write to eeprom using tlv_eeprom command*/
+	run_command("tlv_eeprom", 0);
+
 	/* save mac address to eeprom */
 	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x24 %02x:%02x:%02x:%02x:%02x:%02x", \
 			mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
@@ -686,6 +689,9 @@ void set_dev_serial_no(uint8_t *eeprom_data)
 	}
 	pr_info("\n");
 
+	/*must read before set/write to eeprom using tlv_eeprom command*/
+	run_command("tlv_eeprom", 0);
+
 	/* save serial number to eeprom */
 	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x23 %02x%02x%02x%02x%02x%02x", \
 			sn[0], sn[1], sn[2], sn[3], sn[4], sn[5]);
@@ -706,7 +712,6 @@ void refresh_config_info(u8 *eeprom_data)
 	struct tlvinfo_tlv *tlv_info = NULL;
 	char *strval;
 	int i;
-	char tmp_name[64];
 
 	const struct code_desc_info {
 		u8    m_code;
@@ -742,15 +747,6 @@ void refresh_config_info(u8 *eeprom_data)
 				strval = malloc(tlv_info->length + 1);
 				memcpy(strval, tlv_info->value, tlv_info->length);
 				strval[tlv_info->length] = '\0';
-
-				/*
-					be compatible to previous format name,
-					such as: k1_deb1 -> k1-x_deb1
-				*/
-				if (info[i].m_code == TLV_CODE_PRODUCT_NAME && strncmp(strval, CONFIG_SYS_BOARD, 4)){
-					sprintf(tmp_name, "%s_%s", CONFIG_SYS_BOARD, &strval[3]);
-					strcpy(strval, tmp_name);
-				}
 			}
 			env_set(info[i].m_name, strval);
 			free(strval);
@@ -969,7 +965,17 @@ ulong board_get_usable_ram_top(ulong total_size)
 #if !defined(CONFIG_SPL_BUILD)
 int board_fit_config_name_match(const char *name)
 {
+	char tmp_name[64];
 	char *product_name = env_get("product_name");
+
+	/*
+		be compatible to previous format name,
+		such as: k1_deb1 -> k1-x_deb1
+	*/
+	if (!strncmp(product_name, "k1_", 3)){
+		sprintf(tmp_name, "%s_%s", "k1-x", &product_name[3]);
+		product_name = tmp_name;
+	}
 
 	if ((NULL != product_name) && (0 == strcmp(product_name, name))) {
 		log_emerg("Boot from fit configuration %s\n", name);

@@ -458,6 +458,6 @@ U_BOOT_DRIVER(spacemit_dpu) = {
 	.ops	= &spacemit_dpu_ops,
 	.bind	= spacemit_dpu_bind,
 	.probe	= spacemit_dpu_probe,
-    .remove = spacemit_dpu_remove,
+	.remove = spacemit_dpu_remove,
 	.priv_auto	= sizeof(struct spacemit_dpu_priv),
 };

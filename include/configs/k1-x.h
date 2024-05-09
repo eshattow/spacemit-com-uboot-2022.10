@@ -114,7 +114,12 @@ struct boot_storage_op
 };
 #endif
 
-#define MMC_DEV_EMMC	(2)
+#if defined(CONFIG_SPL_BUILD)
+#define MMC_DEV_EMMC	(1)
+#else
+#define MMC_DEV_EMMC    (2)
+#endif
+
 #define MMC_DEV_SD	(0)
 
 #define BOOTFS_NAME	("bootfs")
