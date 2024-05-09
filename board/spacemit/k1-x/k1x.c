@@ -33,13 +33,13 @@
 #include <u-boot/crc.h>
 #include <fb_mtd.h>
 #include <power/pmic.h>
+#include <dm/device.h>
+#include <dm/device-internal.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
 extern u32 ddr_cs_num;
-#ifdef CONFIG_DISPLAY_SPACEMIT_HDMI
-extern int is_hdmi_connected;
-#endif
+bool is_video_connected = false;
 uint32_t reboot_config;
 void refresh_config_info(u8 *eeprom_data);
 int mac_read_from_buffer(u8 *eeprom_data);
@@ -845,6 +845,17 @@ int board_late_init(void)
 		refresh_config_info(NULL);
 	}
 
+#ifdef CONFIG_VIDEO_SPACEMIT
+	ret = uclass_probe_all(UCLASS_VIDEO);
+	if (ret) {
+		pr_info("video devices not found or not probed yet: %d\n", ret);
+	}
+	ret = uclass_probe_all(UCLASS_DISPLAY);
+	if (ret) {
+		pr_info("display devices not found or not probed yet: %d\n", ret);
+	}
+#endif
+
 	run_fastboot_command();
 
 	run_cardfirmware_flash_command();
@@ -858,11 +869,9 @@ int board_late_init(void)
 	/*import env.txt from bootfs*/
 	import_env_from_bootfs();
 
-#ifdef CONFIG_DISPLAY_SPACEMIT_HDMI
-	if (is_hdmi_connected < 0) {
+	if (!is_video_connected) {
 		env_set("stdout", "serial");
 	}
-#endif
 
 	setenv_boot_mode();
 
