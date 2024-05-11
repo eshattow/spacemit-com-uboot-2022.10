@@ -182,8 +182,9 @@ void fastboot_blk_flash_write(const char *cmd, void *download_buffer,
 	/*save crc value to compare after flash image*/
 	u64 compare_val = 0;
 	/*use for gzip image*/
-	static u32 __maybe_unused part_offset_t = 0;
+	static ulong __maybe_unused part_offset_t = 0;
 	static char __maybe_unused part_name_t[20] = "";
+	static u64 __maybe_unused last_compare_value = 0;
 	unsigned long __maybe_unused src_len = ~0UL;
 	bool gzip_image = false;
 
@@ -276,17 +277,33 @@ void fastboot_blk_flash_write(const char *cmd, void *download_buffer,
 		if (!err)
 			fastboot_okay(NULL, response);
 	} else {
+#ifdef CONFIG_SPACEMIT_FLASH
+		compare_val += checksum64(download_buffer, download_bytes);
+
+		/*
+			if usb disconnect, it would cause retry flash,
+			so info.start should use previous.
+		*/
+		if (compare_val > 0 && compare_val == last_compare_value){
+			printf("detect sum count is as same as the last flash\n");
+			info.start -= download_bytes / info.blksz;
+		}
+
+		part_offset_t += download_bytes;
+		last_compare_value = compare_val;
+
+		printf("write_raw_image, \n");
 		write_raw_image(dev_desc, &info, cmd, download_buffer,
 				download_bytes, response);
-#ifdef CONFIG_SPACEMIT_FLASH
-		/*if download and flash div to many time, that the crc is not correct*/
-		printf("write_raw_image, \n");
-		// compare_val = crc32_wd(compare_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
-		compare_val += checksum64(download_buffer, download_bytes);
 		if (compare_blk_image_val(dev_desc, compare_val, info.start, info.blksz, download_bytes))
 			fastboot_fail("compare crc fail", response);
+
+#else
+		write_raw_image(dev_desc, &info, cmd, download_buffer,
+				download_bytes, response);
+
 #endif
-		part_offset_t += download_bytes;
+		printf("write_raw_image end\n");
 	}
 }
 
