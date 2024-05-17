@@ -32,13 +32,15 @@
 #include <tlv_eeprom.h>
 #include <u-boot/crc.h>
 #include <fb_mtd.h>
+#include <power/pmic.h>
+#include <dm/device.h>
+#include <dm/device-internal.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
 extern u32 ddr_cs_num;
-#ifdef CONFIG_DISPLAY_SPACEMIT_HDMI
-extern int is_hdmi_connected;
-#endif
+bool is_video_connected = false;
+uint32_t reboot_config;
 void refresh_config_info(u8 *eeprom_data);
 int mac_read_from_buffer(u8 *eeprom_data);
 
@@ -218,17 +220,59 @@ void get_ddr_config_info(void)
 		ddr_cs_num = DDR_CS_NUM;
 }
 
+u32 get_reboot_config(void)
+{
+	int ret;
+	struct udevice *dev;
+	u32 flag = 0;
+	uint8_t value;
+
+	if (reboot_config)
+		return reboot_config;
+
+	/* K1 has non-reset register(BOOT_CIU_DEBUG_REG0) to save boot config
+	   before system reboot, but it will be clear when K1 power is down,
+	   then boot config will be save in P1.
+	*/
+	flag = readl((void *)BOOT_CIU_DEBUG_REG0);
+	if ((BOOT_MODE_SHELL == flag) || (BOOT_MODE_USB == flag)) {
+		/* reset  */
+		writel(0, (void *)BOOT_CIU_DEBUG_REG0);
+		reboot_config = flag;
+	}
+	else {
+		// select boot mode from boot strap pin
+		reboot_config = BOOT_MODE_BOOTSTRAP;
+		ret = uclass_get_device_by_driver(UCLASS_PMIC,
+				DM_DRIVER_GET(spacemit_pm8xx), &dev);
+		if (ret) {
+			pr_err("PMIC init failed: %d\n", ret);
+			return 0;
+		}
+		pmic_read(dev, P1_NON_RESET_REG, &value, 1);
+		pr_info("Read PMIC reg %x value %x\n", P1_NON_RESET_REG, value);
+		if (1 == (value & 3)) {
+			reboot_config = BOOT_MODE_USB;
+			value &= ~3;
+			pmic_write(dev, P1_NON_RESET_REG, &value, 1);
+		}
+		else if (2 == (value & 3)) {
+			reboot_config = BOOT_MODE_SHELL;
+			value &= ~3;
+			pmic_write(dev, P1_NON_RESET_REG, &value, 1);
+		}
+	}
+
+	return reboot_config;
+}
+
 void run_fastboot_command(void)
 {
 	u32 boot_mode = get_boot_mode();
 
-	/*if define BOOT_MODE_USB flag in BOOT_CIU_DEBUG_REG0, it would excute fastboot*/
-	u32 cui_flasg = readl((void *)BOOT_CIU_DEBUG_REG0);
-	if (boot_mode == BOOT_MODE_USB || cui_flasg == BOOT_MODE_USB){
+	if (boot_mode == BOOT_MODE_USB || BOOT_MODE_USB == get_reboot_config()) {
 		/* show flash log*/
 		env_set("stdout", env_get("stdout_flash"));
-		/*would reset debug_reg0*/
-		writel(0, (void *)BOOT_CIU_DEBUG_REG0);
 
 		char *cmd_para = "fastboot 0";
 		run_command(cmd_para, 0);
@@ -242,11 +286,7 @@ int run_uboot_shell(void)
 {
 	u32 boot_mode = get_boot_mode();
 
-	/*if define BOOT_MODE_SHELL flag in BOOT_CIU_DEBUG_REG0, it would into uboot shell*/
-	u32 flag = readl((void *)BOOT_CIU_DEBUG_REG0);
-	if (boot_mode == BOOT_MODE_SHELL || flag == BOOT_MODE_SHELL){
-		/*would reset debug_reg0*/
-		writel(0, (void *)BOOT_CIU_DEBUG_REG0);
+	if (boot_mode == BOOT_MODE_SHELL || BOOT_MODE_SHELL == get_reboot_config()) {
 		return 0;
 	}
 	return 1;
@@ -805,6 +845,17 @@ int board_late_init(void)
 		refresh_config_info(NULL);
 	}
 
+#ifdef CONFIG_VIDEO_SPACEMIT
+	ret = uclass_probe_all(UCLASS_VIDEO);
+	if (ret) {
+		pr_info("video devices not found or not probed yet: %d\n", ret);
+	}
+	ret = uclass_probe_all(UCLASS_DISPLAY);
+	if (ret) {
+		pr_info("display devices not found or not probed yet: %d\n", ret);
+	}
+#endif
+
 	run_fastboot_command();
 
 	run_cardfirmware_flash_command();
@@ -818,11 +869,9 @@ int board_late_init(void)
 	/*import env.txt from bootfs*/
 	import_env_from_bootfs();
 
-#ifdef CONFIG_DISPLAY_SPACEMIT_HDMI
-	if (is_hdmi_connected < 0) {
+	if (!is_video_connected) {
 		env_set("stdout", "serial");
 	}
-#endif
 
 	setenv_boot_mode();
 

@@ -29,6 +29,8 @@
 
 #include "spacemit_dpu.h"
 
+extern bool is_video_connected;
+
 DECLARE_GLOBAL_DATA_PTR;
 
 struct fb_info fbi = {0};
@@ -342,8 +344,10 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 		ret = spacemit_panel_init();
 		if (ret) {
 			pr_info("%s: Failed to init panel\n", __func__);
+			is_video_connected = false;
 			return ret;
 		}
+		is_video_connected = true;
 
 		spacemit_mode = &fbi.mode;
 		uc_priv->xsize = spacemit_mode->xres;
