@@ -182,7 +182,7 @@ void fastboot_blk_flash_write(const char *cmd, void *download_buffer,
 	/*save crc value to compare after flash image*/
 	u64 compare_val = 0;
 	/*use for gzip image*/
-	static u32 __maybe_unused part_offset_t = 0;
+	static ulong __maybe_unused part_offset_t = 0;
 	static char __maybe_unused part_name_t[20] = "";
 	unsigned long __maybe_unused src_len = ~0UL;
 	bool gzip_image = false;
