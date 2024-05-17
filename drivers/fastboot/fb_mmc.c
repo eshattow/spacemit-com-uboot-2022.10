@@ -139,18 +139,7 @@ static lbaint_t fb_mmc_blk_write(struct blk_desc *block_dev, lbaint_t start,
 
 	for (i = 0; i < blkcnt; i += FASTBOOT_MAX_BLK_WRITE) {
 		cur_blkcnt = min((int)blkcnt - i, FASTBOOT_MAX_BLK_WRITE);
-#ifdef CONFIG_SPACEMIT_FLASH
-		/*
-			if detect all data is zero, use erase instead of write
-		*/
-		struct mmc *mmc = find_mmc_device(block_dev->devnum);
-		if (buffer &&
-			(checksum64((u64 *)(buffer + (i * block_dev->blksz)), cur_blkcnt * block_dev->blksz) > 0
-				|| cur_blkcnt % mmc->erase_grp_size || blk % mmc->erase_grp_size)
-			) {
-#else
 		if (buffer) {
-#endif
 			if (fastboot_progress_callback)
 				fastboot_progress_callback("writing");
 			blks_written = blk_dwrite(block_dev, blk, cur_blkcnt,
@@ -160,7 +149,6 @@ static lbaint_t fb_mmc_blk_write(struct blk_desc *block_dev, lbaint_t start,
 				fastboot_progress_callback("erasing");
 			blks_written = blk_derase(block_dev, blk, cur_blkcnt);
 		}
-
 		blk += blks_written;
 		blks += blks_written;
 	}
@@ -516,6 +504,7 @@ static struct blk_desc *fastboot_mmc_get_dev(char *response)
 	return ret;
 }
 
+
 /**
  * fastboot_mmc_flash_write() - Write image to eMMC for fastboot
  *
@@ -531,14 +520,12 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 	struct disk_partition info = {0};
 #ifdef CONFIG_SPACEMIT_FLASH
 	static struct flash_dev *fdev = NULL;
-	struct mmc *mmc;
 	u32 __maybe_unused fsbl_offset = 0;
 	/*save crc value to compare after flash image*/
 	u64 compare_val = 0;
 	/*use for gzip image*/
-	static ulong __maybe_unused part_offset_t = 0;
+	static u32 __maybe_unused part_offset_t = 0;
 	static char __maybe_unused part_name_t[20] = "";
-	static __maybe_unused u64 last_compare_value = 0;
 	unsigned long __maybe_unused src_len = ~0UL;
 	bool gzip_image = false;
 
@@ -557,6 +544,13 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 		printf("init fdev success\n");
 	}
 
+	/* flash env */
+	/*if (strcmp(cmd, "env") == 0) {*/
+	/*	printf("flash env to emmc\n");*/
+	/*	fastboot_oem_flash_env(cmd, fastboot_buf_addr, download_bytes,*/
+	/*							response, fdev);*/
+	/*	return;*/
+	/*}*/
 	if (strcmp(cmd, "bootinfo") == 0) {
 		printf("flash bootinfo\n");
 		fastboot_oem_flash_bootinfo(cmd, fastboot_buf_addr, download_bytes,
@@ -698,6 +692,7 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 		download_buffer = decompress_addr;
 		download_bytes = decompress_size;
 		info.start += part_offset_t / info.blksz;
+
 		pr_info("write gzip raw data to part:%s, %p, %x, blkaddr:%lx\n", cmd, download_buffer, download_bytes, info.start);
 	} else {
 		strcpy(part_name_t, cmd);
@@ -734,36 +729,17 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 		if (!err)
 			fastboot_okay(NULL, response);
 	} else {
-#ifdef CONFIG_SPACEMIT_FLASH
-		compare_val += checksum64(download_buffer, download_bytes);
-
-		/*
-			if usb disconnect, it would cause retry flash,
-			so info.start should use previous.
-		*/
-		if (compare_val > 0 && compare_val == last_compare_value){
-			printf("detect sum count is as same as the last flash\n");
-			info.start -= download_bytes / info.blksz;
-		}
-
-		part_offset_t += download_bytes;
-		last_compare_value = compare_val;
-		mmc = find_mmc_device(dev_desc->devnum);
-
-		if (compare_val == 0
-				&& download_bytes % (mmc->erase_grp_size * info.blksz) == 0
-				&& info.start % mmc->erase_grp_size == 0){
-			write_raw_image(dev_desc, &info, cmd, NULL, download_bytes, response);
-		}else{
-			write_raw_image(dev_desc, &info, cmd, download_buffer, download_bytes, response);
-		}
-		if (compare_blk_image_val(dev_desc, compare_val, info.start, info.blksz, download_bytes))
-			fastboot_fail("compare crc fail", response);
-#else
 		write_raw_image(dev_desc, &info, cmd, download_buffer,
 				download_bytes, response);
-#endif
+#ifdef CONFIG_SPACEMIT_FLASH
+		/*if download and flash div to many time, that the crc is not correct*/
 		printf("write_raw_image end\n");
+		// compare_val = crc32_wd(compare_val, (const uchar *)download_buffer, download_bytes, CHUNKSZ_CRC32);
+		compare_val += checksum64(download_buffer, download_bytes);
+		if (compare_blk_image_val(dev_desc, compare_val, info.start, info.blksz, download_bytes))
+			fastboot_fail("compare crc fail", response);
+#endif
+		part_offset_t += download_bytes;
 	}
 }
 
