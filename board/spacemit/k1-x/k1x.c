@@ -35,6 +35,7 @@
 #include <power/pmic.h>
 #include <dm/device.h>
 #include <dm/device-internal.h>
+#include <g_dnl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
@@ -100,6 +101,16 @@ enum board_boot_mode get_boot_mode(void)
 
 	/*else return boot pin select*/
 	return get_boot_pin_select();
+}
+
+void set_serialnumber_based_on_boot_mode(void)
+{
+	const char *s = env_get("serial#");
+	enum board_boot_mode boot_mode = get_boot_mode();
+
+	if (boot_mode != BOOT_MODE_USB && s) {
+		g_dnl_set_serialnumber((char *)s);
+	}
 }
 
 enum board_boot_mode get_boot_storage(void)
@@ -844,6 +855,8 @@ int board_late_init(void)
 		set_dev_serial_no(NULL);
 		refresh_config_info(NULL);
 	}
+
+	set_serialnumber_based_on_boot_mode();
 
 #ifdef CONFIG_VIDEO_SPACEMIT
 	ret = uclass_probe_all(UCLASS_VIDEO);
