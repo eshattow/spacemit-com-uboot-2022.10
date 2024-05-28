@@ -872,4 +872,13 @@
 			 */
 			<0x0 0x0 0xffffffff 0xffffff00 0x0007fff8>;
 	};
+
+	watchdog@D4080000 {
+		compatible = "spacemit,k1x-wdt";
+		reg = <0x0 0xD4080000 0x0 0x1000>,
+			  <0x0 0xD4051020 0x0 0x4>;
+		clocks = <&ccu CLK_WDT>;
+		resets = <&reset RESET_WDT>;
+		status = "okay";
+	};
 };
