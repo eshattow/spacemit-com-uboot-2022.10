@@ -305,10 +305,6 @@ int run_uboot_shell(void)
 
 void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev)
 {
-	/*
-	TODO:
-		load env from bootfs, if bootfs is fat/ext4 at blk dev, use fatload/ext4load.
-	*/
 	int err;
 	u32 part;
 	char cmd[128];
