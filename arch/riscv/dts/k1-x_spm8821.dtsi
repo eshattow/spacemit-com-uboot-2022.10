@@ -132,6 +132,10 @@
 			sw_2: SWITCH_REG1 {
 				regulator-name = "switch1";
 			};
+
+			wdt_pm8821: PMIC_WDT {
+				wdt-name = "wdt_pm8821";
+			};
 		};
 	};
 };
