@@ -419,26 +419,18 @@ void import_env_from_bootfs(void)
 #endif
 		break;
 	case BOOT_MODE_NOR:
-#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
 		struct blk_desc *dev_desc;
+		char *blk_name;
+		int blk_index;
 
-		/*nvme need scan at first*/
-		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)
-						&& run_command("nvme scan", 0)){
-			pr_err("can not find any nvme devices!\n");
+		if (get_available_blk_dev(&blk_name, &blk_index)){
+			printf("can not get available blk dev\n");
 			return;
 		}
 
-		if (strlen(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME) > 0){
-			/* First try partition names on the default device */
-			dev_desc = blk_get_dev(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
-								CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX);
-			if (dev_desc) {
-				_load_env_from_blk(dev_desc, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
-							CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX);
-			}
-	}
-#endif
+		dev_desc = blk_get_dev(blk_name, blk_index);
+		if (dev_desc)
+			_load_env_from_blk(dev_desc, blk_name, blk_index);
 		break;
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
@@ -511,10 +503,16 @@ void setenv_boot_mode(void)
 		env_set("boot_device", "nand");
 		break;
 	case BOOT_MODE_NOR:
+		char *blk_name;
+		int blk_index;
+
+		if (get_available_blk_dev(&blk_name, &blk_index)){
+			printf("can not get available blk dev\n");
+			return;
+		}
+
 		env_set("boot_device", "nor");
-#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
-		env_set("boot_devnum", simple_itoa(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX));
-#endif
+		env_set("boot_devnum", simple_itoa(blk_index));
 		break;
 	case BOOT_MODE_EMMC:
 		env_set("boot_device", "mmc");
