@@ -826,9 +826,6 @@ int board_late_init(void)
 	struct tlvinfo_tlv *first_entry = NULL;
 
 	// save_ddr_training_info();
-	if (IS_ENABLED(CONFIG_SYSRESET_SPACEMIT))
-		device_bind_driver(gd->dm_root, "spacemit_sysreset",
-					"spacemit_sysreset", NULL);
 
 	// it MAY be NULL when did NOT load build-in env and eeprom is empty
 	if (NULL == env_get("product_name"))
