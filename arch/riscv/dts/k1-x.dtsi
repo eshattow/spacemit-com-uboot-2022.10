@@ -884,7 +884,6 @@
 
 	wdt_reboot {
 		compatible = "wdt-reboot";
-		wdt = <&watchdog>;
 		status = "okay";
 	};
 

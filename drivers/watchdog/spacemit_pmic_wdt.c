@@ -181,6 +181,11 @@ static int pmic_wdt_stop(struct udevice *dev)
 	return 0;
 }
 
+static int pmic_wdt_remove(struct udevice *dev)
+{
+	return pmic_wdt_stop(dev);
+}
+
 static int pmic_wdt_expire_now(struct udevice *dev, ulong flags)
 {
 	struct pmic_wdt_priv *priv = dev_get_priv(dev);
@@ -264,4 +269,6 @@ U_BOOT_DRIVER(pm8xx_wdt) = {
 	.probe = pmic_wdt_probe,
 	.priv_auto = sizeof(struct pmic_wdt_priv),
 	.ops = &pmic_wdt_ops,
+	.remove = pmic_wdt_remove,
+	.flags  = DM_FLAG_OS_PREPARE,
 };
