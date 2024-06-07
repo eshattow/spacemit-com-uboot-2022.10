@@ -305,10 +305,6 @@ int run_uboot_shell(void)
 
 void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev)
 {
-	/*
-	TODO:
-		load env from bootfs, if bootfs is fat/ext4 at blk dev, use fatload/ext4load.
-	*/
 	int err;
 	u32 part;
 	char cmd[128];
@@ -423,26 +419,18 @@ void import_env_from_bootfs(void)
 #endif
 		break;
 	case BOOT_MODE_NOR:
-#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
 		struct blk_desc *dev_desc;
+		char *blk_name;
+		int blk_index;
 
-		/*nvme need scan at first*/
-		if (!strncmp("nvme", CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME, 4)
-						&& run_command("nvme scan", 0)){
-			pr_err("can not find any nvme devices!\n");
+		if (get_available_blk_dev(&blk_name, &blk_index)){
+			printf("can not get available blk dev\n");
 			return;
 		}
 
-		if (strlen(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME) > 0){
-			/* First try partition names on the default device */
-			dev_desc = blk_get_dev(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
-								CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX);
-			if (dev_desc) {
-				_load_env_from_blk(dev_desc, CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME,
-							CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX);
-			}
-	}
-#endif
+		dev_desc = blk_get_dev(blk_name, blk_index);
+		if (dev_desc)
+			_load_env_from_blk(dev_desc, blk_name, blk_index);
 		break;
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
@@ -515,10 +503,16 @@ void setenv_boot_mode(void)
 		env_set("boot_device", "nand");
 		break;
 	case BOOT_MODE_NOR:
+		char *blk_name;
+		int blk_index;
+
+		if (get_available_blk_dev(&blk_name, &blk_index)){
+			printf("can not get available blk dev\n");
+			return;
+		}
+
 		env_set("boot_device", "nor");
-#ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
-		env_set("boot_devnum", simple_itoa(CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_INDEX));
-#endif
+		env_set("boot_devnum", simple_itoa(blk_index));
 		break;
 	case BOOT_MODE_EMMC:
 		env_set("boot_device", "mmc");
@@ -830,9 +824,6 @@ int board_late_init(void)
 	struct tlvinfo_tlv *first_entry = NULL;
 
 	// save_ddr_training_info();
-	if (IS_ENABLED(CONFIG_SYSRESET_SPACEMIT))
-		device_bind_driver(gd->dm_root, "spacemit_sysreset",
-					"spacemit_sysreset", NULL);
 
 	// it MAY be NULL when did NOT load build-in env and eeprom is empty
 	if (NULL == env_get("product_name"))
