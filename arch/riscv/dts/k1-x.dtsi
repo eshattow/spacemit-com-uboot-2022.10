@@ -701,9 +701,9 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 
-				dpu_out_mipi: endpoint@0 {
+				dpu_out_dsi: endpoint@0 {
 					reg = <0>;
-					remote-endpoint = <&mipi_in_dpu>;
+					remote-endpoint = <&dsi_in_dpu>;
 				};
 
 				dpu_out_hdmi: endpoint@1 {
@@ -737,9 +737,9 @@
 				mipi_in: port {
 					#address-cells = <1>;
 					#size-cells = <0>;
-					mipi_in_dpu: endpoint@0 {
+					dsi_in_dpu: endpoint@0 {
 						reg = <0>;
-						remote-endpoint = <&dpu_out_mipi>;
+						remote-endpoint = <&dpu_out_dsi>;
 					};
 				};
 			};
