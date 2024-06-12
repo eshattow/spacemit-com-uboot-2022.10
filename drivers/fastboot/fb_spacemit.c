@@ -1009,11 +1009,14 @@ static void write_oem_configuration(char *config, char *response)
 		}
 	}
 
-	if (ret){
-		fastboot_fail("write key fail", response);
-		return;
-	}
+	if (0 == ret)
+		fastboot_okay(NULL, response);
+	else
+		fastboot_fail("NOT exist", response);
+}
 
+static void flush_oem_configuration(char *config, char *response)
+{
 #if defined(CONFIG_SPL_BUILD)
 	if (0 == write_tlvinfo_to_eeprom())
 #else
@@ -1044,6 +1047,8 @@ void fastboot_config_access(char *operation, char *config, char *response)
 		read_oem_configuration(config, response);
 	else if (0 == strcmp(operation, "write"))
 		write_oem_configuration(config, response);
+	else if (0 == strcmp(operation, "flush"))
+		flush_oem_configuration(config, response);
 	else
 		fastboot_fail("NOT support", response);
 }
