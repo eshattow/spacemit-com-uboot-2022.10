@@ -716,13 +716,9 @@ void set_dev_serial_no(uint8_t *eeprom_data)
 	} else {
 		read_from_eeprom(&tlv_entry, TLV_CODE_SERIAL_NUMBER);
 	}
-	if (tlv_entry && tlv_entry->length == 12) {
-		for (i = 0; i < 12; i++) {
-			if (tlv_entry->value[i] != 0) {
-				pr_err("Serial number is valid.\n");
-				return;
-			}
-		}
+	if (tlv_entry && (0 < tlv_entry->length) && (tlv_entry->length <= 32)) {
+		pr_info("Serial number is valid.\n");
+		return;
 	}
 
 	pr_info("Generate rand serial number:\n");
