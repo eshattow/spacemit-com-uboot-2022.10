@@ -704,11 +704,8 @@ void set_env_ethaddr(u8 *eeprom_data) {
 
 void set_dev_serial_no(uint8_t *eeprom_data)
 {
-	u8 sn[6] = {0};
-	char cmd_str[128] = {0};
 	struct tlvinfo_tlv *tlv_entry = NULL;
-	int i = 0;
-	unsigned int seed = 0;
+	char *strval;
 
 	// Decide where to read the serial number from
 	if (eeprom_data != NULL) {
@@ -716,31 +713,18 @@ void set_dev_serial_no(uint8_t *eeprom_data)
 	} else {
 		read_from_eeprom(&tlv_entry, TLV_CODE_SERIAL_NUMBER);
 	}
+
 	if (tlv_entry && (0 < tlv_entry->length) && (tlv_entry->length <= 32)) {
 		pr_info("Serial number is valid.\n");
-		return;
+		strval = malloc(tlv_entry->length + 1);
+		memcpy(strval, tlv_entry->value, tlv_entry->length);
+		strval[tlv_entry->length] = 0;
+		env_set("serial#", strval);
+		free(strval);
 	}
-
-	pr_info("Generate rand serial number:\n");
-	/* Generate rand serial number */
-	seed = get_ticks();
-	for (i = 0; i < 6; i++) {
-		sn[i] = rand_r(&seed);
-		pr_info("%02x", sn[i]);
+	else {
+		env_set("serial#", "NULL");
 	}
-	pr_info("\n");
-
-	/*must read before set/write to eeprom using tlv_eeprom command*/
-	run_command("tlv_eeprom", 0);
-
-	/* save serial number to eeprom */
-	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom set 0x23 %02x%02x%02x%02x%02x%02x", \
-			sn[0], sn[1], sn[2], sn[3], sn[4], sn[5]);
-	run_command(cmd_str, 0);
-
-	memset(cmd_str, 0, sizeof(cmd_str));
-	snprintf(cmd_str, (sizeof(cmd_str) - 1), "tlv_eeprom write");
-	run_command(cmd_str, 0);
 }
 
 struct code_desc_info {
