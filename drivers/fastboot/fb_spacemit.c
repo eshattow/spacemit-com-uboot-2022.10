@@ -875,8 +875,8 @@ struct oem_config_info
 	char* (*convert)(char *);
 };
 const struct oem_config_info config_info[] = {
-	{ "product_name", TLV_CODE_PRODUCT_NAME, 16, NULL },
-	{ "serial#", TLV_CODE_SERIAL_NUMBER, 12, NULL },
+	{ "product_name", TLV_CODE_PRODUCT_NAME, 32, NULL },
+	{ "serial#", TLV_CODE_SERIAL_NUMBER, 32, NULL },
 	{ "ethaddr", TLV_CODE_MAC_BASE, 17, NULL },
 	{ "ethsize", TLV_CODE_MAC_SIZE, 6, NULL },/*size must equal or less than 65535*/
 	{ "manufacture_date", TLV_CODE_MANUF_DATE, 19, NULL },
@@ -1009,11 +1009,14 @@ static void write_oem_configuration(char *config, char *response)
 		}
 	}
 
-	if (ret){
-		fastboot_fail("write key fail", response);
-		return;
-	}
+	if (0 == ret)
+		fastboot_okay(NULL, response);
+	else
+		fastboot_fail("NOT exist", response);
+}
 
+static void flush_oem_configuration(char *config, char *response)
+{
 #if defined(CONFIG_SPL_BUILD)
 	if (0 == write_tlvinfo_to_eeprom())
 #else
@@ -1044,6 +1047,8 @@ void fastboot_config_access(char *operation, char *config, char *response)
 		read_oem_configuration(config, response);
 	else if (0 == strcmp(operation, "write"))
 		write_oem_configuration(config, response);
+	else if (0 == strcmp(operation, "flush"))
+		flush_oem_configuration(config, response);
 	else
 		fastboot_fail("NOT support", response);
 }
