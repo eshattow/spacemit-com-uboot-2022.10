@@ -875,7 +875,7 @@ struct oem_config_info
 	char* (*convert)(char *);
 };
 const struct oem_config_info config_info[] = {
-	{ "product_name", TLV_CODE_PRODUCT_NAME, 16, NULL },
+	{ "product_name", TLV_CODE_PRODUCT_NAME, 32, NULL },
 	{ "serial#", TLV_CODE_SERIAL_NUMBER, 32, NULL },
 	{ "ethaddr", TLV_CODE_MAC_BASE, 17, NULL },
 	{ "ethsize", TLV_CODE_MAC_SIZE, 6, NULL },/*size must equal or less than 65535*/
