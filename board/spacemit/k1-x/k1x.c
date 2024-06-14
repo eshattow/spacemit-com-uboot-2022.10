@@ -723,7 +723,7 @@ void set_dev_serial_no(uint8_t *eeprom_data)
 		free(strval);
 	}
 	else {
-		env_set("serial#", "NULL");
+		env_set("serial#", CONFIG_K1_X_BOARD_DEFAULT_SN);
 	}
 }
 
