@@ -109,6 +109,15 @@
 				algo = "crc32";
 			};
 		};
+		fdt_11 {
+			description = "k1-x_MUSE-Book.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k1-x_MUSE-Book.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -163,6 +172,10 @@
 			loadables = "uboot";
 			fdt = "fdt_10";
 		};
-
+		conf_11 {
+			description = "k1-x_MUSE-Book";
+			loadables = "uboot";
+			fdt = "fdt_11";
+		};
 	};
 };
