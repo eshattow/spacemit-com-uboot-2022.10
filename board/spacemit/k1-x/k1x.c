@@ -722,9 +722,6 @@ void set_dev_serial_no(uint8_t *eeprom_data)
 		env_set("serial#", strval);
 		free(strval);
 	}
-	else {
-		env_set("serial#", CONFIG_K1_X_BOARD_DEFAULT_SN);
-	}
 }
 
 struct code_desc_info {

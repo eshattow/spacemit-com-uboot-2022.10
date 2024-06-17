@@ -147,7 +147,7 @@ struct boot_storage_op
 
 #define BOOTENV_DEVICE_CONFIG \
 	"product_name=" DEFAULT_PRODUCT_NAME "\0" \
-	"serial#=123456789ABC\0" \
+	"serial#=0123456789ABCDEF\0" \
 	"manufacturer=" CONFIG_SYS_VENDOR "\0" \
 	"manufacture_date=01/16/2023 11:02:20\0" \
 	"device_version=1\0" \
