@@ -253,11 +253,9 @@ uint32_t get_ddr_rev_id(void)
 /* adjust ddr frequency to the max value */
 int ddr_freq_max(void)
 {
-//	return ddr_freq_change(MAX_FREQ_LV - 1);
+//	return ddr_freq_change(freq_levels[MAX_FREQ_LV - 1].data_rate);
 	return 0;
 }
-
-#ifndef CONFIG_SPL_BUILD
 
 static struct dfc_level_config freq_levels[MAX_FREQ_LV] =
 {
@@ -280,6 +278,17 @@ static int get_cur_freq_level(void)
 	level = (level >> 1) & 0x7;
 
 	return level;
+}
+
+static int get_datarate_freq_level(uint32_t data_rate)
+{
+	int i;
+	for (i = ARRAY_SIZE(freq_levels) - 1; i >= 0; i--) {
+		if (data_rate >= freq_levels[i].data_rate)
+			return freq_levels[i].freq_lv;
+	}
+
+	return freq_levels[1].freq_lv;
 }
 
 static int dfc_bypass_conf(struct dfc_level_config *cfg)
@@ -499,9 +508,9 @@ static int ddr_freq_init(void)
 	return 0;
 }
 
-static int ddr_freq_change(u32 freq_level)
+int ddr_freq_change(u32 data_rate)
 {
-	int ret, freq_curr;
+	int ret, freq_curr, freq_level;
 
 	ret = ddr_freq_init();
 	if (ret < 0) {
@@ -510,6 +519,7 @@ static int ddr_freq_change(u32 freq_level)
 	}
 
 	freq_curr = get_cur_freq_level();
+	freq_level = get_datarate_freq_level(data_rate);
 
 	if(freq_curr == freq_level) {
 		/* dram frequency is same as the target already */
@@ -536,14 +546,15 @@ static int ddr_freq_change(u32 freq_level)
 	clear_dfc_int_status();
 	enable_dfc_int(false);
 
-	pr_info("%s: ddr frequency change from level %d to %d\n", __func__, freq_curr, get_cur_freq_level());
+	printf("Change DDR data rate to %dMT/s\n", freq_levels[get_cur_freq_level()].data_rate);
 
 	return 0;
 }
 
+#ifndef CONFIG_SPL_BUILD
 int do_ddr_freq(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
-	u32 freq_level;
+	u32 datarate;
 	int i;
 
 	if (argc <= 1 || argc > 2) {
@@ -562,22 +573,22 @@ int do_ddr_freq(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 		return CMD_RET_SUCCESS;
 	}
 
-	freq_level = simple_strtoul(argv[1], NULL, 0);
-	if(freq_level >= MAX_FREQ_LV) {
+	datarate = simple_strtoul(argv[1], NULL, 0);
+	if ((datarate > freq_levels[MAX_FREQ_LV - 1].data_rate)
+		|| (datarate < freq_levels[0].data_rate)) {
 		/* invalid parameter, report error */
 		return CMD_RET_USAGE;
 	}
 
-	ddr_freq_change(freq_level);
-	pr_info("Change DDR data rate to %dMT/s\n", freq_levels[get_cur_freq_level()].data_rate);
+	ddr_freq_change(datarate);
 
 	return CMD_RET_SUCCESS;
 }
 
 U_BOOT_CMD(
 	ddrfreq, CONFIG_SYS_MAXARGS, 1, do_ddr_freq,
-	"Adjusting the DRAM working frequency",
-	"ddrfreq list	- display the valid frequncy points\n"
-	"ddrfreq [0~7]	- adjust dram working frequency to level[0~7]"
+	"Adjusting the DRAM working data rate",
+	"list		- display the valid data rate list\n"
+	"ddrfreq [600~3200]	- adjust dram working data rate"
 );
 #endif

@@ -28,6 +28,7 @@
 
 extern u32 ddr_cs_num;
 extern const char *ddr_type;
+extern int ddr_freq_change(u32 data_rate);
 
 static int test_pattern(fdt_addr_t base, fdt_size_t size)
 {
@@ -161,6 +162,7 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	start = get_timer(start);
 	printf("lpddr4_silicon_init consume %lldms\n", start);
 #endif
+	ddr_freq_change(ddr_datarate);
 
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
 	if (ret < 0) {
