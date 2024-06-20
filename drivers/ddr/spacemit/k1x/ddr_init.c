@@ -153,9 +153,6 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	if (NULL == ddr_type) {
 		ddr_type = dev_read_string(dev, "type");
 	}
-	if (NULL == ddr_type) {
-		ddr_type = "LPDDR4";
-	}
 	printf("DDR type %s\n", ddr_type);
 
 	/* init dram */
