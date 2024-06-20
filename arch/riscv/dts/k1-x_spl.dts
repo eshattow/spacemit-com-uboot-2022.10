@@ -23,9 +23,9 @@
 
 	cpu@0 {
 		/* boot frequency for cluster-0, should be 1600000, 1228000, 819000, or 614000 */
-		boot_freq_cluster0 = <1228000>;
+		boot_freq_cluster0 = <1600000>;
 		/* boot frequency for cluster-1, should be 1600000, 1228000, 819000, or 614000 */
-		boot_freq_cluster1 = <1228000>;
+		boot_freq_cluster1 = <1600000>;
 		u-boot,dm-spl;
 	};
 };
