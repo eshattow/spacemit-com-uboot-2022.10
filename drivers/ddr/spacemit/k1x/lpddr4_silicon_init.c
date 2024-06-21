@@ -90,6 +90,7 @@ struct io_para_info {
 const struct io_para_info ddr_io_para_table[] = {
 	{SK_HYNIX, LPDDR4X, 0x9D, R_40, R_40, R_60, 0x19, R_60, VOH_0P6, R_60, R_60, 0x55},
 	{SK_HYNIX, LPDDR4, 0xB2, R_40, R_40, R_120, 0xA7, R_60, VOH_0P6, R_80, R_80, 0x33},
+	// {SK_HYNIX, LPDDR4, 0xB2, R_40, R_40, R_60, 0xA7, R_48, VOH_0P6, R_48, R_48, 0x00},
 };
 
 const struct io_para_info *io_para_update;
@@ -269,6 +270,9 @@ void fp_timing_init(unsigned DDRC_BASE)
 	REG32(DDRC_BASE+MC_CH0_BASE+0x01c4) = 0x00000006;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x01d8) = 0x00010190;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x014c) = 0x000c4090;
+	if (LPDDR4 == io_para_update->devicetype)
+		REG32(DDRC_BASE+MC_CH0_BASE+0x0200) = ((0x1 << 31) | (0x1E << 8) | (0x6 << 0)); // DRAM wdqs timing
+
 	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x15000A02;
 	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03ec) = 0x0000046c;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x0104)= 0xA0800400;
@@ -311,6 +315,9 @@ void fp_timing_init(unsigned DDRC_BASE)
 	REG32(DDRC_BASE+MC_CH0_BASE+0x01c4) = 0x00000004;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x01d8) = 0x0000D94E;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x014c) = 0x0007204a;
+	if (LPDDR4 == io_para_update->devicetype)
+		REG32(DDRC_BASE+MC_CH0_BASE+0x0200) = ((0x1 << 31) | (0x1B << 8) | (0x4 << 0)); // DRAM wdqs timing
+
 	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x13000802;
 	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03ec) = 0x00000450;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x0104)= 0x50800400;
@@ -353,6 +360,9 @@ void fp_timing_init(unsigned DDRC_BASE)
 	REG32(DDRC_BASE+MC_CH0_BASE+0x01c4) = 0x00000003;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x01d8) = 0x00008190;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x014c) = 0x00030848;
+	if (LPDDR4 == io_para_update->devicetype)
+		REG32(DDRC_BASE+MC_CH0_BASE+0x0200) = ((0x1 << 31) | (0x15 << 8) | (0x0 << 0)); // DRAM wdqs timing
+
 	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x0a000402;
 	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03ec) = 0x00000480;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x0104)= 0x00800400;
@@ -395,6 +405,9 @@ void fp_timing_init(unsigned DDRC_BASE)
 	REG32(DDRC_BASE+MC_CH0_BASE+0x01c4) = 0x00000003;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x01d8) = 0x00008190;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x014c) = 0x00030848;
+	if (LPDDR4 == io_para_update->devicetype)
+		REG32(DDRC_BASE+MC_CH0_BASE+0x0200) = ((0x1 << 31) | (0x15 << 8) | (0x0 << 0)); // DRAM wdqs timing
+
 	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03e4) = 0x0a000402;
 	REG32(DDRC_BASE+MC_CH0_PHY_BASE+0x03ec) = 0x00000480;
 
