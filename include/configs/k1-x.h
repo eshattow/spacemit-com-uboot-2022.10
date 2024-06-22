@@ -78,6 +78,7 @@
 
 #define TLV_CODE_SDK_VERSION		0x40
 #define TLV_CODE_DDR_CSNUM		0x41
+#define TLV_CODE_DDR_TYPE		0x42
 
 #define TLV_CODE_PMIC_TYPE		0x80
 #define TLV_CODE_EEPROM_I2C_INDEX	0x81
@@ -146,7 +147,7 @@ struct boot_storage_op
 
 #define BOOTENV_DEVICE_CONFIG \
 	"product_name=" DEFAULT_PRODUCT_NAME "\0" \
-	"serial#=123456789ABC\0" \
+	"serial#=0123456789ABCDEF\0" \
 	"manufacturer=" CONFIG_SYS_VENDOR "\0" \
 	"manufacture_date=01/16/2023 11:02:20\0" \
 	"device_version=1\0" \

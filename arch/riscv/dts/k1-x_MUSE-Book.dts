@@ -8,7 +8,7 @@
 #include "k1-x_spm8821.dtsi"
 
 / {
-	model = "k1-x_MUSE-Book";
+	model = "M1-MUSE-BOOK";
 
 	aliases {
 		efuse_power = &ldo_31;
