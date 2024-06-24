@@ -118,6 +118,15 @@
 				algo = "crc32";
 			};
 		};
+		fdt_12 {
+                        description = "m1-x_milkv-jupiter";
+                        type = "flat_dt";
+                        compression = "none";
+                        data = /incbin/("../dtb/m1-x_milkv-jupiter.dtb");
+                        hash-1 {
+                                algo = "crc32";
+                        };
+		};
 	};
 
 	configurations {
@@ -177,5 +186,11 @@
 			loadables = "uboot";
 			fdt = "fdt_11";
 		};
+		conf_12 {
+                        description = "m1-x_milkv-jupiter";
+                        loadables = "uboot";
+                        fdt = "fdt_12";
+                };
+
 	};
 };
