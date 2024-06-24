@@ -127,6 +127,15 @@
                                 algo = "crc32";
                         };
 		};
+		fdt_13 {
+                        description = "k1-x_lpi3a";
+                        type = "flat_dt";
+                        compression = "none";
+                        data = /incbin/("../dtb/k1-x_lpi3a.dtb");
+                        hash-1 {
+                                algo = "crc32";
+                        };
+                };
 	};
 
 	configurations {
@@ -190,6 +199,11 @@
                         description = "m1-x_milkv-jupiter";
                         loadables = "uboot";
                         fdt = "fdt_12";
+                };
+		 conf_13 {
+                        description = "k1-x_lpi3a";
+                        loadables = "uboot";
+                        fdt = "fdt_13";
                 };
 
 	};
