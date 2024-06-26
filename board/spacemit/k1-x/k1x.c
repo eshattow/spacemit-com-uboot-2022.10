@@ -423,7 +423,7 @@ void import_env_from_bootfs(void)
 		char *blk_name;
 		int blk_index;
 
-		if (get_available_blk_dev(&blk_name, &blk_index)){
+		if (get_available_boot_blk_dev(&blk_name, &blk_index)){
 			printf("can not get available blk dev\n");
 			return;
 		}
@@ -506,7 +506,7 @@ void setenv_boot_mode(void)
 		char *blk_name;
 		int blk_index;
 
-		if (get_available_blk_dev(&blk_name, &blk_index)){
+		if (get_available_boot_blk_dev(&blk_name, &blk_index)){
 			printf("can not get available blk dev\n");
 			return;
 		}
