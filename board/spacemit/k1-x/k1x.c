@@ -36,6 +36,7 @@
 #include <dm/device.h>
 #include <dm/device-internal.h>
 #include <g_dnl.h>
+#include <fdt_simplefb.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
@@ -996,3 +997,18 @@ int board_fit_config_name_match(const char *name)
 		return -1;
 }
 #endif
+
+int ft_board_setup(void *blob, struct bd_info *bd)
+{
+	int node;
+
+	if (CONFIG_IS_ENABLED(FDT_SIMPLEFB)) {
+		node = fdt_node_offset_by_compatible(blob, -1, "simple-framebuffer");
+		if (node < 0)
+			fdt_simplefb_add_node(blob);
+
+		fdt_simplefb_enable_and_mem_rsv(blob);
+	}
+
+	return 0;
+}
