@@ -37,6 +37,7 @@
 #include <dm/device-internal.h>
 #include <g_dnl.h>
 #include <fdt_simplefb.h>
+#include <mtd_node.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
@@ -1001,6 +1002,14 @@ int board_fit_config_name_match(const char *name)
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	int node;
+	static const struct node_info nodes[] = {
+		{ "spacemit,k1x-qspi", MTD_DEV_TYPE_NOR, },  /* SPI flash */
+	};
+
+	/* update MTD partition info for nor boot */
+	if (CONFIG_IS_ENABLED(FDT_FIXUP_PARTITIONS) &&
+		BOOT_MODE_NOR == get_boot_mode())
+		fdt_fixup_mtdparts(blob, nodes, ARRAY_SIZE(nodes));
 
 	if (CONFIG_IS_ENABLED(FDT_SIMPLEFB)) {
 		node = fdt_node_offset_by_compatible(blob, -1, "simple-framebuffer");
