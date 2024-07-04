@@ -87,6 +87,9 @@
 #define RAMDISK_LOAD_ADDR		0x21000000
 #define DTB_LOAD_ADDR			0x31000000
 
+// for those has NOT been through test procedure(ATE)
+#define SVT_DRO_DEFAULT_VALUE	(120)
+
 #ifndef __ASSEMBLY__
 #include "linux/types.h"
 
