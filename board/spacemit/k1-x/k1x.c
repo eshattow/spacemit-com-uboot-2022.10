@@ -1097,7 +1097,7 @@ static int ft_board_cpu_fixup(void *blob, struct bd_info *bd)
 
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
-	int node;
+	struct fdt_memory mem;
 	static const struct node_info nodes[] = {
 		{ "spacemit,k1x-qspi", MTD_DEV_TYPE_NOR, },  /* SPI flash */
 	};
@@ -1108,11 +1108,12 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 		fdt_fixup_mtdparts(blob, nodes, ARRAY_SIZE(nodes));
 
 	if (CONFIG_IS_ENABLED(FDT_SIMPLEFB)) {
-		node = fdt_node_offset_by_compatible(blob, -1, "simple-framebuffer");
-		if (node < 0)
-			fdt_simplefb_add_node(blob);
+		/* reserved with no-map tag the video buffer */
+		mem.start = gd->video_bottom;
+		mem.end = gd->video_top - 1;
 
-		fdt_simplefb_enable_and_mem_rsv(blob);
+		fdtdec_add_reserved_memory(blob, "framebuffer", &mem, NULL, 0, NULL,
+			FDTDEC_RESERVED_MEMORY_NO_MAP);
 	}
 
 	ft_board_cpu_fixup(blob, bd);
