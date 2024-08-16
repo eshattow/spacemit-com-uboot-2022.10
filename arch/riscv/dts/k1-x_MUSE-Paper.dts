@@ -240,6 +240,18 @@
 	};
 };
 
+&pwm14 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm14_1>;
+	status = "okay";
+};
+
+&backlight {
+	pwms = <&pwm14 0 2000>;
+	default-brightness-level = <4>;
+	status = "okay";
+};
+
 &mipi_dsi {
 	status = "okay";
 };
@@ -250,7 +262,7 @@
 	dcn-gpios = <&gpio 42 0>;
 	avee-gpios = <&gpio 35 0>;
 	avdd-gpios = <&gpio 36 0>;
-	bl-gpios = <&gpio 44 0>;
+	backlight = <&backlight>;
 	enable-gpios = <&gpio 31 0>;
 	reset-gpios = <&gpio 30 0>;
 	status = "okay";
