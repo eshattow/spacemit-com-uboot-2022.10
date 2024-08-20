@@ -455,6 +455,10 @@ int lcd_mipi_probe(void)
 		tx_device_client.panel_type = LCD_MIPI;
 		tx_device.panel_type = tx_device_client.panel_type;
 		lcd_icnl9951r_init();
+	} else if(strcmp("jd9365dah3", priv->panel_name) == 0) {
+		tx_device_client.panel_type = LCD_MIPI;
+		tx_device.panel_type = tx_device_client.panel_type;
+		lcd_jd9365dah3_init();
 	} else {
 		// lcd_icnl9911c_init();
 		lcd_gx09inx101_init();
