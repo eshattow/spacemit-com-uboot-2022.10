@@ -86,7 +86,7 @@ extern void update_ddr_info(void);
 extern enum board_boot_mode get_boot_storage(void);
 extern int spl_mtd_read(struct mtd_info *mtd, ulong sector, ulong count, void *buf);
 char *product_name;
-extern u32 ddr_cs_num;
+extern u32 ddr_cs_num, ddr_datarate;;
 extern const char *ddr_type;
 
 int timer_init(void)
@@ -690,6 +690,15 @@ void update_ddr_info(void)
 		pr_info("Get ddr cs num %d from eeprom\n", ddr_cs_num);
 	else
 		ddr_cs_num = 0;
+
+	// if fail to get ddr cs number from eeprom, update it from dts node
+	if (0 == spacemit_eeprom_read((uint8_t*)&ddr_datarate, TLV_CODE_DDR_DATARATE)) {
+		// convert it from big endian to little endian
+		ddr_datarate = be16_to_cpu(ddr_datarate);
+		pr_info("Get ddr datarate %d from eeprom\n", ddr_datarate);
+	}
+	else
+		ddr_datarate = 0;
 }
 
 void spl_board_init(void)
