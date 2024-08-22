@@ -27,7 +27,7 @@ DECLARE_GLOBAL_DATA_PTR;
 int _read_from_i2c(int chip, u32 addr, u32 size, uchar *buf);
 bool _is_valid_tlvinfo_header(struct tlvinfo_header *hdr);
 
-static uint8_t tlv_data[256];
+static __section(".data") uint8_t tlv_data[256];
 
 char *spacemit_i2c_eeprom[] = {
 	"atmel,24c02",
