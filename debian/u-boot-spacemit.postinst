@@ -48,13 +48,13 @@ configure)
         "/dev/nvme0n1"*)
             BOOTINFO_FILE=bootinfo_spinor.bin
             BOOTINFO=/dev/mtdblock0
-            FSBL=/dev/mtdblock2
-            FSBL_SEEK=0
-            ENV=/dev/mtdblock3
-            ENV_SEEK=0
-            UBOOT=/dev/mtdblock5
+            FSBL=/dev/mtdblock0
+            FSBL_SEEK=$((128 * 1024))
+            ENV=/dev/mtdblock0
+            ENV_SEEK=$((384 * 1024))
+            UBOOT=/dev/mtdblock0
             # 以KB为单位
-            UBOOT_SEEK=0
+            UBOOT_SEEK=640
             ;;
         *)
             echo "Unsupported root=$ROOT"
