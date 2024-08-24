@@ -12,9 +12,6 @@
 
 	aliases {
 		efuse_power = &ldo_31;
-		battery = &cw2015;
-		charger = &sgm41515;
-		charger-2 = &secsgm41515;
 	};
 
 	memory@0 {
@@ -38,6 +35,7 @@
 		vbus-gpios = <&gpio 79 0>;	/* gpio_79 for usb3 pwren */
 		status = "disabled";
 	};
+
 };
 
 &cpus {
@@ -313,5 +311,29 @@
 	backlight = <&backlight>;
 	enable-gpios = <&gpio 31 0>;
 	reset-gpios = <&gpio 30 0>;
+	status = "okay";
+};
+
+&shutdown_charging {
+	electricity-meter = <&cw2015>;
+	power-domains = <&pmu K1X_PMU_WKUP_EVENT_PWR_DOMAIN>;
+
+	wk-name = "pwr_event", "pwr_int", "rtc_ctrl", "rtc_event", "rtc_irq", "sys-shutdown";
+	pwr_event = <&power_event>;
+	pwr_int = <&power_int>;
+
+	rtc_ctrl = <&rtc_ctrl>;
+	rtc_event = <&rtc_event>;
+	rtc_irq = <&rtc_irq>;
+
+	sys-shutdown = <&power_down>;
+	reboot-flag = <&reboot_flag>;
+
+	charge-light = <&gpio 75 0 &gpio 76 0>;
+
+	charger-name = "charger0", "charger1";
+	charger0 = <&sgm41515>;
+	charger1 = <&secsgm41515>;
+
 	status = "okay";
 };

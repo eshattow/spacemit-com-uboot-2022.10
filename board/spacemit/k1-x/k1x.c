@@ -790,6 +790,13 @@ int board_init(void)
 	if (ret)
 		pr_debug("%s: Cannot enable boot on regulator\n", __func__);
 #endif
+#ifdef CONFIG_SPACEMIT_SHUTDOWN_CHARGE
+	struct udevice *udev;
+
+	if (get_boot_mode() != BOOT_MODE_USB) {
+		ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(shutdown_charge), &udev);
+	}
+#endif
 	return 0;
 }
 
