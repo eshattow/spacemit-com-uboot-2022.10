@@ -39,6 +39,14 @@
 #include <fdt_simplefb.h>
 #include <mtd_node.h>
 #include <misc.h>
+#ifdef CONFIG_BUTTON
+#include <button.h>
+struct fastboot_key_config {
+	const char **key_names;
+	int key_count;
+	u32 press_time;
+};
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
@@ -279,11 +287,126 @@ u32 get_reboot_config(void)
 	return reboot_config;
 }
 
+
+#ifdef CONFIG_BUTTON
+static int button_get_state_by_label(struct udevice *dev, const char *label)
+{
+	struct udevice *child;
+	struct button_uc_plat *plat;
+	int state;
+	bool invert_state = false;
+
+	pr_debug("Searching for button with label '%s'\n", label);
+	for (device_find_first_child(dev, &child);
+			child;
+			device_find_next_child(&child)) {
+		plat = dev_get_uclass_plat(child);
+		if (plat->label && !strcmp(plat->label, label)) {
+			invert_state = ofnode_read_bool(dev_ofnode(child), "invert-state");
+
+			state = button_get_state(child);
+			pr_debug("Button '%s' found, raw state: %d, invert: %d\n", label, state, invert_state);
+
+			if (invert_state) {
+				state = (state == BUTTON_ON) ? BUTTON_OFF : BUTTON_ON;
+			}
+			pr_debug("Button '%s' final state: %d\n", label, state);
+			return state;
+		}
+	}
+
+	pr_err("Button '%s' not found\n", label);
+	return -ENOENT;
+}
+
+static int get_fastboot_key_config(struct fastboot_key_config *config)
+{
+	ofnode node;
+	int ret;
+
+	node = ofnode_path("/gpio_keys");
+	if (!ofnode_valid(node))
+		return -ENODEV;
+
+	ret = ofnode_read_string_list(node, "fastboot-key-combo", &config->key_names);
+	if (ret < 0)
+		return ret;
+	config->key_count = ret;
+
+	ret = ofnode_read_u32(node, "fastboot-key-press-time", &config->press_time);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+static bool check_fastboot_keys(void)
+{
+	struct udevice *dev;
+	struct fastboot_key_config config;
+	int *key_states;
+	ulong press_start = 0;
+	int i, ret;
+	bool all_pressed = true;
+
+	ret = get_fastboot_key_config(&config);
+	if (ret < 0) {
+		pr_err("Failed to get fastboot key config: %d\n", ret);
+		return false;
+	}
+
+	pr_debug("Fastboot key config: count=%d, press_time=%u\n", config.key_count, config.press_time);
+
+	ret = uclass_get_device_by_name(UCLASS_BUTTON, "gpio_keys", &dev);
+	if (ret) {
+		pr_err("Failed to get device for gpio_keys\n");
+		return false;
+	}
+
+	key_states = calloc(config.key_count, sizeof(int));
+	if (!key_states) {
+		pr_err("Failed to allocate memory for key_states\n");
+		return false;
+	}
+
+	press_start = get_timer(0);
+
+	while (get_timer(press_start) < config.press_time) {
+		all_pressed = true;
+		for (i = 0; i < config.key_count; i++) {
+			key_states[i] = button_get_state_by_label(dev, config.key_names[i]);
+			if (key_states[i] < 0 || key_states[i] != BUTTON_ON) {
+				all_pressed = false;
+				break;
+			}
+		}
+
+		if (!all_pressed) {
+			/* Key released within the specified time, normal boot */
+			free(key_states);
+			return false;
+		}
+
+		mdelay(10);
+	}
+
+	/* Keys held down longer than specified time, enter Fastboot mode */
+	free(key_states);
+	pr_info("Fastboot key combination detected! Duration: %u ms\n", config.press_time);
+	return true;
+}
+#endif
+
+
 void run_fastboot_command(void)
 {
 	u32 boot_mode = get_boot_mode();
 
-	if (boot_mode == BOOT_MODE_USB || BOOT_MODE_USB == get_reboot_config()) {
+	if (boot_mode == BOOT_MODE_USB || BOOT_MODE_USB == get_reboot_config()
+#ifdef CONFIG_BUTTON
+		|| check_fastboot_keys()
+#endif
+	) {
 		/* show flash log*/
 		env_set("stdout", env_get("stdout_flash"));
 
@@ -294,6 +417,7 @@ void run_fastboot_command(void)
 		refresh_config_info(NULL);
 	}
 }
+
 
 int run_uboot_shell(void)
 {
@@ -844,6 +968,15 @@ int board_late_init(void)
 	ret = uclass_probe_all(UCLASS_DISPLAY);
 	if (ret) {
 		pr_info("display devices not found or not probed yet: %d\n", ret);
+	}
+#endif
+
+#ifdef CONFIG_BUTTON
+	ret = uclass_probe_all(UCLASS_BUTTON);
+	if (ret) {
+		pr_err("Failed to probe all buttons: %d\n", ret);
+	} else {
+		pr_info("All buttons probed successfully\n");
 	}
 #endif
 
