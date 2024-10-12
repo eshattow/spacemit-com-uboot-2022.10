@@ -39,6 +39,9 @@
 #include <fdt_simplefb.h>
 #include <mtd_node.h>
 #include <misc.h>
+#ifdef CONFIG_ENV_IS_IN_NFS
+#include "nfs_env.h"
+#endif
 #ifdef CONFIG_BUTTON
 #include <button.h>
 struct fastboot_key_config {
@@ -54,6 +57,7 @@ extern u32 ddr_cs_num;
 bool is_video_connected = false;
 uint32_t reboot_config;
 void refresh_config_info(u8 *eeprom_data);
+void read_from_eeprom(struct tlvinfo_tlv **tlv_data, u8 tcode);
 int mac_read_from_buffer(u8 *eeprom_data);
 
 void set_boot_mode(enum board_boot_mode boot_mode)
@@ -505,6 +509,20 @@ char* parse_mtdparts_and_find_bootfs(void) {
 void import_env_from_bootfs(void)
 {
 	u32 boot_mode = get_boot_mode();
+
+#ifdef CONFIG_ENV_IS_IN_NFS
+	// Check if local bootfs exists
+	if (check_bootfs_exists() != 0) {
+		#ifdef CONFIG_CMD_NET
+			eth_initialize();
+		#endif
+		// Local bootfs not found, try to load from NFS
+		if (load_env_from_nfs() == 0) {
+			return;
+		}
+	}
+#endif
+
 	switch (boot_mode) {
 	case BOOT_MODE_NAND:
 #if CONFIG_IS_ENABLED(ENV_IS_IN_MTD)
@@ -623,6 +641,16 @@ void run_cardfirmware_flash_command(void)
 
 void setenv_boot_mode(void)
 {
+#ifdef CONFIG_ENV_IS_IN_NFS
+	const char *boot_override = env_get("boot_override");
+
+	if (boot_override) {
+		env_set("boot_device", boot_override);
+		env_set("boot_override", NULL);
+		return;
+	}
+#endif
+
 	u32 boot_mode = get_boot_mode();
 	switch (boot_mode) {
 	case BOOT_MODE_NAND:
