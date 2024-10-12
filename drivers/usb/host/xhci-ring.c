@@ -466,6 +466,12 @@ static int event_ready(struct xhci_ctrl *ctrl)
  */
 union xhci_trb *xhci_wait_for_event(struct xhci_ctrl *ctrl, trb_type expected)
 {
+	return xhci_wait_for_event_timeout(ctrl, expected, XHCI_TIMEOUT);
+}
+
+union xhci_trb *xhci_wait_for_event_timeout(struct xhci_ctrl *ctrl, trb_type expected,
+		  unsigned long timeout)
+{
 	trb_type type;
 	unsigned long ts = get_timer(0);
 
@@ -498,12 +504,13 @@ union xhci_trb *xhci_wait_for_event(struct xhci_ctrl *ctrl, trb_type expected)
 				le32_to_cpu(event->generic.field[3]));
 
 		xhci_acknowledge_event(ctrl);
-	} while (get_timer(ts) < XHCI_TIMEOUT);
+	} while (get_timer(ts) < timeout);
 
 	if (expected == TRB_TRANSFER)
 		return NULL;
 
-	printf("XHCI timeout on event type %d...\n", expected);
+	/* Don't spam msgs for some keyboards who always timeout when no inputs */
+	debug("XHCI timeout on event type %d...\n", expected);
 
 	return NULL;
 }
@@ -633,18 +640,8 @@ static void record_transfer_result(struct usb_device *udev,
 	}
 }
 
-/**** Bulk and Control transfer methods ****/
-/**
- * Queues up the BULK Request
- *
- * @param udev		pointer to the USB device structure
- * @param pipe		contains the DIR_IN or OUT , devnum
- * @param length	length of the buffer
- * @param buffer	buffer to be read/written based on the request
- * Return: returns 0 if successful else -1 on failure
- */
-int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
-			int length, void *buffer)
+static int xhci_normal_tx_internal(struct usb_device *udev, unsigned long pipe,
+			int length, void *buffer, unsigned long timeout)
 {
 	int num_trbs = 0;
 	struct xhci_generic_trb *start_trb;
@@ -812,7 +809,7 @@ int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
 	giveback_first_trb(udev, ep_index, start_cycle, start_trb);
 
 again:
-	event = xhci_wait_for_event(ctrl, TRB_TRANSFER);
+	event = xhci_wait_for_event_timeout(ctrl, TRB_TRANSFER, timeout);
 	if (!event) {
 		debug("XHCI bulk transfer timed out, aborting...\n");
 		abort_td(udev, ep_index);
@@ -839,6 +836,40 @@ again:
 	xhci_dma_unmap(ctrl, buf_64, length);
 
 	return (udev->status != USB_ST_NOT_PROC) ? 0 : -1;
+}
+
+/**** Bulk, Interrupt and Control transfer methods ****/
+/**
+ * Queues up the BULK Request
+ *
+ * @param udev		pointer to the USB device structure
+ * @param pipe		contains the DIR_IN or OUT , devnum
+ * @param length	length of the buffer
+ * @param buffer	buffer to be read/written based on the request
+ * Return: returns 0 if successful else -1 on failure
+ */
+int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
+			int length, void *buffer)
+{
+	return xhci_normal_tx_internal(udev, pipe, length, buffer, XHCI_TIMEOUT);
+}
+
+/**
+ * Queues up the INTR Request
+ *
+ * @param udev		pointer to the USB device structure
+ * @param pipe		contains the DIR_IN or OUT , devnum
+ * @param length	length of the buffer
+ * @param buffer	buffer to be read/written based on the request
+ * @param nonblock	non-blocking flag, useful for keyboard intrupt
+ * Return: returns 0 if successful else -1 on failure
+ */
+int xhci_intr_tx(struct usb_device *udev, unsigned long pipe,
+			int length, void *buffer, bool nonblock)
+{
+	unsigned long timeout;
+	timeout = nonblock ? XHCI_NONBLOCK_INTR_TIMEOUT : USB_TIMEOUT_MS(pipe);
+	return xhci_normal_tx_internal(udev, pipe, length, buffer, timeout);
 }
 
 /**

@@ -26,6 +26,13 @@
 
 #define MAX_EP_CTX_NUM		31
 #define XHCI_ALIGNMENT		64
+
+/* Non-blocking INTR transfer timeout
+ * Keyboard idle timeout is 40ms, double it to make sure key is captured,
+ * meanwhile prevent misbehaved keyboard block too long
+ */
+#define XHCI_NONBLOCK_INTR_TIMEOUT		80
+
 /* Generic timeout for XHCI events */
 #define XHCI_TIMEOUT		5000
 /* Max number of USB devices for any host controller - limit in section 6.1 */
@@ -1263,8 +1270,12 @@ void xhci_queue_command_extra_flags(struct xhci_ctrl *ctrl, dma_addr_t addr,
 			u32 slot_id, u32 ep_index, trb_type cmd, u32 extra_flags);
 void xhci_acknowledge_event(struct xhci_ctrl *ctrl);
 union xhci_trb *xhci_wait_for_event(struct xhci_ctrl *ctrl, trb_type expected);
+union xhci_trb *xhci_wait_for_event_timeout(struct xhci_ctrl *ctrl, trb_type expected,
+		  unsigned long timeout);
 int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
 		 int length, void *buffer);
+int xhci_intr_tx(struct usb_device *udev, unsigned long pipe,
+		 int length, void *buffer, bool nonblock);
 int xhci_ctrl_tx(struct usb_device *udev, unsigned long pipe,
 		 struct devrequest *req, int length, void *buffer);
 int xhci_check_maxpacket(struct usb_device *udev);
