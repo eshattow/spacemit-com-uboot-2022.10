@@ -49,6 +49,9 @@ int overwrite_console(void)
 #define REPEAT_RATE	40		/* 40msec -> 25cps */
 #define REPEAT_DELAY	10		/* 10 x REPEAT_RATE = 400msec */
 
+/* Timeout for SETLED control transfer */
+#define SETLED_TIMEOUT 500
+
 #define NUM_LOCK	0x53
 #define CAPS_LOCK	0x39
 #define SCROLL_LOCK	0x47
@@ -162,12 +165,16 @@ static void usb_kbd_setled(struct usb_device *dev)
 {
 	struct usb_kbd_pdata *data = dev->privptr;
 	struct usb_interface *iface = &dev->config.if_desc[data->ifnum];
+	int ret;
 	ALLOC_ALIGN_BUFFER(uint32_t, leds, 1, USB_DMA_MINALIGN);
 
 	*leds = data->flags & USB_KBD_LEDMASK;
-	usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 		USB_REQ_SET_REPORT, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		0x200, iface->desc.bInterfaceNumber, leds, 1, 0);
+		0x200, iface->desc.bInterfaceNumber, leds, 1, SETLED_TIMEOUT);
+	if (ret < 0) {
+		debug("WARN: usb_kbd_setled failed: %d\n", ret);
+	}
 }
 
 #define CAPITAL_MASK	0x20
