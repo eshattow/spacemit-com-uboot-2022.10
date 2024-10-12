@@ -129,6 +129,7 @@ struct usb_kbd_pdata {
 	uint8_t		old[USB_KBD_BOOT_REPORT_SIZE];
 
 	uint8_t		flags;
+	bool		gone;
 };
 
 extern int __maybe_unused net_busy_flag;
@@ -378,7 +379,8 @@ static inline void usb_kbd_poll_for_event(struct usb_device *dev)
 			data->intpktsize, data->intinterval, true) >= 0)
 		usb_kbd_irq_worker(dev);
 #elif defined(CONFIG_SYS_USB_EVENT_POLL_VIA_CONTROL_EP) || \
-      defined(CONFIG_SYS_USB_EVENT_POLL_VIA_INT_QUEUE)
+      defined(CONFIG_SYS_USB_EVENT_POLL_VIA_INT_QUEUE) || \
+      defined(CONFIG_SYS_USB_EVENT_POLL_COMPATIBLE)
 #if defined(CONFIG_SYS_USB_EVENT_POLL_VIA_CONTROL_EP)
 	struct usb_interface *iface;
 	struct usb_kbd_pdata *data = dev->privptr;
@@ -387,6 +389,34 @@ static inline void usb_kbd_poll_for_event(struct usb_device *dev)
 		       1, 0, data->new, USB_KBD_BOOT_REPORT_SIZE);
 	if (memcmp(data->old, data->new, USB_KBD_BOOT_REPORT_SIZE)) {
 		usb_kbd_irq_worker(dev);
+#elif defined(CONFIG_SYS_USB_EVENT_POLL_COMPATIBLE)
+	struct usb_kbd_pdata *data = dev->privptr;
+	struct udevice *bus = dev->controller_dev;
+	bool use_int_queue = !!usb_get_ops(bus)->create_int_queue;
+	int data_pending = 0;
+	/* If keyboard is gone and cannot recover, we stop polling it,
+	 * so xhci won't spam a lots of EP reset messages.
+	 */
+	if (data->gone)
+		return;
+	if (use_int_queue) {
+		data_pending = !!poll_int_queue(dev, data->intq);
+	} else {
+		data_pending = usb_int_msg(dev, data->intpipe, &data->new[0],
+			data->intpktsize, data->intinterval, true);
+		if (data_pending == -EINVAL)
+			data->gone = true;
+		data_pending = data_pending >= 0;
+	}
+	if (data_pending) {
+		usb_kbd_irq_worker(dev);
+		if (use_int_queue) {
+			/* We've consumed all queued int packets, create new */
+			destroy_int_queue(dev, data->intq);
+			data->intq = create_int_queue(dev, data->intpipe, 1,
+						USB_KBD_BOOT_REPORT_SIZE, data->new,
+						data->intinterval);
+		}
 #else
 	struct usb_kbd_pdata *data = dev->privptr;
 	if (poll_int_queue(dev, data->intq)) {
@@ -481,6 +511,11 @@ static int usb_kbd_probe_dev(struct usb_device *dev, unsigned int ifnum)
 	struct usb_interface *iface;
 	struct usb_endpoint_descriptor *ep;
 	struct usb_kbd_pdata *data;
+#if defined(CONFIG_SYS_USB_EVENT_POLL_COMPATIBLE)
+	struct udevice *bus = dev->controller_dev;
+	struct dm_usb_ops *ops = usb_get_ops(bus);
+	bool use_int_queue = !!ops->create_int_queue;
+#endif
 	int epNum;
 
 	if (dev->descriptor.bNumConfigurations != 1)
@@ -545,9 +580,16 @@ static int usb_kbd_probe_dev(struct usb_device *dev, unsigned int ifnum)
 	usb_set_protocol(dev, iface->desc.bInterfaceNumber, 0);
 
 #if !defined(CONFIG_SYS_USB_EVENT_POLL_VIA_CONTROL_EP) && \
-    !defined(CONFIG_SYS_USB_EVENT_POLL_VIA_INT_QUEUE)
+    !defined(CONFIG_SYS_USB_EVENT_POLL_VIA_INT_QUEUE) && \
+    !defined(CONFIG_SYS_USB_EVENT_POLL_COMPATIBLE)
 	debug("USB KBD: set idle interval...\n");
 	usb_set_idle(dev, iface->desc.bInterfaceNumber, REPEAT_RATE / 4, 0);
+#elif defined(CONFIG_SYS_USB_EVENT_POLL_COMPATIBLE)
+	debug("USB KBD: set idle interval=0...\n");
+	if (use_int_queue)
+		usb_set_idle(dev, iface->desc.bInterfaceNumber, 0, 0);
+	else
+		usb_set_idle(dev, iface->desc.bInterfaceNumber, REPEAT_RATE / 4, 0);
 #else
 	debug("USB KBD: set idle interval=0...\n");
 	usb_set_idle(dev, iface->desc.bInterfaceNumber, 0, 0);
@@ -559,6 +601,12 @@ static int usb_kbd_probe_dev(struct usb_device *dev, unsigned int ifnum)
 				      USB_KBD_BOOT_REPORT_SIZE, data->new,
 				      data->intinterval);
 	if (!data->intq) {
+#elif defined(CONFIG_SYS_USB_EVENT_POLL_COMPATIBLE)
+	data->intq = create_int_queue(dev, data->intpipe, 1,
+				      USB_KBD_BOOT_REPORT_SIZE, data->new,
+				      data->intinterval);
+	// Only abort when we do support int queue, else we will fallback
+	if (!data->intq && use_int_queue) {
 #elif defined(CONFIG_SYS_USB_EVENT_POLL_VIA_CONTROL_EP)
 	if (usb_get_report(dev, iface->desc.bInterfaceNumber,
 			   1, 0, data->new, USB_KBD_BOOT_REPORT_SIZE) < 0) {
