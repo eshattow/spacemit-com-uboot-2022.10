@@ -294,6 +294,12 @@ static int prepare_ring(struct xhci_ctrl *ctrl, struct xhci_ring *ep_ring,
 void xhci_queue_command(struct xhci_ctrl *ctrl, dma_addr_t addr, u32 slot_id,
 			u32 ep_index, trb_type cmd)
 {
+	return xhci_queue_command_extra_flags(ctrl, addr, slot_id, ep_index, cmd, 0);
+}
+
+void xhci_queue_command_extra_flags(struct xhci_ctrl *ctrl, dma_addr_t addr, u32 slot_id,
+			u32 ep_index, trb_type cmd, u32 extra_flags)
+{
 	u32 fields[4];
 
 	BUG_ON(prepare_ring(ctrl, ctrl->cmd_ring, EP_STATE_RUNNING));
@@ -302,7 +308,7 @@ void xhci_queue_command(struct xhci_ctrl *ctrl, dma_addr_t addr, u32 slot_id,
 	fields[1] = upper_32_bits(addr);
 	fields[2] = 0;
 	fields[3] = TRB_TYPE(cmd) | SLOT_ID_FOR_TRB(slot_id) |
-		    ctrl->cmd_ring->cycle_state;
+		    ctrl->cmd_ring->cycle_state | extra_flags;
 
 	/*
 	 * Only 'reset endpoint', 'stop endpoint' and 'set TR dequeue pointer'

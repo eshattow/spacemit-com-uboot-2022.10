@@ -874,6 +874,9 @@ struct xhci_event_cmd {
 /* Block Event Interrupt */
 #define	TRB_BEI			(1<<9)
 
+/* Address device - disable SetAddress */
+#define	TRB_BSR			(1<<9)
+
 /* Control transfer TRB specific fields */
 #define TRB_DIR_IN		(1<<16)
 #define	TRB_TX_TYPE(p)		((p) << 16)
@@ -1256,6 +1259,8 @@ void xhci_setup_addressable_virt_dev(struct xhci_ctrl *ctrl,
 				     struct usb_device *udev, int hop_portnr);
 void xhci_queue_command(struct xhci_ctrl *ctrl, dma_addr_t addr,
 			u32 slot_id, u32 ep_index, trb_type cmd);
+void xhci_queue_command_extra_flags(struct xhci_ctrl *ctrl, dma_addr_t addr,
+			u32 slot_id, u32 ep_index, trb_type cmd, u32 extra_flags);
 void xhci_acknowledge_event(struct xhci_ctrl *ctrl);
 union xhci_trb *xhci_wait_for_event(struct xhci_ctrl *ctrl, trb_type expected);
 int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
@@ -1269,6 +1274,8 @@ void xhci_cleanup(struct xhci_ctrl *ctrl);
 struct xhci_ring *xhci_ring_alloc(struct xhci_ctrl *ctrl, unsigned int num_segs,
 				  bool link_trbs);
 int xhci_alloc_virt_device(struct xhci_ctrl *ctrl, unsigned int slot_id);
+void xhci_copy_ep0_dequeue_into_input_ctx(struct xhci_ctrl *ctrl,
+		  struct usb_device *udev);
 int xhci_mem_init(struct xhci_ctrl *ctrl, struct xhci_hccr *hccr,
 		  struct xhci_hcor *hcor);
 

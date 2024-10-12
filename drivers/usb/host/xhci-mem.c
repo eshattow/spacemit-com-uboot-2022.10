@@ -515,6 +515,30 @@ int xhci_alloc_virt_device(struct xhci_ctrl *ctrl, unsigned int slot_id)
 	return 0;
 }
 
+void xhci_copy_ep0_dequeue_into_input_ctx(struct xhci_ctrl *ctrl,
+		struct usb_device *udev)
+{
+	struct xhci_virt_device *virt_dev;
+	struct xhci_ep_ctx	*ep0_ctx;
+	struct xhci_ring	*ep_ring;
+
+	virt_dev = ctrl->devs[udev->slot_id];
+	ep0_ctx = xhci_get_ep_ctx(ctrl, virt_dev->in_ctx, 0);
+	ep_ring = virt_dev->eps[0].ring;
+	/*
+	 * FIXME we don't keep track of the dequeue pointer very well after a
+	 * Set TR dequeue pointer, so we're setting the dequeue pointer of the
+	 * host to our enqueue pointer.  This should only be called after a
+	 * configured device has reset, so all control transfers should have
+	 * been completed or cancelled before the reset.
+	 */
+	ep0_ctx->deq = cpu_to_le64(xhci_trb_virt_to_dma(ep_ring->enq_seg,
+							ep_ring->enqueue)
+				   | ep_ring->cycle_state);
+	/* uboot should flush the cache here while kernel do elsewhere */
+	xhci_flush_cache((uintptr_t)ep0_ctx, sizeof(struct xhci_ep_ctx));
+}
+
 /**
  * Allocates the necessary data structures
  * for XHCI host controller

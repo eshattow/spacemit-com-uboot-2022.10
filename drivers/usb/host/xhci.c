@@ -658,7 +658,7 @@ static int xhci_set_configuration(struct usb_device *udev)
  * @param udev pointer to the Device Data Structure
  * Return: 0 if successful else error code on failure
  */
-static int xhci_address_device(struct usb_device *udev, int root_portnr)
+static int xhci_address_device(struct usb_device *udev, int root_portnr, bool do_address)
 {
 	int ret = 0;
 	struct xhci_ctrl *ctrl = xhci_get_ctrl(udev);
@@ -674,14 +674,27 @@ static int xhci_address_device(struct usb_device *udev, int root_portnr)
 	 * This is the first Set Address since device plug-in
 	 * so setting up the slot context.
 	 */
-	debug("Setting up addressable devices %p\n", ctrl->dcbaa);
-	xhci_setup_addressable_virt_dev(ctrl, udev, root_portnr);
+	debug("Setting up addressable devices %p, BSR: %d\n", ctrl->dcbaa, !do_address);
+	slot_ctx = xhci_get_slot_ctx(ctrl, virt_dev->in_ctx);
+	/*
+	 * If this is the first Set Address since device plug-in or
+	 * virt_device realloaction after a resume with an xHCI power loss,
+	 * then set up the slot context.
+	 */
+	if (!slot_ctx->dev_info)
+		xhci_setup_addressable_virt_dev(ctrl, udev, root_portnr);
+	/* Otherwise, update the control endpoint ring enqueue pointer. */
+	else
+		xhci_copy_ep0_dequeue_into_input_ctx(ctrl, udev);
 
 	ctrl_ctx = xhci_get_input_control_ctx(virt_dev->in_ctx);
 	ctrl_ctx->add_flags = cpu_to_le32(SLOT_FLAG | EP0_FLAG);
 	ctrl_ctx->drop_flags = 0;
-
-	xhci_queue_command(ctrl, virt_dev->in_ctx->dma,
+	if (!do_address)
+		xhci_queue_command_extra_flags(ctrl, virt_dev->in_ctx->dma,
+			   slot_id, 0, TRB_ADDR_DEV, TRB_BSR);
+	else
+		xhci_queue_command(ctrl, virt_dev->in_ctx->dma,
 			   slot_id, 0, TRB_ADDR_DEV);
 	event = xhci_wait_for_event(ctrl, TRB_COMPLETION);
 	if (!event)
@@ -749,6 +762,9 @@ static int _xhci_alloc_device(struct usb_device *udev)
 	struct xhci_ctrl *ctrl = xhci_get_ctrl(udev);
 	union xhci_trb *event;
 	int ret;
+	struct usb_device *uhop;
+	struct udevice *hub;
+	int root_portnr = 0;
 
 	/*
 	 * Root hub will be first device to be initailized.
@@ -781,6 +797,21 @@ static int _xhci_alloc_device(struct usb_device *udev)
 		puts("Could not allocate xHCI USB device data structures\n");
 		return ret;
 	}
+
+	hub = udev->dev;
+	if (device_get_uclass_id(hub) == UCLASS_USB_HUB) {
+		/* Figure out our port number on the root hub */
+		if (usb_hub_is_root_hub(hub)) {
+			root_portnr = udev->portnr;
+		} else {
+			while (!usb_hub_is_root_hub(hub->parent))
+				hub = hub->parent;
+			uhop = dev_get_parent_priv(hub);
+			root_portnr = uhop->portnr;
+		}
+	}
+
+	xhci_address_device(udev, root_portnr, false);
 
 	return 0;
 }
@@ -1210,7 +1241,7 @@ static int _xhci_submit_control_msg(struct usb_device *udev, unsigned long pipe,
 
 	if (setup->request == USB_REQ_SET_ADDRESS &&
 	   (setup->requesttype & USB_TYPE_MASK) == USB_TYPE_STANDARD)
-		return xhci_address_device(udev, root_portnr);
+		return xhci_address_device(udev, root_portnr, true);
 
 	if (setup->request == USB_REQ_SET_CONFIGURATION &&
 	   (setup->requesttype & USB_TYPE_MASK) == USB_TYPE_STANDARD) {
@@ -1441,12 +1472,12 @@ int xhci_register(struct udevice *dev, struct xhci_hccr *hccr,
 	ctrl->dev = dev;
 
 	/*
-	 * XHCI needs to issue a Address device command to setup
-	 * proper device context structures, before it can interact
-	 * with the device. So a get_descriptor will fail before any
-	 * of that is done for XHCI unlike EHCI.
+	 * XHCI support get_descriptor before Address device command after
+	 * we support send Address device command with BSR to setup proper
+	 * device context structures without actually sending Set Address to
+	 * device, so enable it.
 	 */
-	priv->desc_before_addr = false;
+	priv->desc_before_addr = true;
 
 	ret = xhci_reset(hcor);
 	if (ret)
