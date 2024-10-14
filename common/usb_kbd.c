@@ -71,6 +71,7 @@ int overwrite_console(void)
 
 /* Device name */
 #define DEVNAME			"usbkbd"
+static unsigned int usbkbd_count;
 
 /* Keyboard maps */
 static const unsigned char usb_kbd_numkey[] = {
@@ -111,10 +112,15 @@ static const u8 usb_special_keys[] = {
 	(USB_KBD_NUMLOCK | USB_KBD_CAPSLOCK | USB_KBD_SCROLLLOCK)
 
 struct usb_kbd_pdata {
+	struct stdio_dev*	sdev;
 	unsigned long	intpipe;
 	int		intpktsize;
 	int		intinterval;
 	unsigned long	last_report;
+
+	/* The period of time between two calls of usb_kbd_testc(). */
+	unsigned long kbd_testc_tms;
+
 	struct int_queue *intq;
 
 	uint32_t	ifnum;
@@ -134,8 +140,6 @@ struct usb_kbd_pdata {
 
 extern int __maybe_unused net_busy_flag;
 
-/* The period of time between two calls of usb_kbd_testc(). */
-static unsigned long kbd_testc_tms;
 
 /* Puts character in the queue and sets up the in and out pointer. */
 static void usb_kbd_put_queue(struct usb_kbd_pdata *data, u8 c)
@@ -473,9 +477,9 @@ static int usb_kbd_testc(struct stdio_dev *sdev)
 	usb_kbd_dev = (struct usb_device *)dev->priv;
 	data = usb_kbd_dev->privptr;
 
-	if (get_timer(kbd_testc_tms) >= poll_delay) {
+	if (get_timer(data->kbd_testc_tms) >= poll_delay) {
 		usb_kbd_poll_for_event(usb_kbd_dev);
-		kbd_testc_tms = get_timer(0);
+		data->kbd_testc_tms = get_timer(0);
 	}
 
 	return !(data->usb_in_pointer == data->usb_out_pointer);
@@ -632,6 +636,7 @@ static int probe_usb_keyboard(struct usb_device *dev)
 	unsigned int max_ifnum = min((unsigned int)USB_MAX_ACTIVE_INTERFACES,
 				     (unsigned int)dev->config.no_of_if);
 	int error;
+	struct usb_kbd_pdata *data;
 
 	/* Try probing the keyboard */
 	for (ifnum = 0; ifnum < max_ifnum; ifnum++) {
@@ -644,30 +649,34 @@ static int probe_usb_keyboard(struct usb_device *dev)
 	/* Register the keyboard */
 	debug("USB KBD: register.\n");
 	memset(&usb_kbd_dev, 0, sizeof(struct stdio_dev));
-	strcpy(usb_kbd_dev.name, DEVNAME);
+	if (usbkbd_count)
+		sprintf(usb_kbd_dev.name, DEVNAME"%d", usbkbd_count);
+	else
+		strcpy(usb_kbd_dev.name, DEVNAME);
+	usbkbd_count++;
 	usb_kbd_dev.flags =  DEV_FLAGS_INPUT;
 	usb_kbd_dev.getc = usb_kbd_getc;
 	usb_kbd_dev.tstc = usb_kbd_testc;
 	usb_kbd_dev.priv = (void *)dev;
-	error = stdio_register(&usb_kbd_dev);
+	data = dev->privptr;
+	error = stdio_register_dev(&usb_kbd_dev, &data->sdev);
 	if (error)
 		return error;
-
 	stdinname = env_get("stdin");
 #if CONFIG_IS_ENABLED(CONSOLE_MUX)
-	if (strstr(stdinname, DEVNAME) != NULL) {
+	if (strstr(stdinname, usb_kbd_dev.name) != NULL) {
 		error = iomux_doenv(stdin, stdinname);
 		if (error)
 			return error;
 	}
 #else
 	/* Check if this is the standard input device. */
-	if (!strcmp(stdinname, DEVNAME)) {
+	if (!strcmp(stdinname, usb_kbd_dev.name)) {
 		/* Reassign the console */
 		if (overwrite_console())
 			return 1;
 
-		error = console_assign(stdin, DEVNAME);
+		error = console_assign(stdin, usb_kbd_dev.name);
 		if (error)
 			return error;
 	}
@@ -755,14 +764,14 @@ static int usb_kbd_remove(struct udevice *dev)
 	struct stdio_dev *sdev;
 	int ret;
 
-	sdev = stdio_get_by_name(DEVNAME);
+	data = udev->privptr;
+	sdev = data->sdev;
 	if (!sdev) {
 		ret = -ENXIO;
 		goto err;
 	}
-	data = udev->privptr;
 #if CONFIG_IS_ENABLED(CONSOLE_MUX)
-	if (iomux_replace_device(stdin, DEVNAME, "nulldev")) {
+	if (iomux_replace_device(stdin, data->sdev->name, "nulldev")) {
 		ret = -ENOLINK;
 		goto err;
 	}
@@ -774,6 +783,7 @@ static int usb_kbd_remove(struct udevice *dev)
 #ifdef CONFIG_SYS_USB_EVENT_POLL_VIA_INT_QUEUE
 	destroy_int_queue(udev, data->intq);
 #endif
+	usbkbd_count--;
 	free(data->new);
 	free(data);
 
