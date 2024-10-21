@@ -24,6 +24,8 @@
 #include <jffs2/load_kernel.h>
 #include <vsprintf.h>
 #include <ctype.h>
+#include <dm.h>
+#include <fb_spacemit.h>
 #include "nfs_env.h"
 
 #define NFS_LOAD_ADDR  CONFIG_FASTBOOT_BUF_ADDR
@@ -245,22 +247,29 @@ static int check_nand_bootfs(void)
 
 static int check_nor_bootfs(void)
 {
-	struct mtd_device *dev;
-	struct part_info *part;
-	u8 pnum;
-	char *partname;
-	int ret;
+	int part, blk_index;
+	char *blk_name;
+	char devpart_str[16];
 
-	ret = mtdparts_init();
-	if (ret) {
-		pr_info("Can't initialize MTD partitions\n");
+	if (get_available_boot_blk_dev(&blk_name, &blk_index)) {
+		pr_err("Cannot get available block device\n");
 		return -1;
 	}
 
-	partname = BOOTFS_NAME;
-	ret = find_dev_and_part(partname, &dev, &pnum, &part);
-	if (ret) {
-		pr_info("No partition named '%s'\n", partname);
+	part = detect_blk_dev_or_partition_exist(blk_name, blk_index, BOOTFS_NAME);
+	if (part < 0) {
+		pr_err("Failed to detect partition %s on %s:%d\n", BOOTFS_NAME, blk_name, blk_index);
+		return -1;
+	}
+
+	snprintf(devpart_str, sizeof(devpart_str), "%d:%d", blk_index, part);
+
+	if (!strcmp("mmc", blk_name)) {
+		pr_info("Found bootfs partition on eMMC device %s\n", devpart_str);
+	} else if (!strcmp("nvme", blk_name)) {
+		pr_info("Found bootfs partition on NVMe device %s\n", devpart_str);
+	} else {
+		pr_info("Not found bootfs partition on %s\n", blk_name);
 		return -1;
 	}
 
