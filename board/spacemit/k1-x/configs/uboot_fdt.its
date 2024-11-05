@@ -199,6 +199,16 @@
 				algo = "crc32";
 			};
 		};
+		fdt_21 {
+			description = "k1-x_uav";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k1-x_uav.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
+
 	};
 
 	configurations {
@@ -302,6 +312,11 @@
 			description = "k1-x_ZT001H";
 			loadables = "uboot";
 			fdt = "fdt_20";
+		};
+		conf_21 {
+			description = "k1-x_uav";
+			loadables = "uboot";
+			fdt = "fdt_21";
 		};
 	};
 };
