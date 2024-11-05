@@ -190,6 +190,15 @@
 				algo = "crc32";
 			};
 		};
+		fdt_20 {
+			description = "k1-x_ZT001H";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k1-x_ZT001H.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -288,6 +297,11 @@
 			description = "k1-x_orangepi-rv2";
 			loadables = "uboot";
 			fdt = "fdt_19";
+		};
+		conf_20 {
+			description = "k1-x_ZT001H";
+			loadables = "uboot";
+			fdt = "fdt_20";
 		};
 	};
 };
