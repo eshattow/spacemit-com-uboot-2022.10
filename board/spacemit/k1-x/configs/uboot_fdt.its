@@ -208,7 +208,15 @@
 				algo = "crc32";
 			};
 		};
-
+		fdt_22 {
+			description = "k1-x_MUSE-Paper2";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k1-x_MUSE-Paper2.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -317,6 +325,11 @@
 			description = "k1-x_uav";
 			loadables = "uboot";
 			fdt = "fdt_21";
+		};
+		conf_22 {
+			description = "k1-x_MUSE-Paper2";
+			loadables = "uboot";
+			fdt = "fdt_22";
 		};
 	};
 };
