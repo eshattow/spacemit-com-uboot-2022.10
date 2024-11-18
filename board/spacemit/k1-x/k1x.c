@@ -899,6 +899,8 @@ void refresh_config_info(u8 *eeprom_data)
 		{ TLV_CODE_SERIAL_NUMBER,  false, "serial#"},
 		{ TLV_CODE_MANUF_DATE,     false, "manufacture_date"},
 		{ TLV_CODE_MANUF_NAME,     false, "manufacturer"},
+		{ TLV_CODE_WIFI_MAC_ADDR,  false, "wifi_addr"},
+		{ TLV_CODE_BLUETOOTH_ADDR, false, "bt_addr"},
 		{ TLV_CODE_DEVICE_VERSION, true,  "device_version"},
 		{ TLV_CODE_SDK_VERSION,    true,  "sdk_version"},
 	};
@@ -928,7 +930,7 @@ void refresh_config_info(u8 *eeprom_data)
 			env_set(info[i].m_name, strval);
 			free(strval);
 		} else {
-			pr_err("Cannot find TLV data: %s\n", info[i].m_name);
+			pr_debug("Cannot find TLV data: %s\n", info[i].m_name);
 		}
 	}
 }
@@ -1281,6 +1283,31 @@ static int ft_board_info_fixup(void *blob, struct bd_info *bd)
 	return 0;
 }
 
+static int ft_board_mac_addr_fixup(void *blob, struct bd_info *bd)
+{
+	int node, i;
+	const char *addr_value;
+	// char addr_str[ARP_HLEN_ASCII + 1];
+	const char *mac_item[] = {"wifi_addr", "bt_addr"};
+
+	node = fdt_path_offset(blob, "/soc");
+	if (node < 0) {
+		pr_err("Can't find soc node!\n");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(mac_item); i++) {
+		addr_value = env_get(mac_item[i]);
+		if (NULL != addr_value) {
+			// memset(addr_str, 0, sizeof(addr_str));
+			// sprintf(addr_str, "%pM", addr_value);
+			fdt_setprop(blob, node, mac_item[i], addr_value, strlen(addr_value));
+		}
+	}
+
+	return 0;
+}
+
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	struct fdt_memory mem;
@@ -1303,5 +1330,6 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 
 	ft_board_cpu_fixup(blob, bd);
 	ft_board_info_fixup(blob, bd);
+	ft_board_mac_addr_fixup(blob, bd);
 	return 0;
 }
