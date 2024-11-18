@@ -191,15 +191,13 @@
 	default-brightness-level = <6>;
 	status = "okay";
 };
-/*
+
 &mipi_dsi {
-	bit-clk = <500000000>;
-	pix-clk = <70000000>;
 	status = "okay";
 };
 
 &panel {
-	force-attached = "jd9365dah3";
+	force-attached = "ft8201sinx101";
 	dcp-gpios = <&gpio 34 0>;
 	dcn-gpios = <&gpio 42 0>;
 	avee-gpios = <&gpio 35 0>;
@@ -209,4 +207,3 @@
 	reset-gpios = <&gpio 30 0>;
 	status = "okay";
 };
-*/
