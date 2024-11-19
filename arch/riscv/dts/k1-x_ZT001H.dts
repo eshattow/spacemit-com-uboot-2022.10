@@ -104,12 +104,6 @@
 		&range GPIO_124 1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_125 3 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 	>;
-
-	gpio80_pmx_func0: gpio80_pmx_func0 {
-		pinctrl-single,pins = <
-			K1X_PADCONF(GPIO_80, MUX_MODE0, (EDGE_BOTH | PULL_UP | PAD_3V_DS4))  /* mmc cd */
-		>;
-	};
 };
 
 &gpio{
