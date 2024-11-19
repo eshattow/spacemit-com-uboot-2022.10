@@ -351,6 +351,7 @@
 	reboot-flag = <&reboot_flag>;
 
 	charge-light = <&gpio 75 0 &gpio 76 0>;
+	valid-level = <0>;
 
 	charger-name = "charger0", "charger1";
 	charger0 = <&sgm41515>;
