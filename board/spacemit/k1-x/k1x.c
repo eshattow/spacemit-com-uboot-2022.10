@@ -1333,3 +1333,111 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	ft_board_mac_addr_fixup(blob, bd);
 	return 0;
 }
+
+static bool has_bootarg(const char *args, const char *param, size_t param_len)
+{
+	const char *p = args;
+
+	if (!args || !param || !param_len)
+		return false;
+
+	// Iterate through all parameters in args
+	while (*p) {
+		// Skip spaces
+		while (*p == ' ')
+			p++;
+		if (!*p)
+			break;
+
+		// Check if current parameter matches
+		if (strncmp(p, param, param_len) == 0 &&
+			(p[param_len] == '\0' || p[param_len] == ' ' || p[param_len] == '=')) {
+			return true;
+		}
+
+		// Move to next parameter
+		while (*p && *p != ' ')
+			p++;
+	}
+	return false;
+}
+
+char *board_fdt_chosen_bootargs(void)
+{
+	const void *fdt;
+	const char *env_args = env_get("bootargs");
+	const char *dts_args = NULL;
+	char *merged = NULL;
+	int nodeoffset;
+
+	fdt = (void *)env_get_hex("fdt_addr", 0);
+	if (!fdt) {
+		return (char *)env_args;
+	}
+
+	if (fdt_check_header(fdt)) {
+		pr_err("Invalid kernel DTB\n");
+		return (char *)env_args;
+	}
+
+	nodeoffset = fdt_path_offset(fdt, "/chosen");
+	if (nodeoffset >= 0)
+		dts_args = fdt_getprop(fdt, nodeoffset, "bootargs", NULL);
+
+	// Print env bootargs
+	pr_debug("Env bootargs:\n    %s\n", env_args ? env_args : "NULL");
+	// Print DTS bootargs
+	pr_debug("DTS bootargs:\n    %s\n", dts_args ? dts_args : "NULL");
+
+	if (!dts_args)
+		return (char *)env_args;
+
+	size_t total_len = 1;
+	if (env_args)
+		total_len += strlen(env_args);
+	if (dts_args)
+		total_len += strlen(dts_args) + 1;
+
+	merged = calloc(1, total_len);
+	if (!merged) {
+		pr_err("Memory allocation failed\n");
+		return NULL;
+	}
+
+	if (env_args)
+		strcpy(merged, env_args);
+
+	const char *p = dts_args;
+	bool need_space = (merged[0] != '\0');
+
+	while (p && *p) {
+		while (*p && *p == ' ')
+			p++;
+		if (!*p)
+			break;
+
+		const char *end = p;
+		while (*end && *end != ' ')
+			end++;
+
+		size_t param_len;
+		const char *eq = memchr(p, '=', end - p);
+		param_len = eq ? (size_t)(eq - p) : (size_t)(end - p);
+
+		if (!has_bootarg(env_args, p, param_len)) {
+			if (need_space)
+				strcat(merged, " ");
+			strncat(merged, p, end - p);
+			need_space = true;
+		}
+
+		p = end;
+	}
+
+	if (!merged[0]) {
+		free(merged);
+		merged = NULL;
+	}
+
+	return merged;
+}
