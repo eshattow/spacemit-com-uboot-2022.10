@@ -92,7 +92,7 @@
 			};
 		};
 		fdt_9 {
-			description = "k1-x_MUSE-Book.dtb";
+			description = "k1-x_MUSE-Book";
 			type = "flat_dt";
 			compression = "none";
 			data = /incbin/("../dtb/k1-x_MUSE-Book.dtb");
