@@ -26,7 +26,7 @@
 #define DDR_CHECK_CNT			(0x1000)
 #define TOP_DDR_NUM				1
 
-extern u32 ddr_cs_num;
+extern u32 ddr_cs_num, ddr_tx_odt;
 extern const char *ddr_type;
 extern int ddr_freq_change(u32 data_rate);
 extern void qos_set_default(void);
@@ -151,6 +151,11 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	if ((0 == ddr_cs_num) && dev_read_u32u(dev, "cs-num", &ddr_cs_num)) {
 		pr_info("ddr cs number not configed in dts!\n");
 		ddr_cs_num = DDR_CS_NUM;
+	}
+
+	/* if DDR tx odt is NOT configued in eeprom or in dts, use default value */
+	if ((0 == ddr_tx_odt) && dev_read_u32u(dev, "tx-odt", &ddr_tx_odt)) {
+		pr_info("ddr tx odt not configed in dts!\n");
 	}
 
 	if (NULL == ddr_type) {
