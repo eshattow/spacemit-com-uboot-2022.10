@@ -1014,6 +1014,8 @@ int board_late_init(void)
 
 	run_cardfirmware_flash_command();
 
+	run_net_flash_command();
+
 	ret = run_uboot_shell();
 	if (!ret) {
 		pr_info("reboot into uboot shell\n");
