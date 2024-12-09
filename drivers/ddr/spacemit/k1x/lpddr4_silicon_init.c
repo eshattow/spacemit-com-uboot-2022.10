@@ -107,15 +107,16 @@ static const uint32_t resistance_config_array[][2] = {
 	{40,  R_40},
 };
 
-static uint32_t get_resistance_config(uint32_t resistance)
+static uint32_t get_resistance_config(uint32_t *resistance)
 {
 	uint32_t i;
 	// the last item is the default value
 	for (i = 0; i < (ARRAY_SIZE(resistance_config_array) - 1); i++) {
-		if (resistance >= resistance_config_array[i][0])
+		if (*resistance >= resistance_config_array[i][0])
 			break;
 	}
 
+	*resistance = resistance_config_array[i][0];
 	return resistance_config_array[i][1];
 }
 
@@ -1389,7 +1390,7 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp, void *inp
 void lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 {
 	u32 fp=0;
-	u32 size_mb, mr8_value, cs_num;;
+	u32 size_mb, mr8_value, cs_num, tx_odt_ohm;
 	struct ddr_training_info_t *info;
 
 	cs_num = ddr_cs_num;
@@ -1406,12 +1407,14 @@ void lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 	if (0 == ddr_tx_odt) {
 		// if DDR tx odt is NOT configued in eeprom or in dts, use default value
 		ddr_tx_odt = io_para_update->tx_odt;
+		tx_odt_ohm = 80;
 	}
 	else {
 		// convert resistance to ddr controller config value
-		ddr_tx_odt = get_resistance_config(ddr_tx_odt);
+		tx_odt_ohm = ddr_tx_odt;
+		ddr_tx_odt = get_resistance_config(&tx_odt_ohm);
 	}
-	pr_info("ddr tx odt configed value %d!\n", ddr_tx_odt);
+	printf("set ddr tx odt to %dohm!\n", tx_odt_ohm);
 
 	top_DDR_MC_Phy_Device_Init(ddr_base, cs_num, 0);
 
