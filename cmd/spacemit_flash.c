@@ -124,6 +124,8 @@ int download_file_via_tftp(char *file_name, char *load_addr) {
 	char cmd_buffer[256];
 	char *tftp_server_ip;
 	char *tftp_path_prefix;
+	char *net_flash_protocol;
+	char *eth_mac;
 	int retry_count = 0;
 	int cmd_ret;
 
@@ -138,8 +140,20 @@ int download_file_via_tftp(char *file_name, char *load_addr) {
 		printf("Error: TFTP relative path not set\n");
 		return -1;
 	}
+	// Check if net flash mode is enabled
+	net_flash_protocol = env_get("net_flash_protocol");
+	if (!net_flash_protocol || strcmp(net_flash_protocol, "spacemit_tftp") != 0) {
+		sprintf(full_path, "%s%s", tftp_path_prefix, file_name);
+	} else {
+		eth_mac = env_get("ethaddr");
+		if (eth_mac) {
+			sprintf(full_path, "%s*%s%s", eth_mac, tftp_path_prefix, file_name);
+		} else {
+			printf("Warning: MAC address not found, using filename without prefix\n");
+			sprintf(full_path, "%s%s", tftp_path_prefix, file_name);
+		}
+	}
 
-	sprintf(full_path, "%s%s", tftp_path_prefix, file_name);
 	sprintf(cmd_buffer, "tftpboot %s %s:%s", load_addr, tftp_server_ip, full_path);
 
 	while (retry_count < TFTP_RETRY_COUNT) {
