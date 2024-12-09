@@ -115,7 +115,7 @@ static int	tftp_put_final_block_sent;
 #define STATE_INVALID_OPTION	8
 
 /* default TFTP block size */
-#define TFTP_BLOCK_SIZE		(512*20)
+#define TFTP_BLOCK_SIZE		512
 /* sequence number is 16 bit */
 #define TFTP_SEQUENCE_SIZE	((ulong)(1<<16))
 
