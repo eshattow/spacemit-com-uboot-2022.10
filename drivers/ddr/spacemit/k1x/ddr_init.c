@@ -119,12 +119,13 @@ ERR_HANDLE:
 }
 
 #ifdef CONFIG_K1_X_BOARD_ASIC
-extern void lpddr4_silicon_init(uint32_t base, const char *ddr_type, uint32_t data_rate);
+extern uint32_t lpddr4_silicon_init(uint32_t base, const char *ddr_type, uint32_t data_rate);
 #endif
 
 static int spacemit_ddr_probe(struct udevice *dev)
 {
 	int ret;
+	uint32_t data_rate;
 
 #ifdef CONFIG_K1_X_BOARD_FPGA
 	void (*ddr_init)(void);
@@ -165,11 +166,11 @@ static int spacemit_ddr_probe(struct udevice *dev)
 
 	/* init dram */
 	uint64_t start = get_timer(0);
-	lpddr4_silicon_init(ddrc_base, ddr_type, ddr_datarate);
+	data_rate = lpddr4_silicon_init(ddrc_base, ddr_type, ddr_datarate);
 	start = get_timer(start);
 	printf("lpddr4_silicon_init consume %lldms\n", start);
 #endif
-	ddr_freq_change(ddr_datarate);
+	ddr_freq_change(data_rate);
 
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
 	if (ret < 0) {

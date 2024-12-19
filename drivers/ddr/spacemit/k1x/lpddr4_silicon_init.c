@@ -1404,7 +1404,7 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp, void *inp
 	training(to_traning_param);
 }
 
-void lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
+uint32_t lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 {
 	u32 fp=0;
 	u32 size_mb, mr8_value, cs_num, tx_odt_ohm;
@@ -1488,7 +1488,7 @@ void lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 		break;
 	}
 
-	return;
+	return data_rate;
 }
 
 #endif
