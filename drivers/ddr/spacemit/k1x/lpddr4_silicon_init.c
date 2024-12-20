@@ -1163,10 +1163,27 @@ void top_DDR_phy_init(unsigned DDRC_BASE, unsigned int cs_num, unsigned fp)
 	return;
 }
 
-void top_Common_config(void)
+void top_Common_config(uint32_t ddr_data_rate)
 {
-	REG32(0xd4282800 + 0x39c) &= 0xFFFF00FF;
-	REG32(0xd4282800 + 0x39c) |= (0x3B << 8);
+	uint32_t pll1_reg0 = 0x55;
+	uint32_t pll1_reg1 = 0x55;
+	uint32_t pll1_reg2 = 0x3c;
+	uint32_t pll1_reg3 = 0x20;
+	uint32_t pll1_reg4 = 0x38;
+	uint32_t pll1_reg5 = 0x65;
+	uint32_t pll1_reg6 = 0xdd;
+	uint32_t pll1_reg7 = 0x50;
+
+	if (2666 == ddr_data_rate) {
+		//pll1 2666mbps
+		REG32(0xd4282800 + 0x39c) = (pll1_reg3 << 24) | (pll1_reg2 << 16) | (pll1_reg1 << 8) | (pll1_reg0);
+		REG32(0xd4282800 + 0x3a0) = (pll1_reg7 << 24) | (pll1_reg6 << 16) | (pll1_reg5 << 8) | (pll1_reg4);
+	}
+	else {
+		REG32(0xd4282800 + 0x39c) &= 0xFFFF00FF;
+		REG32(0xd4282800 + 0x39c) |= (0x3B << 8);
+	}
+
 	enable_PLL();
 	mck6_sw_fc_top(BOOT_PP);
 	REG32(0xd42828e8) &= 0xFFFFFFFC;
@@ -1387,7 +1404,7 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp, void *inp
 	training(to_traning_param);
 }
 
-void lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
+uint32_t lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 {
 	u32 fp=0;
 	u32 size_mb, mr8_value, cs_num, tx_odt_ohm;
@@ -1396,7 +1413,7 @@ void lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 	cs_num = ddr_cs_num;
 	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
 	ddr_mid = SAMSUNG;
-	top_Common_config();
+	top_Common_config(data_rate);
 
 	if (0 == strcasecmp(ddr_type, "LPDDR4"))
 		io_para_update = io_para_select(LPDDR4);
@@ -1460,6 +1477,7 @@ void lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 		break;
 
 	case 2400:
+	case 2666:
 		ddr_dfc(2);
 		break;
 
@@ -1470,7 +1488,7 @@ void lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 		break;
 	}
 
-	return;
+	return data_rate;
 }
 
 #endif
