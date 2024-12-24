@@ -811,10 +811,11 @@ static int flash_image(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 					}
 
 					free(split_file_name);
-				}
-				else{
+				} else {
 					ret = load_and_flash_file(cmdtp, fdev, file_name, part_name, &partition_offset);
 				}
+			} else {
+				ret = load_and_flash_file(cmdtp, fdev, file_name, part_name, &partition_offset);
 			}
 
 			if (RESULT_OK != ret) {
