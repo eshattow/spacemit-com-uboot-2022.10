@@ -696,7 +696,7 @@ void update_ddr_info(void)
 
 	// if fail to get ddr tx odt from eeprom, update it from dts node
 	if (0 == spacemit_eeprom_read((uint8_t*)&ddr_tx_odt, TLV_CODE_DDR_TX_ODT)) {
-		pr_info("Get ddr datarate %d from eeprom\n", ddr_datarate);
+		pr_info("Get ddr tx odt(%dohm) from eeprom\n", ddr_tx_odt);
 	}
 }
 
