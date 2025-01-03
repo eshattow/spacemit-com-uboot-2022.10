@@ -7,6 +7,7 @@
 #include "k1-x_pinctrl.dtsi"
 #include "k1-x_spm8821.dtsi"
 #include <dt-bindings/input/input.h>
+#include <dt-bindings/usb/pd.h>
 
 / {
 	model = "M1-MUSE-PAPER";
@@ -99,7 +100,31 @@
 	#size-cells = <0>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c4_2>;
-	status = "disabled";	
+	status = "okay";
+
+	husb239_u2: tcpc@62 {
+		compatible = "hynetek,husb239";
+		reg = <0x62>;
+		status = "okay";
+
+		connector {
+			compatible = "usb-c-connector";
+			label = "USB-C";
+			sink-pdos = <PDO_VAR(5000, 9000, 2000)>;
+		};
+	};
+
+	husb239_u3: tcpc@42 {
+		compatible = "hynetek,husb239";
+		reg = <0x42>;
+		status = "okay";
+
+		connector {
+			compatible = "usb-c-connector";
+			label = "USB-C";
+			sink-pdos = <PDO_VAR(5000, 9000, 2000)>;
+		};
+	};
 };
 
 &i2c5 {
