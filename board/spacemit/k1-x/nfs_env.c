@@ -349,7 +349,7 @@ int run_net_flash_command(void)
 {
 #ifdef CONFIG_CMD_NET
 	char cmd[128];
-	char *ip_addr;
+	char *ethaddr;
 	char *tftp_load_addr = (char *)NFS_LOAD_ADDR;
 	const char *flash_cmd = "flash_image net";
 	char *filesize_str;
@@ -378,15 +378,15 @@ int run_net_flash_command(void)
 		goto flash_fail;
 	}
 
-	// Get IP address after DHCP
-	ip_addr = env_get("ipaddr");
-	if (!ip_addr) {
-		pr_err("IP address not set in environment\n");
+	// Get mac address after DHCP
+	ethaddr = env_get("ethaddr");
+	if (!ethaddr) {
+		pr_err("mac address not set in environment\n");
 		goto flash_fail;
 	}
 
 	// Construct TFTP command
-	snprintf(cmd, sizeof(cmd), "tftpboot %lx %s", (ulong)tftp_load_addr, ip_addr);
+	snprintf(cmd, sizeof(cmd), "tftpboot %lx %s", (ulong)tftp_load_addr, ethaddr);
 	if (run_command(cmd, 0) != 0) {
 		pr_err("Failed to execute TFTP command\n");
 		goto flash_fail;
