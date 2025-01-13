@@ -2253,8 +2253,15 @@ static efi_status_t EFIAPI efi_stall(unsigned long microseconds)
 	EFI_ENTRY("%ld", microseconds);
 
 	end_tick = get_ticks() + usec_to_tick(microseconds);
-	while (get_ticks() < end_tick)
-		efi_timer_check();
+	while (get_ticks() < end_tick) {
+		/*
+		* Comment out efi_timer_check to ensure accurate timing.
+		* The original efi_timer_check (especially with keyboard attached) introduces
+		* significant delay, causing GRUB to miscalculate timer frequency.
+		* This leads to extended boot countdown where 1s becomes tens of seconds.
+		*/
+		//efi_timer_check();
+	}
 
 	return EFI_EXIT(EFI_SUCCESS);
 }
