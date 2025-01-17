@@ -49,6 +49,10 @@
 
 #define HUB_DEBOUNCE_TIMEOUT	1000
 
+#if CONFIG_IS_ENABLED(K1_X_BOARD_ASIC)
+static unsigned usb_hub_debounce_timeout = HUB_DEBOUNCE_TIMEOUT;
+#endif
+
 #define PORT_OVERCURRENT_MAX_SCAN_COUNT		3
 
 struct usb_device_scan {
@@ -204,16 +208,27 @@ static void usb_hub_power_on(struct usb_hub_device *hub)
 	 * so that the power can stablize before the devices are queried
 	 */
 	hub->query_delay = get_timer(0) + max(100, (int)pgood_delay);
-
+#if CONFIG_IS_ENABLED(K1_X_BOARD_ASIC)	
+	env = env_get("usb_hub_debounce_timeout");
+	if (env)
+		usb_hub_debounce_timeout = (unsigned)simple_strtol(env, NULL, 0);
+#endif
 	/*
 	 * Record the power-on timeout here. The max. delay (timeout)
 	 * will be done based on this value in the USB port loop in
 	 * usb_hub_configure() later.
 	 */
+#if CONFIG_IS_ENABLED(K1_X_BOARD_ASIC)
+	hub->connect_timeout = hub->query_delay + usb_hub_debounce_timeout;
+	debug("devnum=%d poweron: query_delay=%d connect_timeout=%d\n",
+	      dev->devnum, max(100, (int)pgood_delay),
+	      max(100, (int)pgood_delay) + usb_hub_debounce_timeout);
+#else
 	hub->connect_timeout = hub->query_delay + HUB_DEBOUNCE_TIMEOUT;
 	debug("devnum=%d poweron: query_delay=%d connect_timeout=%d\n",
 	      dev->devnum, max(100, (int)pgood_delay),
 	      max(100, (int)pgood_delay) + HUB_DEBOUNCE_TIMEOUT);
+#endif
 }
 
 #if !CONFIG_IS_ENABLED(DM_USB)
@@ -475,7 +490,7 @@ static int usb_scan_port(struct usb_device_scan *usb_scan)
 	if (!(portchange & USB_PORT_STAT_C_CONNECTION) &&
 	    !(portstatus & USB_PORT_STAT_CONNECTION)) {
 		if (get_timer(0) >= hub->connect_timeout) {
-			debug("devnum=%d port=%d: timeout\n",
+			printf("devnum=%d port=%d: timeout\n",
 			      dev->devnum, i + 1);
 			/* Remove this device from scanning list */
 			list_del(&usb_scan->list);
@@ -573,6 +588,7 @@ static int usb_device_list_scan(void)
 
 	running = 1;
 
+	pr_info("start port scan\n");
 	while (1) {
 		/* We're done, once the list is empty again */
 		if (list_empty(&usb_scan_list))
