@@ -6,6 +6,7 @@
 
 #include <common.h>
 #include <dm.h>
+#include <dm/device_compat.h>
 #include <errno.h>
 #include <i2c.h>
 #include <linux/usb/pd.h>
@@ -184,7 +185,7 @@ static void husb239_update_operating_status(struct udevice *dev)
 	if (status < 0)
 		return;
 
-	pr_info("update operating status: %x type: %x\n", status, type);
+	dev_info(dev, "update operating status: %x type: %x\n", status, type);
 
 	if (!(status & HUSB239_REG_STATUS_ATTACH)) {
 		husb239->voltage = 0;
@@ -196,7 +197,7 @@ static void husb239_update_operating_status(struct udevice *dev)
 	if (status0 < 0)
 		return;
 
-	pr_info("contract status0: %x\n", status0);
+	dev_info(dev, "contract status0: %x\n", status0);
 	pd_contract = (status0 & HUSB239_PD_CONTRACT_MASK) >> HUSB239_PD_CONTRACT_SHIFT;
 
 	if (!(type & HUSB239_REG_TYPE_SINK))
@@ -242,7 +243,7 @@ static void husb239_update_operating_status(struct udevice *dev)
 	husb239->op_current = op_current;
 
 out:
-	pr_info("update sink voltage: %dmV current: %dmA\n", husb239->voltage, husb239->op_current);
+	dev_info(dev, "update sink voltage: %dmV current: %dmA\n", husb239->voltage, husb239->op_current);
 }
 
 static int husb239_usbpd_detect(struct udevice *dev)
@@ -255,7 +256,7 @@ static int husb239_usbpd_detect(struct udevice *dev)
 		if(ret < 0)
 			return ret;
 
-		pr_info("husb239 detect pd, contract status0: %x\n", ret);
+		dev_info(dev, "husb239 detect pd, contract status0: %x\n", ret);
 		if (((ret & HUSB239_PD_CONTRACT_MASK) >> HUSB239_PD_CONTRACT_SHIFT) == SNKCAP_5V) {
 			husb239_update_operating_status(dev);
 			break;
@@ -304,7 +305,7 @@ static int husb239_usbpd_request_voltage(struct udevice *dev)
 		snk_sel = SNKCAP_20V;
 		break;
 	default:
-		pr_info("voltage %d is not support, use default 9v\n", husb239->req_voltage);
+		dev_info(dev, "voltage %d is not support, use default 9v\n", husb239->req_voltage);
 		snk_sel = SNKCAP_9V;
 		break;
 	}
@@ -314,7 +315,7 @@ static int husb239_usbpd_request_voltage(struct udevice *dev)
 		if(ret < 0)
 			return ret;
 
-		pr_info("husb239_attach src_pdo: %x\n", ret);
+		dev_info(dev, "husb239_attach src_pdo: %x\n", ret);
 		if (ret & HUSB239_REG_SRC_DETECT)
 			break;
 
@@ -332,7 +333,7 @@ static int husb239_usbpd_request_voltage(struct udevice *dev)
 	if (count == 0)
 		return -EINVAL;
 
-	pr_info("pd detect \n");
+	dev_info(dev, "pd detect\n");
 	ret = dm_i2c_reg_clrset(dev, HUSB239_REG_SRC_PDO,
 				HUSB239_REG_SRC_PDO_SEL_MASK, (snk_sel << 3));
 	if (ret)
@@ -344,7 +345,7 @@ static int husb239_usbpd_request_voltage(struct udevice *dev)
 		if(ret < 0)
 			return ret;
 
-		pr_info("husb239 check cc rx active, type: %x\n", ret);
+		dev_info(dev, "husb239 check cc rx active, type: %x\n", ret);
 		if (!(ret & HUSB239_REG_TYPE_CC_RX_ACTIVE))
 			break;
 
@@ -376,7 +377,7 @@ static int husb239_attach(struct udevice *dev)
 	if(type < 0)
 		return type;
 
-	pr_info("husb239 attach type: %x\n", type);
+	dev_info(dev, "husb239 attach type: %x\n", type);
 	if (type & HUSB239_REG_TYPE_SINK) {
 		if (!husb239_usbpd_detect(dev)) {
 			husb239->req_voltage = husb239->sink_voltage;/* mv */
@@ -398,22 +399,15 @@ static void husb239_pd_contract(struct udevice *dev)
 	return;
 }
 
-int husb239_detect_pd(void)
+int husb239_detect(struct udevice *dev)
 {
-	struct udevice *dev;
 	int int0, int1, int2;
-	int ret;
-
-	ret = uclass_get_device_by_driver(UCLASS_I2C_GENERIC,
-					  DM_DRIVER_GET(husb239),
-					  &dev);
-	if (ret < 0)
-		return ret;
 
 	int0 = dm_i2c_reg_read(dev, HUSB239_REG_INT);
 	int1 = dm_i2c_reg_read(dev, HUSB239_REG_INT1);
 	int2 = dm_i2c_reg_read(dev, HUSB239_REG_INT2);
-	pr_info("int0: 0x%x int1: 0x%x\n", int0, int1);
+	if (int0 || int1)
+		dev_info(dev, "int0: 0x%x int1: 0x%x\n", int0, int1);
 
 	dm_i2c_reg_write(dev, HUSB239_REG_INT, int0);
 	dm_i2c_reg_write(dev, HUSB239_REG_INT1, int1);
@@ -427,6 +421,21 @@ int husb239_detect_pd(void)
 
 	if (int0 & HUSB239_REG_MASK2_PD_HV)
 		husb239_pd_contract(dev);
+
+	return 0;
+}
+
+int husb239_detect_pd(void)
+{
+	struct udevice *dev;
+
+	for (uclass_get_device_by_driver(UCLASS_I2C_GENERIC,
+		 DM_DRIVER_GET(husb239), &dev); dev;
+		 uclass_next_device(&dev)) {
+		if (!device_active(dev))
+			continue;
+		husb239_detect(dev);
+	}
 
 	return 0;
 }
@@ -523,7 +532,7 @@ static int husb239_probe(struct udevice *dev)
 								 husb239->sink_pdo,
 								 husb239->sink_pdo_nr);
 			if (ret < 0) {
-				pr_err("sink cap validate failed: %d\n", ret);
+				dev_err(dev, "sink cap validate failed: %d\n", ret);
 				return ret;
 			}
 
@@ -545,7 +554,7 @@ static int husb239_probe(struct udevice *dev)
 				/* max sink voltage/current */
 				husb239->sink_voltage = max(5000, vol);/* mv */
 				husb239->sink_current = max(500, cur);/* ma */
-				pr_debug("sink voltage: %dmV sink current: %dmA\n",
+				dev_dbg(dev, "sink voltage: %dmV sink current: %dmA\n",
 							husb239->sink_voltage, husb239->sink_current);
 			}
 		}
@@ -554,7 +563,7 @@ static int husb239_probe(struct udevice *dev)
 	while(--count) {
 		ret = husb239_chip_init(dev);
 		if (ret < 0) {
-			pr_err("husb239 init chip fail\n");
+			dev_err(dev, "husb239 init chip fail\n");
 			continue;
 		}
 		break;
