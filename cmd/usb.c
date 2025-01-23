@@ -623,6 +623,7 @@ static void usb_show_info(struct usb_device *udev)
 }
 #endif
 
+extern bool usb_kbd_only;
 /******************************************************************************
  * usb command intepreter
  */
@@ -637,6 +638,17 @@ static int do_usb(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		return CMD_RET_USAGE;
 
 	usb_name = argc > 2 ? argv[2] : NULL;
+
+	if (strncmp(argv[1], "kbd", 3) == 0) {
+		if (usb_started)
+			return 0; /* Already started */
+		printf("starting USB only for keyboard...\n");
+		usb_kbd_only = true;
+		do_usb_start(usb_name);
+		return 0;
+	}
+
+	usb_kbd_only = false;
 
 	if (strncmp(argv[1], "start", 5) == 0) {
 		if (usb_started)
