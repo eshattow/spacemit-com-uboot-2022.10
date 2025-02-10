@@ -284,6 +284,8 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 	}
 
 	pr_debug("dpu_id %d,compat = %s\n", dpu_id, compat);
+	uc_priv->xsize = 1920;
+	uc_priv->ysize = 1080;
 
 	if(dpu_id == DPU_MODE_HDMI)
 	{
@@ -306,9 +308,6 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 			pr_info("%s: Failed to read timings\n", __func__);
 			return ret;
 		}
-
-		uc_priv->xsize = 1920;
-		uc_priv->ysize = 1080;
 
 		pr_info("fb=%lx, size=%dx%d\n", fbbase, uc_priv->xsize, uc_priv->ysize);
 
