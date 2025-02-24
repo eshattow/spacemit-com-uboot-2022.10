@@ -26,7 +26,11 @@
 
 	usb3hub: usb3hub {
 		compatible = "spacemit,usb-hub";
-		vbus-gpios = <&gpio 79 0>;	/* gpio_79 for usb3 pwren */
+		hub-gpios = <
+			&gpio 127 0	/* usb3 hub en */
+			&gpio 123 0>;	/* usb3 hub rst*/
+		vbus-gpios = <&gpio 79 0>;	/* usb3 hub output vbus */
+		regulator-force-boot-off;
 		status = "okay";
 	};
 
@@ -134,11 +138,11 @@
 };
 
 &usbphy1 {
-	status = "okay";
+	status = "disabled";
 };
 
 &ehci1 {
-	status = "okay";
+	status = "disabled";
 };
 
 &usb2phy {
