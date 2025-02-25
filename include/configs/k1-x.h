@@ -147,6 +147,10 @@ struct boot_storage_op
 	ulong (*read)(ulong byte_addr, ulong byte_size, void *buff);
 	bool (*write)(ulong byte_addr, ulong byte_size, void *buff);
 };
+
+/* LED GPIO definition for environment */
+#define STATUS_LED_GPIO0    96
+
 #endif
 
 #if defined(CONFIG_SPL_BUILD)
@@ -199,6 +203,7 @@ struct boot_storage_op
 	"splashimage=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
 	"splashpos=m,m\0" \
 	"splashfile=bianbu.bmp\0" \
+	"led0_gpio=" __stringify(STATUS_LED_GPIO0) "\0" \
 	BOOTENV_DEVICE_CONFIG
 
 
