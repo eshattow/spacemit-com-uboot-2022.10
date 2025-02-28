@@ -82,8 +82,7 @@
 #define MMC1_CLK_OFFSET    0x14
 
 extern int __data_start[], __data_end[];
-extern int k1x_eeprom_init(void);
-extern int spacemit_eeprom_read(uint8_t *buffer, uint8_t id);
+extern int get_tlvinfo(uint8_t id, uint8_t *buffer);
 extern bool get_mac_address(uint64_t *mac_addr);
 extern char *get_product_name(void);
 extern void update_ddr_info(void);
@@ -766,8 +765,8 @@ static void spl_load_env(void)
 
 bool get_mac_address(uint64_t *mac_addr)
 {
-	if ((k1x_eeprom_init() >= 0) && (NULL != mac_addr) &&
-		(0 == spacemit_eeprom_read((uint8_t*)mac_addr, TLV_CODE_MAC_BASE))) {
+	if ((NULL != mac_addr) &&
+		(0 == get_tlvinfo(TLV_CODE_MAC_BASE, (uint8_t*)mac_addr))) {
 		pr_info("Get mac address %llx from eeprom\n", *mac_addr);
 		return true;
 	}
@@ -780,8 +779,8 @@ char *get_product_name(void)
 	char *name = NULL;
 
 	name = calloc(1, 64);
-	if ((k1x_eeprom_init() >= 0) && (NULL != name) &&
-		(0 == spacemit_eeprom_read(name, TLV_CODE_PRODUCT_NAME))) {
+	if ((NULL != name) &&
+		(0 == get_tlvinfo(TLV_CODE_PRODUCT_NAME, name))) {
 		pr_info("Get product name from eeprom %s\n", name);
 		return name;
 	}
@@ -802,30 +801,27 @@ void update_ddr_info(void)
 	ddr_tx_odt = 0;
 	ddr_type = NULL;
 
-	if (k1x_eeprom_init() < 0)
-		return;
-
 	// read ddr type from eeprom
 	info = malloc(32);
 	memset(info, 0, 32);
-	if (0 == spacemit_eeprom_read(info, TLV_CODE_DDR_TYPE))
+	if (0 == get_tlvinfo(TLV_CODE_DDR_TYPE, info))
 		ddr_type = info;
 	else
 		free(info);
 
 	// if fail to get ddr cs number from eeprom, update it from dts node
-	if (0 == spacemit_eeprom_read((uint8_t*)&ddr_cs_num, TLV_CODE_DDR_CSNUM))
+	if (0 == get_tlvinfo(TLV_CODE_DDR_CSNUM, (uint8_t*)&ddr_cs_num))
 		pr_info("Get ddr cs num %d from eeprom\n", ddr_cs_num);
 
 	// if fail to get ddr cs number from eeprom, update it from dts node
-	if (0 == spacemit_eeprom_read((uint8_t*)&ddr_datarate, TLV_CODE_DDR_DATARATE)) {
+	if (0 == get_tlvinfo(TLV_CODE_DDR_DATARATE, (uint8_t*)&ddr_datarate)) {
 		// convert it from big endian to little endian
 		ddr_datarate = be16_to_cpu(ddr_datarate);
 		pr_info("Get ddr datarate %d from eeprom\n", ddr_datarate);
 	}
 
 	// if fail to get ddr tx odt from eeprom, update it from dts node
-	if (0 == spacemit_eeprom_read((uint8_t*)&ddr_tx_odt, TLV_CODE_DDR_TX_ODT)) {
+	if (0 == get_tlvinfo(TLV_CODE_DDR_TX_ODT, (uint8_t*)&ddr_tx_odt)) {
 		pr_info("Get ddr tx odt(%dohm) from eeprom\n", ddr_tx_odt);
 	}
 }
