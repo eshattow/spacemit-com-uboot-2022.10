@@ -209,7 +209,7 @@ static int lcd_mipi_identify(struct video_tx_device *dev)
 
 		video_tx_client->panel_info = panel_info;
 
-		if (panel_info->panel_type == LCD_EDP) {
+		if (panel_info->panel_type == LCD_EDP || panel_info->panel_type == LCD_DPI) {
 
 			is_panel = true;
 		} else {

@@ -397,6 +397,30 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 			}
 
 			video_tx->driver->bl_enable(video_tx, true);
+		} else if (fbi.tx->panel_type == LCD_DPI ){
+			dsi_dpu_init(spacemit_mode, fbbase);
+			video_tx_reset(fbi.tx);
+			video_tx = fbi.tx;
+
+			ret = uclass_first_device_err(UCLASS_PANEL, &panel);
+			if (ret) {
+				if (ret != -ENODEV)
+					pr_info("panel device error %d\n", ret);
+
+				return ret;
+			}
+
+			ret = panel_get_display_timing(panel, &timing);
+			if (ret) {
+				pr_info("%s: timing error: %d\n", __func__, ret);
+			}
+
+			ret = panel_enable_backlight(panel);
+			if (ret) {
+				pr_info("%s: backlight error: %d\n", __func__, ret);
+				return ret;
+			}
+
 		} else {
 			pr_info("%s: Failed to find panel\n", __func__);
 		}
