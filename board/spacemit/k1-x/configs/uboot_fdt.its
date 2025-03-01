@@ -164,10 +164,10 @@
 			};
 		};
 		fdt_17 {
-			description = "k1-x_orangepi-rv2";
+			description = "k1-x_InnoBoard-Pi";
 			type = "flat_dt";
 			compression = "none";
-			data = /incbin/("../dtb/k1-x_orangepi-rv2.dtb");
+			data = /incbin/("../dtb/k1-x_InnoBoard-Pi.dtb");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -195,6 +195,15 @@
 			type = "flat_dt";
 			compression = "none";
 			data = /incbin/("../dtb/k1-x_MUSE-Paper2.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
+		fdt_21 {
+			description = "k1-x_MUSE-Pi2";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k1-x_MUSE-Pi2.dtb");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -284,7 +293,7 @@
 			fdt = "fdt_16";
 		};
 		conf_17 {
-			description = "k1-x_orangepi-rv2";
+			description = "k1-x_InnoBoard-Pi";
 			loadables = "uboot";
 			fdt = "fdt_17";
 		};
@@ -302,6 +311,11 @@
 			description = "k1-x_MUSE-Paper2";
 			loadables = "uboot";
 			fdt = "fdt_20";
+		};
+		conf_21 {
+			description = "k1-x_MUSE-Pi2";
+			loadables = "uboot";
+			fdt = "fdt_21";
 		};
 	};
 };
