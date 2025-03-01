@@ -483,21 +483,21 @@ static ulong read_boot_storage_spinor(ulong byte_addr, ulong byte_size, void *bu
 		return 0;
 }
 
-static const struct boot_storage_op storage_read[] = {
-	{BOOT_MODE_EMMC, 0x10000, read_boot_storage_emmc, NULL},
-	{BOOT_MODE_SD, 0x10000, read_boot_storage_sdcard, NULL},
-	{BOOT_MODE_NOR, 0, read_boot_storage_spinor, NULL},
+static const struct boot_storage_op storage_op[] = {
+	{BOOT_MODE_EMMC, read_boot_storage_emmc, NULL},
+	{BOOT_MODE_SD, read_boot_storage_sdcard, NULL},
+	{BOOT_MODE_NOR, read_boot_storage_spinor, NULL},
 };
 
-static ulong read_training_info(void *buff, ulong byte_size)
+ulong read_boot_storage(void *buff, ulong offset, ulong byte_size)
 {
 	int i;
 	// read data from boot storage
 	enum board_boot_mode boot_storage = get_boot_storage();
 
-	for (i = 0; i < ARRAY_SIZE(storage_read); i++) {
-		if (boot_storage == storage_read[i].boot_storage)
-			return storage_read[i].read(storage_read[i].address, byte_size, buff);
+	for (i = 0; i < ARRAY_SIZE(storage_op); i++) {
+		if (boot_storage == storage_op[i].boot_storage)
+			return storage_op[i].read(offset, byte_size, buff);
 	}
 
 	return 0;
@@ -515,7 +515,7 @@ bool restore_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
 	// Force to do DDR software training while in USB download mode or info is invalid
 	if ((BOOT_MODE_USB == get_boot_mode()) ||
-		(sizeof(*info) != read_training_info(info, sizeof(*info))) ||
+		(sizeof(*info) != read_boot_storage(info, DDR_TRAINING_INFO_OFFSET, sizeof(*info))) ||
 		(DDR_TRAINING_INFO_MAGIC != info->magic) ||
 		(chipid != info->chipid) ||
 		(mac_addr != info->mac_addr) ||

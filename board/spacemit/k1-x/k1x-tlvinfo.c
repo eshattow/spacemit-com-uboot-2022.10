@@ -12,6 +12,7 @@
 
 extern int tlv_device_init(void);
 extern int init_tlv_from_eeprom(uint8_t *tlv_data, uint32_t tlv_size);
+extern ulong read_boot_storage(void *buff, ulong offset, ulong byte_size);
 
 /* File scope function prototypes */
 static bool is_checksum_valid(u8 *tlv_data);
@@ -145,7 +146,16 @@ static void update_crc(u8* tlv_data)
 
 static int init_tlv_data(uint8_t *buffer, u32 tlv_size)
 {
-	return init_tlv_from_eeprom(buffer, tlv_size);
+	int ret = init_tlv_from_eeprom(buffer, tlv_size);
+	if (0 != ret) {
+		if (tlv_size == read_boot_storage(buffer, TLV_DATA_OFFSET, tlv_size)) {
+			ret = 0;
+		} else {
+			pr_err("fail to read tlv data from boot storage\n");
+			ret = -1;
+		}
+	}
+	return ret;
 }
 
 static int read_tlvinfo(u8 *tlv_data, u32 tlv_size)

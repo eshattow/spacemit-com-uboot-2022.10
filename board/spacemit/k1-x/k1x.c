@@ -199,21 +199,21 @@ static bool write_boot_storage_spinor(ulong byte_addr, ulong byte_size, void *bu
 		return false;
 }
 
-static const struct boot_storage_op storage_write[] = {
-	{BOOT_MODE_EMMC, 0x10000, NULL, write_boot_storage_emmc},
-	{BOOT_MODE_SD, 0x10000, NULL, write_boot_storage_sdcard},
-	{BOOT_MODE_NOR, 0, NULL, write_boot_storage_spinor},
+static const struct boot_storage_op storage_op[] = {
+	{BOOT_MODE_EMMC, NULL, write_boot_storage_emmc},
+	{BOOT_MODE_SD, NULL, write_boot_storage_sdcard},
+	{BOOT_MODE_NOR, NULL, write_boot_storage_spinor},
 };
 
-static bool write_training_info(void *buff, ulong byte_size)
+static bool write_boot_storage(void *buff, ulong offset, ulong byte_size)
 {
 	int i;
 	// save data to boot storage
 	enum board_boot_mode boot_storage = get_boot_storage();
 
-	for (i = 0; i < ARRAY_SIZE(storage_write); i++) {
-		if (boot_storage == storage_write[i].boot_storage)
-			return storage_write[i].write(storage_write[i].address, byte_size, buff);
+	for (i = 0; i < ARRAY_SIZE(storage_op); i++) {
+		if (boot_storage == storage_op[i].boot_storage)
+			return storage_op[i].write(offset, byte_size, buff);
 	}
 
 	return false;
@@ -227,7 +227,7 @@ void save_ddr_training_info(void)
 	if ((DDR_TRAINING_INFO_MAGIC == info->magic) &&
 		(info->crc32 == crc32(0, (const uchar *)&info->chipid, sizeof(*info) - 8))) {
 		// save DDR training info to boot storage
-		write_training_info(info, sizeof(*info));
+		write_boot_storage(info, DDR_TRAINING_INFO_OFFSET, sizeof(*info));
 	}
 }
 
