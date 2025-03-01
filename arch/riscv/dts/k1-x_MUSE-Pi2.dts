@@ -77,7 +77,23 @@
 };
 
 &i2c5 {
-	status = "disabled";
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c5_0>;
+
+	raspits-panel@45 {
+		compatible = "raspberrypi,7inch-touchscreen-panel";
+		reg = <0x45>;
+		status = "okay";
+
+		enable-gpios = <&gpio 83 0>;
+
+		port {
+			panel_in_dsi1: endpoint {
+				remote-endpoint = <&dsi_out>;
+			};
+		};
+	};
 };
 
 &i2c6 {
@@ -267,26 +283,24 @@
 	status = "okay";
 };
 
-&pwm14 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pwm14_1>;
-	status = "disabled";
-};
-
-&backlight {
-	pwms = <&pwm14 0 2000>;
-	default-brightness-level = <6>;
-	status = "disabled";
-};
-
 &mipi_dsi {
-	status = "disabled";
+	bit-clk = <700000000>;
+	pix-clk = <24000000>;
+	status = "okay";
+
+	ports {
+		mipi_in: port {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			dsi_out: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&panel_in_dsi1>;
+			};
+		};
+	};
 };
 
 &panel {
-	dcp-gpios = <&gpio 82 0>;
-	dcn-gpios = <&gpio 83 0>;
-	backlight = <&backlight>;
-	reset-gpios = <&gpio 81 0>;
-	status = "disabled";
+	force-attached = "lcd_tc358762xbg_dpi";
+	status = "okay";
 };
