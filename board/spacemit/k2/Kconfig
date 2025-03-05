@@ -1,0 +1,46 @@
+if TARGET_SPACEMIT_K2
+
+config SYS_BOARD
+	default "k2"
+
+config SYS_VENDOR
+	default "spacemit"
+
+config SYS_CPU
+	default "x100"
+
+config SYS_CONFIG_NAME
+	default "spacemit_k2"
+
+config SYS_TEXT_BASE
+	default 0x81200000 if SPL
+	default 0x80000000 if !RISCV_SMODE
+	default 0x80200000 if RISCV_SMODE
+
+config SPL_TEXT_BASE
+	default 0x20100000
+
+config SPL_OPENSBI_LOAD_ADDR
+	hex
+	default 0x21000000
+
+config BOARD_SPECIFIC_OPTIONS # dummy
+	def_bool y
+	select SPACEMIT_X100
+
+choice
+	prompt "product board"
+	default K2_BOARD_FPGA
+
+config K2_BOARD_FPGA
+	bool "k2 board fpga"
+	help
+	  k2 board is fpga.
+
+config K2_BOARD_SIMULATION
+	bool "k2 board simulation"
+	help
+	  k2 board is simulation.
+endchoice
+
+endif
