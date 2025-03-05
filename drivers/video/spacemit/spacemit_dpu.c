@@ -398,10 +398,6 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 
 			video_tx->driver->bl_enable(video_tx, true);
 		} else if (fbi.tx->panel_type == LCD_DPI ){
-			dsi_dpu_init(spacemit_mode, fbbase);
-			video_tx_reset(fbi.tx);
-			video_tx = fbi.tx;
-
 			ret = uclass_first_device_err(UCLASS_PANEL, &panel);
 			if (ret) {
 				if (ret != -ENODEV)
@@ -409,6 +405,10 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 
 				return ret;
 			}
+
+			dsi_dpu_init(spacemit_mode, fbbase);
+			video_tx_reset(fbi.tx);
+			video_tx = fbi.tx;
 
 			ret = panel_get_display_timing(panel, &timing);
 			if (ret) {
