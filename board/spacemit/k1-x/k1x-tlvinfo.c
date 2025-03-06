@@ -18,10 +18,10 @@ extern bool tlvinfo_add_tlv(u8 *eeprom, int tcode, char *strval);
 extern bool write_boot_storage(void *buff, ulong offset, ulong byte_size);
 
 /* File scope function prototypes */
-static bool is_checksum_valid(u8 *tlv_data);
+bool is_checksum_valid(u8 *tlv_data);
 // for block device, mininum read size is 512 bytes(1 block)
-static __section(".data") uint8_t* tlvinfo_buffer = NULL;
-static __section(".data") bool is_tlv_in_eeprom;
+__section(".data") uint8_t* tlvinfo_buffer = NULL;
+__section(".data") bool is_tlv_in_eeprom;
 
 /**
  *  _is_valid_tlvinfo_header
@@ -54,7 +54,7 @@ static inline bool is_valid_tlv(struct tlvinfo_tlv *tlv)
  *  TLV is a CRC-32 TLV. Then calculate the CRC over the data
  *  and compare it to the value stored in the CRC-32 TLV.
  */
-static bool is_checksum_valid(u8 *tlv_data)
+bool is_checksum_valid(u8 *tlv_data)
 {
 	struct tlvinfo_header *tlv_hdr = (struct tlvinfo_header *)tlv_data;
 	struct tlvinfo_tlv    *tlv_crc;
@@ -119,7 +119,7 @@ bool tlvinfo_find_tlv(u8 *tlv_data, u8 tcode, int *index)
  *  one is added. This function should be called after each update to the
  *  TLV info structure, to make sure the CRC is always correct.
  */
-static void update_crc(u8* tlv_data)
+void update_crc(u8* tlv_data)
 {
 	struct tlvinfo_header* tlv_hdr = (struct tlvinfo_header*)tlv_data;
 	struct tlvinfo_tlv* tlv_crc;
@@ -260,7 +260,7 @@ int write_tlv_to_storage(uint32_t addr, uint8_t* buf, uint32_t size)
 		return write_boot_storage(buf, addr + TLV_DATA_OFFSET, round_up(size, 512)) ? 0 : -1;
 }
 
-static bool tlvinfo_delete_tlv(u8* tlv_data, u8 code)
+bool tlvinfo_delete_tlv(u8* tlv_data, u8 code)
 {
 	int index;
 	int tlength;
