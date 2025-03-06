@@ -897,10 +897,10 @@ const struct oem_config_info config_info[] = {
 static int write_config_info_to_eeprom(uint32_t id, char *value)
 {
 	if (!tlvinfo_init){
-		run_command("tlv_eeprom", 0);
+		run_command("tlv_custom", 0);
 		tlvinfo_init = true;
 	}
-	if (run_commandf("tlv_eeprom set 0x%x %s", id, value) == 0)
+	if (run_commandf("tlv_custom set 0x%x %s", id, value) == 0)
 		return 0;
 	else
 		return -1;
@@ -1015,10 +1015,10 @@ static void write_oem_configuration(char *config, char *response)
 static void flush_oem_configuration(char *config, char *response)
 {
 	if (!tlvinfo_init){
-		run_command("tlv_eeprom", 0);
+		run_command("tlv_custom", 0);
 		tlvinfo_init = true;
 	}
-	if (run_command("tlv_eeprom write", 0) == 0)
+	if (run_command("tlv_custom write", 0) == 0)
 		fastboot_okay(NULL, response);
 	else
 		fastboot_fail("write fail", response);
@@ -1265,7 +1265,7 @@ void clear_storage_data(char *cmd_parameter, char *response)
 	if (!strncmp("eeprom", operation, 6)){
 		erase_size = (erase_size == 0) ? DEFAULT_EEPROM_ERASE_SIZE : erase_size;
 		pr_info("erase eeprom, erase size:%x\n", erase_size);
-		if (run_command("tlv_eeprom;tlv_eeprom erase;tlv_eeprom write", 0))
+		if (run_command("tlv_custom;tlv_custom erase;tlv_custom write", 0))
 			fastboot_fail("erase eeprom fail", response);
 		else
 			fastboot_okay(NULL, response);
