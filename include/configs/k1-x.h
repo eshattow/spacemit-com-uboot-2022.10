@@ -143,9 +143,14 @@ struct ddr_training_info_t {
 struct boot_storage_op
 {
 	uint32_t boot_storage;
-	uint32_t address;
 	ulong (*read)(ulong byte_addr, ulong byte_size, void *buff);
 	bool (*write)(ulong byte_addr, ulong byte_size, void *buff);
+};
+
+// data usage in private partition
+enum private_part_offset {
+	DDR_TRAINING_INFO_OFFSET = 0x10000,
+	TLV_DATA_OFFSET = 0x10000 + 0x1000,
 };
 
 /* LED GPIO definition for environment */

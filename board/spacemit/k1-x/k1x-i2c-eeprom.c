@@ -99,7 +99,7 @@ int init_tlv_from_eeprom(uint8_t *tlv_data, uint32_t tlv_size)
 		else {
 			pr_info("find eeprom in bus %d, address %d\n", bus, saddr);
 			init_tlv_data(saddr, tlv_data, tlv_size);
-			return 0;
+			return tlv_size;
 		}
 	}
 

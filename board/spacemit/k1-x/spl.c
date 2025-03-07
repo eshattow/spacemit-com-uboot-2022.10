@@ -82,12 +82,12 @@
 #define MMC1_CLK_OFFSET    0x14
 
 extern int __data_start[], __data_end[];
-extern int get_tlvinfo(uint8_t id, uint8_t *buffer);
+extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 extern bool get_mac_address(uint64_t *mac_addr);
 extern char *get_product_name(void);
 extern void update_ddr_info(void);
 extern enum board_boot_mode get_boot_storage(void);
-extern int spl_mtd_read(struct mtd_info *mtd, ulong sector, ulong count, void *buf);
+extern ulong read_boot_storage(void *buff, ulong offset, ulong byte_size);
 char *product_name;
 extern u32 ddr_cs_num, ddr_datarate, ddr_tx_odt;
 extern const char *ddr_type;
@@ -435,74 +435,6 @@ void load_board_config(int *eeprom_i2c_index, int *eeprom_pin_group, int *pmic_t
 	pr_debug("pmic_type :%d\n", *pmic_type);
 }
 
-static ulong read_boot_storage_emmc(ulong byte_addr, ulong byte_size, void *buff)
-{
-	ulong ret;
-	//select mmc device(MUST be align with spl.dts): 0:sd, 1:emmc
-	struct blk_desc *dev_desc = blk_get_dev("mmc", 1);
-	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
-		pr_err("invalid mmc device\n");
-		return 0;
-	}
-
-	blk_dselect_hwpart(dev_desc, 0);
-	ret = blk_dread(dev_desc,
-		byte_addr / dev_desc->blksz,
-		byte_size / dev_desc->blksz, buff);
-	return dev_desc->blksz * ret;
-}
-
-static ulong read_boot_storage_sdcard(ulong byte_addr, ulong byte_size, void *buff)
-{
-	ulong ret;
-	//select sdcard device(MUST be align with spl.dts): 0:sd, 1:emmc
-	struct blk_desc *dev_desc = blk_get_dev("mmc", 0);
-	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
-		pr_err("invalid sdcard device\n");
-		return 0;
-	}
-
-	ret = blk_dread(dev_desc,
-		byte_addr / dev_desc->blksz,
-		byte_size / dev_desc->blksz, buff);
-	return dev_desc->blksz * ret;
-}
-
-static ulong read_boot_storage_spinor(ulong byte_addr, ulong byte_size, void *buff)
-{
-	struct mtd_info *mtd;
-	const char* part = "private";
-
-	mtd_probe_devices();
-	mtd = get_mtd_device_nm(part);
-	if ((NULL != mtd) && (0 == spl_mtd_read(mtd, byte_addr, byte_size, buff))) {
-		// print_buffer(0, buff, 1, byte_size, 16);
-		return byte_size;
-	}
-	else
-		return 0;
-}
-
-static const struct boot_storage_op storage_read[] = {
-	{BOOT_MODE_EMMC, 0x10000, read_boot_storage_emmc, NULL},
-	{BOOT_MODE_SD, 0x10000, read_boot_storage_sdcard, NULL},
-	{BOOT_MODE_NOR, 0, read_boot_storage_spinor, NULL},
-};
-
-static ulong read_training_info(void *buff, ulong byte_size)
-{
-	int i;
-	// read data from boot storage
-	enum board_boot_mode boot_storage = get_boot_storage();
-
-	for (i = 0; i < ARRAY_SIZE(storage_read); i++) {
-		if (boot_storage == storage_read[i].boot_storage)
-			return storage_read[i].read(storage_read[i].address, byte_size, buff);
-	}
-
-	return 0;
-}
-
 bool restore_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 {
 	bool success = true;
@@ -515,7 +447,7 @@ bool restore_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
 	// Force to do DDR software training while in USB download mode or info is invalid
 	if ((BOOT_MODE_USB == get_boot_mode()) ||
-		(sizeof(*info) != read_training_info(info, sizeof(*info))) ||
+		(sizeof(*info) != read_boot_storage(info, DDR_TRAINING_INFO_OFFSET, sizeof(*info))) ||
 		(DDR_TRAINING_INFO_MAGIC != info->magic) ||
 		(chipid != info->chipid) ||
 		(mac_addr != info->mac_addr) ||
@@ -766,7 +698,7 @@ static void spl_load_env(void)
 bool get_mac_address(uint64_t *mac_addr)
 {
 	if ((NULL != mac_addr) &&
-		(0 == get_tlvinfo(TLV_CODE_MAC_BASE, (uint8_t*)mac_addr))) {
+		(get_tlvinfo(TLV_CODE_MAC_BASE, (uint8_t*)mac_addr, 6)) > 0) {
 		pr_info("Get mac address %llx from eeprom\n", *mac_addr);
 		return true;
 	}
@@ -780,7 +712,7 @@ char *get_product_name(void)
 
 	name = calloc(1, 64);
 	if ((NULL != name) &&
-		(0 == get_tlvinfo(TLV_CODE_PRODUCT_NAME, name))) {
+		(get_tlvinfo(TLV_CODE_PRODUCT_NAME, name, 64)) > 0) {
 		pr_info("Get product name from eeprom %s\n", name);
 		return name;
 	}
@@ -804,24 +736,24 @@ void update_ddr_info(void)
 	// read ddr type from eeprom
 	info = malloc(32);
 	memset(info, 0, 32);
-	if (0 == get_tlvinfo(TLV_CODE_DDR_TYPE, info))
+	if (get_tlvinfo(TLV_CODE_DDR_TYPE, info, 32) > 0)
 		ddr_type = info;
 	else
 		free(info);
 
 	// if fail to get ddr cs number from eeprom, update it from dts node
-	if (0 == get_tlvinfo(TLV_CODE_DDR_CSNUM, (uint8_t*)&ddr_cs_num))
+	if (get_tlvinfo(TLV_CODE_DDR_CSNUM, (uint8_t*)&ddr_cs_num, 1) > 0)
 		pr_info("Get ddr cs num %d from eeprom\n", ddr_cs_num);
 
 	// if fail to get ddr cs number from eeprom, update it from dts node
-	if (0 == get_tlvinfo(TLV_CODE_DDR_DATARATE, (uint8_t*)&ddr_datarate)) {
+	if (get_tlvinfo(TLV_CODE_DDR_DATARATE, (uint8_t*)&ddr_datarate, 2) > 0) {
 		// convert it from big endian to little endian
 		ddr_datarate = be16_to_cpu(ddr_datarate);
 		pr_info("Get ddr datarate %d from eeprom\n", ddr_datarate);
 	}
 
 	// if fail to get ddr tx odt from eeprom, update it from dts node
-	if (0 == get_tlvinfo(TLV_CODE_DDR_TX_ODT, (uint8_t*)&ddr_tx_odt)) {
+	if (get_tlvinfo(TLV_CODE_DDR_TX_ODT, (uint8_t*)&ddr_tx_odt, 1) > 0) {
 		pr_info("Get ddr tx odt(%dohm) from eeprom\n", ddr_tx_odt);
 	}
 }
