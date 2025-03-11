@@ -24,6 +24,10 @@ config SPL_OPENSBI_LOAD_ADDR
 	hex
 	default 0x21000000
 
+config SPACEMIT_BUILD_BIN
+       bool "build fsbl.bin for spacemit image"
+       default n
+
 config BOARD_SPECIFIC_OPTIONS # dummy
 	def_bool y
 	select SPACEMIT_X100
@@ -37,10 +41,6 @@ config K2_BOARD_FPGA
 	help
 	  k2 board is fpga.
 
-config K2_BOARD_SIMULATION
-	bool "k2 board simulation"
-	help
-	  k2 board is simulation.
 endchoice
 
 endif

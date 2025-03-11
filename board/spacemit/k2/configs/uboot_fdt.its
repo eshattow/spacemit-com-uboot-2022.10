@@ -1,0 +1,43 @@
+/dts-v1/;
+
+/ {
+	description = "U-boot FIT image for k2";
+	#address-cells = <2>;
+	fit,fdt-list = "of-list";
+
+	images {
+		uboot {
+			description = "U-Boot";
+			type = "standalone";
+			os = "U-Boot";
+			arch = "riscv";
+			compression = "none";
+			load = <0x0 0x00200000>;
+			data = /incbin/("../u-boot-nodtb.bin");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
+
+		fdt_1 {
+			description = "k2_fpga.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k2_fpga.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
+
+	};
+
+	configurations {
+		default = "conf_1";
+		conf_1 {
+			description = "k2_fpga";
+			loadables = "uboot";
+			fdt = "fdt_1";
+		};
+
+	};
+};
