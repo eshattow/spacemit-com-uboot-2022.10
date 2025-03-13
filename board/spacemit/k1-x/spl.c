@@ -88,6 +88,9 @@ extern char *get_product_name(void);
 extern void update_ddr_info(void);
 extern enum board_boot_mode get_boot_storage(void);
 extern ulong read_boot_storage(void *buff, ulong offset, ulong byte_size);
+extern int dram_init_banksize(void);
+extern void spl_fixup_fdt(void *fdt_blob);
+
 char *product_name;
 extern u32 ddr_cs_num, ddr_datarate, ddr_tx_odt;
 extern const char *ddr_type;
@@ -817,4 +820,10 @@ void spl_load_error_handler(int bootdev, const char *loader_name)
 		printf("%s load failed\n", loader_name);
 		break;
 	}
+}
+
+void spl_perform_fixups(struct spl_image_info *spl_image)
+{
+	dram_init_banksize();
+	spl_fixup_fdt(spl_image->fdt_addr);
 }
