@@ -164,10 +164,10 @@
 			};
 		};
 		fdt_17 {
-			description = "k1-x_MUSE-Pi2";
+			description = "k1-x_MUSE-Pi-Pro";
 			type = "flat_dt";
 			compression = "none";
-			data = /incbin/("../dtb/k1-x_MUSE-Pi2.dtb");
+			data = /incbin/("../dtb/k1-x_MUSE-Pi-Pro.dtb");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -266,7 +266,7 @@
 			fdt = "fdt_16";
 		};
 		conf_17 {
-			description = "k1-x_MUSE-Pi2";
+			description = "k1-x_MUSE-Pi-Pro";
 			loadables = "uboot";
 			fdt = "fdt_17";
 		};
