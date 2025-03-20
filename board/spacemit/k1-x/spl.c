@@ -109,7 +109,7 @@ struct led_config {
 static const struct led_config board_leds[] = {
 	{
 		.product_names = {
-			"k1-x_MUSE-Pi2",
+			"k1-x_MUSE-Pi-Pro",
 		},
 		.gpio = STATUS_LED_GPIO0,
 		.pad_conf_reg = 0xD401E1E0,  // K1X_PADCONF_DVL0
@@ -151,7 +151,7 @@ static const struct led_config *get_led_config(void)
 		}
 	}
 
-	printf("Warning: No LED config found for board %s\n", name);
+	pr_debug("Warning: No LED config found for board %s\n", name);
 	return &board_leds[0];
 }
 
@@ -171,7 +171,7 @@ static void gpio_led_init(void)
 	/* Set initial state to HIGH */
 	writel(GPIO_TO_BIT(current_led->gpio), &gpio_bank->gpsr);
 
-	printf("GPIO LED initialized for %s on pin %d\n", current_led->product_names[0], current_led->gpio);
+	pr_debug("GPIO LED initialized for %s on pin %d\n", current_led->product_names[0], current_led->gpio);
 }
 
 static void gpio_led_set(int value)
