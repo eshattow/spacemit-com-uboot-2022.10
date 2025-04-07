@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * finch board's base device tree configure.
+ *
+ * Copyright (C) 2019 SPACEMIT Micro Limited
+ */
+
+#include "k2.dtsi"
+
+/ {
+	compatible = "spacemit,k2-fpga";
+
+};
+
+&uart0 {
+	status = "okay";
+};

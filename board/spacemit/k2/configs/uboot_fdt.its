@@ -23,7 +23,7 @@
 			description = "k2_fpga.dtb";
 			type = "flat_dt";
 			compression = "none";
-			data = /incbin/("../dtb/k2_fpga.dtb");
+			data = /incbin/("../dtb/k2_fpga_1x1.dtb");
 			hash-1 {
 				algo = "crc32";
 			};
