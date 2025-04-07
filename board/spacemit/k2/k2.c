@@ -50,6 +50,56 @@ int board_late_init(void)
 	return 0;
 }
 
+int misc_init_r(void)
+{
+	return 0;
+}
+extern u32 ddr_get_density(void);
+
+int dram_init(void)
+{
+#if CONFIG_K2_BOARD_FPGA
+	gd->ram_size = SZ_2GB - SEC_IMG_SIZE;
+#else
+	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
+	gd->ram_size = dram_size;
+#endif
+	gd->ram_base = CONFIG_SYS_SDRAM_BASE;
+
+	return 0;
+}
+
+int dram_init_banksize(void)
+{
+#if CONFIG_K2_BOARD_FPGA
+	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
+	gd->bd->bi_dram[0].size = SZ_2G - SEC_IMG_SIZE;
+#else
+	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
+
+	memset(gd->bd->bi_dram, 0, sizeof(gd->bd->bi_dram));
+	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
+	gd->bd->bi_dram[0].size = dram_size;
+#endif
+	return 0;
+}
+
+ulong board_get_usable_ram_top(ulong total_size)
+{
+#if CONFIG_K2_BOARD_FPGA
+	return 0x180000000;
+#else
+	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
+
+		/* Some devices (like the EMAC) have a 32-bit DMA limit. */
+	if(dram_size > SZ_2GB) {
+		return 0x80000000;
+	} else {
+		return dram_size;
+	}
+#endif
+}
+
 void *board_fdt_blob_setup(int *err)
 {
 	*err = 0;
