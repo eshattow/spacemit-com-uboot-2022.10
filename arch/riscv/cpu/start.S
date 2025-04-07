@@ -17,10 +17,6 @@
 #include <asm/encoding.h>
 #include <generated/asm-offsets.h>
 
-#if defined(CONFIG_SPL_BOOTING_NON_AI_CORE_SUPPORT) && defined(CONFIG_SPL_BUILD)
-#include <configs/k1-x.h>
-#endif
-
 #ifdef CONFIG_32BIT
 #define LREG			lw
 #define SREG			sw
@@ -45,12 +41,6 @@ secondary_harts_relocation_error:
 .globl _start
 _start:
 #if CONFIG_IS_ENABLED(RISCV_MMODE)
-#ifdef CONFIG_RISCV_ISA_DOUBLE_FLOAT
-	csrr	a0, CSR_MSTATUS
-	li		t0, 3<<13
-	xor		a0, a0, t0
-	csrw	CSR_MSTATUS, a0
-#endif
 	csrr	a0, CSR_MHARTID
 #endif
 
@@ -81,14 +71,6 @@ _start:
 	 * IPI
 	 */
 	csrw	MODE_PREFIX(ie), zero
-
-#if defined(CONFIG_SPL_BOOTING_NON_AI_CORE_SUPPORT) && defined(CONFIG_SPL_BUILD)
-	/* set the secondary cpu's boot entry */
-	la	t0, _non_ai_start
-	li	t1, CLUSTER1_RVBADDR_LO_ADDR
-	sw	t0, 0(t1)
-	fence   ow, ow
-#endif
 
 #if CONFIG_IS_ENABLED(SMP)
 	/* check if hart is within range */
@@ -138,6 +120,11 @@ call_board_init_f_0:
 
 	/* Configure proprietary settings and customized CSRs of harts */
 call_harts_early_init:
+#if CONFIG_IS_ENABLED(RISCV_MMODE)
+	csrsi 0x7c0, 0x1
+	csrsi 0x7c0, 0x2
+#endif
+
 	jal	harts_early_init
 
 #ifndef CONFIG_XIP
@@ -165,7 +152,6 @@ call_harts_early_init:
 	
 	mv      a0, s0
 	jal	board_init_f_init_reserve
-
 	SREG	s1, GD_FIRMWARE_FDT_ADDR(gp)
 	/* save the boot hart id to global_data */
 	SREG	tp, GD_BOOT_HART(gp)
@@ -207,10 +193,6 @@ wait_for_gd_init:
 	jal	icache_enable
 	jal	dcache_enable
 
-	/* Enable prefetch and branch predict*/
-	jal branch_predict_enable
-	jal prefetch_enable
-
 #ifdef CONFIG_DEBUG_UART
 	jal	debug_uart_init
 #endif
@@ -218,7 +200,6 @@ wait_for_gd_init:
 	mv	a0, zero		/* a0 <-- boot_flags = 0 */
 	la	t5, board_init_f
 	jalr	t5			/* jump to board_init_f() */
-
 #ifdef CONFIG_SPL_BUILD
 spl_clear_bss:
 	la	t0, __bss_start
@@ -469,87 +450,3 @@ secondary_hart_loop:
 #endif
 
 	j	secondary_hart_loop
-
-#if defined(CONFIG_SPL_BOOTING_NON_AI_CORE_SUPPORT) && defined(CONFIG_SPL_BUILD)
-	.extern _non_ai_entry
-	.align 2
-	.global _non_ai_start
-_non_ai_start:
-	/* Reset all registers for non-boot HARTs */
-	li	ra, 0
-	call	_reset_regs
-
-	/* Disable all interrupts */
-	csrw	CSR_MIE, zero
-
-	li	t0, -16
-	li	t1, NON_AI_CORE_STACK_TOP_BASE
-	and	sp, t1, t0		/* force 16 byte alignment */
-
-	/* Find HART id */
-	csrr	tp, CSR_MHARTID
-
-	/*
-	 * Set the global data pointer to a known value in case we get a very
-	 * early trap. The global data pointer will be set its actual value only
-	 * after it has been initialized.
-	 */
-	mv	gp, zero
-
-	/*
-	 * Set the trap handler. This must happen after initializing gp because
-	 * the handler may use it.
-	 */
-	la	t0, trap_entry
-	csrw	MODE_PREFIX(tvec), t0
-
-	/* Enable cache */
-	jal	invalidate_icache_all
-	jal	icache_enable
-	jal	dcache_enable
-
-	li	t0, CLUSTER0_RVBADDR_LO_ADDR
-	lwu	a0, 0(t0)
-	fence   ow, ow
-
-	call	_non_ai_entry
-
-	/* We don't expect to reach here hence just hang */
-	j	.
-
-_reset_regs:
-
-	/* flush the instruction cache */
-	fence.i
-	/* Reset all registers except ra, a0, a1 and a2 */
-	li sp, 0
-	li gp, 0
-	li tp, 0
-	li t0, 0
-	li t1, 0
-	li t2, 0
-	li s0, 0
-	li s1, 0
-	li a3, 0
-	li a4, 0
-	li a5, 0
-	li a6, 0
-	li a7, 0
-	li s2, 0
-	li s3, 0
-	li s4, 0
-	li s5, 0
-	li s6, 0
-	li s7, 0
-	li s8, 0
-	li s9, 0
-	li s10, 0
-	li s11, 0
-	li t3, 0
-	li t4, 0
-	li t5, 0
-	li t6, 0
-	csrw CSR_MSCRATCH, 0
-
-	ret
-#endif

@@ -753,8 +753,9 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 	};
 	struct spl_image_info spl_image;
 	int ret;
+	u32 read_data;
 
-	pr_debug(">>" SPL_TPL_PROMPT "board_init_r()\n");
+	debug(">>" SPL_TPL_PROMPT "board_init_r()\n");
 
 	spl_set_bd();
 
@@ -815,6 +816,14 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 
 		dm_get_mem(&mem);
 		dm_dump_mem(&mem);
+	}
+
+	if (1) {
+		printf("wait image\n");
+		read_data = readl((void*)0xc0820000);
+		while(read_data != 0xa55a)
+			read_data = readl((void*)0xc0820000);
+		printf("get new image\n");
 	}
 
 	memset(&spl_image, '\0', sizeof(spl_image));
