@@ -149,7 +149,7 @@ call_harts_early_init:
 	bnez	tp, secondary_hart_loop
 #endif
 #endif
-	
+
 	mv      a0, s0
 	jal	board_init_f_init_reserve
 	SREG	s1, GD_FIRMWARE_FDT_ADDR(gp)
@@ -192,6 +192,7 @@ wait_for_gd_init:
 	/* Enable cache */
 	jal	icache_enable
 	jal	dcache_enable
+	jal	snoop_enable
 
 #ifdef CONFIG_DEBUG_UART
 	jal	debug_uart_init
