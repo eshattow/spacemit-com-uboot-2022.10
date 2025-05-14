@@ -320,21 +320,26 @@
 		maplic: interrupt-controller@f1800000 {
 			compatible = "riscv,aplic";
 			msi-parent = <&mimsic>;
+			/*aplic config*/
 			reg = <0x0 0xf1800000 0x0 0x4000>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
+			/*the number of wired interrupt sources*/
 			riscv,num-sources = <512>;
- 			riscv,children = <&saplic>;
+			riscv,children = <&saplic>;
+			/*M-mode delegate S-mode*/
 			riscv,delegate = <&saplic 1 512>;
-			status = "ok";
-        };
+			status = "okay";
+		};
 
 		saplic: interrupt-controller@e0804000 {
 			compatible = "riscv,aplic";
+			/*aplic config*/
 			reg = <0x0 0xe0804000 0x0 0x4000>;
 			msi-parent = <&simsic>;
 			#interrupt-cells = <2>;
 			interrupt-controller;
+			/*the number of wired interrupt sources*/
 			riscv,num-sources = <512>;
 			status = "disabled";
 		};
@@ -342,27 +347,30 @@
 		mimsic: interrupt-controller@f1000000 {
 			compatible = "riscv,imsics";
 			interrupts-extended = <&cpu0_intc 11>;
-			reg = <0x0 0xf1000000 0x0 0x2000>;
-			interrupt-controller;
-			#interrupt-cells = <0>;
-			msi-controller;
-			riscv,num-ids = <255>;
-			status = "ok";
-        };
-
-		simsic: interrupt-controller@f1400000 {
-			compatible = "riscv,imsics";
-			interrupts-extended = <&cpu0_intc 9>;
-			reg = <0x0 0xf1400000 0x0 0x1000000>;
+			reg = <0x0 0xf1000000 0x0 0x10000>;
 			interrupt-controller;
 			#interrupt-cells = <0>;
 			#msi-cells = <0>;
 			msi-controller;
-			riscv,num-ids = <255>;
-			riscv,group-index-bits = <1>;
-			riscv,group-index-shift = <55>;
+			/* Number of interrupt identities:512*/
+			riscv,num-ids = <511>;
+			status = "okay";
+		};
+
+		simsic: interrupt-controller@e0400000 {
+			compatible = "riscv,imsics";
+			interrupts-extended = <&cpu0_intc 9>;
+			reg = <0x0 0xe0400000 0x0 0x400000>;
+			interrupt-controller;
+			#interrupt-cells = <0>;
+			#msi-cells = <0>;
+			msi-controller;
+			/* Number of interrupt identities:512*/
+			riscv,num-ids = <511>;
+			/* Number of HART index bits:16 */
 			riscv,hart-index-bits = <4>;
-			riscv,guest-index-bits = <6>;
+			/* Number of guest index bits:7 */
+			riscv,guest-index-bits = <3>;
 			status = "disabled";
 		};
 
