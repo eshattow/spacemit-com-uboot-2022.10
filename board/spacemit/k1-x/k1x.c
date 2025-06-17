@@ -902,6 +902,25 @@ void refresh_config_info(void)
 	free(strval);
 }
 
+void set_data_buffer_env(void)
+{
+	u64 dram_size = (u64)ddr_get_density() * SZ_1MB, fastboot_buffer_size;
+	char temp[32];
+
+	if (dram_size < SZ_1G) {
+		pr_info("Need shrink data buffer for DDR capacity: %llu MB\n", dram_size / SZ_1MB);
+		// 1/4 of dram as fastboot buffer, 1/4 of dram as decompression buffer
+		fastboot_buffer_size = dram_size / 4;
+		env_set_hex("fastboot_buffer_size", fastboot_buffer_size);
+		env_set_hex("decompress_addr", CONFIG_FASTBOOT_BUF_ADDR + fastboot_buffer_size);
+
+		sprintf(temp, "0x%llx", CONFIG_FASTBOOT_BUF_ADDR + fastboot_buffer_size);
+		env_set("ramdisk_addr", temp);
+		sprintf(temp, "0x%llx", CONFIG_FASTBOOT_BUF_ADDR + fastboot_buffer_size * 2);
+		env_set("dtb_addr", temp);
+	}
+}
+
 static int probe_shutdown_charge(void)
 {
 #ifdef CONFIG_SPACEMIT_SHUTDOWN_CHARGE
@@ -954,6 +973,7 @@ int board_late_init(void)
 	set_env_ethaddr();
 	set_dev_serial_no();
 	refresh_config_info();
+	set_data_buffer_env();
 
 	set_serialnumber_based_on_boot_mode();
 
