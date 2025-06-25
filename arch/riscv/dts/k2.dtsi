@@ -63,7 +63,7 @@
 				&cpu14_intc  3 &cpu14_intc  7
 				&cpu15_intc  3 &cpu15_intc  7
 			>;
-			reg = <0x0 0xe081c000 0x0 0x00010000>;
+			reg = <0x0 0xf1810000 0x0 0x00010000>;
 			clint,has-no-64bit-mmio;
 		};
 
