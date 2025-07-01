@@ -263,44 +263,33 @@
 	};
 };
 
-&ldo_33 {
-	regulator-init-microvolt = <1800000>;
-	regulator-boot-on;
-	regulator-state-mem {
-			regulator-off-in-suspend;
-	};
-};
-
 &dpu {
-	status = "disabled";
+	status = "okay";
 };
 
 &pwm14 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm14_1>;
-	status = "disabled";
+	status = "okay";
 };
 
 &backlight {
 	pwms = <&pwm14 0 2000>;
 	default-brightness-level = <6>;
-	status = "disabled";
+	status = "okay";
 };
 
 &mipi_dsi {
-	status = "disabled";
+	status = "okay";
 };
 
 &panel {
-	force-attached = "ft8201sinx101";
+	force-attached = "hxdm101";
 	dcp-gpios = <&gpio 34 0>;
 	dcn-gpios = <&gpio 42 0>;
-	avee-gpios = <&gpio 35 0>;
-	avdd-gpios = <&gpio 36 0>;
 	backlight = <&backlight>;
-	enable-gpios = <&gpio 31 0>;
-	reset-gpios = <&gpio 30 0>;
-	status = "disabled";
+	reset-gpios = <&gpio 59 0>;
+	status = "okay";
 };
 
 &shutdown_charging {
