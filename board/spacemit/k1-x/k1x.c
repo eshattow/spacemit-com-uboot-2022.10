@@ -551,7 +551,21 @@ char* parse_mtdparts_and_find_bootfs(void) {
 		return NULL;
 	}
 
-	/* Find the last partition */
+	/* First try to find bootfs as an independent partition */
+	if (strstr(mtdparts, "(bootfs)")) {
+		strcpy(found_partition, "bootfs");
+		snprintf(cmd_buf, sizeof(cmd_buf), "ubi part %s", found_partition);
+		if (run_command(cmd_buf, 0) == 0) {
+			/* Check if the bootfs volume exists in bootfs partition */
+			snprintf(cmd_buf, sizeof(cmd_buf), "ubi check %s", BOOTFS_NAME);
+			if (run_command(cmd_buf, 0) == 0) {
+				pr_info("Found bootfs volume in independent bootfs partition\n");
+				return found_partition;
+			}
+		}
+	}
+
+	/* Fallback: Find the last partition (for backward compatibility) */
 	const char *last_part_start = strrchr(mtdparts, '(');
 	if (last_part_start) {
 		last_part_start++; /* Skip the left parenthesis */
@@ -1001,7 +1015,9 @@ int board_late_init(void)
 
 	run_cardfirmware_flash_command();
 
+#ifdef CONFIG_ENV_IS_IN_NFS
 	run_net_flash_command();
+#endif
 
 	probe_shutdown_charge();
 
