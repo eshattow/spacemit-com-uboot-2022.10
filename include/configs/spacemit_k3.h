@@ -3,8 +3,8 @@
  * Copyright (C) 2025, Kevin.z.m <zhangmeng.kevin@spacemit.com>
  */
 
- #ifndef __SPACEMIT_K2_CONFIG_H
- #define __SPACEMIT_K2_CONFIG_H
+ #ifndef __SPACEMIT_K3_CONFIG_H
+ #define __SPACEMIT_K3_CONFIG_H
 
 #include <linux/sizes.h>
 
@@ -61,4 +61,4 @@
 	"pxefile_addr_r=0x12c200000\0" \
 	"ramdisk_addr_r=0x12c300000\0"
 
-#endif /* __SPACEMIT_K2_CONFIG_H */
+#endif /* __SPACEMIT_K3_CONFIG_H */

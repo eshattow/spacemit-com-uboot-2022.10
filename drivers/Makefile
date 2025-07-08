@@ -124,5 +124,5 @@ obj-$(CONFIG_DM_RNG) += rng/
 endif
 
 obj-$(CONFIG_TARGET_SPACEMIT_K1X) += ddr/spacemit/k1x/
-obj-$(CONFIG_TARGET_SPACEMIT_K2) += ddr/spacemit/k2/
+obj-$(CONFIG_TARGET_SPACEMIT_K3) += ddr/spacemit/k3/
 obj-y += soc/

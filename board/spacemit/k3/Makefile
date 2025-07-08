@@ -2,5 +2,5 @@
 #
 # Copyright (c) 2025-2026 Spacemit, Inc
 
-obj-y	+= k2.o
+obj-y	+= k3.o
 obj-$(CONFIG_SPL_BUILD) += spl.o

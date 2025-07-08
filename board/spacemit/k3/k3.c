@@ -58,7 +58,7 @@ extern u32 ddr_get_density(void);
 
 int dram_init(void)
 {
-#if CONFIG_K2_BOARD_FPGA
+#if CONFIG_K3_BOARD_FPGA
 	gd->ram_size = SZ_2GB - SEC_IMG_SIZE;
 #else
 	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
@@ -71,7 +71,7 @@ int dram_init(void)
 
 int dram_init_banksize(void)
 {
-#if CONFIG_K2_BOARD_FPGA
+#if CONFIG_K3_BOARD_FPGA
 	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
 	gd->bd->bi_dram[0].size = SZ_2G - SEC_IMG_SIZE;
 #else
@@ -86,7 +86,7 @@ int dram_init_banksize(void)
 
 ulong board_get_usable_ram_top(ulong total_size)
 {
-#if CONFIG_K2_BOARD_FPGA
+#if CONFIG_K3_BOARD_FPGA
 	return 0x180000000;
 #else
 	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;

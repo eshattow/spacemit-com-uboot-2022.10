@@ -49,10 +49,10 @@ MRPROPER_FILES += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-bo
 MRPROPER_FILES += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-spl.bin
 MRPROPER_FILES += u-boot.itb FSBL.bin u-boot-env-default.*
 MRPROPER_FILES += bootinfo_spinor.bin bootinfo_spinand.bin bootinfo_emmc.bin bootinfo_sd.bin
-MRPROPER_FILES += k2_fpga_1x1.dtb
+MRPROPER_FILES += k3_fpga_1x1.dtb
 MRPROPER_DIRS += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb
 
-INPUTS-y += u-boot.itb
+#INPUTS-y += u-boot.itb
 u-boot.itb: u-boot-nodtb.bin u-boot-dtb.bin u-boot.dtb FORCE
 	$(call if_changed,build_itb,$@)
 

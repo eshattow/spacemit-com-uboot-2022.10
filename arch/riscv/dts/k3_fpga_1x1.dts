@@ -2,10 +2,10 @@
 /*
  * finch board's base device tree configure.
  *
- * Copyright (C) 2019 SPACEMIT Micro Limited
+ * Copyright (C) 2025 SPACEMIT Micro Limited
  */
 
-#include "k2.dtsi"
+#include "k3.dtsi"
 
 &uart0 {
 	status = "okay";

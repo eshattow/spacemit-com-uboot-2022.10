@@ -16,7 +16,7 @@ dtb-$(CONFIG_TARGET_SPACEMIT_K1X) += k1-x_evb.dtb k1-x_deb2.dtb k1-x_deb1.dtb k1
 				     k1-x_MUSE-Paper-mini-4g.dtb k1-x_baton-camera.dtb \
 				     k1-x_FusionOne.dtb k1-x_InnoBoard-Pi.dtb k1-x_ZT001H.dtb \
 				     k1-x_uav.dtb k1-x_MUSE-Paper2.dtb k1-x_MUSE-Pi2.dtb
-dtb-$(CONFIG_TARGET_SPACEMIT_K2) += k2_fpga_1x1.dtb
+dtb-$(CONFIG_TARGET_SPACEMIT_K3) += k3_fpga_1x1.dtb
 include $(srctree)/scripts/Makefile.dts
 
 targets += $(dtb-y)

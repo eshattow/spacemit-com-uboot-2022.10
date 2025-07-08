@@ -9,7 +9,7 @@
   },
   "info": {
     "arch": "RISCV64",
-    "description": "spacemit k2 fsbl image"
+    "description": "spacemit k3 fsbl image"
   },
   "image": [
     {

@@ -1,7 +1,7 @@
 /dts-v1/;
 
 / {
-	description = "U-boot FIT image for k2";
+	description = "U-boot FIT image for k3";
 	#address-cells = <2>;
 	fit,fdt-list = "of-list";
 
@@ -20,10 +20,10 @@
 		};
 
 		fdt_1 {
-			description = "k2_fpga.dtb";
+			description = "k3_fpga.dtb";
 			type = "flat_dt";
 			compression = "none";
-			data = /incbin/("../dtb/k2_fpga_1x1.dtb");
+			data = /incbin/("../dtb/k3_fpga_1x1.dtb");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -34,7 +34,7 @@
 	configurations {
 		default = "conf_1";
 		conf_1 {
-			description = "k2_fpga";
+			description = "k3_fpga";
 			loadables = "uboot";
 			fdt = "fdt_1";
 		};

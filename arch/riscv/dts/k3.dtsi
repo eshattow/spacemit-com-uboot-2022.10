@@ -8,12 +8,12 @@
 /dts-v1/;
 
 #include <config.h>
-#include "k2-cpus.dtsi"
+#include "k3-cpus.dtsi"
 
 / {
 	#address-cells = <2>;
 	#size-cells = <2>;
-	compatible = "spacemit,k2";
+	compatible = "spacemit,k3";
 
 	chosen {
 		stdout-path = "uart0:115200";
