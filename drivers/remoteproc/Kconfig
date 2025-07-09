@@ -102,4 +102,12 @@ config REMOTEPROC_TI_IPU
 	help
 	  Say 'y' here to add support for TI' K3 remoteproc driver.
 
+config SPL_REMOTEPROC_K3_PROC
+	bool "Support for K3 Power processor"
+	select SPL_REMOTEPROC
+	depends on SPL
+	depends on DM
+	depends on OF_CONTROL
+	help
+	  Say 'y' here to add support for K1X power processors.
 endmenu

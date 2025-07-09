@@ -11,7 +11,6 @@
 #include <log.h>
 #include <linux/delay.h>
 
-
 int spl_board_init_f(void)
 {
 	int ret;
@@ -32,6 +31,24 @@ u32 spl_boot_device(void)
 {
 	return BOOT_DEVICE_RAM;
 }
+
+#if CONFIG_IS_ENABLED(FIT_IMAGE_POST_PROCESS)
+#include <remoteproc.h>
+#include <image.h>
+/* load the esos firmare */
+void board_fit_image_post_process(const void *fit, int node, void **p_image,
+				  size_t *p_size)
+{
+	const char *name = fit_get_name(fit, node, NULL);
+
+	if (name && !strcmp(name, "rcpu-fw")) {
+		rproc_init();
+		rproc_load(0, (ulong)*p_image, *p_size);
+		rproc_start(0);
+		*p_size = 0;
+	}
+}
+#endif
 
 #ifdef CONFIG_SPL_LOAD_FIT
 int board_fit_config_name_match(const char *name)
