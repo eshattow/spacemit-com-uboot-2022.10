@@ -192,8 +192,8 @@ struct eqos_tegra186_regs {
 #define EQOS_AUTO_CAL_STATUS_ACTIVE			BIT(31)
 
 /* Descriptors */
-#define EQOS_DESCRIPTORS_TX	4
-#define EQOS_DESCRIPTORS_RX	4
+#define EQOS_DESCRIPTORS_TX	64
+#define EQOS_DESCRIPTORS_RX	64
 #define EQOS_DESCRIPTORS_NUM	(EQOS_DESCRIPTORS_TX + EQOS_DESCRIPTORS_RX)
 #define EQOS_BUFFER_ALIGN	ARCH_DMA_MINALIGN
 #define EQOS_MAX_PACKET_SIZE	ALIGN(1568, ARCH_DMA_MINALIGN)
@@ -283,3 +283,6 @@ int eqos_null_ops(struct udevice *dev);
 
 extern struct eqos_config eqos_imx_config;
 extern struct eqos_config eqos_spacemit_config;
+#if IS_ENABLED(CONFIG_DWC_ETH_QOS_K3)
+extern struct eqos_config eqos_spacemit_k3_config;
+#endif

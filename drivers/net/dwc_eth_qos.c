@@ -1681,6 +1681,13 @@ static const struct udevice_id eqos_ids[] = {
 	},
 #endif
 
+#if IS_ENABLED(CONFIG_DWC_ETH_QOS_K3)
+       {
+               .compatible = "spacemit,k3-dwmac-eqos",
+               .data = (ulong)&eqos_spacemit_k3_config
+       },
+#endif
+
 	{ }
 };
 
