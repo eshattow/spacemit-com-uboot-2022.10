@@ -10,3 +10,29 @@
 &uart0 {
 	status = "okay";
 };
+
+&eth0 {
+	phy-reset-pin = <40>;
+	max-speed = <100>;
+	clk_tuning_enable;
+	clk-tuning-by-reg;
+	tx-phase = <10>;
+	rx-phase = <40>;
+
+	phy-mode = "rgmii";
+	phy-addr = <0>;
+	phy-handle = <&rgmii>;
+	ref-clock-from-phy;
+
+	status = "okay";
+
+	mdio {
+		#address-cells = <0x1>;
+		#size-cells = <0x0>;
+		rgmii: phy@0 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			device_type = "ethernet-phy";
+			reg = <0x0>;
+		};
+	};
+};
