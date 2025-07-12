@@ -41,7 +41,12 @@
  * However, if CONFIG_IP_DEFRAG is set, a bigger value could be used.  In any
  * case, most NFS servers are optimized for a power of 2.
  */
-#define NFS_READ_SIZE	(32*1024)	/* biggest power of two that fits Ether frame */
+#ifdef CONFIG_K3_BOARD_FPGA
+#define NFS_READ_SIZE	(16*1024)	/* biggest power of two that fits Ether frame */
+#else
+#define NFS_READ_SIZE	(32*1024)
+#endif
+
 #define NFS_MAX_ATTRS	26
 
 /* Values for Accept State flag on RPC answers (See: rfc1831) */
