@@ -185,6 +185,45 @@
 			clock-frequency = <14745600>;
 		};
 
+		rcpu@0 {
+			compatible = "spacemit,k3-rproc";
+			u-boot,dm-spl;
+			reg = <0 0 0 0>;
+			remoteproc-name = "rcpu";
+			coreid = <0>;
+			mem_heap_start = <0x1 0x500000>;
+			mem_heap_size = <0x200000>;
+			fw_boot_entry = <0x1 0x200000>;
+			status = "okay";
+		};
+
+		rpmi_shmem_mbox: rpmi-shmem-mbox@cac90100 {
+			compatible = "riscv,rpmi-shmem-mbox";
+			reg = <0x1 0x00800000 0x0 0x1000>,
+				<0x1 0x00801000 0x0 0x1000>,
+				<0x1 0x00802000 0x0 0x1000>,
+				<0x1 0x00803000 0x0 0x1000>,
+				<0x0 0xcac90c40 0x0 0x100>;
+			reg-names = "a2p-req", "p2a-ack", "p2a-req", "a2p-ack", "db-reg";
+			riscv,slot-size = <256>;
+			#mbox-cells = <1>;
+			status = "okay";
+		};
+
+		rpmi_mpxy_clk: rpmi-mpxy-clk@0 {
+			compatible = "riscv,rpmi-mpxy-clock";
+			mboxes = <&rpmi_shmem_mbox 8>;
+			riscv,sbi-mpxy-channel-id = <8>;
+			status = "okay";
+		};
+
+		rpmi_mpxy_voltage: rpmi-mpxy-voltage@0 {
+			compatible = "riscv,rpmi-mpxy-voltage";
+			mboxes = <&rpmi_shmem_mbox 7>;
+			riscv,sbi-mpxy-channel-id = <7>;
+			status = "okay";
+		};
+
 		ddr@3000000 {
 			u-boot,dm-spl;
 			compatible = "spacemit,snps-lp45";
