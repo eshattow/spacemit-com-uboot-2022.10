@@ -697,7 +697,9 @@ int rproc_elf64_load_rsc_table(struct udevice *dev, ulong fw_addr,
  */
 int rproc_elf_load_rsc_table(struct udevice *dev, ulong fw_addr,
 			     ulong fw_size, ulong *rsc_addr, ulong *rsc_size);
-
+#ifdef CONFIG_TARGET_SPACEMIT_K3 
+int rproc_elf64_load_dtb_table(struct udevice *dev, ulong fw_addr, ulong fw_size);
+#endif
 unsigned long rproc_parse_resource_table(struct udevice *dev,
 					 struct rproc *cfg);
 
@@ -739,6 +741,10 @@ static inline int rproc_elf64_load_rsc_table(struct udevice *dev, ulong fw_addr,
 					     ulong fw_size, ulong *rsc_addr,
 					     ulong *rsc_size)
 { return -ENOSYS; }
+#ifdef CONFIG_TARGET_SPACEMIT_K3
+int rproc_elf64_load_dtb_table(struct udevice *dev, ulong fw_addr, ulong fw_size)
+{ return -ENOSYS; }
+#endif
 static inline int rproc_elf_load_rsc_table(struct udevice *dev, ulong fw_addr,
 					   ulong fw_size, ulong *rsc_addr,
 					   ulong *rsc_size)

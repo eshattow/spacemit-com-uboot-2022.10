@@ -84,7 +84,6 @@ static void k3_enable_pwrswitch(void)
 static int k3_rproc_load(struct udevice *dev, ulong addr, ulong size)
 {
 	unsigned int val;
-	// ulong rsc_table_size;
 	struct k3_rproc_privdata *priv;
 
 	priv = dev_get_priv(dev);
@@ -107,6 +106,8 @@ static int k3_rproc_load(struct udevice *dev, ulong addr, ulong size)
 	writel(val, (void __iomem *)PMU_AUDIO_CLK_CTRL);
 
 	writel(1, (void __iomem *)RCPU_EXECUTION_CTRL);
+
+	rproc_elf64_load_dtb_table(dev, addr, size);
 
 	return rproc_elf_load_image(dev, addr, size);
 }

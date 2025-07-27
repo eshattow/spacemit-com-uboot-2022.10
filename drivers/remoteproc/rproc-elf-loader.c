@@ -515,6 +515,69 @@ int rproc_elf64_load_rsc_table(struct udevice *dev, ulong fw_addr,
 	return 0;
 }
 
+#ifdef CONFIG_TARGET_SPACEMIT_K3
+/*
+ * Search for the dtb table in an ELF64 image.
+ * Returns the address of the dtb table section if found, NULL if there is
+ * no dtb table section, or error pointer.
+ */
+static Elf64_Shdr *rproc_elf64_find_dtb_table(struct udevice *dev,
+					      ulong fw_addr, ulong fw_size)
+{
+	int ret;
+	unsigned int i;
+	const char *name_table;
+	const u8 *elf_data = (void *)fw_addr;
+	Elf64_Ehdr *ehdr = (Elf64_Ehdr *)fw_addr;
+	Elf64_Shdr *shdr;
+
+	ret = rproc_elf64_sanity_check(fw_addr, fw_size);
+	if (ret) {
+		pr_debug("Invalid ELF64 Image %d\n", ret);
+		return ERR_PTR(ret);
+	}
+
+	/* look for the resource table and handle it */
+	shdr = (Elf64_Shdr *)(elf_data + ehdr->e_shoff);
+	name_table = (const char *)(elf_data +
+				    shdr[ehdr->e_shstrndx].sh_offset);
+
+	for (i = 0; i < ehdr->e_shnum; i++, shdr++) {
+		if (strcmp(name_table + shdr->sh_name, ".dtb_table"))
+			continue;
+
+		return shdr;
+	}
+
+	return NULL;
+}
+/* Load the dtb table from an ELF64 image */
+int rproc_elf64_load_dtb_table(struct udevice *dev, ulong fw_addr, ulong fw_size)
+{
+	Elf64_Shdr *shdr;
+
+	shdr = rproc_elf64_find_dtb_table(dev, fw_addr, fw_size);
+	if (!shdr)
+		return -ENODATA;
+	if (IS_ERR(shdr))
+		return PTR_ERR(shdr);
+
+	printf("Loading resource table to 0x%8lx\n",
+		(ulong)shdr);
+
+	printf("Loading resource table to 0x%8lx (%ld bytes)\n",
+		(ulong)shdr->sh_addr, (ulong)shdr->sh_size);
+
+	memcpy((void *)shdr->sh_addr, (void *)fw_addr + shdr->sh_offset, shdr->sh_size);
+	flush_cache(rounddown((unsigned long)shdr->sh_addr, ARCH_DMA_MINALIGN),
+		    roundup((unsigned long)shdr->sh_addr + shdr->sh_size,
+			    ARCH_DMA_MINALIGN) -
+		    rounddown((unsigned long)shdr->sh_addr, ARCH_DMA_MINALIGN));
+
+	return 0;
+}
+#endif
+
 /* Load the resource table from an ELF32 or ELF64 image */
 int rproc_elf_load_rsc_table(struct udevice *dev, ulong fw_addr,
 			     ulong fw_size, ulong *rsc_addr, ulong *rsc_size)
