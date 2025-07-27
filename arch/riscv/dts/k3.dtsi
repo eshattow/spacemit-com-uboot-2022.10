@@ -197,13 +197,13 @@
 			status = "okay";
 		};
 
-		rpmi_shmem_mbox: rpmi-shmem-mbox@cac90100 {
+		rpmi_shmem_mbox: rpmi-shmem-mbox@cac90c00 {
 			compatible = "riscv,rpmi-shmem-mbox";
 			reg = <0x1 0x00800000 0x0 0x1000>,
 				<0x1 0x00801000 0x0 0x1000>,
 				<0x1 0x00802000 0x0 0x1000>,
 				<0x1 0x00803000 0x0 0x1000>,
-				<0x0 0xcac90c40 0x0 0x100>;
+				<0x0 0xcac90c00 0x0 0x100>;
 			reg-names = "a2p-req", "p2a-ack", "p2a-req", "a2p-ack", "db-reg";
 			riscv,slot-size = <256>;
 			#mbox-cells = <1>;
