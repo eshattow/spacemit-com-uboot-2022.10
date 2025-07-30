@@ -20,7 +20,8 @@
 					"zvfh", "zvfhmin", "zvkb", "zvkg", "zvkn", "zvknc",
 					"zvkned", "zvkng", "zvknha", "zvknhb", "zvks",
 					"zvksc", "zvksed", "zvksh", "zvksg", "zvkt", "ssaia",
-					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt" ;
+					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt",
+					"smstateen";
 			riscv,cbom-block-size = <64>;
 			riscv,cboz-block-size = <64>;
 			i-cache-block-size = <64>;
@@ -52,7 +53,8 @@
 					"zvfh", "zvfhmin", "zvkb", "zvkg", "zvkn", "zvknc",
 					"zvkned", "zvkng", "zvknha", "zvknhb", "zvks",
 					"zvksc", "zvksed", "zvksh", "zvksg", "zvkt", "ssaia",
-					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt" ;
+					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt",
+					"smstateen";
 			riscv,cbom-block-size = <64>;
 			riscv,cboz-block-size = <64>;
 			i-cache-block-size = <64>;
@@ -84,7 +86,8 @@
 					"zvfh", "zvfhmin", "zvkb", "zvkg", "zvkn", "zvknc",
 					"zvkned", "zvkng", "zvknha", "zvknhb", "zvks",
 					"zvksc", "zvksed", "zvksh", "zvksg", "zvkt", "ssaia",
-					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt" ;
+					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt",
+					"smstateen";
 			riscv,cbom-block-size = <64>;
 			riscv,cboz-block-size = <64>;
 			i-cache-block-size = <64>;
@@ -116,7 +119,8 @@
 					"zvfh", "zvfhmin", "zvkb", "zvkg", "zvkn", "zvknc",
 					"zvkned", "zvkng", "zvknha", "zvknhb", "zvks",
 					"zvksc", "zvksed", "zvksh", "zvksg", "zvkt", "ssaia",
-					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt" ;
+					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt",
+					"smstateen";
 			riscv,cbom-block-size = <64>;
 			riscv,cboz-block-size = <64>;
 			i-cache-block-size = <64>;
@@ -148,7 +152,8 @@
 					"zvfh", "zvfhmin", "zvkb", "zvkg", "zvkn", "zvknc",
 					"zvkned", "zvkng", "zvknha", "zvknhb", "zvks",
 					"zvksc", "zvksed", "zvksh", "zvksg", "zvkt", "ssaia",
-					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt" ;
+					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt",
+					"smstateen";
 			riscv,cbom-block-size = <64>;
 			riscv,cboz-block-size = <64>;
 			i-cache-block-size = <64>;
@@ -180,7 +185,8 @@
 					"zvfh", "zvfhmin", "zvkb", "zvkg", "zvkn", "zvknc",
 					"zvkned", "zvkng", "zvknha", "zvknhb", "zvks",
 					"zvksc", "zvksed", "zvksh", "zvksg", "zvkt", "ssaia",
-					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt" ;
+					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt",
+					"smstateen";
 			riscv,cbom-block-size = <64>;
 			riscv,cboz-block-size = <64>;
 			i-cache-block-size = <64>;
@@ -212,7 +218,8 @@
 					"zvfh", "zvfhmin", "zvkb", "zvkg", "zvkn", "zvknc",
 					"zvkned", "zvkng", "zvknha", "zvknhb", "zvks",
 					"zvksc", "zvksed", "zvksh", "zvksg", "zvkt", "ssaia",
-					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt" ;
+					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt",
+					"smstateen";
 			riscv,cbom-block-size = <64>;
 			riscv,cboz-block-size = <64>;
 			i-cache-block-size = <64>;
@@ -244,7 +251,8 @@
 					"zvfh", "zvfhmin", "zvkb", "zvkg", "zvkn", "zvknc",
 					"zvkned", "zvkng", "zvknha", "zvknhb", "zvks",
 					"zvksc", "zvksed", "zvksh", "zvksg", "zvkt", "ssaia",
-					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt" ;
+					"sscofpmf", "sstc", "svinval", "svnapot", "svpbmt",
+					"smstateen";
 			riscv,cbom-block-size = <64>;
 			riscv,cboz-block-size = <64>;
 			i-cache-block-size = <64>;
@@ -267,9 +275,9 @@
 			reg = <8>;
 			status = "okay";
 			compatible = "riscv";
-			riscv,isa = "rv64imafdcvh";
+			riscv,isa = "rv64imafdcv";
 			riscv,isa-base = "rv64i";
-			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v", "h",
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v",
 					"zicbom", "zicboz", "zicntr", "zicond", "zicsr",
 					"zifencei", "zihintpause", "zihpm", "zfh", "zfhmin",
 					"zba", "zbb", "zbc", "zbs", "zkt", "zvbb", "zvbc",
@@ -299,9 +307,9 @@
 			reg = <9>;
 			status = "okay";
 			compatible = "riscv";
-			riscv,isa = "rv64imafdcvh";
+			riscv,isa = "rv64imafdcv";
 			riscv,isa-base = "rv64i";
-			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v", "h",
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v",
 					"zicbom", "zicboz", "zicntr", "zicond", "zicsr",
 					"zifencei", "zihintpause", "zihpm", "zfh", "zfhmin",
 					"zba", "zbb", "zbc", "zbs", "zkt", "zvbb", "zvbc",
@@ -331,9 +339,9 @@
 			reg = <10>;
 			status = "okay";
 			compatible = "riscv";
-			riscv,isa = "rv64imafdcvh";
+			riscv,isa = "rv64imafdcv";
 			riscv,isa-base = "rv64i";
-			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v", "h",
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v",
 					"zicbom", "zicboz", "zicntr", "zicond", "zicsr",
 					"zifencei", "zihintpause", "zihpm", "zfh", "zfhmin",
 					"zba", "zbb", "zbc", "zbs", "zkt", "zvbb", "zvbc",
@@ -363,9 +371,9 @@
 			reg = <11>;
 			status = "okay";
 			compatible = "riscv";
-			riscv,isa = "rv64imafdcvh";
+			riscv,isa = "rv64imafdcv";
 			riscv,isa-base = "rv64i";
-			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v", "h",
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v",
 					"zicbom", "zicboz", "zicntr", "zicond", "zicsr",
 					"zifencei", "zihintpause", "zihpm", "zfh", "zfhmin",
 					"zba", "zbb", "zbc", "zbs", "zkt", "zvbb", "zvbc",
@@ -395,9 +403,9 @@
 			reg = <12>;
 			status = "okay";
 			compatible = "riscv";
-			riscv,isa = "rv64imafdcvh";
+			riscv,isa = "rv64imafdcv";
 			riscv,isa-base = "rv64i";
-			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v", "h",
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v",
 					"zicbom", "zicboz", "zicntr", "zicond", "zicsr",
 					"zifencei", "zihintpause", "zihpm", "zfh", "zfhmin",
 					"zba", "zbb", "zbc", "zbs", "zkt", "zvbb", "zvbc",
@@ -427,9 +435,9 @@
 			reg = <13>;
 			status = "okay";
 			compatible = "riscv";
-			riscv,isa = "rv64imafdcvh";
+			riscv,isa = "rv64imafdcv";
 			riscv,isa-base = "rv64i";
-			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v", "h",
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v",
 					"zicbom", "zicboz", "zicntr", "zicond", "zicsr",
 					"zifencei", "zihintpause", "zihpm", "zfh", "zfhmin",
 					"zba", "zbb", "zbc", "zbs", "zkt", "zvbb", "zvbc",
@@ -459,9 +467,9 @@
 			reg = <14>;
 			status = "okay";
 			compatible = "riscv";
-			riscv,isa = "rv64imafdcvh";
+			riscv,isa = "rv64imafdcv";
 			riscv,isa-base = "rv64i";
-			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v", "h",
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v",
 					"zicbom", "zicboz", "zicntr", "zicond", "zicsr",
 					"zifencei", "zihintpause", "zihpm", "zfh", "zfhmin",
 					"zba", "zbb", "zbc", "zbs", "zkt", "zvbb", "zvbc",
@@ -491,9 +499,9 @@
 			reg = <15>;
 			status = "okay";
 			compatible = "riscv";
-			riscv,isa = "rv64imafdcvh";
+			riscv,isa = "rv64imafdcv";
 			riscv,isa-base = "rv64i";
-			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v", "h",
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v",
 					"zicbom", "zicboz", "zicntr", "zicond", "zicsr",
 					"zifencei", "zihintpause", "zihpm", "zfh", "zfhmin",
 					"zba", "zbb", "zbc", "zbs", "zkt", "zvbb", "zvbc",
