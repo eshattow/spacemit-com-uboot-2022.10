@@ -10,6 +10,8 @@
 #include <misc.h>
 #include <log.h>
 #include <linux/delay.h>
+#include <remoteproc.h>
+#include <image.h>
 
 int spl_board_init_f(void)
 {
@@ -23,6 +25,9 @@ int spl_board_init_f(void)
 		debug("DRAM init failed: %d\n", ret);
 		return ret;
 	}
+#ifdef CONFIG_SPL_REMOTEPROC_K3_PROC
+	rproc_init();
+#endif
 
 	return 0;
 }
@@ -33,20 +38,23 @@ u32 spl_boot_device(void)
 }
 
 #if CONFIG_IS_ENABLED(FIT_IMAGE_POST_PROCESS)
-#include <remoteproc.h>
-#include <image.h>
 /* load the esos firmare */
 void board_fit_image_post_process(const void *fit, int node, void **p_image,
 				  size_t *p_size)
 {
+#ifdef CONFIG_SPL_REMOTEPROC_K3_PROC
 	const char *name = fit_get_name(fit, node, NULL);
 
-	if (name && !strcmp(name, "rcpu-fw")) {
-		rproc_init();
+	if (name && !strncmp(name, "rcpu0-fw", 8)) {
 		rproc_load(0, (ulong)*p_image, *p_size);
 		rproc_start(0);
 		*p_size = 0;
+	} else if (name && !strncmp(name, "rcpu1-fw", 8)) {
+		rproc_load(1, (ulong)*p_image, *p_size);
+		rproc_start(1);
+		*p_size = 0;
 	}
+#endif
 }
 #endif
 
