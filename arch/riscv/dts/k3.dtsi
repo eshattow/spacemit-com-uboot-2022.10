@@ -199,12 +199,24 @@
 			compatible = "spacemit,k3-rproc";
 			u-boot,dm-spl;
 			reg = <0 0 0 0>;
-			remoteproc-name = "rcpu";
+			remoteproc-name = "rcpu0";
 			coreid = <0>;
 			mem_heap_start = <0x1 0x500000>;
 			mem_heap_size = <0x200000>;
 			fw_boot_entry = <0x1 0x200000>;
 			status = "okay";
+		};
+
+		rcpu@1 {
+			compatible = "spacemit,k3-rproc";
+			u-boot,dm-spl;
+			reg = <0 0 0 0>;
+			remoteproc-name = "rcpu1";
+			coreid = <1>;
+			mem_heap_start = <0x1 0xB04000>;
+			mem_heap_size = <0x200000>;
+			fw_boot_entry = <0x1 0x804000>;
+			status = "disabled";
 		};
 
 		rpmi_shmem_mbox: rpmi-shmem-mbox@cac90c00 {
