@@ -20,6 +20,7 @@
 #include <linux/iopoll.h>
 #include <linux/bug.h>
 #include <linux/ioport.h>
+#include <cpu_func.h>
 
 #define K1X_DUMP_QSPI_REG		0
 
@@ -269,19 +270,33 @@ static u32 qspi_readl(struct k1x_qspi *qspi, void __iomem *addr)
 		return in_le32(addr);
 }
 
-static void qspi_set_func_clk(struct k1x_qspi *qspi)
+static void qspi_reset_ctrl(struct k1x_qspi *qspi)
 {
 	reset_assert_bulk(&qspi->resets);
+	udelay(1);
+	reset_deassert_bulk(&qspi->resets);
+	dev_dbg(qspi->dev, "reset controller completed\n");
+}
+
+#ifndef CONFIG_K3_BOARD_FPGA
+static void qspi_set_func_clk(struct k1x_qspi *qspi)
+{
 	clk_disable(&qspi->bus_clk);
 	clk_disable(&qspi->clk);
 
 	clk_set_rate(&qspi->clk, qspi->max_hz);
 	clk_enable(&qspi->clk);
 	clk_enable(&qspi->bus_clk);
-	reset_deassert_bulk(&qspi->resets);
-	dev_info(qspi->dev, "bus clock: %dHz, PMUap reg[0x%08x]:0x%08x\n",
+	dev_dbg(qspi->dev, "bus clock: %dHz, PMUap reg[0x%08x]:0x%08x\n",
 			qspi->max_hz, qspi->pmuap_reg, readl((void __iomem *)((unsigned long)qspi->pmuap_reg)));
 }
+#else
+static void qspi_set_func_clk(struct k1x_qspi *qspi)
+{
+	/* FPGA stage: clock framework not available */
+	dev_dbg(qspi->dev, "FPGA stage: clock setup skipped, max_hz: %dHz\n", qspi->max_hz);
+}
+#endif
 
 static int qspi_reset(struct k1x_qspi *qspi)
 {
@@ -678,6 +693,10 @@ static int k1x_qspi_exec_op(struct spi_slave *slave,
 	qspi = dev_get_priv(bus);
 	base = qspi->iobase;
 
+	dev_dbg(qspi->dev, "exec_op: cmd=0x%02x, addr_nbytes=%u, dummy_nbytes=%u, data_nbytes=%u, data_dir=%s\n",
+		 op->cmd.opcode, op->addr.nbytes, op->dummy.nbytes, op->data.nbytes,
+		 op->data.dir == SPI_MEM_DATA_IN ? "IN" : (op->data.dir == SPI_MEM_DATA_OUT ? "OUT" : "NONE"));
+
 	dump_spi_mem_op_info(qspi, op);
 
 	/* wait for controller being ready */
@@ -835,6 +854,9 @@ static int k1x_qspi_host_init(struct k1x_qspi *qspi)
 	/* set PMUap */
 	qspi_set_func_clk(qspi);
 
+	/* reset controller - needed for both normal and FPGA stage */
+	qspi_reset_ctrl(qspi);
+
 	/* rest qspi */
 	ret = qspi_reset(qspi);
 	if (ret < 0) {
@@ -891,9 +913,16 @@ static int k1x_qspi_host_init(struct k1x_qspi *qspi)
 	return 0;
 
 dis_clk:
+#ifndef CONFIG_K3_BOARD_FPGA
 	reset_assert_bulk(&qspi->resets);
 	clk_disable(&qspi->bus_clk);
 	clk_disable(&qspi->clk);
+#else
+	/* FPGA stage: skip clock cleanup, but handle reset */
+	reset_assert_bulk(&qspi->resets);
+	dev_dbg(qspi->dev, "FPGA stage: reset cleanup completed\n");
+	dev_dbg(qspi->dev, "FPGA stage: clock cleanup skipped\n");
+#endif
 	return ret;
 }
 
@@ -965,6 +994,7 @@ static int k1x_qspi_ofdata_to_platdata(struct udevice *bus)
 	qspi->memmap_phy_size = ahb_size;
 	qspi->memmap_phy = (u32)ahb_addr;
 
+#ifndef CONFIG_K3_BOARD_FPGA
     ret = clk_get_by_index(bus, 0, &qspi->clk);
 	if (ret) {
 		dev_err(bus, "can not find the clock\n");
@@ -982,6 +1012,18 @@ static int k1x_qspi_ofdata_to_platdata(struct udevice *bus)
 		dev_err(bus, "can not find resets\n");
 		return ret;
 	}
+#else
+	/* FPGA stage: skip clock initialization, but try to get reset resources */
+	ret = reset_get_bulk(bus, &qspi->resets);
+	if (ret) {
+		dev_dbg(bus, "FPGA stage: reset resources not available, continuing without reset framework\n");
+		/* Clear reset structure to avoid issues */
+		memset(&qspi->resets, 0, sizeof(qspi->resets));
+	} else {
+		dev_dbg(bus, "FPGA stage: reset resources available\n");
+	}
+	dev_dbg(bus, "FPGA stage: clock initialization skipped\n");
+#endif
 
 	qspi->qspi_id = fdtdec_get_int(blob, node, "qspi-id", 0);
 	qspi->sfa1ad = fdtdec_get_int(blob, node, "qspi-sfa1ad", (QSPI_FLASH_A1_TOP - QSPI_AMBA_BASE));
@@ -994,7 +1036,7 @@ static int k1x_qspi_ofdata_to_platdata(struct udevice *bus)
 	qspi->rxfifo = fdtdec_get_int(blob, node, "qspi-rxbuf", QSPI_RX_BUFF_MAX);
 	qspi->txfifo = fdtdec_get_int(blob, node, "qspi-txfifo", QSPI_TX_BUFF_MAX);
 	qspi->ahb_buf_size = fdtdec_get_int(blob, node, "qspi-ahbbuf", QSPI_AHB_BUFF_MAX_SIZE);
-	qspi->ahb_read_enable = fdtdec_get_int(blob, node, "qspi-ahbread", 1);
+	qspi->ahb_read_enable = fdtdec_get_int(blob, node, "qspi-ahbread", 0);
 	qspi->endian_xchg = fdtdec_get_int(blob, node, "qspi-little", 0);
 
 	qspi->cs_selected = QSPI_CS_A1;
@@ -1029,6 +1071,7 @@ static const struct dm_spi_ops k1x_qspi_ops = {
 
 static const struct udevice_id k1x_qspi_ids[] = {
 	{ .compatible = "spacemit,k1x-qspi", },
+	{ .compatible = "spacemit,k3-qspi", },
 	{ }
 };
 

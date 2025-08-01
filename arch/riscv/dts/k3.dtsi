@@ -260,6 +260,28 @@
 			dline-reg = <0x3e8>;
 			status = "disabled";
 		};
+
+		qspi: spi@d420c000 {
+			compatible = "spacemit,k3-qspi";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x0 0xd420c000 0x0 0x1000>,
+			      <0x0 0xb8000000 0x0 0x4100000>;
+			reg-names = "qspi-base", "qspi-mmap";
+			qspi-sfa1ad = <0x4000000>;
+			qspi-sfa2ad = <0x100000>;
+			qspi-sfb1ad = <0x100000>;
+			qspi-sfb2ad = <0x100000>;
+			qspi-pmuap-reg = <0xd4282860>;
+			qspi-mpmu-acgr-reg = <0xd4051024>;
+			qspi-ahbread = <0>;
+			qspi-freq = <26500000>;
+			qspi-id = <4>;
+			resets = <&reset RESET_QSPI>,
+				<&reset RESET_QSPI_BUS>;
+			reset-names = "qspi_reset", "qspi_bus_reset";
+			status = "disabled";
+		};
 	};
 
 };
