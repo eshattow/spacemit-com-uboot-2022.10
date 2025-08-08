@@ -22,6 +22,9 @@
 
 	aliases {
 		console = &uart0;
+		mmc0 = &sdhci0;
+		mmc1 = &sdhci1;
+		mmc2 = &sdhci2;
 	};
 
 	clocks {
@@ -275,6 +278,33 @@
 			resets = <&reset RESET_QSPI>,
 				<&reset RESET_QSPI_BUS>;
 			reset-names = "qspi_reset", "qspi_bus_reset";
+			status = "disabled";
+		};
+
+		sdhci0: sdh@d4280000 {
+			compatible = "spacemit,k3-sdhci";
+			reg = <0x0 0xd4280000 0x0 0x200>;
+			resets = <&reset RESET_SDH_AXI>,
+				 <&reset RESET_SDH0>;
+			reset-names = "sdh_axi", "sdh0";
+			status = "disabled";
+		};
+
+		sdhci1: sdh@d4280800 {
+			compatible = "spacemit,k3-sdhci";
+			reg = <0x0 0xd4280800 0x0 0x200>;
+			resets = <&reset RESET_SDH_AXI>,
+				 <&reset RESET_SDH1>;
+			reset-names = "sdh_axi", "sdh1";
+			status = "disabled";
+		};
+
+		sdhci2: sdh@d4281000 {
+			compatible = "spacemit,k3-sdhci";
+			reg = <0x0 0xd4281000 0x0 0x200>;
+			resets = <&reset RESET_SDH_AXI>,
+				 <&reset RESET_SDH2>;
+			reset-names = "sdh_axi", "sdh2";
 			status = "disabled";
 		};
 
