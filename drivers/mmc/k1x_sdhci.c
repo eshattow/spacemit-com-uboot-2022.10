@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Driver for Spacemit K1x Mobile Storage Host Controller
+ * Driver for Spacemit K1x/K3 Mobile Storage Host Controller
  *
  * Copyright (C) 2023 Spacemit Inc.
  */
@@ -199,7 +199,7 @@ static const u32 tuning_patten8[32] = {
 
 static int is_emulator_platform(void)
 {
-#ifdef CONFIG_K1_X_BOARD_FPGA
+#if defined(CONFIG_K1_X_BOARD_FPGA) || defined(CONFIG_K3_BOARD_FPGA)
 	return 1;
 #else
 	return 0;
@@ -881,14 +881,16 @@ static int spacemit_sdhci_probe(struct udevice *dev)
 	struct spacemit_sdhci_priv *priv = dev_get_priv(dev);
 	struct sdhci_host *host = &priv->host;
 	struct dm_mmc_ops *mmc_driver_ops = (struct dm_mmc_ops *)dev->driver->ops;
+#if !defined(CONFIG_K1_X_BOARD_FPGA) && !defined(CONFIG_K3_BOARD_FPGA)
 	struct clk clk;
+#endif
 	int ret = 0;
 
 	host->mmc = &plat->mmc;
 	host->mmc->priv = host;
 	host->mmc->dev = dev;
 	upriv->mmc = host->mmc;
-
+#if !defined(CONFIG_K1_X_BOARD_FPGA) && !defined(CONFIG_K3_BOARD_FPGA)
 	ret = clk_get_bulk(dev, &plat->clks);
 	if (ret) {
 		pr_err("Can't get clk: %d\n", ret);
@@ -900,7 +902,7 @@ static int spacemit_sdhci_probe(struct udevice *dev)
 		pr_err("Failed to enable clk: %d\n", ret);
 		return ret;
 	}
-
+#endif
 	ret = reset_get_bulk(dev, &plat->resets);
 	if (ret) {
 		pr_err("Can't get reset: %d\n", ret);
@@ -912,7 +914,7 @@ static int spacemit_sdhci_probe(struct udevice *dev)
 		pr_err("Failed to reset: %d\n", ret);
 		return ret;
 	}
-
+#if !defined(CONFIG_K1_X_BOARD_FPGA) && !defined(CONFIG_K3_BOARD_FPGA)
 	ret = clk_get_by_index(dev, 0, &clk);
 	if (ret) {
 		pr_err("Can't get io clk: %d\n", ret);
@@ -924,7 +926,7 @@ static int spacemit_sdhci_probe(struct udevice *dev)
 		pr_err("Failed to set io clk: %d\n", ret);
 		return ret;
 	}
-
+#endif
 	/* Set quirks */
 #if defined(CONFIG_SPL_BUILD)
 	host->quirks = SDHCI_QUIRK_WAIT_SEND_CMD;
@@ -1009,6 +1011,9 @@ const struct spacemit_sdhci_driver_data spacemit_sdhci_drv_data = {
 
 static const struct udevice_id spacemit_sdhci_ids[] = {
 	{ .compatible = "spacemit,k1-x-sdhci",
+	  .data = (ulong)&spacemit_sdhci_drv_data,
+	},
+	{ .compatible = "spacemit,k3-sdhci",
 	  .data = (ulong)&spacemit_sdhci_drv_data,
 	},
 	{ }
