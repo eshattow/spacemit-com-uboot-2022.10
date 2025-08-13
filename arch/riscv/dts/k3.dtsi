@@ -282,6 +282,20 @@
 			reset-names = "qspi_reset", "qspi_bus_reset";
 			status = "disabled";
 		};
+
+		usb3_porta: usb3@0 {
+			compatible = "spacemit,k3-dwc3";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			resets = <&reset RESET_USB3_PORTA>;
+			reset-names = "ctl_rst";
+			ranges;
+			status = "disabled";
+			dwc3@cad00000 {
+				compatible = "snps,dwc3";
+				reg = <0x0 0xcad00000 0x0 0x10000>;
+			};
+		};
 	};
 
 };
