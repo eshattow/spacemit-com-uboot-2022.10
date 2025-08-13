@@ -383,8 +383,13 @@ static void dwc3_hsphy_mode_setup(struct dwc3 *dwc)
 	case USBPHY_INTERFACE_MODE_UTMIW:
 		reg &= ~(DWC3_GUSB2PHYCFG_PHYIF_MASK |
 			DWC3_GUSB2PHYCFG_USBTRDTIM_MASK);
+#ifdef CONFIG_K3_BOARD_FPGA
+		reg |= DWC3_GUSB2PHYCFG_PHYIF(UTMI_PHYIF_16_BIT) |
+			DWC3_GUSB2PHYCFG_USBTRDTIM_MASK;
+#else
 		reg |= DWC3_GUSB2PHYCFG_PHYIF(UTMI_PHYIF_16_BIT) |
 			DWC3_GUSB2PHYCFG_USBTRDTIM(USBTRDTIM_UTMI_16_BIT);
+#endif
 		break;
 	default:
 		break;
@@ -466,6 +471,10 @@ static void dwc3_phy_setup(struct dwc3 *dwc)
 
 	if (dwc->dis_u2_freeclk_exists_quirk)
 		reg &= ~DWC3_GUSB2PHYCFG_U2_FREECLK_EXISTS;
+
+#ifdef CONFIG_TARGET_SPACEMIT_K3
+	reg |= DWC3_GUSB2PHYCFG_TOUTCAL_MASK;
+#endif
 
 	dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
 
@@ -1108,12 +1117,23 @@ int dwc3_init(struct dwc3 *dwc)
 	if (dwc->revision >= DWC3_REVISION_250A) {
 		reg = dwc3_readl(dwc->regs, DWC3_GUCTL1);
 
-		/*
-		 * Enable hardware control of sending remote wakeup
-		 * in HS when the device is in the L1 state.
-		 */
-		if (dwc->revision >= DWC3_REVISION_290A)
+		if (dwc->revision >= DWC3_REVISION_290A) {
+			/*
+		 	 * Enable hardware control of sending remote wakeup
+		 	 * in HS when the device is in the L1 state.
+		 	 */
 			reg |= DWC3_GUCTL1_DEV_L1_EXIT_BY_HW;
+
+			/*
+			 * Controller will stuck if BIT(26) not set in HS-only mode,
+			 * This is already in Linux kernel.
+			 */
+			if (dwc->maximum_speed == USB_SPEED_FULL ||
+				dwc->maximum_speed == USB_SPEED_HIGH)
+				reg |= DWC3_GUCTL1_DEV_FORCE_20_CLK_FOR_30_CLK;
+			else
+				reg &= ~DWC3_GUCTL1_DEV_FORCE_20_CLK_FOR_30_CLK;
+		}
 
 		if (dwc->dis_tx_ipgap_linecheck_quirk)
 			reg |= DWC3_GUCTL1_TX_IPGAP_LINECHECK_DIS;
