@@ -1305,11 +1305,20 @@ void adjust_mapping(u32 DDRC_BASE, u32 cs_num, u32 size_mb, u32 mr8_value)
 	case 512: // 512M
 		area_length_cfg = 0xD;
 		break;
+	case 768: // 768M
+		area_length_cfg = 0x1;
+		break;
 	case 1024: // 1GB
 		area_length_cfg = 0xE;
 		break;
+	case 1536: // 1.5GB
+		area_length_cfg = 0x2;
+		break;
 	case 2048: // 2GB
 		area_length_cfg = 0xF;
+		break;
+	case 3072: // 3GB
+		area_length_cfg = 0x3;
 		break;
 	case 4096: // 4GB
 		area_length_cfg = 0x10;
