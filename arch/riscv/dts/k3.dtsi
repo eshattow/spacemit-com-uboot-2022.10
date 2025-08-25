@@ -45,7 +45,7 @@
 		compatible = "simple-bus";
 		ranges;
 
-		clint0: clint@e081c000 {
+		clint0: clint@f1810000 {
 			compatible = "riscv,clint0";
 			interrupts-extended = <&cpu0_intc  3 &cpu0_intc  7
 				&cpu1_intc  3 &cpu1_intc  7
@@ -105,9 +105,7 @@
 					&cpu10_intc 11 &cpu11_intc 11
 					&cpu12_intc 11 &cpu13_intc 11
 					&cpu14_intc 11 &cpu15_intc 11>;
-
-                        reg = <0x0 0xf1000000 0x0 0x10000>;
-
+			reg = <0x0 0xf1000000 0x0 0x10000>;
 			interrupt-controller;
 			#interrupt-cells = <0>;
 			#msi-cells = <0>;
@@ -119,7 +117,6 @@
 
 		simsic: interrupt-controller@e0400000 {
 			compatible = "riscv,imsics";
-
 			interrupts-extended = <&cpu0_intc 9 &cpu1_intc 9
 				&cpu2_intc 9 &cpu3_intc 9
 				&cpu4_intc 9 &cpu5_intc 9
@@ -128,9 +125,7 @@
 				&cpu10_intc 9 &cpu11_intc 9
 				&cpu12_intc 9 &cpu13_intc 9
 				&cpu14_intc 9 &cpu15_intc 9>;
-
-                        reg = <0x0 0xe0400000 0x0 0x400000>;
-
+			reg = <0x0 0xe0400000 0x0 0x400000>;
 			interrupt-controller;
 			#interrupt-cells = <0>;
 			#msi-cells = <0>;
