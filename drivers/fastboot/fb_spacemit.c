@@ -35,6 +35,186 @@
 #define EMMC_MAX_BLK_WRITE 16384
 
 #if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
+
+/**
+ * @brief Expand the last GPT partition to occupy all remaining space.
+ * Rebuilds the GPT table,forces the last partition's size to "-"
+ * so that U-Boot auto-expands it.
+ * @param dev_desc Block device descriptor (SD/eMMC)
+ * @return 0 on success, -1 on failure
+ */
+int sd_last_partition_resize(struct blk_desc *dev_desc)
+{
+	const char *last_partition_resized;
+	struct disk_partition part_info;
+	int last_part_num = -1;
+	char *gpt_table_str = NULL;
+	char gpt_cmd[256];
+	int combine_len = 1;
+
+	pr_debug("sd_last_partition_resize: Function entry\n");
+
+	/* Check if last partition has already been resized */
+	last_partition_resized = env_get("last_partition_resized");
+	if (last_partition_resized && strcmp(last_partition_resized, "1") == 0) {
+		pr_debug("SD last partition already resized, skipping\n");
+		return 0;
+	}
+
+	/* Validate device */
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+		pr_err("Invalid SD card device\n");
+		return -1;
+	}
+
+	pr_debug("SD card total sectors: %lu, sector size: %lu\n", dev_desc->lba, dev_desc->blksz);
+
+	/* Find the last partition - same logic as _parse_flash_config */
+	for (int i = 1; i <= 128; i++) {
+		if (part_get_info(dev_desc, i, &part_info) == 0) {
+			last_part_num = i;
+		} else {
+			break; /* No more partitions */
+		}
+	}
+
+	if (last_part_num == -1) {
+		pr_debug("No partition found, marking as resized\n");
+		env_set("last_partition_resized", "1");
+		env_save();
+		return 0;
+	}
+
+	pr_debug("Found %d partitions, last partition is %d\n", last_part_num, last_part_num);
+
+	/* Calculate space needed */
+	for (int i = 1; i <= last_part_num; i++) {
+		if (part_get_info(dev_desc, i, &part_info) == 0) {
+			/* Calculate length needed for this partition entry */
+			/* Format: "name=partname,start=XXXs,size=YYY;" */
+			combine_len += strlen((char *)part_info.name) + 50; /* name + formatting */
+		}
+	}
+
+	/* Initialize GPT table string */
+	gpt_table_str = malloc(combine_len);
+	if (gpt_table_str == NULL) {
+		pr_err("malloc gpt_table_str fail\n");
+		return -1;
+	}
+	memset(gpt_table_str, '\0', combine_len);
+
+	/* Build GPT table string with all partitions */
+	for (int i = 1; i <= last_part_num; i++) {
+		char part_entry[128];
+
+		if (part_get_info(dev_desc, i, &part_info) != 0) {
+			pr_err("Failed to get partition %d info during rebuild\n", i);
+			free(gpt_table_str);
+			return -1;
+		}
+
+		/* Debug: print partition info */
+		pr_debug("Partition %d: name=%s, start=%lu, size=%lu sectors, blksz=%lu\n", 
+				i, (char *)part_info.name, part_info.start, part_info.size, part_info.blksz);
+
+		if (i == last_part_num) {
+			/* Keep the original start of the last partition and set size to '-' for auto expansion */
+			snprintf(part_entry, sizeof(part_entry),
+					"name=%s,start=%lu,size=-",
+					(char *)part_info.name,
+					part_info.start * dev_desc->blksz);
+		} else {
+			/* Skip partitions with size 0 to avoid GPT parse issues */
+			if (part_info.size == 0) {
+				printf("Skipping partition %d: %s (size=0)\n", i, (char *)part_info.name);
+				continue;
+			}
+			/* Convert sectors to bytes since U-Boot's parser may not handle 'S' suffix reliably */
+			snprintf(part_entry, sizeof(part_entry),
+					"name=%s,start=%lu,size=%lu",
+					(char *)part_info.name,
+					part_info.start * dev_desc->blksz,
+					part_info.size * dev_desc->blksz);
+		}
+		/* Check buffer size and reallocate if needed - same pattern as _parse_flash_config */
+		if (strlen(gpt_table_str) + strlen(part_entry) + 2 >= combine_len) {
+			combine_len *= 2;
+			gpt_table_str = realloc(gpt_table_str, combine_len);
+			if (gpt_table_str == NULL) {
+				pr_err("realloc gpt_table_str fail\n");
+				return -1;
+			}
+		}
+
+		/* Add separator if not first partition */
+		if (strlen(gpt_table_str) > 0) {
+			strcat(gpt_table_str, ";");
+		}
+		strcat(gpt_table_str, part_entry);
+
+		pr_debug("Added partition %d: %s\n", i, part_entry);
+	}
+
+	pr_debug("Built GPT table: %s\n", gpt_table_str);
+
+	/* Set partitions environment variable */
+	if (env_set("partitions", gpt_table_str)) {
+		pr_err("Failed to set partitions env\n");
+		free(gpt_table_str);
+		return -1;
+	}
+
+	/* Write GPT table using environment variable*/
+	snprintf(gpt_cmd, sizeof(gpt_cmd), "gpt write mmc 0 $partitions");
+	pr_debug("Executing GPT write: %s\n", gpt_cmd);
+
+	if (run_command(gpt_cmd, 0)) {
+		pr_err("GPT write command failed\n");
+
+		/* Try alternative: direct command without environment variable */
+		snprintf(gpt_cmd, sizeof(gpt_cmd), "gpt write mmc 0 '%s'", gpt_table_str);
+		pr_debug("Trying direct GPT write: %s\n", gpt_cmd);
+
+		if (run_command(gpt_cmd, 0)) {
+			pr_err("Both GPT write methods failed\n");
+			free(gpt_table_str);
+			return -1;
+		}
+	}
+
+	free(gpt_table_str);
+
+	/* Force re-read partition table */
+	run_command("gpt read mmc 0", 0);
+
+	/* Simple verification - check if last partition grew */
+	struct disk_partition new_part_info;
+	if (part_get_info(dev_desc, last_part_num, &new_part_info) == 0) {
+		if (new_part_info.size > part_info.size) {
+			lbaint_t gained = new_part_info.size - part_info.size;
+			unsigned long gained_mb = (unsigned long)((gained * dev_desc->blksz) / (1024UL * 1024UL));
+			pr_debug("Partition expansion successful:\n");
+			pr_debug("  Name: %s\n", (char *)new_part_info.name);
+			pr_debug("  Old size: %lu sectors\n", part_info.size);
+			pr_debug("  New size: %lu sectors\n", new_part_info.size);
+			pr_debug("  Gained: %lu sectors (%lu MB)\n", gained, gained_mb);
+		} else {
+			pr_warn("Warning: Partition size did not increase\n");
+		}
+	}
+
+	/* Mark as completed - same pattern as fastboot_oem_flash_gpt */
+	env_set("last_partition_resized", "1");
+	if (env_save()) {
+		pr_warn("Warning: Failed to save environment variable\n");
+	}
+
+	pr_debug("SD rootfs partition expansion completed\n");
+	return 0;
+}
+
+
 int _write_gpt_partition(struct flash_dev *fdev)
 {
 	char *gpt_table_str = NULL;

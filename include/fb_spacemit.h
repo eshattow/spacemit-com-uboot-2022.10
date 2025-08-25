@@ -368,4 +368,13 @@ int get_available_blk_dev(char **blk_dev, int *index);
 */
 int get_available_boot_blk_dev(char **blk_dev, int *index);
 
+/**
+ * @brief Expand the last GPT partition to occupy all remaining space.
+ * Rebuilds the GPT table,forces the last partition's size to "-"
+ * so that U-Boot auto-expands it.
+ * @param dev_desc Block device descriptor (SD/eMMC)
+ * @return 0 on success, -1 on failure
+ */
+int sd_last_partition_resize(struct blk_desc *dev_desc);
+
 #endif
