@@ -176,10 +176,16 @@ static inline u32 map_format_size(u32 val)
 	switch (tmp) {
 	case 0xd:
 		return 512;
+	case 0x1:
+		return 768;
 	case 0xe:
 		return 1024;
+	case 0x2:
+		return 1536;
 	case 0xf:
 		return 2048;
+	case 0x3:
+		return 3072;
 	case 0x10:
 		return 4096;
 	case 0x11:
