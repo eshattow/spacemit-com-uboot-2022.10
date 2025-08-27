@@ -3,7 +3,6 @@
  * Copyright (C) 2025, Spacemit
  */
 
-
 #include <dm.h>
 #include <init.h>
 #include <spl.h>
@@ -12,13 +11,17 @@
 #include <linux/delay.h>
 #include <remoteproc.h>
 #include <image.h>
+#include <common.h>
+#include <env.h>
+#include <asm/io.h>
+
+void spl_load_env(void) { /* TODO: load environment */ }
 
 int spl_board_init_f(void)
 {
 	int ret;
 	struct udevice *dev;
 
-	printf("%s\n", __FUNCTION__);
 	/* DDR init */
 	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
 	if (ret) {
@@ -29,18 +32,18 @@ int spl_board_init_f(void)
 	rproc_init();
 #endif
 
+	spl_load_env();
 	return 0;
 }
 
-u32 spl_boot_device(void)
+void spl_board_init(void)
 {
-	return BOOT_DEVICE_RAM;
+	spl_load_env();
 }
 
 #if CONFIG_IS_ENABLED(FIT_IMAGE_POST_PROCESS)
 /* load the esos firmare */
-void board_fit_image_post_process(const void *fit, int node, void **p_image,
-				  size_t *p_size)
+void board_fit_image_post_process(const void *fit, int node, void **p_image, size_t *p_size)
 {
 #ifdef CONFIG_SPL_REMOTEPROC_K3_PROC
 	const char *name = fit_get_name(fit, node, NULL);
@@ -59,10 +62,9 @@ void board_fit_image_post_process(const void *fit, int node, void **p_image,
 #endif
 
 #ifdef CONFIG_SPL_LOAD_FIT
-int board_fit_config_name_match(const char *name)
+int board_fit_config_name_match(const char* name)
 {
 	/* boot using first FIT config */
 	return 0;
 }
 #endif
-

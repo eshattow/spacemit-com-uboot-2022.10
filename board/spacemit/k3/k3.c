@@ -116,3 +116,125 @@ void *board_fdt_blob_setup(int *err)
 	return (ulong *)&_end;
 }
 
+/*May be not used*/
+void set_boot_mode(enum board_boot_mode boot_mode)
+{
+	writel(boot_mode, (void *)BOOT_DEV_FLAG_REG);
+}
+
+/*
+ * Boot mode strap pins (4 bits total)
+ *
+ * bit3 bit2 bit1-0  Meaning
+ *  1     0     XX   Update from USB
+ *  1     1     XX   Update from UART
+ *  0     X     00   Normal boot from eMMC
+ *  0     X     10   Normal boot from SPI Nand
+ *  0     X     01   Normal boot from SPI Nor
+ *  0     X     11   Normal boot from UFS
+ */
+enum board_boot_mode get_boot_pin_select(void)
+{
+    /* Decode full 4-bit strap field starting at BOOT_STRAP_BIT_OFFSET */
+    u32 strap = readl((void *)BOOT_PIN_SELECT);
+    u32 pins = (strap >> BOOT_STRAP_BIT_OFFSET) & 0xF; /* bit3:bit0 */
+    pr_debug("strap_pins:%#x\n", pins);
+
+    /* Update modes when bit3 == 1 */
+    if (pins & 0x8) {
+        if (pins & 0x4)
+            return BOOT_MODE_UART; /* bit3=1, bit2=1 */
+        else
+            return BOOT_MODE_USB;  /* bit3=1, bit2=0 */
+    }
+
+    /* Normal boot by storage when bit3 == 0, select by bit1-0 */
+    switch (pins & 0x3) {
+    case BOOT_STRAP_BIT_EMMC: /* 00 */
+        return BOOT_MODE_EMMC;
+    case BOOT_STRAP_BIT_NAND: /* 10 */
+        return BOOT_MODE_NAND;
+    case BOOT_STRAP_BIT_NOR: /* 01 */
+        return BOOT_MODE_NOR;
+    case BOOT_STRAP_BIT_UFS: /* 11 */
+        return BOOT_MODE_UFS;
+    default:
+        return BOOT_MODE_SD;
+    }
+}
+
+/* Get boot mode based on bootrom implementation */
+enum board_boot_mode get_boot_mode(void)
+{
+	u32 boot_flag_reg;
+	enum board_boot_mode mode = BOOT_MODE_USB;
+
+	/* Read bootrom boot flag from BOOT_DEV_FLAG_REG */
+	boot_flag_reg = readl((void*)BOOT_DEV_FLAG_REG);
+	pr_debug("%s boot_flag_reg:0x%x\n", __func__, boot_flag_reg);
+
+	/* Check bootrom set boot type */
+	u32 boot_type = boot_flag_reg & BOOT_TYPE_MASK;
+	switch (boot_type) {
+	case BOOT_MODE_USB:
+		mode = BOOT_MODE_USB;
+		break;
+	case BOOT_MODE_UART:
+		mode = BOOT_MODE_UART;
+		break;
+	case BOOT_MODE_EMMC:
+		mode = BOOT_MODE_EMMC;
+		break;
+	case BOOT_MODE_NAND:
+		mode = BOOT_MODE_NAND;
+		break;
+	case BOOT_MODE_NOR:
+		mode = BOOT_MODE_NOR;
+		break;
+	case BOOT_MODE_UFS:
+		mode = BOOT_MODE_UFS;
+		break;
+	case BOOT_MODE_SD:
+		mode = BOOT_MODE_SD;
+		break;
+	default:
+		mode = BOOT_MODE_SHELL;  /* Default to shell if unknown */
+		break;
+	}
+
+	pr_debug("Final boot mode: 0x%x\n", mode);
+	return mode;
+}
+
+void board_boot_order(u32* spl_boot_list)
+{
+	u32 boot_mode = get_boot_mode();
+	pr_debug("boot_mode:0x%x\n", boot_mode);
+	if (boot_mode == BOOT_MODE_USB) {
+		spl_boot_list[0] = BOOT_DEVICE_BOARD;
+	} else {
+		switch (boot_mode) {
+		case BOOT_MODE_SD:
+			spl_boot_list[0] = BOOT_DEVICE_MMC1;
+			break;
+		case BOOT_MODE_EMMC:
+			spl_boot_list[0] = BOOT_DEVICE_MMC2;
+			break;
+		case BOOT_MODE_NAND:
+			spl_boot_list[0] = BOOT_DEVICE_NAND;
+			break;
+		case BOOT_MODE_NOR:
+			spl_boot_list[0] = BOOT_DEVICE_NOR;
+			break;
+		case BOOT_MODE_UFS:
+			spl_boot_list[0] = BOOT_DEVICE_UFS;
+			break;
+		default:
+			spl_boot_list[0] = BOOT_DEVICE_RAM;
+			break;
+		}
+
+		// reserve for debug/test to load/run uboot from ram.
+		spl_boot_list[1] = BOOT_DEVICE_RAM;
+	}
+}

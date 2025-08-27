@@ -12,7 +12,7 @@
 			os = "U-Boot";
 			arch = "riscv";
 			compression = "none";
-			load = <0x0 0x00200000>;
+			load = <0x1 0x02000000>;
 			data = /incbin/("../u-boot-nodtb.bin");
 			hash-1 {
 				algo = "crc32";
