@@ -238,9 +238,13 @@ static void husb239_update_operating_status(struct udevice *dev)
 	else
 		op_current = 3000 + (status1 - STEP_BOUNDARY) * 40;
 
-	/* covert mV/mA to uV/uA */
-	husb239->voltage = voltage;
-	husb239->op_current = op_current;
+	if ((husb239->voltage != voltage)
+	    || (husb239->op_current != op_current)) {
+		husb239->voltage = voltage;
+		husb239->op_current = op_current;
+		goto out;
+	}
+	return;
 
 out:
 	dev_info(dev, "update sink voltage: %dmV current: %dmA\n", husb239->voltage, husb239->op_current);
@@ -257,9 +261,9 @@ static int husb239_usbpd_detect(struct udevice *dev)
 			return ret;
 
 		dev_info(dev, "husb239 detect pd, contract status0: %x\n", ret);
-		if (((ret & HUSB239_PD_CONTRACT_MASK) >> HUSB239_PD_CONTRACT_SHIFT) == SNKCAP_5V) {
+		if (((ret & HUSB239_PD_CONTRACT_MASK) >> HUSB239_PD_CONTRACT_SHIFT)) {
 			husb239_update_operating_status(dev);
-			break;
+			return 0;
 		}
 
 		/* check attach status */
@@ -310,30 +314,30 @@ static int husb239_usbpd_request_voltage(struct udevice *dev)
 		break;
 	}
 
-	while(--count) {
-		ret = dm_i2c_reg_read(dev, HUSB239_REG_SRC_PDO_5V + snk_sel - 1);
-		if(ret < 0)
-			return ret;
+	for (; snk_sel >= SNKCAP_5V; snk_sel--) {
+		for (count = 10; count > 0; count--) {
+			ret = dm_i2c_reg_read(dev, HUSB239_REG_SRC_PDO_5V + snk_sel - 1);
+			if(ret < 0)
+				return ret;
 
-		dev_info(dev, "husb239_attach src_pdo: %x\n", ret);
-		if (ret & HUSB239_REG_SRC_DETECT)
-			break;
+			dev_info(dev, "husb239_attach src_pdo: %x\n", ret);
+			if (ret & HUSB239_REG_SRC_DETECT)
+				goto pd_detect;
 
-		/* check attach status */
-		ret = dm_i2c_reg_read(dev, HUSB239_REG_STATUS);
-		if(ret < 0)
-			return ret;
+			/* check attach status */
+			ret = dm_i2c_reg_read(dev, HUSB239_REG_STATUS);
+			if(ret < 0)
+				return ret;
 
-		if (!(ret & HUSB239_REG_STATUS_ATTACH))
-			return -ENODEV;
+			if (!(ret & HUSB239_REG_STATUS_ATTACH))
+				return -ENODEV;
 
-		mdelay(100);
+			mdelay(100);
+		}
 	}
 
-	if (count == 0)
-		return -EINVAL;
-
-	dev_info(dev, "pd detect\n");
+pd_detect:
+	dev_info(dev, "pd detect, snk_sel: %d\n", snk_sel);
 	ret = dm_i2c_reg_clrset(dev, HUSB239_REG_SRC_PDO,
 				HUSB239_REG_SRC_PDO_SEL_MASK, (snk_sel << 3));
 	if (ret)
@@ -395,7 +399,12 @@ static void husb239_detach(struct udevice *dev)
 
 static void husb239_pd_contract(struct udevice *dev)
 {
+	struct husb239_plat *husb239 = dev_get_plat(dev);
+
 	husb239_update_operating_status(dev);
+	husb239->req_voltage = husb239->sink_voltage;/* mv */
+	husb239_usbpd_request_voltage(dev);
+
 	return;
 }
 
@@ -422,6 +431,7 @@ int husb239_detect(struct udevice *dev)
 	if (int0 & HUSB239_REG_MASK2_PD_HV)
 		husb239_pd_contract(dev);
 
+	husb239_update_operating_status(dev);
 	return 0;
 }
 
