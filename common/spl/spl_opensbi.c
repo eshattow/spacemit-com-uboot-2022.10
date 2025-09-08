@@ -20,6 +20,16 @@ DECLARE_GLOBAL_DATA_PTR;
 
 struct fw_dynamic_info opensbi_info;
 
+/*
+ * Provide a weak hook to allow board-specific logic to load extra FITs
+ * and optionally override U-Boot entry address.
+ */
+__weak int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
+{
+    /* default: do nothing */
+    return 0;
+}
+
 static int spl_opensbi_find_uboot_node(void *blob, int *uboot_node)
 {
 	int fit_images_node, node;
@@ -49,6 +59,8 @@ void spl_invoke_opensbi(struct spl_image_info *spl_image)
 	ulong uboot_entry;
 	void (*opensbi_entry)(ulong hartid, ulong dtb, ulong info);
 
+	board_load_extra_fits(spl_image, &uboot_entry);
+
 	if (!spl_image->fdt_addr) {
 		pr_err("No device tree specified in SPL image\n");
 		hang();
@@ -57,8 +69,7 @@ void spl_invoke_opensbi(struct spl_image_info *spl_image)
 	/* Find U-Boot image in /fit-images */
 	ret = spl_opensbi_find_uboot_node(spl_image->fdt_addr, &uboot_node);
 	if (ret) {
-		pr_err("Can't find U-Boot node, %d\n", ret);
-		hang();
+		printf("Can't find U-Boot node, %d\n", ret);
 	}
 
 	/* Get U-Boot entry point */

@@ -136,6 +136,10 @@ enum board_boot_mode {
 	"fdt_addr_r=0x12c000000\0" \
 	"scriptaddr=0x12c100000\0" \
 	"pxefile_addr_r=0x12c200000\0" \
-	"ramdisk_addr_r=0x12c300000\0"
+	"ramdisk_addr_r=0x12c300000\0" \
+	"bootfs_esos_itb=esos.itb\0" \
+	"bootfs_uboot_itb=u-boot.itb\0" \
+	"extra_fit_esos=esos\0" \
+	"extra_fit_uboot=uboot\0"
 
 #endif /* __SPACEMIT_K3_CONFIG_H */

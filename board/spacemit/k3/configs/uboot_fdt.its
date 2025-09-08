@@ -9,7 +9,7 @@
 		uboot {
 			description = "U-Boot";
 			type = "standalone";
-			os = "U-Boot";
+			os = "u-boot";
 			arch = "riscv";
 			compression = "none";
 			load = <0x1 0x02000000>;
