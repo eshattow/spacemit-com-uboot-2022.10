@@ -471,11 +471,11 @@ static int check_reboot_or_powerup(struct shutdown_charge *priv,
 	*reboot_flag = regulator_get_value(priv->wkup_set[SYS_REBOOT_FLAG]);
 	printf("reboot flag before clear: 0x%x\n", *reboot_flag);
 
-	*reboot_flag &= ~(1 << SYS_REBOOT_FLAG_BIT);
-	regulator_set_value_force(priv->wkup_set[SYS_REBOOT_FLAG], *reboot_flag);
+	unsigned int flag_after = *reboot_flag & ~(1 << SYS_REBOOT_FLAG_BIT);
+	regulator_set_value_force(priv->wkup_set[SYS_REBOOT_FLAG], flag_after);
 
 	/* Read again after clear */
-	unsigned int flag_after = regulator_get_value(priv->wkup_set[SYS_REBOOT_FLAG]);
+	flag_after = regulator_get_value(priv->wkup_set[SYS_REBOOT_FLAG]);
 	printf("reboot flag after clear: 0x%x\n", flag_after);
 
 	return status; /* Return charger status */
@@ -487,8 +487,8 @@ static bool need_exit_early(struct shutdown_charge *priv,
 						int capacity,
 						int charger_status)
 {
-	if ((reboot_flag & SYS_REBOOT_FLAG_BIT) && (capacity >= priv->threshold1)) {
-		printf("reboot_flag & SYS_REBOOT_FLAG_BIT && (capacity >= priv->threshold1)\n");
+	if ((reboot_flag & (1 << SYS_REBOOT_FLAG_BIT)) && (capacity >= priv->threshold1)) {
+		printf("reboot_flag & 1 << SYS_REBOOT_FLAG_BIT && (capacity >= priv->threshold1)\n");
 		return true;
 	}
 
