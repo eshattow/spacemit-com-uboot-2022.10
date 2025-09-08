@@ -168,6 +168,17 @@
 			status = "okay";
 		};
 
+		gpio: gpio@d4019000 {
+			compatible = "spacemit,k3-gpio";
+			reg = <0x0 0xd4019000 0x0 0x800>;
+			gpio-controller;
+			gpio-count = <128>;
+			#gpio-cells = <2>;
+			interrupts = <58 4>;
+			interrupt-names = "gpio_mux";
+			interrupt-parent = <&saplic>;
+		};
+
 		pmx: pinmux@d401e000 {
 			compatible = "pinctrl-single";
 			reg = <0x0 0xd401e000 0x0 0x400>;
