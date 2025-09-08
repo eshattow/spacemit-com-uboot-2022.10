@@ -146,6 +146,7 @@ extern int husb239_detect_pd(void);
 
 /* Global suspend context */
 static struct suspend_context context = { 0 };
+static unsigned int def_rtcctrl_value = 0;
 
 /* ---------------------------------------------------------------------- */
 /*                      Suspend/Resume Helpers                            */
@@ -515,6 +516,7 @@ static void config_wakeup_and_plic(struct shutdown_charge *priv,
 								PWRKEY_LONG_PRESS_EVENT |
 								PWRKEY_SHORT_PRESS_EVENT);
 
+	def_rtcctrl_value = regulator_get_value(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_CTRL]);
 	/* Enable RTC basic functions */
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_CTRL],
 								RTC_CLK_SEL_EXTERNAL_OSC |
@@ -567,7 +569,8 @@ static void cleanup_wakeup_and_plic(struct shutdown_charge *priv,
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_EVENT], 0xff);
 
 	/* Disable RTC completely */
-	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_CTRL], 0);
+	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_CTRL], def_rtcctrl_value);
+	printf("restore value:0x%x to rtc ctrl reg\n", def_rtcctrl_value);
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_IRQ], 0);
 }
 
