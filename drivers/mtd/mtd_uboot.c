@@ -357,20 +357,34 @@ int mtd_probe_devices(void)
 	 */
 	mtd_dev_list_updated();
 
-	/* If both mtdparts and mtdids are non-empty, parse */
-	if (mtdparts && mtdids) {
-		if (parse_mtdparts(mtdparts, mtdids) < 0){
-			pr_info("Failed parsing MTD partitions from mtdparts!\n");
+	/* First try to OF partitions */
+	bool use_mtdparts = true;
+	mtd_for_each_device(mtd) {
+		/* Skip partition devices, only process master devices */
+		if (mtd->parent != NULL)
+			continue;
+
+		ofnode parts = ofnode_null();
+		if (mtd->dev)
+			parts = ofnode_find_subnode(mtd_get_ofnode(mtd), "partitions");
+		else if (ofnode_valid(mtd->flash_node))
+			parts = ofnode_find_subnode(mtd->flash_node, "partitions");
+
+		if (ofnode_valid(parts) &&
+			ofnode_is_available(parts) &&
+			ofnode_device_is_compatible(parts, "fixed-partitions")) {
+			use_mtdparts = false;
+			int ret = add_mtd_partitions_of(mtd);
+			if (ret != 0)
+				use_mtdparts = true;
 		}
 	}
 
-	/* Fallback to OF partitions */
-	mtd_for_each_device(mtd) {
-		if (list_empty(&mtd->partitions)) {
-			if (add_mtd_partitions_of(mtd) < 0){
-				pr_info("Failed parsing MTD %s OF partitions!\n",
-					mtd->name);
-			}
+	/* If both use_mtdparts is true and mtdparts and mtdids are non-empty, parse */
+	if (use_mtdparts && mtdparts && mtdids) {
+		pr_info("Using mtdparts: %s, mtdids: %s\n", mtdparts, mtdids);
+		if (parse_mtdparts(mtdparts, mtdids) < 0){
+			pr_info("Failed parsing MTD partitions from mtdparts!\n");
 		}
 	}
 
