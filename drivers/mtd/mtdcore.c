@@ -159,7 +159,7 @@ int idr_alloc(struct idr *idp, void *ptr, int start, int end, gfp_t gfp_mask)
 // board_init_f: mtd_probe_devices, get_mtd_device_nm
 // bss section memset
 // board_init_r: mtd_probe_devices(bypass), get_mtd_device_nm(FAIL)
-__section(".data.mtd_idr") static DEFINE_IDR(mtd_idr);
+__section(".data.mtd_idr") DEFINE_IDR(mtd_idr);
 #else
 static DEFINE_IDR(mtd_idr);
 #endif

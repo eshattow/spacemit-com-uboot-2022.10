@@ -20,6 +20,7 @@
 #include <linux/iopoll.h>
 #include <linux/bug.h>
 #include <linux/ioport.h>
+#include "../drivers/gpio/k1x_gpio.h"
 
 #define K1X_DUMP_QSPI_REG		0
 
@@ -237,6 +238,9 @@ struct k1x_qspi {
 	u32 max_hz;
 	u32 endian_xchg;
 	u32 dma_enable;
+
+	int cs_gpio_num;
+	int cs_gpio_level;
 };
 
 enum qpsi_cs {
@@ -252,6 +256,43 @@ enum qpsi_mode {
 	QSPI_DISABLE_MODE,
 	QSPI_STOP_MODE,
 };
+
+/* Helper macros for GPIO register access */
+#define K1X_GPIO_BASE           0xD4019000
+#define GPIO_TO_REG(gp)     (gp >> 5)
+#define GPIO_TO_BIT(gp)     (1 << (gp & 0x1f))
+static inline struct gpio_reg *get_gpio_bank(int gpio)
+{
+	const unsigned long offset[] = {0, 4, 8, 0x100};
+	return (struct gpio_reg *)(K1X_GPIO_BASE + offset[GPIO_TO_REG(gpio)]);
+}
+
+void set_qspi_cs_gpio(int gpio, int select)
+{
+	struct gpio_reg *gpio_bank = get_gpio_bank(gpio);
+	writel(MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_3V_DS4, (void __iomem *)gpio_bank);
+}
+
+/* Select QSPI target via a board GPIO mux. */
+void set_qspi_cs(int gpio, int select)
+{
+	struct gpio_reg *gpio_bank = get_gpio_bank(gpio);
+
+	/* Configure as GPIO output */
+	writel(GPIO_TO_BIT(gpio), &gpio_bank->gsdr);
+
+	/* Default to High */
+	writel(GPIO_TO_BIT(gpio), &gpio_bank->gpsr);
+
+	/* Drive level according to parameter */
+	if (select) {
+		/* High */
+		writel(GPIO_TO_BIT(gpio), &gpio_bank->gpsr);
+	} else {
+		/* Low */
+		writel(GPIO_TO_BIT(gpio), &gpio_bank->gpcr);
+	}
+}
 
 static void qspi_writel(struct k1x_qspi *qspi, u32 val, void __iomem *addr)
 {
@@ -913,6 +954,10 @@ static int k1x_qspi_claim_bus(struct udevice *dev)
 	bus = dev->parent;
 	qspi = dev_get_priv(bus);
 
+	/* Also ensure board mux is set when claiming the bus */
+	if (qspi->cs_gpio_num)
+		set_qspi_cs(qspi->cs_gpio_num, qspi->cs_gpio_level);
+
 	k1x_qspi_select_mem(qspi, slave_plat->cs);
 
 	return 0;
@@ -998,6 +1043,19 @@ static int k1x_qspi_ofdata_to_platdata(struct udevice *bus)
 	qspi->endian_xchg = fdtdec_get_int(blob, node, "qspi-little", 0);
 
 	qspi->cs_selected = QSPI_CS_A1;
+
+	{
+		u32 cs_arr[2];
+		ret = dev_read_u32_array(bus, "cs-gpio", cs_arr, 2);
+		if (!ret) {
+			qspi->cs_gpio_num = cs_arr[0];
+			qspi->cs_gpio_level = (int)cs_arr[1];
+			dev_info(bus, "cs-gpio num: level%d: %d\n", qspi->cs_gpio_num, qspi->cs_gpio_level);
+		} else {
+			qspi->cs_gpio_num = 0;
+			qspi->cs_gpio_level = 1; /* default High */
+		}
+	}
 
 	dev_info(bus, "qspi iobase:0x%pa, ahb_addr:0x%pa, max_hz:%dHz\n",
 				&iobase, &ahb_addr, qspi->max_hz);

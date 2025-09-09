@@ -315,8 +315,9 @@ int _clear_env_part(void *download_buffer, u32 download_bytes,
 			int ret;
 			ret = fb_mtd_lookup("env", &mtd, &part);
 			if (ret) {
-				pr_err("invalid mtd device\n");
-				return -1;
+				/* No 'env' partition defined: skip ENV clear gracefully */
+				pr_info("no env partition found, skip clearing env\n");
+				break;
 			}
 			ret = _fb_mtd_erase(mtd, CONFIG_ENV_SIZE);
 			if (ret)
