@@ -355,6 +355,42 @@
 			status = "disabled";
 		};
 
+		spi0: spi0@d4040000 {
+			compatible = "spacemit,k3-spi";
+			reg = <0x0 0xd4040000 0x0 0x30>;
+			clocks = <&ccu CLK_SPI0>;
+			resets = <&reset RESET_SPI0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <5000000>;
+			port = <0>;
+			status = "disabled";
+		};
+
+		spi1: spi1@d4040800 {
+			compatible = "spacemit,k3-spi";
+			reg = <0x0 0xd4040800 0x0 0x30>;
+			clocks = <&ccu CLK_SPI1>;
+			resets = <&reset RESET_SPI1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <5000000>;
+			port = <1>;
+			status = "disabled";
+		};
+
+		spi3: spi3@d401c000 {
+			compatible = "spacemit,k3-spi";
+			reg = <0x0 0xd401c000 0x0 0x30>;
+			clocks = <&ccu CLK_SPI3>;
+			resets = <&reset RESET_SPI3>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <5000000>;
+			port = <3>;
+			status = "disabled";
+		};
+
 		qspi: spi@d420c000 {
 			compatible = "spacemit,k3-qspi";
 			#address-cells = <1>;
