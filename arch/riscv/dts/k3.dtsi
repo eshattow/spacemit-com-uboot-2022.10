@@ -202,7 +202,7 @@
 			mem_heap_start = <0x1 0x500000>;
 			mem_heap_size = <0x200000>;
 			fw_boot_entry = <0x1 0x200000>;
-			status = "okay";
+			status = "disabled";
 		};
 
 		rcpu@1 {
@@ -227,21 +227,21 @@
 			reg-names = "a2p-req", "p2a-ack", "p2a-req", "a2p-ack", "db-reg";
 			riscv,slot-size = <256>;
 			#mbox-cells = <1>;
-			status = "okay";
+			status = "disabled";
 		};
 
 		rpmi_mpxy_clk: rpmi-mpxy-clk@0 {
 			compatible = "riscv,rpmi-mpxy-clock";
 			mboxes = <&rpmi_shmem_mbox 8>;
 			riscv,sbi-mpxy-channel-id = <8>;
-			status = "okay";
+			status = "disabled";
 		};
 
 		rpmi_mpxy_voltage: rpmi-mpxy-voltage@0 {
 			compatible = "riscv,rpmi-mpxy-voltage";
 			mboxes = <&rpmi_shmem_mbox 7>;
 			riscv,sbi-mpxy-channel-id = <7>;
-			status = "okay";
+			status = "disabled";
 		};
 
 		ddr@3000000 {
