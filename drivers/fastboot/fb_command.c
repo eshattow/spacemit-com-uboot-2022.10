@@ -212,7 +212,7 @@ int fastboot_handle_command(char *cmd_string, char *response)
 	strsep(&cmd_parameter, ":");
 
 	for (i = 0; i < FASTBOOT_COMMAND_COUNT; i++) {
-		if (!strcmp(commands[i].command, cmd_string)) {
+		if (commands[i].command && !strcmp(commands[i].command, cmd_string)) {
 			if (commands[i].dispatch) {
 				commands[i].dispatch(cmd_parameter,
 							response);
