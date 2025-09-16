@@ -1072,6 +1072,7 @@ int board_late_init(void)
 	return 0;
 }
 
+#if !defined(CONFIG_SPL_BUILD)
 void *board_fdt_blob_setup(int *err)
 {
 	*err = 0;
@@ -1086,6 +1087,7 @@ void *board_fdt_blob_setup(int *err)
 	}
 	return (ulong *)&_end;
 }
+#endif
 
 enum env_location env_get_location(enum env_operation op, int prio)
 {

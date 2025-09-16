@@ -1395,7 +1395,6 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp, void *inp
 	u64 to_traning_param[10];
 	int (*func)(const char*, ...) = printf;
 	void (*training)(void* param);
-	unsigned long flush_lenth;
 
 	#if !(LOGLEVEL > 0)
 	func = printf_no_output;
@@ -1406,9 +1405,6 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp, void *inp
 	to_traning_param[2] = boot_pp;
 	to_traning_param[3] = (u64)func;
 	to_traning_param[4] = (u64)input;
-	memcpy((void*)DDR_TRAINING_DATA_BASE, lpddr4_training_img, sizeof(lpddr4_training_img));
-	flush_lenth = round_up(sizeof(lpddr4_training_img), CONFIG_RISCV_CBOM_BLOCK_SIZE);
-	flush_dcache_range(DDR_TRAINING_DATA_BASE, DDR_TRAINING_DATA_BASE + flush_lenth);
 
 	training = (void (*)(void * param))DDR_TRAINING_DATA_BASE;
 	training(to_traning_param);
