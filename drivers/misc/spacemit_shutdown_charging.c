@@ -146,21 +146,21 @@ extern int husb239_detect_pd(void);
 
 /* Global suspend context */
 static struct suspend_context context = { 0 };
+static unsigned int def_rtcctrl_value = 0;
 
 /* ---------------------------------------------------------------------- */
 /*                      Suspend/Resume Helpers                            */
 /* ---------------------------------------------------------------------- */
-static int sbi_suspend_finisher(unsigned long suspend_type,
-								unsigned long resume_addr,
-								unsigned long opaque)
+static int sbi_suspend_finisher(unsigned long suspend_type, unsigned long resume_addr,
+				unsigned long opaque)
 {
 	struct sbiret ret;
 
 	flush_dcache_range((unsigned long)&context,
-						(unsigned long)(&context) + sizeof(struct suspend_context));
+			   (unsigned long)(&context) + sizeof(struct suspend_context));
 
 	ret = sbi_ecall(SBI_EXT_HSM, SBI_EXT_HSM_HART_SUSPEND,
-					suspend_type, resume_addr, opaque, 0, 0, 0);
+			suspend_type, resume_addr, opaque, 0, 0, 0);
 
 	return (ret.error) ? ret.error : 0;
 }
@@ -191,9 +191,7 @@ int cpu_suspend(unsigned long arg,
 	suspend_save_csrs(&context);
 
 	if (__cpu_suspend_enter(&context)) {
-		rc = finish(arg,
-					(unsigned long)__cpu_resume_enter,
-					(unsigned long)&context);
+		rc = finish(arg, (unsigned long)__cpu_resume_enter, (unsigned long)&context);
 		if (!rc) {
 			rc = -EOPNOTSUPP;
 		}
@@ -232,9 +230,8 @@ static int spacemit_display_backlight_off(struct shutdown_charge *priv)
 /* 1) Initialize battery (electricity meter) */
 static int init_electricity_meter(struct udevice *dev, struct shutdown_charge *priv)
 {
-	int ret = uclass_get_device_by_phandle(UCLASS_BATTERY, dev,
-											"electricity-meter",
-											&priv->ele_meter);
+	int ret = uclass_get_device_by_phandle(UCLASS_BATTERY, dev, "electricity-meter",
+					       &priv->ele_meter);
 	if (ret) {
 		printf("%s:%d, failed to get electricity meter\n", __func__, __LINE__);
 		return ret;
@@ -263,10 +260,9 @@ static int init_wkup_regulators(struct udevice *dev, struct shutdown_charge *pri
 
 	int count = dev_read_string_count(dev, "wk-name");
 	for (int i = 0; i < count; ++i) {
-		ret = uclass_get_device_by_phandle(UCLASS_REGULATOR,
-											dev,
-											priv->wkup_name[i],
-											&priv->wkup_set[i]);
+		ret = uclass_get_device_by_phandle(UCLASS_REGULATOR, dev,
+						   priv->wkup_name[i],
+						   &priv->wkup_set[i]);
 		if (ret) {
 			printf("%s:%d, failed to get regulator: %s\n",
 					__func__, __LINE__, priv->wkup_name[i]);
@@ -294,10 +290,9 @@ static int init_chargers(struct udevice *dev, struct shutdown_charge *priv)
 	}
 
 	for (int i = 0; i < priv->charger_cnt; ++i) {
-		ret = uclass_get_device_by_phandle(UCLASS_CHARGER,
-											dev,
-											priv->charger_name[i],
-											&priv->charger[i]);
+		ret = uclass_get_device_by_phandle(UCLASS_CHARGER, dev,
+						   priv->charger_name[i],
+						   &priv->charger[i]);
 		if (ret) {
 			printf("%s:%d, failed to get charger: %s\n",
 					__func__, __LINE__, priv->charger_name[i]);
@@ -310,11 +305,8 @@ static int init_chargers(struct udevice *dev, struct shutdown_charge *priv)
 /* 5) Initialize LED GPIO for charging indicators */
 static int init_leds(struct udevice *dev, struct shutdown_charge *priv)
 {
-	int ret = gpio_request_list_by_name(dev,
-										"charge-light",
-										priv->led_indicators,
-										MAX_GPIO_COUNT,
-										GPIOD_IS_OUT);
+	int ret = gpio_request_list_by_name(dev, "charge-light", priv->led_indicators,
+					    MAX_GPIO_COUNT, GPIOD_IS_OUT);
 	if (ret < 0) {
 		printf("%s:%d, failed to get charge-light GPIO\n", __func__, __LINE__);
 		return ret;
@@ -337,10 +329,8 @@ static int init_leds(struct udevice *dev, struct shutdown_charge *priv)
 /* 6) Initialize backlight for mipi display */
 static int init_backlight(struct udevice *dev, struct shutdown_charge *priv)
 {
-	int ret = uclass_get_device_by_phandle(UCLASS_PANEL_BACKLIGHT,
-											dev,
-											"backlight",
-											&priv->backlight);
+	int ret = uclass_get_device_by_phandle(UCLASS_PANEL_BACKLIGHT, dev,
+					       "backlight", &priv->backlight);
 	if (ret) {
 		printf("%s:%d, failed to get backlight\n", __func__, __LINE__);
 		return ret;
@@ -374,17 +364,20 @@ static int update_charging_status(struct shutdown_charge *priv)
 			continue;
 		}
 
-		// Set charging current based on battery status
+		/* Set charging current based on battery status */
 		switch (battery_status) {
 			case BAT_STATE_VERY_LOW:
-				charger_set_current(priv->charger[i], 500000);  // Use 500mA low current charging when voltage below 3V
+				/* Use 500mA low current charging when voltage below 3V */
+				charger_set_current(priv->charger[i], 500000);
 				break;
 			case BAT_STATE_NEED_CHARGING:
 			case BAT_STATE_NORMAL:
-				charger_set_current(priv->charger[i], 2000000);  // Normal charging with 2A
+				/* Normal charging with 2A */
+				charger_set_current(priv->charger[i], 2000000);
 				break;
 			default:
-				charger_set_current(priv->charger[i], 0);  // Stop charging for other states
+				/* Stop charging for other states */
+				charger_set_current(priv->charger[i], 0);
 				break;
 		}
 	}
@@ -444,9 +437,9 @@ static int init_devices(struct udevice *dev, struct shutdown_charge *priv)
  * Check reboot flag, power key event, battery capacity, charger status
  */
 static int check_reboot_or_powerup(struct shutdown_charge *priv,
-								unsigned int *pwr_key_status,
-								unsigned int *reboot_flag,
-								int *capacity_out)
+				   unsigned int *pwr_key_status,
+				   unsigned int *reboot_flag,
+				   int *capacity_out)
 {
 	int ret;
 	int status = 0;
@@ -471,24 +464,22 @@ static int check_reboot_or_powerup(struct shutdown_charge *priv,
 	*reboot_flag = regulator_get_value(priv->wkup_set[SYS_REBOOT_FLAG]);
 	printf("reboot flag before clear: 0x%x\n", *reboot_flag);
 
-	*reboot_flag &= ~(1 << SYS_REBOOT_FLAG_BIT);
-	regulator_set_value_force(priv->wkup_set[SYS_REBOOT_FLAG], *reboot_flag);
+	unsigned int flag_after = *reboot_flag & ~(1 << SYS_REBOOT_FLAG_BIT);
+	regulator_set_value_force(priv->wkup_set[SYS_REBOOT_FLAG], flag_after);
 
 	/* Read again after clear */
-	unsigned int flag_after = regulator_get_value(priv->wkup_set[SYS_REBOOT_FLAG]);
+	flag_after = regulator_get_value(priv->wkup_set[SYS_REBOOT_FLAG]);
 	printf("reboot flag after clear: 0x%x\n", flag_after);
 
 	return status; /* Return charger status */
 }
 
-static bool need_exit_early(struct shutdown_charge *priv,
-						unsigned int reboot_flag,
-						unsigned int pwr_key_status,
-						int capacity,
-						int charger_status)
+static bool need_exit_early(struct shutdown_charge *priv, unsigned int reboot_flag,
+			    unsigned int pwr_key_status, int capacity,
+			    int charger_status)
 {
-	if ((reboot_flag & SYS_REBOOT_FLAG_BIT) && (capacity >= priv->threshold1)) {
-		printf("reboot_flag & SYS_REBOOT_FLAG_BIT && (capacity >= priv->threshold1)\n");
+	if ((reboot_flag & (1 << SYS_REBOOT_FLAG_BIT)) && (capacity >= priv->threshold1)) {
+		printf("reboot_flag & 1 << SYS_REBOOT_FLAG_BIT && (capacity >= priv->threshold1)\n");
 		return true;
 	}
 
@@ -504,23 +495,19 @@ static bool need_exit_early(struct shutdown_charge *priv,
 /*
  * Configure wakeup sources and PLIC
  */
-static void config_wakeup_and_plic(struct shutdown_charge *priv,
-								unsigned int *prio,
-								unsigned int *thresh)
+static void config_wakeup_and_plic(struct shutdown_charge *priv, unsigned int *prio,
+				   unsigned int *thresh)
 {
 	/* Clear power key pending events */
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_POWER_KEY_EVENT],
-								PWRKEY_RISING_EVENT |
-								PWRKEY_FAILING_EVENT |
-								PWRKEY_LONG_PRESS_EVENT |
-								PWRKEY_SHORT_PRESS_EVENT);
+				  PWRKEY_RISING_EVENT | PWRKEY_FAILING_EVENT |
+				  PWRKEY_LONG_PRESS_EVENT | PWRKEY_SHORT_PRESS_EVENT);
 
+	def_rtcctrl_value = regulator_get_value(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_CTRL]);
 	/* Enable RTC basic functions */
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_CTRL],
-								RTC_CLK_SEL_EXTERNAL_OSC |
-								RTC_EN |
-								RTC_OUT_32K_EN |
-								RTC_CRYSTAL_EN);
+				  RTC_CLK_SEL_EXTERNAL_OSC | RTC_EN |
+				  RTC_OUT_32K_EN | RTC_CRYSTAL_EN);
 
 	/* Clear RTC tick event */
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_EVENT], 0xff);
@@ -542,9 +529,8 @@ static void config_wakeup_and_plic(struct shutdown_charge *priv,
 /*
  * Cleanup PLIC and RTC after exiting the loop
  */
-static void cleanup_wakeup_and_plic(struct shutdown_charge *priv,
-									unsigned int prio,
-									unsigned int thresh)
+static void cleanup_wakeup_and_plic(struct shutdown_charge *priv, unsigned int prio,
+				    unsigned int thresh)
 {
 	/* Restore PLIC config */
 	writel(0, (void __iomem *)PLIC_PMIC_PENDING_REG);
@@ -555,10 +541,8 @@ static void cleanup_wakeup_and_plic(struct shutdown_charge *priv,
 	/* Disable power key interrupt & clear pending */
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_POWER_KEY_INTER], 0);
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_POWER_KEY_EVENT],
-								PWRKEY_RISING_EVENT |
-								PWRKEY_FAILING_EVENT |
-								PWRKEY_LONG_PRESS_EVENT |
-								PWRKEY_SHORT_PRESS_EVENT);
+				  PWRKEY_RISING_EVENT | PWRKEY_FAILING_EVENT |
+				  PWRKEY_LONG_PRESS_EVENT | PWRKEY_SHORT_PRESS_EVENT);
 
 	/* Disable RTC tick */
 	int ctrl_val = regulator_get_value(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_CTRL]);
@@ -567,7 +551,8 @@ static void cleanup_wakeup_and_plic(struct shutdown_charge *priv,
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_EVENT], 0xff);
 
 	/* Disable RTC completely */
-	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_CTRL], 0);
+	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_CTRL], def_rtcctrl_value);
+	printf("restore value:0x%x to rtc ctrl reg\n", def_rtcctrl_value);
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_RTC_WAKEUP_IRQ], 0);
 }
 
@@ -575,13 +560,13 @@ static void cleanup_wakeup_and_plic(struct shutdown_charge *priv,
 /*   Helper: handle suspend/wakeup repeated logic (no multi-press count)  */
 /* ---------------------------------------------------------------------- */
 static void handle_suspend_and_wakeup(struct shutdown_charge *priv,
-									unsigned int *pwr_key_status,
-									unsigned long long *plugin_count,
-									unsigned long long *plugout_count)
+				      unsigned int *pwr_key_status,
+				      unsigned long long *plugin_count,
+				      unsigned long long *plugout_count)
 {
 	/* 1) Enable power key failing event */
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_POWER_KEY_INTER],
-								PWRKEY_FAILING_EVENT);
+				  PWRKEY_FAILING_EVENT);
 
 	/* 2) Enter low power state */
 	spacemit_display_backlight_off(priv);
@@ -597,16 +582,14 @@ static void handle_suspend_and_wakeup(struct shutdown_charge *priv,
 		printf("%s:%d, pwr_key_status:%x => user pressed power key\n",
 				__func__, __LINE__, *pwr_key_status);
 
-		*plugin_count             = 0;
-		*plugout_count            = 0;
+		*plugin_count = 0;
+		*plugout_count = 0;
 	}
 
 	/* 4) Clear power key pending */
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_POWER_KEY_EVENT],
-								PWRKEY_RISING_EVENT |
-								PWRKEY_FAILING_EVENT |
-								PWRKEY_LONG_PRESS_EVENT |
-								PWRKEY_SHORT_PRESS_EVENT);
+				  PWRKEY_RISING_EVENT | PWRKEY_FAILING_EVENT |
+				  PWRKEY_LONG_PRESS_EVENT | PWRKEY_SHORT_PRESS_EVENT);
 
 	/* 5) Disable power key interrupt */
 	regulator_set_value_force(priv->wkup_set[WAKEUP_SOURCE_POWER_KEY_INTER], 0);
@@ -648,11 +631,10 @@ static void blink_red_led_n_times(struct shutdown_charge *priv, int count, int o
 	}
 }
 
-static int handle_led_unplugged(struct shutdown_charge *priv,
-								int capacity,
-								unsigned int *pwr_key_status,
-								unsigned long long *plugout_count,
-								bool charger_changed)
+static int handle_led_unplugged(struct shutdown_charge *priv, int capacity,
+				unsigned int *pwr_key_status,
+				unsigned long long *plugout_count,
+				bool charger_changed)
 {
 	bool red_on = false;
 	bool green_on = false;
@@ -675,19 +657,24 @@ static int handle_led_unplugged(struct shutdown_charge *priv,
 		set_led_state(priv, red_on, green_on);
 
 		if ((*pwr_key_status & PWRKEY_FAILING_EVENT)) {
-			printf("Detect power key pressed and charger is unplugged, but not enough capacity to power on\n");
+			printf("Detect power key pressed and charger is unplugged,"
+			       " but not enough capacity to power on\n");
 			blink_red_led_n_times(priv, 5, 200, 200);
 		}
 	}
 	else if (capacity < priv->threshold1) {
-		/* Range 2: [STHRESHOLD0, STHRESHOLD1) => show battery level when power key pressed */
+		/*
+		 * Range 2: [STHRESHOLD0, STHRESHOLD1) => show battery
+		 * level when power key pressed
+		 */
 		printf("Range 2 (unplugged): somewhat low battery\n");
 		red_on   = false;
 		green_on = false;
 		set_led_state(priv, red_on, green_on);
 
 		if ((*pwr_key_status & PWRKEY_FAILING_EVENT)) {
-			printf("Detect power key pressed and charger is unplugged, but not enough capacity to power on\n");
+			printf("Detect power key pressed and charger is unplugged,"
+			       " but not enough capacity to power on\n");
 			spacemit_display_backlight_on(priv, BACKLIGHT_ON_BRIGHTNESS);
 			battery_level_display(capacity);
 
@@ -697,7 +684,10 @@ static int handle_led_unplugged(struct shutdown_charge *priv,
 		}
 	}
 	else if (capacity < priv->threshold2) {
-		/* Range 3: [STHRESHOLD1, STHRESHOLD2) => ready to boot and blink red led when power key pressed*/
+		/*
+		 * Range 3: [STHRESHOLD1, STHRESHOLD2) => ready to boot and
+		 * blink red led when power key pressed
+		 */
 		printf("Range 3 (unplugged): partial\n");
 		red_on   = false;
 		green_on = false;
@@ -726,11 +716,10 @@ static int handle_led_unplugged(struct shutdown_charge *priv,
 	return 0;
 }
 
-static int handle_led_plugged(struct shutdown_charge *priv,
-							int capacity,
-							unsigned int *pwr_key_status,
-							unsigned long long *plugin_count,
-							bool charger_changed)
+static int handle_led_plugged(struct shutdown_charge *priv, int capacity,
+			      unsigned int *pwr_key_status,
+			      unsigned long long *plugin_count,
+			      bool charger_changed)
 {
 	bool red_on = false;
 	bool green_on = false;
@@ -738,19 +727,27 @@ static int handle_led_plugged(struct shutdown_charge *priv,
 	printf("charger is attached, capacity=%d%%\n", capacity);
 
 	if (capacity < priv->threshold0) {
-		/* Range 1: capacity < STHRESHOLD0 => red steady and blink red led when power key pressed */
+		/*
+		 * Range 1: capacity < STHRESHOLD0 => red steady and
+		 * blink red led when power key pressed
+		 */
 		printf("Range 1 (plugged): very low battery \n");
 		red_on   = true;
 		green_on = false;
 		set_led_state(priv, red_on, green_on);
 
 		if ((*pwr_key_status & PWRKEY_FAILING_EVENT)) {
-			printf("Detect power key pressed and charger is plugged, but not enough capacity to power on\n");
+			printf("Detect power key pressed and charger is plugged,"
+			       " but not enough capacity to power on\n");
 			blink_red_led_n_times(priv, 5, 200, 200);
 		}
 	}
 	else if (capacity < priv->threshold1) {
-		/* Range 2: [STHRESHOLD0, STHRESHOLD1) => red steady and show battery level when plugged and blink red led when power key pressed */
+		/*
+		 * Range 2: [STHRESHOLD0, STHRESHOLD1) => red steady and
+		 * show battery level when plugged and blink red led when
+		 * power key pressed
+		 */
 		printf("Range 2 (plugged): somewhat low \n");
 		if (charger_changed) {
 			spacemit_display_backlight_on(priv, BACKLIGHT_ON_BRIGHTNESS);
@@ -762,7 +759,8 @@ static int handle_led_plugged(struct shutdown_charge *priv,
 		set_led_state(priv, red_on, green_on);
 
 		if ((*pwr_key_status & PWRKEY_FAILING_EVENT)) {
-			printf("Detect power key pressed and charger is plugged, but not enough capacity to power on\n");
+			printf("Detect power key pressed and charger is plugged, "
+			       "but not enough capacity to power on\n");
 			blink_red_led_n_times(priv, 5, 200, 200);
 			mdelay(3000);
 		} else {
@@ -772,7 +770,11 @@ static int handle_led_plugged(struct shutdown_charge *priv,
 		clear_battery_display();
 	}
 	else if (capacity < priv->threshold2) {
-		/* Range 3: [STHRESHOLD1, STHRESHOLD2) => red steady and show battery level when plugged and ready to boot when power key pressed */
+		/*
+		 * Range 3: [STHRESHOLD1, STHRESHOLD2) => red steady and
+		 * show battery level when plugged and ready to boot when
+		 * power key pressed
+		 */
 		printf("Range 3 (plugged): partial\n");
 		if (charger_changed) {
 			spacemit_display_backlight_on(priv, BACKLIGHT_ON_BRIGHTNESS);
@@ -783,9 +785,13 @@ static int handle_led_plugged(struct shutdown_charge *priv,
 		green_on = false;
 		set_led_state(priv, red_on, green_on);
 
-		/* If we want to detect power-key to power on, we could return 1 to "exit loop => system on" */
+		/*
+		 * If we want to detect power-key to power on, we could
+		 * return 1 to "exit loop => system on"
+		 */
 		if ((*pwr_key_status & PWRKEY_FAILING_EVENT)) {
-			printf("Detect power key pressed and charger is plugged, enough capacity to power on\n");
+			printf("Detect power key pressed and charger is plugged, "
+			       "enough capacity to power on\n");
 			return 1; /* Trigger upper-layer logic to power on */
 		} else {
 			mdelay(5000);
@@ -794,7 +800,11 @@ static int handle_led_plugged(struct shutdown_charge *priv,
 		clear_battery_display();
 	}
 	else {
-		/* Range 4: capacity >= priv->threshold2 => green steady and show battery level when plugged and ready to boot when power key pressed */
+		/*
+		 * Range 4: capacity >= priv->threshold2 => green steady and
+		 * show battery level when plugged and ready to boot when power
+		 * key pressed
+		 */
 		printf("Range 4 (plugged): battery full\n");
 		if (charger_changed) {
 			spacemit_display_backlight_on(priv, BACKLIGHT_ON_BRIGHTNESS);
@@ -805,10 +815,15 @@ static int handle_led_plugged(struct shutdown_charge *priv,
 		green_on = true;
 		set_led_state(priv, red_on, green_on);
 
-		/* If we want to detect power-key to power on, we could return 1 to "exit loop => system on" */
+		/*
+		 * If we want to detect power-key to power on, we could
+		 * return 1 to "exit loop => system on"
+		 */
 		if ((*pwr_key_status & PWRKEY_FAILING_EVENT)) {
-			printf("Detect power key pressed and charger is plugged, enough capacity to power on\n");
-			return 1; /* Trigger upper-layer logic to power on */
+			/* Trigger upper-layer logic to power on */
+			printf("Detect power key pressed and charger is plugged, "
+			       "enough capacity to power on\n");
+			return 1;
 		} else {
 			mdelay(5000);
 		}
@@ -820,10 +835,9 @@ static int handle_led_plugged(struct shutdown_charge *priv,
 	return 0;
 }
 
-static int run_charging_loop(struct shutdown_charge *priv,
-							unsigned int *pwr_key_status,
-							unsigned long long *plugin_count,
-							unsigned long long *plugout_count)
+static int run_charging_loop(struct shutdown_charge *priv, unsigned int *pwr_key_status,
+			     unsigned long long *plugin_count,
+			     unsigned long long *plugout_count)
 {
 	int capacity;
 	int charger_status;
@@ -851,11 +865,8 @@ static int run_charging_loop(struct shutdown_charge *priv,
 			++(*plugout_count);
 
 			/* Helper for LED states in "unplugged" scenario */
-			int want_boot = handle_led_unplugged(priv,
-												capacity,
-												pwr_key_status,
-												plugout_count,
-												charger_changed);
+			int want_boot = handle_led_unplugged(priv, capacity, pwr_key_status,
+							     plugout_count, charger_changed);
 
 			if (want_boot == 1) {
 				return 1;
@@ -876,11 +887,8 @@ static int run_charging_loop(struct shutdown_charge *priv,
 			update_charging_status(priv);
 
 			/* Helper for LED states in "plugged" scenario */
-			int want_boot = handle_led_plugged(priv,
-												capacity,
-												pwr_key_status,
-												plugin_count,
-												charger_changed);
+			int want_boot = handle_led_plugged(priv, capacity, pwr_key_status,
+							   plugin_count, charger_changed);
 			/* If handle_led_plugged() returns 1 => means "request boot => exit loop" */
 			if (want_boot == 1) {
 				return 0;
@@ -896,10 +904,7 @@ static int run_charging_loop(struct shutdown_charge *priv,
 		last_charger_status = charger_status;
 
 		/* 5) Handle suspend + wake cycle */
-		handle_suspend_and_wakeup(priv,
-									pwr_key_status,
-									plugin_count,
-									plugout_count);
+		handle_suspend_and_wakeup(priv, pwr_key_status, plugin_count, plugout_count);
 	}
 
 	return 0; /* not reached */
@@ -920,10 +925,8 @@ int shutdown_charge_manager(struct udevice *dev)
 	int capacity = 0;
 
 	/* 1) Check initial conditions */
-	int charger_status = check_reboot_or_powerup(priv,
-												&pwr_key_status,
-												&reboot_flag,
-												&capacity);
+	int charger_status = check_reboot_or_powerup(priv, &pwr_key_status,
+						     &reboot_flag, &capacity);
 	if (charger_status < 0) {
 		return charger_status;
 	}
@@ -937,10 +940,7 @@ int shutdown_charge_manager(struct udevice *dev)
 	config_wakeup_and_plic(priv, &prio, &thresh);
 
 	/* 4) Run charging loop */
-	ret = run_charging_loop(priv,
-							&pwr_key_status,
-							&plugin_count,
-							&plugout_count);
+	ret = run_charging_loop(priv, &pwr_key_status, &plugin_count, &plugout_count);
 
 	/* 5) Cleanup upon exit */
 	cleanup_wakeup_and_plic(priv, prio, thresh);

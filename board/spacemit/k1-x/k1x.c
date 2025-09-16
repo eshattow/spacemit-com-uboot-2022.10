@@ -1036,6 +1036,20 @@ int board_late_init(void)
 
 	setenv_boot_mode();
 
+	// Resize the last partition for sd
+	const char *boot_device = env_get("boot_device");
+	if (boot_device && strcmp(boot_device, "mmc") == 0) {
+		const char *boot_devnum = env_get("boot_devnum");
+		unsigned long devnum = simple_strtoul(boot_devnum, NULL, 10);
+		if (devnum == MMC_DEV_SD) {
+			printf("Resize the last partition for boot dev %s devnum %lu\n", boot_device, devnum);
+			struct blk_desc *dev_desc = blk_get_devnum_by_type(IF_TYPE_MMC, devnum);
+			if (dev_desc) {
+				sd_last_partition_resize(dev_desc);
+			}
+		}
+	}
+
 	/*save ram size to env, transfer to MB*/
 	sprintf(ram_size_str, "mem=%dMB", (int)(gd->ram_size / SZ_1MB));
 	env_set("ram_size", ram_size_str);
