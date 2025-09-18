@@ -29,10 +29,17 @@
 #include <fb_mtd.h>
 #include <nvme.h>
 #include <watchdog.h>
+#include <linux/delay.h>
+#include <linux/mtd/spi-nor.h>
+
+/* Default UBI threshold: 16MB */
+#define DEFAULT_UBI_THRESHOLD_MB	16
+#define MB_TO_BYTES(mb)			((u64)(mb) * 1024 * 1024)
 
 static int dev_emmc_num = -1;
 static int dev_sdio_num = -1;
 static u32 bootfs_part_index = 0;
+static bool nor_nand_mode = false;
 
 void recovery_show_result(struct flash_dev *fdev, int ret);
 
@@ -505,6 +512,80 @@ int mtd_write_raw_image(struct mtd_info *mtd, const char *part_name, void *buffe
 	return 0;
 }
 
+int mtd_ubi_write_raw_image(struct mtd_info *mtd, const char *part_name,
+                            void *buffer, u32 download_bytes)
+{
+	char cmd_buf[128];
+	bool use_ubi = false;
+
+	printf("Starting mtd_ubi_write_raw_image for %s\n", part_name);
+
+	/* Get UBI threshold from env, default 16MB */
+	u64 ubi_threshold = MB_TO_BYTES(DEFAULT_UBI_THRESHOLD_MB);
+	const char *thr = env_get("fastboot_ubi_size");
+	if (thr)
+		ubi_threshold = simple_strtoul(thr, NULL, 0) * 1024 * 1024;
+
+	/* Decide whether to use UBI */
+	if (mtd_type_is_nand(mtd) && mtd->size > ubi_threshold) {
+		use_ubi = true;
+		printf("Partition %s: NAND, size %lluMB > %lluMB → use UBI\n",
+				part_name, mtd->size >> 20, ubi_threshold >> 20);
+	} else {
+		printf("Partition %s: direct MTD write\n", part_name);
+	}
+
+	if (use_ubi) {
+		/* Erase partition and initialize UBI */
+		run_command("ubi detach", 0);
+		snprintf(cmd_buf, sizeof(cmd_buf), "mtd erase %s", part_name);
+		if (run_command(cmd_buf, 0)) {
+			printf("Erase %s failed\n", part_name);
+			return RESULT_FAIL;
+		}
+
+		snprintf(cmd_buf, sizeof(cmd_buf), "ubi part %s 2048", part_name);
+		if (run_command(cmd_buf, 0)) {
+			printf("UBI attach %s failed\n", part_name);
+			return RESULT_FAIL;
+		}
+
+		/* Remove and re-create volume to ensure clean state */
+		snprintf(cmd_buf, sizeof(cmd_buf), "ubi remove %s", part_name);
+		run_command(cmd_buf, 0);
+		snprintf(cmd_buf, sizeof(cmd_buf), "ubi create %s", part_name);
+		if (run_command(cmd_buf, 0)) {
+			printf("UBI create %s failed\n", part_name);
+			return RESULT_FAIL;
+		}
+
+		/* Write data to UBI volume */
+		snprintf(cmd_buf, sizeof(cmd_buf), "ubi write %p %s 0x%X",
+					buffer, part_name, download_bytes);
+		if (run_command(cmd_buf, 0)) {
+			printf("UBI write %s failed\n", part_name);
+			return RESULT_FAIL;
+		}
+
+		run_command("ubi detach", 0);
+		printf("........ wrote %u bytes to UBI volume '%s'\n",
+				download_bytes, part_name);
+		return RESULT_OK;
+
+	} else {
+		if (_fb_mtd_erase(mtd, download_bytes)) {
+			printf("Erase %s failed\n", part_name);
+			return RESULT_FAIL;
+		}
+		if (_fb_mtd_write(mtd, buffer, 0, download_bytes, NULL) < 0) {
+			printf("Write %s failed\n", part_name);
+			return RESULT_FAIL;
+		}
+		printf("........ wrote %u bytes to '%s'\n", download_bytes, part_name);
+		return RESULT_OK;
+	}
+}
+
 void specific_flash_mmc_opt(struct cmd_tbl *cmdtp, struct flash_dev *fdev)
 {
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
@@ -580,6 +661,7 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 	uint64_t download_offset, download_bytes, bytes_read;
 	u64 compare_value = 0;
 	int div_times, data_source;
+	bool is_ubi_write = false;
 
 	memset(load_str, 0, sizeof(load_str));
 	memset(offset_str, 0, sizeof(offset_str));
@@ -623,6 +705,21 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 		/*update info to mtd dev*/
 		info.start = 0;
 		info.blksz = 1;
+
+		/* Check if this is UBI write function */
+		if (fdev->mtd_write == mtd_ubi_write_raw_image) {
+			/* Get UBI threshold from env, default 16MB */
+			u64 ubi_threshold = MB_TO_BYTES(DEFAULT_UBI_THRESHOLD_MB);
+			const char *thr = env_get("fastboot_ubi_size");
+			if (thr)
+				ubi_threshold = simple_strtoul(thr, NULL, 0) * 1024 * 1024;
+
+			/* Check if this MTD will use UBI */
+			if (mtd_type_is_nand(mtd) && mtd->size > ubi_threshold) {
+				is_ubi_write = true;
+				printf("Will use UBI for partition %s verification\n", partition);
+			}
+		}
 	}
 
 	download_offset = 0;
@@ -684,15 +781,27 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 	debug("check crc, read %lx, imagesize:%lld\n", part_start_addr, image_size);
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 
-	if (fdev->blk_write){
+	/* Perform verification based on storage type */
+	if (fdev->blk_write) {
+		/* Block device verification */
 		if (compare_blk_image_val(fdev->dev_desc, compare_value, part_start_addr, info.blksz, image_size)) {
 			printf("check image crc32 fail, \n");
 			return RESULT_FAIL;
 		}
-	}else{
-		if (compare_mtd_image_val(mtd, compare_value, image_size)) {
-			printf("check image crc32 fail, \n");
-			return RESULT_FAIL;
+	} else {
+		/* MTD device verification */
+		if (is_ubi_write) {
+			/* UBI verification */
+			if (compare_ubi_image_val(partition, partition, compare_value, image_size)) {
+				printf("UBI verification failed\n");
+				return RESULT_FAIL;
+			}
+		} else {
+			/* Raw MTD verification */
+			if (compare_mtd_image_val(mtd, compare_value, image_size)) {
+				printf("check image crc32 fail, \n");
+				return RESULT_FAIL;
+			}
 		}
 	}
 #endif
@@ -916,15 +1025,18 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
 	case BOOT_MODE_NOR:
-		if (get_available_blk_dev(&blk_dev, &blk_index)){
-			printf("can not get availabel blk dev\n");
-			return -1;
-		}
+		/* In nor_nand_mode, NOR flash should use MTD interface, not block device */
+		if (!nor_nand_mode) {
+			if (get_available_blk_dev(&blk_dev, &blk_index)){
+				printf("can not get availabel blk dev\n");
+				return -1;
+			}
 
-		fdev->dev_desc = blk_get_dev(blk_dev, blk_index);
-		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
-			printf("get blk faild\n");
-			return -1;
+			fdev->dev_desc = blk_get_dev(blk_dev, blk_index);
+			if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
+				printf("get blk faild\n");
+				return -1;
+			}
 		}
 
 		if (flash_image(cmdtp, fdev)) {
@@ -961,7 +1073,7 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 	return RESULT_OK;
 }
 
-void get_mtd_partition_file(struct flash_dev *fdev)
+void get_nor_partition_file(struct flash_dev *fdev)
 {
 	char tmp_file[30] = {"\0"};
 
@@ -974,7 +1086,10 @@ void get_mtd_partition_file(struct flash_dev *fdev)
 		struct mtd_info *mtd;
 		mtd_probe_devices();
 		mtd_for_each_device(mtd) {
-			if (!mtd_is_partition(mtd)) {
+			if (!mtd_is_partition(mtd) && mtd_type_is_nand(mtd)) {
+				nor_nand_mode = true;
+			}
+			if (!mtd_is_partition(mtd) && (mtd->type == MTD_NORFLASH)) {
 				if (mtd->size / 0x40000000){
 					sprintf(tmp_file, "partition_%lldG.json", mtd->size / 0x40000000);
 					fdev->mtdinfo.size_type = MTD_SIZE_G;
@@ -997,6 +1112,39 @@ void get_mtd_partition_file(struct flash_dev *fdev)
 	default:
 		return;
 	}
+}
+
+void get_nand_partition_file(struct flash_dev *fdev)
+{
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MTD)
+	char tmp_file[30] = {"\0"};
+	if(nor_nand_mode){
+		/*if select nor/nand, it would check if mtd dev exists or not*/
+		struct mtd_info *mtd;
+		mtd_probe_devices();
+		mtd_for_each_device(mtd) {
+			if (!mtd_is_partition(mtd) && mtd_type_is_nand(mtd)) {
+				nor_nand_mode = true;
+				if (mtd->size / 0x40000000){
+					sprintf(tmp_file, "partition_%lldG.json", mtd->size / 0x40000000);
+					fdev->mtdinfo.size_type = MTD_SIZE_G;
+					fdev->mtdinfo.size = mtd->size / 0x40000000;
+				} else if (mtd->size / 0x100000){
+					sprintf(tmp_file, "partition_%lldM.json", mtd->size / 0x100000);
+					fdev->mtdinfo.size_type = MTD_SIZE_M;
+					fdev->mtdinfo.size = mtd->size / 0x100000;
+				} else if (mtd->size / 0x400){
+					sprintf(tmp_file, "partition_%lldK.json", mtd->size / 0x400);
+					fdev->mtdinfo.size_type = MTD_SIZE_K;
+					fdev->mtdinfo.size = mtd->size / 0x400;
+				}
+			}
+		}
+		pr_info("get mtd partition file name:%s, \n", tmp_file);
+		strcpy(fdev->partition_file_name, tmp_file);
+		return;
+	}
+#endif
 }
 
 void get_blk_partition_file(char *file_name)
@@ -1061,7 +1209,7 @@ static int do_flash_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const
 	/*start flash*/
 	unsigned long time_start_flash = get_timer(0);
 
-	get_mtd_partition_file(fdev);
+	get_nor_partition_file(fdev);
 	if (strlen(fdev->partition_file_name) > 0){
 		/*flash image to mtd dev*/
 		printf("partition file:%s\n", fdev->partition_file_name);
@@ -1092,28 +1240,16 @@ static int do_flash_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const
 		}
 	}
 
-	memset(fdev->partition_file_name, '\0', sizeof(fdev->partition_file_name));
-	get_blk_partition_file(fdev->partition_file_name);
+	get_nand_partition_file(fdev);
 	if (strlen(fdev->partition_file_name) > 0){
-		/*flash image to blk dev*/
+		/*flash image to mtd dev*/
 		printf("partition file:%s\n", fdev->partition_file_name);
 
-		/*clear parts infomation*/
-		for (int i = 0; i < MAX_PARTITION_NUM; i++){
-			if (fdev->parts_info[i].part_name != NULL){
-				free(fdev->parts_info[i].part_name);
-				free(fdev->parts_info[i].file_name);
-				free(fdev->parts_info[i].size);
-			}else{
-				break;
-			}
-		}
-
 		/*only one write method.*/
-		fdev->mtd_write = NULL;
-		fdev->blk_write = blk_write_raw_image;
+		fdev->mtd_write = mtd_ubi_write_raw_image;
+		fdev->blk_write = NULL;
 
-		/*Load partition.json file*/
+		/*Load partitino.json file*/
 		int result = load_recovery_file(cmdtp, fdev, argc, argv);
 		if (result != RESULT_OK) {
 			recovery_show_result(fdev, RESULT_FAIL);
@@ -1132,6 +1268,52 @@ static int do_flash_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const
 			printf("Failed to flash the device.\n");
 			recovery_show_result(fdev, RESULT_FAIL);
 			return RESULT_FAIL;
+		}
+	}
+
+	if(!nor_nand_mode){
+		memset(fdev->partition_file_name, '\0', sizeof(fdev->partition_file_name));
+		get_blk_partition_file(fdev->partition_file_name);
+		printf("get_blk_partition_file:nor_nand_mode:%d\n", nor_nand_mode);
+		if (strlen(fdev->partition_file_name) > 0){
+			/*flash image to blk dev*/
+			printf("partition file:%s\n", fdev->partition_file_name);
+
+			/*clear parts infomation*/
+			for (int i = 0; i < MAX_PARTITION_NUM; i++){
+				if (fdev->parts_info[i].part_name != NULL){
+					free(fdev->parts_info[i].part_name);
+					free(fdev->parts_info[i].file_name);
+					free(fdev->parts_info[i].size);
+				}else{
+					break;
+				}
+			}
+
+			/*only one write method.*/
+			fdev->mtd_write = NULL;
+			fdev->blk_write = blk_write_raw_image;
+
+			/*Load partition.json file*/
+			int result = load_recovery_file(cmdtp, fdev, argc, argv);
+			if (result != RESULT_OK) {
+				recovery_show_result(fdev, RESULT_FAIL);
+				return RESULT_FAIL;
+			}
+
+			/*Parse json file and fill in relevant data structures*/
+			if (parse_flash_config(fdev)) {
+				printf("Failed to parse flash config.\n");
+				recovery_show_result(fdev, RESULT_FAIL);
+				return RESULT_FAIL;
+			}
+
+			/*Perform programming operation based on the provided information*/
+			if (perform_flash_operations(cmdtp, fdev)) {
+				printf("Failed to flash the device.\n");
+				recovery_show_result(fdev, RESULT_FAIL);
+				return RESULT_FAIL;
+			}
 		}
 	}
 
