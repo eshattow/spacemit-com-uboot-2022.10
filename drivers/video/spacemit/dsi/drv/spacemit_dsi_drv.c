@@ -22,6 +22,24 @@
 
 #define SPACEMIT_DSI_MAX_TX_FIFO_BYTES	256
 #define SPACEMIT_DSI_MAX_RX_FIFO_BYTES	64
+#define HIGH_BRUSH_V	3000
+
+static struct spacemit_dsi_info g_spacemit_dsi_info[DSI_VERSION_MAX] = {
+	[DSI_VERSION_1] = {
+		.cmd_pkt_max_size = 0x400, /* to check */
+		.cmd_pkt_default_size = 0x400,
+		.cmd_fifo_max_level = 0x400, /* to check */
+		.cmd_fifo_default_level = 0x400,
+		.vpn_burst_mode_shift = 2,
+	},
+	[DSI_VERSION_2] = {
+		.cmd_pkt_max_size = 0x167E,
+		.cmd_pkt_default_size = 0x167E,
+		.cmd_fifo_max_level = 0x1680,
+		.cmd_fifo_default_level = 0x1680,
+		.vpn_burst_mode_shift = 3,
+	},
+};
 
 #define SPACEMIT_DSI_MAX_CMD_FIFO_BYTES	1024
 
@@ -291,12 +309,15 @@ static void dsi_get_dphy_setting(struct spacemit_dsi_device *dev)
 	dphy_timing->lpx_ui = LPX_UI_DEFAULT;
 }
 
+#define DSI_GLB_RESET	CFG_SOFT_RST
+#define DSI_DEBUG_RESET	(CFG_SOFT_RST | CFG_SOFT_RST_REG | CFG_CLR_PHY_FIFO | CFG_RST_TXLP | \
+			 CFG_RST_CPU | CFG_RST_CPN | CFG_RST_VPN | CFG_DSI_PHY_RST)
+
 static void dsi_reset(void)
 {
 	uint32_t reg;
 
-	reg = CFG_SOFT_RST | CFG_SOFT_RST_REG | CFG_CLR_PHY_FIFO | CFG_RST_TXLP |
-		CFG_RST_CPU | CFG_RST_CPN | CFG_RST_VPN | CFG_DSI_PHY_RST;
+	reg = DSI_GLB_RESET;
 
 	/* software reset DSI module */
 	dsi_write(DSI_CTRL_0, reg);
@@ -307,7 +328,7 @@ static void dsi_reset(void)
 
 static void dsi_enable_video_mode(bool enable)
 {
-	if(enable)
+	if (enable)
 		dsi_set_bits(DSI_CTRL_0, CFG_VPN_TX_EN | CFG_VPN_SLV | CFG_VPN_EN);
 	else
 		dsi_clear_bits(DSI_CTRL_0, CFG_VPN_TX_EN | CFG_VPN_EN);
@@ -315,7 +336,7 @@ static void dsi_enable_video_mode(bool enable)
 
 static void dsi_enable_cmd_mode(bool enable)
 {
-	if(enable)
+	if (enable)
 		dsi_set_bits(DSI_CTRL_0, CFG_CPN_EN);
 	else
 		dsi_clear_bits(DSI_CTRL_0, CFG_CPN_EN);
@@ -323,7 +344,7 @@ static void dsi_enable_cmd_mode(bool enable)
 
 static void dsi_enable_eotp(bool enable)
 {
-	if(enable)
+	if (enable)
 		dsi_set_bits(DSI_CTRL_1, CFG_EOTP_EN);
 	else
 		dsi_clear_bits(DSI_CTRL_1, CFG_EOTP_EN);
@@ -337,7 +358,7 @@ static void dsi_enable_lptx_lanes(uint32_t lane_num)
 
 static void dsi_enable_split_mode(bool splite_mode)
 {
-	if(splite_mode){
+	if (splite_mode) {
 		dsi_set_bits(DSI_LCD_BDG_CTRL0, CFG_SPLIT_EN);
 	} else {
 		dsi_clear_bits(DSI_LCD_BDG_CTRL0, CFG_SPLIT_EN);
@@ -353,7 +374,7 @@ static int dsi_write_cmd(uint8_t *parameter, uint8_t count, bool lp)
 	/* write all packet bytes to packet data buffer */
 	for (i = 0; i < count; i++) {
 		send_data |= parameter[i] << ((i % 4) * 8);
-		if (0 ==((i + 1) % 4)) {
+		if (((i + 1) % 4) == 0) {
 			dsi_write(DSI_CPU_WDAT, send_data);
 			reg = CFG_CPU_DAT_REQ |	CFG_CPU_DAT_RW |((i - 3) << CFG_CPU_DAT_ADDR_SHIFT);
 			dsi_write(DSI_CPU_CMD_3, reg);
@@ -370,9 +391,9 @@ static int dsi_write_cmd(uint8_t *parameter, uint8_t count, bool lp)
 	}
 
 	/* handle last none 4Byte align data */
-	if (0 != i % 4) {
+	if (i % 4 != 0) {
 		dsi_write(DSI_CPU_WDAT, send_data);
-		reg = CFG_CPU_DAT_REQ | CFG_CPU_DAT_RW |((4 * (i / 4)) << CFG_CPU_DAT_ADDR_SHIFT);
+		reg = CFG_CPU_DAT_REQ | CFG_CPU_DAT_RW | ((4 * (i / 4)) << CFG_CPU_DAT_ADDR_SHIFT);
 		dsi_write(DSI_CPU_CMD_3, reg);
 		/* wait write operation done */
 		timeout = 1000;
@@ -430,10 +451,10 @@ static void dsi_config_video_mode(struct spacemit_dsi_device *dsi_ctx, struct sp
 	uint32_t slot_cnt0, slot_cnt1;
 	uint32_t dsi_ex_pixel_cnt = 0;
 	uint32_t dsi_hex_en = 0;
-	uint32_t width, lane_number;
+	uint32_t width, lane_number, height_val;
 	struct spacemit_dsi_advanced_setting *adv_setting = &dsi_ctx->adv_setting;
 
-	switch(mipi_info->rgb_mode){
+	switch (mipi_info->rgb_mode) {
 	case DSI_INPUT_DATA_RGB_MODE_565:
 		bpp = 16;
 		break;
@@ -450,10 +471,22 @@ static void dsi_config_video_mode(struct spacemit_dsi_device *dsi_ctx, struct sp
 		bpp = 24;
 	}
 
-	v_total = mipi_info->height + mipi_info->vfp + mipi_info->vbp + mipi_info->vsync;
+	if (mipi_info->dsc_enable) {
+		mipi_info->rgb_mode = DSI_INPUT_DATA_RGB_MODE_DSC;
+		bpp = 24; //Jessica: for dsc, this always be 24.
+	}
 
-	if(mipi_info->split_enable) {
-		if(( 0 != (mipi_info->width & 0x1)) || (0 != (mipi_info->lane_number & 0x1))){
+	height_val = mipi_info->height + mipi_info->h_extra;
+
+	if (dsi_ctx->version >= DSI_VERSION_2)
+		v_total = height_val + mipi_info->vfp + mipi_info->vbp + mipi_info->vsync;
+	else
+		v_total = height_val + mipi_info->vfp + mipi_info->vbp + mipi_info->vsync + HIGH_BRUSH_V;
+
+	mipi_info->vrr_param.vrr_vfp = mipi_info->vfp;
+
+	if (mipi_info->split_enable) {
+		if (((mipi_info->width & 0x1) != 0) || ((mipi_info->lane_number & 0x1) != 0)) {
 			pr_info("%s: warning:Invalid split config(lane = %d, width = %d)\n",
 				__func__, mipi_info->lane_number, mipi_info->width);
 		}
@@ -464,7 +497,11 @@ static void dsi_config_video_mode(struct spacemit_dsi_device *dsi_ctx, struct sp
 		lane_number = mipi_info->lane_number;
 	}
 
-	hact_b = to_dsi_bcnt(width, bpp);
+	if (mipi_info->dsc_enable)
+		hact_b = to_dsi_bcnt(width, mipi_info->dsc_bpc);
+	else
+		hact_b = to_dsi_bcnt(width, bpp);
+
 	hfp_b = to_dsi_bcnt(mipi_info->hfp, bpp);
 	hbp_b = to_dsi_bcnt(mipi_info->hbp, bpp);
 	hsync_b = to_dsi_bcnt(mipi_info->hsync, bpp);
@@ -491,7 +528,10 @@ static void dsi_config_video_mode(struct spacemit_dsi_device *dsi_ctx, struct sp
 		(hfp_b + hex_b - lgp_over_head - lgp_over_head) :
 		(hfp_b - lgp_over_head - lgp_over_head);
 
-	hact_wc =  (width * bpp) >> 3;
+	if (mipi_info->dsc_enable)
+		hact_wc = to_dsi_bcnt(width, mipi_info->dsc_bpc);
+	else
+		hact_wc = to_dsi_bcnt(width, bpp);
 
 	/* disable Hex currently */
 	hex_wc = 0;
@@ -505,16 +545,19 @@ static void dsi_config_video_mode(struct spacemit_dsi_device *dsi_ctx, struct sp
 	* from input data or output to panel
 	*/
 
-	/*Jessica: need be calculated by really case*/
-	if (mipi_info->lane_number == 1)
-		dsi_write(DSI_VPN_CTRL_0, (0x50<<16) | 0xc12);
+	if (dsi_ctx->version >= DSI_VERSION_2)
+		if (mipi_info->vpn_dly_cnt && mipi_info->vpn_tx_dly_cnt)
+			dsi_write(DSI_VPN_CTRL_0, ((mipi_info->vpn_dly_cnt & 0xFFFF) << CFG_VPN_DLY_CNT_SHIFT) |
+				CFG_VPN_HSYNC_GRANTEE_EN | CFG_VPN_1LN_DLY | (mipi_info->vpn_tx_dly_cnt & 0xFF));
+		else
+			dsi_write(DSI_VPN_CTRL_0, (0x50 << CFG_VPN_DLY_CNT_SHIFT) | 0x508);
 	else
-		dsi_write(DSI_VPN_CTRL_0, (0x50<<16) | 0xc08);
+		dsi_write(DSI_VPN_CTRL_0, (0x50 << CFG_VPN_DLY_CNT_SHIFT) | 0xc08);
 
 	/* SET UP LCD1 TIMING REGISTERS FOR DSI BUS */
 	dsi_write(DSI_VPN_TIMING_0, (hact << 16) | httl);
 	dsi_write(DSI_VPN_TIMING_1, (hsync << 16) | hbp);
-	dsi_write(DSI_VPN_TIMING_2, ((mipi_info->height)<<16) | (v_total));
+	dsi_write(DSI_VPN_TIMING_2, ((height_val)<<16) | (v_total));
 	dsi_write(DSI_VPN_TIMING_3, ((mipi_info->vsync) << 16) | (mipi_info->vbp));
 
 	/* SET UP LCD1 WORD COUNT REGISTERS FOR DSI BUS */
@@ -537,12 +580,12 @@ static void dsi_config_video_mode(struct spacemit_dsi_device *dsi_ctx, struct sp
 			adv_setting->hbp_pkt_en << CFG_VPN_HBP_PKT_EN_SHIFT |
 			adv_setting->hse_pkt_en << CFG_VPN_HSE_PKT_EN_SHIFT |
 			adv_setting->hsa_pkt_en << CFG_VPN_HSA_PKT_EN_SHIFT |
-			adv_setting->hex_slot_en<< CFG_VPN_HEX_SLOT_EN_SHIFT |
+			adv_setting->hex_slot_en << CFG_VPN_HEX_SLOT_EN_SHIFT |
 			adv_setting->last_line_turn << CFG_VPN_LAST_LINE_TURN_SHIFT |
 			adv_setting->lpm_frame_en << CFG_VPN_LPM_FRAME_EN_SHIFT |
-			mipi_info->burst_mode << CFG_VPN_BURST_MODE_SHIFT |
+			mipi_info->burst_mode << g_spacemit_dsi_info[dsi_ctx->version].vpn_burst_mode_shift |
 			mipi_info->rgb_mode << CFG_VPN_RGB_TYPE_SHIFT;
-	dsi_write(DSI_VPN_CTRL_1,reg);
+	dsi_write(DSI_VPN_CTRL_1, reg);
 
 	dsi_write_bits(DSI_LCD_BDG_CTRL0, CFG_VPN_FIFO_AFULL_CNT_MASK,
 		0 << CFG_VPN_FIFO_AFULL_CNT_SHIT);
@@ -553,12 +596,43 @@ static void dsi_config_video_mode(struct spacemit_dsi_device *dsi_ctx, struct sp
 	dsi_enable_video_mode(true);
 }
 
+static void spacemit_dsi_config_cmd_pkg(struct spacemit_dsi_device *dsi_ctx, struct spacemit_mipi_info *mipi_info)
+{
+	struct spacemit_dsi_info *dsi_info = g_spacemit_dsi_info;
+	u32 cmd_pkt_size = dsi_info[dsi_ctx->version].cmd_pkt_default_size;
+	u32 cmd_fifo_level = dsi_info[dsi_ctx->version].cmd_fifo_default_level;
+
+	if (mipi_info->cmd_pkg_ctrl > 0) {
+		cmd_pkt_size = mipi_info->cmd_pkg_ctrl >> 16;
+		cmd_fifo_level = mipi_info->cmd_pkg_ctrl & 0xffff;
+	} else if (mipi_info->cmd_pkg_ctrl == 0) {
+		switch (mipi_info->rgb_mode) {
+		case DSI_INPUT_DATA_RGB_MODE_565:
+			cmd_pkt_size = mipi_info->width * 2 + 1;
+			break;
+		case DSI_INPUT_DATA_RGB_MODE_666UNPACKET:
+		case DSI_INPUT_DATA_RGB_MODE_888:
+		default:
+			cmd_pkt_size = mipi_info->width * 3 + 1;
+		}
+		cmd_fifo_level = dsi_info[dsi_ctx->version].cmd_fifo_default_level;
+	}
+
+	while (cmd_pkt_size > dsi_info[dsi_ctx->version].cmd_pkt_max_size) {
+		cmd_pkt_size = cmd_pkt_size / 2;
+	}
+
+	mipi_info->cmd_pkt_size = cmd_pkt_size;
+	mipi_info->cmd_fifo_level = cmd_fifo_level < dsi_info[dsi_ctx->version].cmd_fifo_max_level ?
+				cmd_fifo_level : dsi_info[dsi_ctx->version].cmd_fifo_max_level;
+}
+
 static void dsi_config_cmd_mode(struct spacemit_dsi_device *dsi_ctx, struct spacemit_mipi_info *mipi_info)
 {
 	int reg;
 	int rgb_mode, bpp;
 
-	switch(mipi_info -> rgb_mode){
+	switch (mipi_info->rgb_mode) {
 	case DSI_INPUT_DATA_RGB_MODE_565:
 		bpp = 16;
 		rgb_mode = 2;
@@ -584,9 +658,10 @@ static void dsi_config_cmd_mode(struct spacemit_dsi_device *dsi_ctx, struct spac
 			0 << CFG_CPN_ADDR0_EN_SHIFT;
 	dsi_write(DSI_CPN_CMD, reg);
 
-	reg = mipi_info->width * bpp / 8 << CFG_CPN_PKT_CNT_SHIFT |
-		SPACEMIT_DSI_MAX_CMD_FIFO_BYTES << CFG_CPN_FIFO_FULL_LEVEL_SHIFT;
-	dsi_write(DSI_CPN_CTRL_1,reg);
+	spacemit_dsi_config_cmd_pkg(dsi_ctx, mipi_info);
+	reg = mipi_info->cmd_pkt_size << CFG_CPN_PKT_CNT_SHIFT |
+			mipi_info->cmd_fifo_level << CFG_CPN_FIFO_FULL_LEVEL_SHIFT;
+	dsi_write(DSI_CPN_CTRL_1, reg);
 
 	dsi_write_bits(DSI_LCD_BDG_CTRL0, CFG_CPN_TE_EDGE_MASK,
 		mipi_info->te_pol << CFG_CPN_TE_EDGE_SHIFT);
@@ -599,19 +674,22 @@ static void dsi_config_cmd_mode(struct spacemit_dsi_device *dsi_ctx, struct spac
 			0 << CFG_CPN_TE_LINE_CNT_SHIFT;
 	dsi_write(DSI_LCD_BDG_CTRL1, reg);
 
+	if (dsi_ctx->version >= DSI_VERSION_2)
+		dsi_write(DSI_PHY_CTRL_2, CFG_DPHY_LANE_EN | CFG_DPHY_HSTX_RX);
+
 	dsi_enable_video_mode(false);
 	dsi_enable_cmd_mode(true);
 }
 
 static int dsi_write_cmd_array(struct spacemit_dsi_device *dsi_ctx,
-									struct spacemit_dsi_cmd_desc *cmds,int count)
+									struct spacemit_dsi_cmd_desc *cmds, int count)
 {
 	struct spacemit_dsi_cmd_desc cmd_line;
 	uint8_t type, parameter[SPACEMIT_DSI_MAX_TX_FIFO_BYTES], len;
 	uint32_t crc, loop;
 	int ret = 0;
 
-	if(NULL == dsi_ctx) {
+	if (dsi_ctx == NULL) {
 		pr_info("%s: Invalid param\n", __func__);
 		return -1;
 	}
@@ -633,6 +711,8 @@ static int dsi_write_cmd_array(struct spacemit_dsi_device *dsi_ctx,
 			break;
 		case SPACEMIT_DSI_GENERIC_LWRITE:
 		case SPACEMIT_DSI_DCS_LWRITE:
+		case SPACEMIT_DSI_PICTURE_PARAMETER_SET:
+		case SPACEMIT_DSI_COMPRESSION_MODE:
 			parameter[1] = len & 0xff;
 			parameter[2] = 0;
 			memcpy(&parameter[4], cmd_line.data, len);
@@ -666,7 +746,7 @@ static int dsi_read_cmd_array(struct spacemit_dsi_device *dsi_ctx, struct spacem
 	uint32_t i, rx_reg, timeout, tmp, packet,
 	    data_pointer, byte_count;
 
-	if(NULL == dsi_ctx) {
+	if (dsi_ctx == NULL) {
 		pr_info("%s: Invalid param\n", __func__);
 		return -1;
 	}
@@ -679,7 +759,7 @@ static int dsi_read_cmd_array(struct spacemit_dsi_device *dsi_ctx, struct spacem
 		timeout--;
 		tmp = dsi_read(DSI_IRQ_ST);
 	} while (((tmp & IRQ_RX_PKT) == 0) && timeout);
-	if (0 == timeout) {
+	if (timeout == 0) {
 		pr_info("%s: dsi didn't receive packet, irq status 0x%x\n", __func__, tmp);
 		return -1;
 	}
@@ -712,7 +792,7 @@ static int dsi_read_cmd_array(struct spacemit_dsi_device *dsi_ctx, struct spacem
 			count--;
 			rx_reg = dsi_read(DSI_RX_PKT_CTRL);
 		} while (rx_reg & CFG_RX_PKT_RD_REQ && count);
-		if ( 0 == count)
+		if (count == 0)
 			pr_info("%s: error: read Rx packet FIFO error\n", __func__);
 		parameter[i - data_pointer] = rx_reg & 0xff;
 	}
@@ -745,7 +825,7 @@ static int dsi_read_cmd_array(struct spacemit_dsi_device *dsi_ctx, struct spacem
 	return 0;
 }
 
-static void dsi_open_dphy(struct spacemit_dsi_device* device_ctx,
+static void dsi_open_dphy(struct spacemit_dsi_device *device_ctx,
 								struct spacemit_mipi_info *mipi_info, bool ready)
 {
 	struct spacemit_dphy_ctx *dphy_config = NULL;
@@ -754,13 +834,13 @@ static void dsi_open_dphy(struct spacemit_dsi_device* device_ctx,
 	dphy_config = &device_ctx->dphy_config;
 	dphy_config->phy_freq = device_ctx->bit_clk_rate / 1000;
 	dphy_config->esc_clk = device_ctx->esc_clk_rate / 1000;
-	if(mipi_info->split_enable)
+	if (mipi_info->split_enable)
 		dphy_config->lane_num = mipi_info->lane_number >> 1;
 	else
 		dphy_config->lane_num = mipi_info->lane_number;
 	dphy_config->status = DPHY_STATUS_UNINIT;
 
-	if(ready){
+	if (ready) {
 		dphy_config->status = DPHY_STATUS_INIT;
 		return;
 	}
@@ -768,12 +848,12 @@ static void dsi_open_dphy(struct spacemit_dsi_device* device_ctx,
 	spacemit_dphy_init(dphy_config);
 }
 
-static void dsi_close_dphy(struct spacemit_dsi_device* device_ctx)
+static void dsi_close_dphy(struct spacemit_dsi_device *device_ctx)
 {
 	spacemit_dphy_uninit(&device_ctx->dphy_config);
 }
 
-int spacemit_dsi_open(struct spacemit_dsi_device* device_ctx, struct spacemit_mipi_info *mipi_info, bool ready)
+int spacemit_dsi_open(struct spacemit_dsi_device *device_ctx, struct spacemit_mipi_info *mipi_info, bool ready)
 {
 	int lane_number;
 
@@ -785,18 +865,21 @@ int spacemit_dsi_open(struct spacemit_dsi_device* device_ctx, struct spacemit_mi
 	device_ctx->bit_clk_rate = mipi_info->phy_bit_clock;
 	device_ctx->esc_clk_rate = mipi_info->phy_esc_clock;
 
-	if(mipi_info->split_enable)
+	if (device_ctx->status == DSI_STATUS_OPENED)
+		return 0;
+
+	if (mipi_info->split_enable)
 		lane_number = mipi_info->lane_number >> 1;
 	else
 		lane_number = mipi_info->lane_number;
 
 	dsi_get_advanced_setting(device_ctx, mipi_info);
 
-	if(!ready)
+	if (!ready)
 		dsi_reset();
 
 	dsi_open_dphy(device_ctx, mipi_info, ready);
-	if(!ready) {
+	if (!ready) {
 		dsi_enable_split_mode(mipi_info->split_enable);
 		dsi_enable_lptx_lanes(spacemit_dsi_lane[lane_number]);
 		dsi_enable_eotp(mipi_info->eotp_enable);
@@ -806,12 +889,15 @@ int spacemit_dsi_open(struct spacemit_dsi_device* device_ctx, struct spacemit_mi
 	return 0;
 }
 
-int spacemit_dsi_close(struct spacemit_dsi_device* device_ctx)
+int spacemit_dsi_close(struct spacemit_dsi_device *device_ctx)
 {
-	if(NULL == device_ctx){
+	if (NULL == device_ctx) {
 		pr_info("%s: Invalid param\n", __func__);
 		return -1;
 	}
+
+	if (device_ctx->status == DSI_STATUS_UNINIT)
+		return 0;
 
 	dsi_close_dphy(device_ctx);
 
@@ -819,20 +905,20 @@ int spacemit_dsi_close(struct spacemit_dsi_device* device_ctx)
 	return 0;
 }
 
-int spacemit_dsi_ready_for_datatx(struct spacemit_dsi_device* device_ctx, struct spacemit_mipi_info *mipi_info)
+int spacemit_dsi_ready_for_datatx(struct spacemit_dsi_device *device_ctx, struct spacemit_mipi_info *mipi_info)
 {
 	if((NULL == device_ctx) || (NULL == mipi_info)){
 		pr_info("%s: Invalid param\n", __func__);
 		return -1;
 	}
 
-	if(mipi_info->work_mode == SPACEMIT_DSI_MODE_CMD){
-	    dsi_config_cmd_mode(device_ctx, mipi_info);
+	if (mipi_info->work_mode == SPACEMIT_DSI_MODE_CMD) {
+		dsi_config_cmd_mode(device_ctx, mipi_info);
 	} else {
-    	dsi_config_video_mode(device_ctx, mipi_info);
+		dsi_config_video_mode(device_ctx, mipi_info);
 	}
 
-    return 0;
+	return 0;
 }
 
 int spacemit_dsi_close_datatx(struct spacemit_dsi_device* device_ctx)
@@ -842,13 +928,16 @@ int spacemit_dsi_close_datatx(struct spacemit_dsi_device* device_ctx)
 		return -1;
 	}
 
+	if (device_ctx->status == DSI_STATUS_UNINIT)
+		return 0;
+
 	dsi_enable_cmd_mode(false);
 	dsi_enable_video_mode(false);
 
-    return 0;
+	return 0;
 }
 
-int spacemit_dsi_write_cmds(struct spacemit_dsi_device* device_ctx,
+int spacemit_dsi_write_cmds(struct spacemit_dsi_device *device_ctx,
 									struct spacemit_dsi_cmd_desc *cmds, int count)
 {
 	if((NULL == device_ctx) || (NULL == cmds)){
@@ -856,16 +945,22 @@ int spacemit_dsi_write_cmds(struct spacemit_dsi_device* device_ctx,
 		return -1;
 	}
 
+	if (device_ctx->status == DSI_STATUS_UNINIT)
+		return 0;
+
 	return dsi_write_cmd_array(device_ctx, cmds, count);
 }
 
-int spacemit_dsi_read_cmds(struct spacemit_dsi_device* device_ctx, struct spacemit_dsi_rx_buf *dbuf,
+int spacemit_dsi_read_cmds(struct spacemit_dsi_device *device_ctx, struct spacemit_dsi_rx_buf *dbuf,
 								struct spacemit_dsi_cmd_desc *cmds, int count)
 {
-	if((NULL == device_ctx) || (NULL == cmds)){
+	if ((device_ctx == NULL) || (cmds == NULL)) {
 		pr_info("%s: Invalid param\n", __func__);
 		return -1;
 	}
+
+	if (device_ctx->status == DSI_STATUS_UNINIT)
+		return 0;
 
 	return dsi_read_cmd_array(device_ctx, dbuf, cmds, count);
 }

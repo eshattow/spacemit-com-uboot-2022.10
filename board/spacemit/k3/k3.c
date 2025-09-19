@@ -18,6 +18,7 @@
 #include <asm/io.h>
 #include <asm/sections.h>
 
+bool is_video_connected = false;
 
 DECLARE_GLOBAL_DATA_PTR;
 

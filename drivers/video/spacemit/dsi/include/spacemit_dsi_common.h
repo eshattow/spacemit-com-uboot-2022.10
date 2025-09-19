@@ -26,6 +26,8 @@ enum spacemit_mipi_input_data_mode{
 	DSI_INPUT_DATA_RGB_MODE_666PACKET = 1,
 	DSI_INPUT_DATA_RGB_MODE_666UNPACKET = 2,
 	DSI_INPUT_DATA_RGB_MODE_888 = 3,
+	DSI_INPUT_DATA_RGB_MODE_101010 = 4,
+	DSI_INPUT_DATA_RGB_MODE_DSC = 5,
 	DSI_INPUT_DATA_RGB_MODE_MAX
 };
 
@@ -43,6 +45,8 @@ enum spacemit_dsi_cmd_type {
 	SPACEMIT_DSI_GENERIC_LWRITE = 0x29,
 	SPACEMIT_DSI_GENERIC_READ1 = 0x14,
 	SPACEMIT_DSI_SET_MAX_PKT_SIZE = 0x37,
+	SPACEMIT_DSI_PICTURE_PARAMETER_SET = 0x0a,
+	SPACEMIT_DSI_COMPRESSION_MODE = 0x07,
 };
 
 enum spacemit_dsi_tx_mode {
@@ -76,6 +80,29 @@ enum spacemit_dsi_te_mode {
 
 };
 
+enum spacemit_dsc_bpc {
+	DSC_BPC_8 = 8,  /* FORMAT_RGB888 */
+	DSC_BPC_10 = 10, /* FORMAT_ARGB2101010 */
+};
+
+enum spacemit_dsi_version {
+	DSI_VERSION_1 = 0,
+	DSI_VERSION_2,
+	DSI_VERSION_MAX
+};
+
+struct spacemit_dsi_vrr_param {
+	uint32_t vrr_vfp;
+};
+
+struct spacemit_dsi_info {
+	unsigned int cmd_pkt_max_size;
+	unsigned int cmd_pkt_default_size;
+	unsigned int cmd_fifo_max_level;
+	unsigned int cmd_fifo_default_level;
+	unsigned int vpn_burst_mode_shift;
+};
+
 struct spacemit_mipi_info {
 	unsigned int height;
 	unsigned int width;
@@ -86,6 +113,7 @@ struct spacemit_mipi_info {
 	unsigned int vbp;
 	unsigned int vsync;
 	unsigned int fps;
+	struct spacemit_dsi_vrr_param vrr_param; /* for variable refresh rate */
 
 	unsigned int work_mode; /*command_mode, video_mode*/
 	unsigned int rgb_mode;
@@ -105,8 +133,22 @@ struct spacemit_mipi_info {
 	unsigned int te_pol;
 	unsigned int te_mode;
 
+	/* dsc parameters */
+	unsigned int dsc_enable;
+	unsigned int dsc_bpc;
+	unsigned int dsc_bpp;
+
+	unsigned int cmd_pkg_ctrl;
+	unsigned int cmd_pkt_size;
+	unsigned int cmd_fifo_level;
 	/*The following fields need not be set by panel*/
 	unsigned int real_fps;
+
+	/* the following dsi version need to set: dsi version2 */
+	unsigned int vpn_tx_dly_cnt;
+	unsigned int vpn_dly_cnt;
+
+	unsigned int h_extra;
 };
 
 struct spacemit_dsi_cmd_desc {

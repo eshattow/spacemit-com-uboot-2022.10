@@ -149,7 +149,7 @@ static int spacemit_mipi_dsi_probe(struct udevice *dev)
 		return ret;
 	}
 
-	ret = reset_get_by_name(dev, "dsi_reset", &priv->dsi_reset);
+	ret = reset_get_by_name(dev, "aclk_reset", &priv->aclk_reset);
 	if (ret) {
 		pr_err("reset_get_by_name dsi_reset failed: %d\n", ret);
 		return ret;
@@ -173,9 +173,9 @@ static int spacemit_mipi_dsi_probe(struct udevice *dev)
 		return ret;
 	}
 
-	ret = reset_deassert(&priv->dsi_reset);
+	ret = reset_deassert(&priv->aclk_reset);
 	if (ret) {
-		pr_err("reset_assert dsi_reset failed: %d\n", ret);
+		pr_err("reset_assert aclk_reset failed: %d\n", ret);
 		return ret;
 	}
 

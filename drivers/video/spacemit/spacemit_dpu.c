@@ -168,7 +168,6 @@ static void dsi_dpu_write(void __iomem *addr, unsigned int val)
 static void dsi_dpu_init(struct spacemit_mode_modeinfo *spacemit_mode, ulong fbbase)
 {
 	unsigned int vsync, hsync, vbp, vfp, hbp, hfp, vsp, hsp;
-	unsigned int reg_val = 0;
 
 	vsync = spacemit_mode->vsync_len & 0x3ff;
 	hsync = spacemit_mode->hsync_len & 0x3ff;
@@ -182,41 +181,92 @@ static void dsi_dpu_init(struct spacemit_mode_modeinfo *spacemit_mode, ulong fbb
 	pr_debug("dsi_dpu_init hbp %d, hfp %d hsync %d vsp %d \n", hbp, hfp, hsync, vsp);
 	pr_debug("dsi_dpu_init vbp %d, vfp %d vsync %d hsp %d \n", vbp, vfp, vsync, hsp);
 
-	dsi_dpu_write((void __iomem *)0xa1c, 0x2223);
-	dsi_dpu_write((void __iomem *)0x18000, (spacemit_mode->yres << 16) | spacemit_mode->xres);
-	dsi_dpu_write((void __iomem *)0x18018, 0x20);
-	dsi_dpu_write((void __iomem *)0x1807c, 0x100);
-	reg_val = (hbp << 16) | hfp;
-	dsi_dpu_write((void __iomem *)0x18080, reg_val);
-	reg_val = (vbp << 16) | vfp;
-	dsi_dpu_write((void __iomem *)0x18084, reg_val);
-	reg_val = (vsp << 28) | (vsync << 16) | (hsp << 12) | (hsync);
-	dsi_dpu_write((void __iomem *)0x18088, reg_val);
-	dsi_dpu_write((void __iomem *)0x1808c, (spacemit_mode->yres << 16) | spacemit_mode->xres);
-	dsi_dpu_write((void __iomem *)0x18090, spacemit_mode->pix_fmt_out);
-	dsi_dpu_write((void __iomem *)0xd80, 0x202040);
-	dsi_dpu_write((void __iomem *)0xda0, (unsigned int)(fbbase & 0xffffffff));
-	dsi_dpu_write((void __iomem *)0xda4, (unsigned int)(fbbase >> 32));
-	dsi_dpu_write((void __iomem *)0xdb8, spacemit_mode->xres * 4);
-	dsi_dpu_write((void __iomem *)0xdbc, (spacemit_mode->yres << 16) | spacemit_mode->xres);
-	dsi_dpu_write((void __iomem *)0xdc0, 0x0);
-	dsi_dpu_write((void __iomem *)0xdc4, ((spacemit_mode->yres - 1) << 16) | (spacemit_mode->xres - 1));
-	dsi_dpu_write((void __iomem *)0xdf0, 0x4);
-	/* PP3 will impact display light */
-	dsi_dpu_write((void __iomem *)0x4c00, (spacemit_mode->xres << 8) | 0x01);
-	dsi_dpu_write((void __iomem *)0x4c04, spacemit_mode->yres);
-	dsi_dpu_write((void __iomem *)0x4c10, 0xff0000);
-	dsi_dpu_write((void __iomem *)0x4c14, 0xff);
-	dsi_dpu_write((void __iomem *)0x4c38, 0x7);
-	dsi_dpu_write((void __iomem *)0x4c48, 0x0);
-	dsi_dpu_write((void __iomem *)0x4c4c, (spacemit_mode->xres - 1) << 16);
-	dsi_dpu_write((void __iomem *)0x4c50, spacemit_mode->yres - 1);
-	dsi_dpu_write((void __iomem *)0x4c54, 0xff0000);
+	dsi_dpu_write((void __iomem *)0x129c, 0x2223);
 
-	dsi_dpu_write((void __iomem *)0x560, 0x40008);
-	dsi_dpu_write((void __iomem *)0x588, 0x821);
-	dsi_dpu_write((void __iomem *)0x56c, 0x1);
-	dsi_dpu_write((void __iomem *)0x58c, 0x1);
+	/*
+	 * reg_0: split_en(bit0), cmd_screen(bit1), fm_timing_en(bit2),
+	 * cmd_wait_en(bit3), cmd_wait_te(bit4), disp_ready_man_en(bit5),
+	 * hsp(bit7), vsp(bit8)
+	 */
+	dsi_dpu_write((void __iomem *)0x51200, (1 << 8) | (1 << 7) | (1 << 5) | (1 << 2));
+
+	/* reg_2: user(bit12-15) */
+	dsi_dpu_write((void __iomem *)0x51208, spacemit_mode->pix_fmt_out << 12);
+
+	/* reg_3: hfp(bit16-27) */
+	dsi_dpu_write((void __iomem *)0x5120C, (hfp + 2000) << 16);
+
+	/* reg_4: hsync_width(bit0-9), hbp(bit16-27) */
+	dsi_dpu_write((void __iomem *)0x51210, (hbp << 16) | hsync);
+
+	/* reg_5: vfp(bit0-15), vsync_width(bit16-25) */
+	dsi_dpu_write((void __iomem *)0x51214, (vsync << 16) | vfp);
+
+	/* reg_6: vbp(bit0-11), h_active(bit16-29) */
+	dsi_dpu_write((void __iomem *)0x51218, (spacemit_mode->xres << 16) | vbp);
+
+	/* reg_7: v_active(bit0-13) */
+	dsi_dpu_write((void __iomem *)0x5121C, spacemit_mode->yres);
+
+	/* (R=0, G=0, B=0xFF) */
+	dsi_dpu_write((void __iomem *)0x51224, 0x0);
+	dsi_dpu_write((void __iomem *)0x51228, 0xFF);
+
+	/*
+	 * reg_11: eof_1st_ln_dly_num(bit0-15), eof_2nd_ln_dly_num(bit16-31)
+	 */
+	dsi_dpu_write((void __iomem *)0x5122C, ((vfp - 6) << 16) | (vfp - 7));
+
+	/* reg_14: sof_pre_ln_num(bit0-16) */
+	dsi_dpu_write((void __iomem *)0x51238, 0x0);
+
+	/*
+	 * RDMA PATH
+	 * layer_mode 0, layer_cmpsr_id 1
+	 */
+	dsi_dpu_write((void __iomem *)0xd000, 1 << 13);
+
+	/* base_addr0_low_ly0 */
+	dsi_dpu_write((void __iomem *)0xd024, (unsigned int)(fbbase & 0xffffffff));
+
+	/* base_addr0_high_ly0 */
+	dsi_dpu_write((void __iomem *)0xd028, (unsigned int)(fbbase >> 32));
+
+	/* reg15 rdma_stride0_layer0 */
+	dsi_dpu_write((void __iomem *)0xd03c, spacemit_mode->xres * 4);
+
+	dsi_dpu_write((void __iomem *)0xd040, spacemit_mode->xres | (spacemit_mode->yres << 16));
+	dsi_dpu_write((void __iomem *)0xd044, 0x0);
+	dsi_dpu_write((void __iomem *)0xd048, (spacemit_mode->xres - 1) | ((spacemit_mode->yres-1) << 16));
+
+	/* reg29 */
+	dsi_dpu_write((void __iomem *)0xd074, 0X4); /* ARGB8888 */
+
+	/* dpu_run */
+	/* POSTPIPE_REG reg0（pp_base + 0x00）saturn_hee_conf_dpuctrl */
+	dsi_dpu_write((void __iomem *)0x30300, 0x0);
+
+	/* POSTPIPE_REG reg13（pp_base + 0x34） */
+	dsi_dpu_write((void __iomem *)0x30334, (spacemit_mode->xres | (spacemit_mode->yres << 16)));
+
+	/* saturn_hee_conf_dpuctrl */
+	/* dpu_ctl_reg_0（DPU_CTRL_BASE_ADDR 0x3c0）: nml_rch_en[9:0] + nml_scl_en[13:10] */
+	dsi_dpu_write((void __iomem *)0x3c0, 0x840008);
+
+	/* dpu_ctl_reg_3 */
+	dsi_dpu_write((void __iomem *)0x3cc, 0x821);
+
+	/* saturn_hee_cfg_ready */
+	/* dpu_int_reg_3 */
+	dsi_dpu_write((void __iomem *)0x70c, 0x100);
+
+	dsi_dpu_write((void __iomem *)0x3c8, 0x1);
+
+	/*
+	 * saturn_ctrl_sw_start
+	 * dev_id=1 → base = DPU_SCENE_CTRL2_BASE_ADDR(0x380)，reg_4 offset 0x10
+	 */
+	dsi_dpu_write((void __iomem *)0x390, 0x1);
 }
 
 static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_node)
@@ -441,10 +491,6 @@ static int spacemit_dpu_probe(struct udevice *dev)
 
 	priv->regs_dsi = dev_remap_addr_name(dev, "dsi");
 	if (!priv->regs_dsi)
-		return -EINVAL;
-
-	priv->regs_hdmi = dev_remap_addr_name(dev, "hdmi");
-	if (!priv->regs_hdmi)
 		return -EINVAL;
 
 	port = dev_read_subnode(dev, "port");

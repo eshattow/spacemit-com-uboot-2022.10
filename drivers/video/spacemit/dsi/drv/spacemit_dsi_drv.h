@@ -54,6 +54,7 @@ struct spacemit_dsi_advanced_setting {
 
 struct spacemit_dsi_device {
 	uint32_t id; /*dsi id*/
+	uint16_t version; /* lark：DSI_VERSION_1, dovenr:DSI_VERSION_2 */
 
 	unsigned long esc_clk_rate, bit_clk_rate;
 

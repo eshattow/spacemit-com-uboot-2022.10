@@ -29,7 +29,7 @@ struct spacemit_mipi_priv {
 	struct clk escclk;
 	struct clk bitclk;
 
-	struct reset_ctl dsi_reset;
+	struct reset_ctl aclk_reset;
 	struct reset_ctl mclk_reset;
 	struct reset_ctl esc_reset;
 	struct reset_ctl lcd_reset;
