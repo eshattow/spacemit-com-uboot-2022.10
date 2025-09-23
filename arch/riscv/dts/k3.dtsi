@@ -236,19 +236,18 @@
 			interrupt-parent = <&saplic>;
 		};
 
-		pmx: pinmux@d401e000 {
+		pinctrl: pinctrl@d401e000 {
 			compatible = "pinctrl-single";
 			reg = <0x0 0xd401e000 0x0 0x400>;
 			#address-cells = <1>;
 			#size-cells = <1>;
-			#pinctrl-cells = <1>;
+			#pinctrl-cells = <2>;
 			#gpio-range-cells = <3>;
-			ranges;
 			pinctrl-single,register-width = <32>;
-			pinctrl-single,function-mask = <7>;
+			pinctrl-single,function-mask = <0xff77>;
 
 			range: gpio-range {
-			#pinctrl-single,gpio-range-cells = <3>;
+				#pinctrl-single,gpio-range-cells = <3>;
 			};
 		};
 

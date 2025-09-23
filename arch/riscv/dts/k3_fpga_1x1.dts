@@ -6,6 +6,7 @@
  */
 
 #include "k3.dtsi"
+#include "k3-pinctrl.dtsi"
 
 &uart0 {
 	status = "okay";
