@@ -452,6 +452,7 @@ static int spacemit_efuse_of_to_plat(struct udevice *dev)
 
 static const struct udevice_id spacemit_efuse_ids[] = {
 	{ .compatible = "spacemit,k1x-efuse" },
+	{ .compatible = "spacemit,k3-efuse" },
 	{}
 };
 

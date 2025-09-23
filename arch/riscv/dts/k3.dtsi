@@ -321,6 +321,18 @@
 				reg = <0x0 0xcad00000 0x0 0x10000>;
 			};
 		};
+
+		efuse: fuse@f0702800 {
+			compatible = "spacemit,k3-efuse";
+			reg = <0x0 0xf0702800 0x0 0x400>;
+			resets = <&reset RESET_AES_WTM>;
+			reset-names = "aes_reset";
+			/*
+			clocks = <&ccu CLK_AES_WTM>;
+			clock-names = "aes_core_wtm";
+			*/
+			status = "disabled";
+		};
 	};
 
 };
