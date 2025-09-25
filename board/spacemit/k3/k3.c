@@ -37,14 +37,15 @@ extern int update_tlvinfo(void);
 
 int board_init(void)
 {
-#ifdef CONFIG_DM_REGULATOR_SPM8XX
-	int ret;
+	int ret = 0;
 
+#ifdef CONFIG_DM_REGULATOR_SPM8XX
 	ret = regulators_enable_boot_on(true);
 	if (ret)
 		pr_debug("%s: Cannot enable boot on regulator\n", __func__);
 #endif
-	return 0;
+
+	return ret;
 }
 
 int board_late_init(void)
