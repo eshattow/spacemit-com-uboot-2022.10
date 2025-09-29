@@ -14,6 +14,7 @@
 #include <dm.h>
 #include <log.h>
 #include <asm/io.h>
+#include "common.h"
 #include "ccu-k1x.h"
 #include "ccu_mix.h"
 #include "ccu_pll.h"
@@ -162,7 +163,7 @@
 #define APBC2_GPIO_CLK_RST		0x1c
 /* end of APBC2 register offset */
 
-struct spacemit_k1x_clk k1x_clock_controller;
+struct spacemit_ccu_clk k1x_clock_controller;
 struct clk vctcxo_24, vctcxo_3, vctcxo_1, pll1_vco, clk_32k, clk_dummy;
 
 #ifdef CONFIG_SPL_BUILD
@@ -1548,7 +1549,7 @@ const struct clk_ops ccu_clk_ops = {
 	.enable = ccu_clk_enable,
 };
 
-int ccu_common_init(struct clk * clk, struct spacemit_k1x_clk *clk_info, struct spacemit_clk_table *clks)
+int ccu_common_init(struct clk * clk, struct spacemit_ccu_clk *clk_info, struct spacemit_clk_table *clks)
 {
 	struct ccu_common *common = clk_to_ccu_common(clk);
 	struct ccu_pll *pll = clk_to_ccu_pll(clk);
@@ -1604,7 +1605,7 @@ int ccu_common_init(struct clk * clk, struct spacemit_k1x_clk *clk_info, struct 
 	return 0;
 }
 
-int spacemit_ccu_probe(struct spacemit_k1x_clk *clk_info,
+int spacemit_ccu_probe(struct spacemit_ccu_clk *clk_info,
 		    struct spacemit_clk_table *clks)
 {
 	int i;
@@ -1663,7 +1664,7 @@ static inline void ccu_clk_dm(ulong id, struct clk *clk)
 static int spacemit_k1x_ccu_probe(struct udevice *dev)
 {
 	int ret = 0;
-	struct spacemit_k1x_clk *clk_info = &k1x_clock_controller;
+	struct spacemit_ccu_clk *clk_info = &k1x_clock_controller;
 	struct spacemit_clk_table *clks = &spacemit_k1x_clks;
 
 	pr_debug("init clock start \n");

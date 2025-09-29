@@ -7,7 +7,10 @@
 #ifndef _CCU_MIX_H_
 #define _CCU_MIX_H_
 
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
 #include "ccu-k1x.h"
+#endif
+#include "common.h"
 
 #define CCU_CLK_MIX  "ccu_clk_mix"
 #define SPACEMIT_CLK_GATE_NEED_DELAY BIT(0)

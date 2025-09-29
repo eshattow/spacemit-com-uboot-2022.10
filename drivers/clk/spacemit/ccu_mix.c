@@ -22,7 +22,9 @@
 #include "ccu_mix.h"
 
 #define TIMEOUT_LIMIT (20000) /* max timeout 10000us */
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
 static int twsi8_reg_val = 0x04;
+#endif
 
 static int ccu_mix_trigger_fc(struct clk *clk)
 {
@@ -84,6 +86,7 @@ static int ccu_mix_disable(struct clk *clk)
 	if (!gate)
 		return 0;
 
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
 #ifdef CONFIG_SPL_BUILD
 	if (clk->id == CLK_TWSI8_SPL){
 #else
@@ -100,6 +103,7 @@ static int ccu_mix_disable(struct clk *clk)
 
 		return 0;
 	}
+#endif
 
 	if (common->reg_type == CLK_DIV_TYPE_2REG_NOFC_V3
 		|| common->reg_type == CLK_DIV_TYPE_2REG_FC_V4)
@@ -152,6 +156,7 @@ static int ccu_mix_set_parent(struct clk *clk, struct clk *parent)
 		return index;
 	}
 
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
 #ifdef CONFIG_SPL_BUILD
 	if (clk->id == CLK_TWSI8_SPL){
 #else
@@ -168,6 +173,7 @@ static int ccu_mix_set_parent(struct clk *clk, struct clk *parent)
 
 		return 0;
 	}
+#endif
 
 	if (common->reg_type == CLK_DIV_TYPE_2REG_NOFC_V3
 		|| common->reg_type == CLK_DIV_TYPE_2REG_FC_V4)
@@ -211,6 +217,7 @@ static int ccu_mix_enable(struct clk *clk)
 	if (!gate)
 		return 0;
 
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
 #ifdef CONFIG_SPL_BUILD
 	if (clk->id == CLK_TWSI8_SPL){
 #else
@@ -227,6 +234,7 @@ static int ccu_mix_enable(struct clk *clk)
 
 		return 0;
 	}
+#endif
 
 	if (common->reg_type == CLK_DIV_TYPE_2REG_NOFC_V3
 		|| common->reg_type == CLK_DIV_TYPE_2REG_FC_V4)
@@ -286,6 +294,7 @@ static ulong ccu_mix_get_rate(struct clk *clk)
 	unsigned long val;
 	u32 reg;
 
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
 #ifdef CONFIG_SPL_BUILD
 	if (clk->id == CLK_TWSI8_SPL){
 #else
@@ -294,6 +303,7 @@ static ulong ccu_mix_get_rate(struct clk *clk)
 		val = parent_rate;
 		return val;
 	}
+#endif
 
 	if (!div){
 		if (mix->factor)
@@ -387,12 +397,14 @@ static ulong ccu_mix_set_rate(struct clk *clk, unsigned long rate)
 	u32 reg;
 	int ret;
 
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
 #ifdef CONFIG_SPL_BUILD
 	if (clk->id == CLK_TWSI8_SPL)
 #else
 	if (clk->id == CLK_TWSI8)
 #endif
 		return 0;
+#endif
 
 	if(!div_config && !mux_config){
 		return 0;
@@ -464,6 +476,7 @@ unsigned int ccu_mix_get_parent(struct clk *clk)
 	if(!mux)
 		return 0;
 
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
 #ifdef CONFIG_SPL_BUILD
 	if (clk->id == CLK_TWSI8_SPL){
 #else
@@ -472,6 +485,7 @@ unsigned int ccu_mix_get_parent(struct clk *clk)
 		parent = (twsi8_reg_val >> 4) & 0x7;
 		return parent;
 	}
+#endif
 
 	if (common->reg_type == CLK_DIV_TYPE_2REG_NOFC_V3
 		|| common->reg_type == CLK_DIV_TYPE_2REG_FC_V4)
