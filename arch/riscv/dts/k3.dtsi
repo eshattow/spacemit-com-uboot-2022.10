@@ -10,6 +10,7 @@
 #include <config.h>
 #include "k3-cpus.dtsi"
 #include <dt-bindings/reset/reset-spacemit-k3.h>
+#include <dt-bindings/clock/spacemit-k3-clock.h>
 
 / {
 	#address-cells = <2>;
@@ -32,6 +33,42 @@
 			compatible = "fixed-clock";
 			#clock-cells = <0>;
 			clock-frequency = <66667000>;
+		};
+		vctcxo_24: vctcxo_24 {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <24000000>;
+			clock-output-names = "vctcxo_24";
+		};
+		vctcxo_3: vctcxo_3 {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <3000000>;
+			clock-output-names = "vctcxo_3";
+		};
+		vctcxo_1: vctcxo_1 {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <1000000>;
+			clock-output-names = "vctcxo_1";
+		};
+		pll1_vco: pll1_vco {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <24576000>;
+			clock-output-names = "pll1_vco";
+		};
+		osc_32k: osc_32k {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <32000>;
+			clock-output-names = "osc_32k";
+		};
+		clk_dummy: clk_dummy {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <0>;
+			clock-output-names = "clk_dummy";
 		};
 	};
 
@@ -149,6 +186,26 @@
 			 *   A100: no valid vs-level interrupt files.
 			 */
 			riscv,guest-index-bits = <6>;
+			status = "okay";
+		};
+
+		ccu: clock-controller@d4050000 {
+			compatible = "spacemit,k3-ccu";
+			reg = <0x0 0xd4050000 0x0 0x209c>,
+				<0x0 0xd4282800 0x0 0x400>,
+				<0x0 0xd4015000 0x0 0x1000>,
+				<0x0 0xd4090000 0x0 0x1000>,
+				<0x0 0xd4282c00 0x0 0x400>,
+				<0x0 0xd8440000 0x0 0x98>,
+				<0x0 0xc0000000 0x0 0x4280>,
+				<0x0 0xf0610000 0x0 0x20>,
+				<0x0 0xc0880000 0x0 0xd100>;
+			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2", "rcpu";
+			clocks = <&vctcxo_24>, <&vctcxo_3>, <&vctcxo_1>, <&pll1_vco>,
+				<&osc_32k>, <&clk_dummy>;
+			clock-names = "vctcxo_24", "vctcxo_3", "vctcxo_1", "pll1_vco",
+				"osc_32k", "clk_dummy";
+			#clock-cells = <1>;
 			status = "okay";
 		};
 
