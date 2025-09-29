@@ -2,5 +2,5 @@
 #
 # Copyright (c) 2025-2026 Spacemit, Inc
 
-obj-y	+= k3.o
+obj-y	+= k3.o k3-tlvinfo.o k3-i2c-eeprom.o
 obj-$(CONFIG_SPL_BUILD) += spl.o
