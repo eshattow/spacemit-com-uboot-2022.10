@@ -318,6 +318,13 @@
 			status = "disabled";
 		};
 
+		rpmi_mpxy_pwrkey: rpmi-mpxy-pwrkey@0 {
+			compatible = "riscv,rpmi-mpxy-pwrkey";
+			mboxes = <&rpmi_shmem_mbox 15>;
+			riscv,sbi-mpxy-channel-id = <15>;
+			status = "disabled";
+		};
+
 		ddr@3000000 {
 			u-boot,dm-spl;
 			compatible = "spacemit,snps-lp45";
