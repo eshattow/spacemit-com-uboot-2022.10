@@ -311,6 +311,13 @@
 			status = "disabled";
 		};
 
+		rpmi_mpxy_rtc: rpmi-mpxy-rtc@0 {
+			compatible = "riscv,rpmi-mpxy-rtc";
+			mboxes = <&rpmi_shmem_mbox 14>;
+			riscv,sbi-mpxy-channel-id = <14>;
+			status = "disabled";
+		};
+
 		ddr@3000000 {
 			u-boot,dm-spl;
 			compatible = "spacemit,snps-lp45";
