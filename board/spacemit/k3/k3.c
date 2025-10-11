@@ -21,6 +21,7 @@
 #include <fb_spacemit.h>
 #include <net.h>
 #include <tlv_eeprom.h>
+#include "nfs_env.h"
 
 bool is_video_connected = false;
 static char found_partition[64] = {0};
@@ -52,9 +53,9 @@ int board_late_init(void)
 	ofnode chosen_node;
 	int ret;
 
-	setenv_boot_mode();
-
 	import_env_from_bootfs();
+
+	setenv_boot_mode();
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
@@ -268,6 +269,16 @@ void board_boot_order(u32* spl_boot_list)
 
 void setenv_boot_mode(void)
 {
+#ifdef CONFIG_ENV_IS_IN_NFS
+	const char *boot_override = env_get("boot_override");
+
+	if (boot_override) {
+		env_set("boot_device", boot_override);
+		env_set("boot_override", NULL);
+		return;
+	}
+#endif
+
 	u32 boot_mode = get_boot_mode();
 	switch (boot_mode) {
 	case BOOT_MODE_NAND:
@@ -441,6 +452,19 @@ static int load_env_from_nand_bootfs(void)
 void import_env_from_bootfs(void)
 {
 	u32 boot_mode = get_boot_mode();
+
+#ifdef CONFIG_ENV_IS_IN_NFS
+	// Check if local bootfs exists
+	if ((BOOT_MODE_USB != boot_mode) && check_bootfs_exists() != 0) {
+		#ifdef CONFIG_CMD_NET
+			eth_initialize();
+		#endif
+		// Local bootfs not found, try to load from NFS
+		if (load_env_from_nfs() == 0) {
+			return;
+		}
+	}
+#endif
 
 	switch (boot_mode) {
 	case BOOT_MODE_NAND:

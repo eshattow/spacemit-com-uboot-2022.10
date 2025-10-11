@@ -4,3 +4,4 @@
 
 obj-y	+= k3.o k3-tlvinfo.o k3-i2c-eeprom.o
 obj-$(CONFIG_SPL_BUILD) += spl.o
+obj-$(CONFIG_ENV_IS_IN_NFS) +=nfs_env.o
