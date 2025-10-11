@@ -18,10 +18,16 @@
 #include <asm/io.h>
 #include <asm/sections.h>
 #include <power/regulator.h>
+#include <fb_spacemit.h>
+#include <net.h>
 
 bool is_video_connected = false;
+static char found_partition[64] = {0};
 
 DECLARE_GLOBAL_DATA_PTR;
+
+void import_env_from_bootfs(void);
+void setenv_boot_mode(void);
 
 int board_init(void)
 {
@@ -40,6 +46,10 @@ int board_late_init(void)
 	ulong kernel_start;
 	ofnode chosen_node;
 	int ret;
+
+	setenv_boot_mode();
+
+	import_env_from_bootfs();
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
@@ -124,7 +134,11 @@ void *board_fdt_blob_setup(int *err)
 	return (ulong *)&_end;
 }
 
-/*May be not used*/
+
+/******************************************************************************
+ * Boot mode support function
+ *******************************************************************************/
+
 void set_boot_mode(enum board_boot_mode boot_mode)
 {
 	writel(boot_mode, (void *)BOOT_DEV_FLAG_REG);
@@ -246,3 +260,223 @@ void board_boot_order(u32* spl_boot_list)
 		spl_boot_list[1] = BOOT_DEVICE_RAM;
 	}
 }
+
+void setenv_boot_mode(void)
+{
+	u32 boot_mode = get_boot_mode();
+	switch (boot_mode) {
+	case BOOT_MODE_NAND:
+		env_set("boot_device", "nand");
+		break;
+	case BOOT_MODE_NOR:
+		char *blk_name;
+		int blk_index;
+
+		if (get_available_boot_blk_dev(&blk_name, &blk_index)){
+			printf("can not get available blk dev\n");
+			return;
+		}
+
+		env_set("boot_device", "nor");
+		env_set("boot_devnum", simple_itoa(blk_index));
+		break;
+	case BOOT_MODE_EMMC:
+		env_set("boot_device", "mmc");
+		env_set("boot_devnum", simple_itoa(MMC_DEV_EMMC));
+		break;
+	case BOOT_MODE_SD:
+		env_set("boot_device", "mmc");
+		env_set("boot_devnum", simple_itoa(MMC_DEV_SD));
+		break;
+	case BOOT_MODE_USB:
+		// for fastboot image download and run test
+		env_set("bootcmd", CONFIG_BOOTCOMMAND);
+		break;
+	default:
+		env_set("boot_device", "");
+		break;
+	}
+}
+
+/******************************************************************************
+ * Load environment support function
+ *******************************************************************************/
+int mmc_get_env_dev(void)
+{
+	u32 boot_mode = 0;
+	boot_mode = get_boot_mode();
+	pr_debug("%s, uboot boot_mode:%x\n", __func__, boot_mode);
+
+	if (boot_mode == BOOT_MODE_EMMC)
+		return MMC_DEV_EMMC;
+	else
+		return MMC_DEV_SD;
+}
+
+void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev)
+{
+	int err;
+	u32 part;
+	char cmd[128];
+	struct disk_partition info;
+
+	for (part = 1; part <= MAX_SEARCH_PARTITIONS; part++) {
+		err = part_get_info(dev_desc, part, &info);
+		if (err)
+			continue;
+		if (!strcmp(BOOTFS_NAME, info.name)){
+			pr_debug("match info.name:%s\n", info.name);
+			break;
+		}
+	}
+	if (part > MAX_SEARCH_PARTITIONS)
+		return;
+
+	env_set("bootfs_part", simple_itoa(part));
+	env_set("bootfs_devname", dev_name);
+
+	/*load env.txt and import to uboot*/
+	memset((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, 0, CONFIG_ENV_SIZE);
+	sprintf(cmd, "load %s %d:%d 0x%lx env_%s.txt", dev_name,
+			dev, part, CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
+	pr_debug("cmd:%s\n", cmd);
+	if (run_command(cmd, 0))
+		return;
+
+	memset(cmd, '\0', 128);
+	sprintf(cmd, "env import -t 0x%lx", CONFIG_SPL_LOAD_FIT_ADDRESS);
+	pr_debug("cmd:%s\n", cmd);
+	if (!run_command(cmd, 0)){
+		pr_info("load env_%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
+	}
+}
+
+char* parse_mtdparts_and_find_bootfs(void) {
+	const char *mtdparts = env_get("mtdparts");
+	char cmd_buf[256];
+
+	if (!mtdparts) {
+		pr_debug("mtdparts not set\n");
+		return NULL;
+	}
+
+	/* Find the last partition */
+	const char *last_part_start = strrchr(mtdparts, '(');
+	if (last_part_start) {
+		last_part_start++; /* Skip the left parenthesis */
+		const char *end = strchr(last_part_start, ')');
+		if (end && (end - last_part_start < sizeof(found_partition))) {
+			int len = end - last_part_start;
+			strncpy(found_partition, last_part_start, len);
+			found_partition[len] = '\0';
+
+			snprintf(cmd_buf, sizeof(cmd_buf), "ubi part %s", found_partition);
+			if (run_command(cmd_buf, 0) == 0) {
+				/* Check if the bootfs volume exists */
+				snprintf(cmd_buf, sizeof(cmd_buf), "ubi check %s", BOOTFS_NAME);
+				if (run_command(cmd_buf, 0) == 0) {
+					pr_info("Found bootfs in partition: %s\n", found_partition);
+					return found_partition;
+				}
+			}
+		}
+	}
+
+	pr_debug("bootfs not found in any partition\n");
+	return NULL;
+}
+
+/* Load environment variables from NAND bootfs partition */
+static int load_env_from_nand_bootfs(void)
+{
+#if CONFIG_IS_ENABLED(ENV_IS_IN_MTD)
+	/*load env from nand bootfs*/
+	const char *bootfs_name = BOOTFS_NAME ;
+	char cmd[128];
+
+	if (!bootfs_name) {
+		pr_err("bootfs not set\n");
+		return -1;
+	}
+
+	/* Parse mtdparts to find the partition containing the BOOTFS_NAME volume */
+	char *mtd_partition   = parse_mtdparts_and_find_bootfs();
+	if (!mtd_partition  ) {
+		pr_err("Bootfs not found in any partition\n");
+		return -1;
+	}
+
+	sprintf(cmd, "ubifsmount ubi0:%s", bootfs_name);
+	if (run_command(cmd, 0)) {
+		pr_err("Cannot mount ubifs partition '%s'\n", bootfs_name);
+		return -1;
+	}
+
+	memset((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, 0, CONFIG_ENV_SIZE);
+	sprintf(cmd, "ubifsload 0x%lx env_%s.txt", CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
+	if (run_command(cmd, 0)) {
+		pr_err("Failed to load env_%s.txt from bootfs\n", CONFIG_SYS_CONFIG_NAME);
+		return -1;
+	}
+
+	memset(cmd, '\0', 128);
+	sprintf(cmd, "env import -t 0x%lx", CONFIG_SPL_LOAD_FIT_ADDRESS);
+	if (!run_command(cmd, 0)) {
+		pr_debug("Imported environment from 'env_%s.txt'\n", CONFIG_SYS_CONFIG_NAME);
+		return 0;
+	}
+
+	return -1;
+#else
+	pr_debug("ENV_IS_IN_MTD not enabled, skipping NAND bootfs env load\n");
+	return 0;
+#endif
+}
+
+void import_env_from_bootfs(void)
+{
+	u32 boot_mode = get_boot_mode();
+
+	switch (boot_mode) {
+	case BOOT_MODE_NAND:
+		load_env_from_nand_bootfs();
+		break;
+	case BOOT_MODE_NOR:
+		struct blk_desc *dev_desc;
+		char *blk_name;
+		int blk_index;
+
+		if (get_available_boot_blk_dev(&blk_name, &blk_index)){
+			printf("can not get available blk dev\n");
+			return;
+		}
+
+		dev_desc = blk_get_dev(blk_name, blk_index);
+		if (dev_desc)
+			_load_env_from_blk(dev_desc, blk_name, blk_index);
+		break;
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+#ifdef CONFIG_MMC
+		int dev;
+		struct mmc *mmc;
+
+		dev = mmc_get_env_dev();
+		mmc = find_mmc_device(dev);
+		if (!mmc) {
+			pr_err("Cannot find mmc device\n");
+			return;
+		}
+		if (mmc_init(mmc)){
+			return;
+		}
+
+		_load_env_from_blk(mmc_get_blk_desc(mmc), "mmc", dev);
+		break;
+#endif
+	default:
+		break;
+	}
+	return;
+}
+
