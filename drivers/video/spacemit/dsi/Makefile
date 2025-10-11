@@ -11,6 +11,7 @@ obj-y += video/lcd/lcd_gx09inx101.o
 obj-y += video/lcd/lcd_icnl9911c.o
 obj-y += video/lcd/lcd_icnl9951r.o
 obj-y += video/lcd/lcd_jd9365dah3.o
+obj-y += video/lcd/lcd_jd9366tc.o
 obj-y += video/lcd/lcd_lt8911ext_edp_1080p.o
 obj-y += video/lcd/lcd_tc358762xbg_dpi.o
 obj-y += video/lcd/lcd_hxdm101.o

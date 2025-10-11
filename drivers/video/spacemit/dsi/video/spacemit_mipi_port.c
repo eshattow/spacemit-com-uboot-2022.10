@@ -463,7 +463,11 @@ int lcd_mipi_probe(void)
 		tx_device_client.panel_type = LCD_MIPI;
 		tx_device.panel_type = tx_device_client.panel_type;
 		lcd_jd9365dah3_init();
-	} else if(strcmp("ft8201sinx101", priv->panel_name) == 0) {
+	} else if(strcmp("jd9366tc", priv->panel_name) == 0) {
+		tx_device_client.panel_type = LCD_MIPI;
+		tx_device.panel_type = tx_device_client.panel_type;
+		lcd_jd9366tc_init();
+	}else if(strcmp("ft8201sinx101", priv->panel_name) == 0) {
 		tx_device_client.panel_type = LCD_MIPI;
 		tx_device.panel_type = tx_device_client.panel_type;
 		lcd_ft8201sinx101_init();
