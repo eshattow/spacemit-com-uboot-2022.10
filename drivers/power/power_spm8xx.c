@@ -2,6 +2,8 @@
 
 #include <i2c.h>
 #include <common.h>
+#include <dm.h>
+#include <dm/device.h>
 #include <asm/global_data.h>
 #include <linux/bug.h>
 #include <asm/barrier.h>
@@ -227,37 +229,57 @@ static int __board_pmic_init(const char *name)
 	const char *s;
 	u32 value, min, max;
 	const struct pm8xx_buck_desc *buck_desc, *ldo_desc;
-	int offset, bus, ret, sub_offset, len, saddr, i, num_buck, num_ldo, sel;
+	int offset, ret, sub_offset, len, saddr, i, num_buck, num_ldo, sel;
 
 	offset = fdt_node_offset_by_compatible(gd->fdt_blob, -1, name);
-	if (offset < 0) {
-		pr_info("%s Get %s node error\n", __func__, name);
+	if (offset < 0)
 		return -EINVAL;
-	}
 
 	saddr = fdtdec_get_uint(gd->fdt_blob, offset, "reg", 0);
-	if (!saddr) {
-		pr_info("%s: %s Node has no reg\n", __func__, name);
+	if (!saddr)
 		return -EINVAL;
+
+#if CONFIG_IS_ENABLED(DM_I2C)
+	struct udevice *i2c_bus, *i2c_dev;
+
+	int parent_offset = fdt_parent_offset(gd->fdt_blob, offset);
+	if (parent_offset < 0)
+		return -EINVAL;
+
+	ret = uclass_get_device_by_ofnode(UCLASS_I2C, offset_to_ofnode(parent_offset), &i2c_bus);
+	if (ret) {
+		/* Probe all I2C devices and retry */
+		struct udevice *dev;
+		for (ret = uclass_first_device(UCLASS_I2C, &dev); dev;
+		     ret = uclass_next_device(&dev))
+			;
+
+		ret = uclass_get_device_by_ofnode(UCLASS_I2C, offset_to_ofnode(parent_offset), &i2c_bus);
+		if (ret)
+			return -EINVAL;
 	}
 
-	bus = fdtdec_get_uint(gd->fdt_blob, offset, "bus", 0);
-	if (!bus) {
-		pr_info("%s: %s Node has no bus\n", __func__, name);
+	ret = dm_i2c_probe(i2c_bus, saddr, 0, &i2c_dev);
+	if (ret < 0)
 		return -EINVAL;
-	}
+
+#else
+	int bus;
+	/* Legacy I2C mode: use bus property */
+	bus = fdtdec_get_uint(gd->fdt_blob, offset, "bus", 0);
+	if (!bus)
+		return -EINVAL;
 
 	ret = i2c_set_bus_num(bus);
-	if (ret < 0) {
-		pr_info("%s: %s set i2c bus number error\n", __func__, name);
+	if (ret < 0)
 		return -EINVAL;
-	}
 
 	ret = i2c_probe(saddr);
 	if (ret < 0) {
 //		pr_info("%s: %s probe i2c failed\n", __func__, name);
 		return -EINVAL;
 	}
+#endif
 
 	__regulator_desc_find(name, &buck_desc, &ldo_desc, &num_buck, &num_ldo);
 
@@ -289,10 +311,15 @@ static int __board_pmic_init(const char *name)
 				if (strcmp(buck_desc[i].name, s) == 0) {
 
 					/* enable the regulator */
+#if CONFIG_IS_ENABLED(DM_I2C)
+					dm_i2c_read(i2c_dev, buck_desc[i].enable_reg, &regval, 1);
+					regval |= (1 << (ffs(buck_desc[i].enable_msk) - 1));
+					dm_i2c_write(i2c_dev, buck_desc[i].enable_reg, &regval, 1);
+#else
 					i2c_read(saddr, buck_desc[i].enable_reg, 1, &regval, 1);
 					regval |= (1 << (ffs(buck_desc[i].enable_msk) - 1));
 					i2c_write(saddr, buck_desc[i].enable_reg, 1, &regval, 1);
-
+#endif
 
 					/* set the regulator */
 					if (value) {
@@ -300,9 +327,15 @@ static int __board_pmic_init(const char *name)
 
 						if (sel >= 0) {
 							sel <<= ffs(buck_desc[i].vsel_msk) - 1;
+#if CONFIG_IS_ENABLED(DM_I2C)
+							dm_i2c_read(i2c_dev, buck_desc[i].vsel_reg, &regval, 1);
+							regval = (regval & ~buck_desc[i].vsel_msk) | sel;
+							dm_i2c_write(i2c_dev, buck_desc[i].vsel_reg, &regval, 1);
+#else
 							i2c_read(saddr, buck_desc[i].vsel_reg, 1, &regval, 1);
 							regval = (regval & ~buck_desc[i].vsel_msk) | sel;
 							i2c_write(saddr, buck_desc[i].vsel_reg, 1, &regval, 1);
+#endif
 						}
 					}
 					break;
@@ -314,9 +347,15 @@ static int __board_pmic_init(const char *name)
 			for (i = 0; i < num_ldo; ++i) {
 				if (strcmp(ldo_desc[i].name, s) == 0) {
 					/* enable the regulator */
+#if CONFIG_IS_ENABLED(DM_I2C)
+					dm_i2c_read(i2c_dev, ldo_desc[i].enable_reg, &regval, 1);
+					regval |= (1 << (ffs(ldo_desc[i].enable_msk) - 1));
+					dm_i2c_write(i2c_dev, ldo_desc[i].enable_reg, &regval, 1);
+#else
 					i2c_read(saddr, ldo_desc[i].enable_reg, 1, &regval, 1);
 					regval |= (1 << (ffs(ldo_desc[i].enable_msk) - 1));
 					i2c_write(saddr, ldo_desc[i].enable_reg, 1, &regval, 1);
+#endif
 
 					/* set the regulator */
 					if (value) {
@@ -324,9 +363,15 @@ static int __board_pmic_init(const char *name)
 
 						if (sel >= 0) {
 							sel <<= ffs(ldo_desc[i].vsel_msk) - 1;
+#if CONFIG_IS_ENABLED(DM_I2C)
+							dm_i2c_read(i2c_dev, ldo_desc[i].vsel_reg, &regval, 1);
+							regval = (regval & ~ldo_desc[i].vsel_msk) | sel;
+							dm_i2c_write(i2c_dev, ldo_desc[i].vsel_reg, &regval, 1);
+#else
 							i2c_read(saddr, ldo_desc[i].vsel_reg, 1, &regval, 1);
 							regval = (regval & ~ldo_desc[i].vsel_msk) | sel;
 							i2c_write(saddr, ldo_desc[i].vsel_reg, 1, &regval, 1);
+#endif
 						}
 					}
 

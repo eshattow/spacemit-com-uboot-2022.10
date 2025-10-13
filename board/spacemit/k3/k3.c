@@ -17,6 +17,7 @@
 #include <virtio.h>
 #include <asm/io.h>
 #include <asm/sections.h>
+#include <power/regulator.h>
 
 bool is_video_connected = false;
 
@@ -24,6 +25,13 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int board_init(void)
 {
+#ifdef CONFIG_DM_REGULATOR_SPM8XX
+	int ret;
+
+	ret = regulators_enable_boot_on(true);
+	if (ret)
+		pr_debug("%s: Cannot enable boot on regulator\n", __func__);
+#endif
 	return 0;
 }
 

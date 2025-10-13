@@ -16,6 +16,11 @@
 #include <asm/io.h>
 
 void spl_load_env(void) { /* TODO: load environment */ }
+#include <i2c.h>
+
+#if CONFIG_IS_ENABLED(SPACEMIT_POWER)
+extern int board_pmic_init(void);
+#endif
 
 int spl_board_init_f(void)
 {
@@ -28,6 +33,15 @@ int spl_board_init_f(void)
 		debug("DRAM init failed: %d\n", ret);
 		return ret;
 	}
+#if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
+	/* init i2c */
+	i2c_init_board();
+#endif
+
+#if CONFIG_IS_ENABLED(SPACEMIT_POWER)
+	board_pmic_init();
+#endif
+
 #ifdef CONFIG_SPL_REMOTEPROC_K3_PROC
 	rproc_init();
 #endif
