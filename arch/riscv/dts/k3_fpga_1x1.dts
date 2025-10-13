@@ -7,6 +7,7 @@
 
 #include "k3.dtsi"
 #include "k3-pinctrl.dtsi"
+#include "k1-x_spm8821.dtsi"
 
 &uart0 {
 	status = "okay";

@@ -4,7 +4,7 @@
 &i2c8 {
 	clock-frequency = <100000>;
 	u-boot,dm-spl;
-	status = "okay";
+	status = "disabled";
 
 	spm8821: pmic@41 {
 		compatible = "spacemit,spm8821";
