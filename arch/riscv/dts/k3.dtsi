@@ -396,17 +396,84 @@
 			status = "disabled";
 		};
 
+		usb2_host: usb2@0 {
+			compatible = "spacemit,k3-dwc3";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			resets = <&reset RESET_USB2>;
+			reset-names = "ctl_rst";
+			clocks = <&ccu CLK_USB2_BUS>;
+			clock-names = "bus";
+			ranges;
+			status = "disabled";
+			dwc3@c0a00000 {
+				compatible = "snps,dwc3";
+				reg = <0x0 0xc0a00000 0x0 0x10000>;
+				maximum-speed = "high-speed";
+			};
+		};
+
 		usb3_porta: usb3@0 {
 			compatible = "spacemit,k3-dwc3";
 			#address-cells = <2>;
 			#size-cells = <2>;
 			resets = <&reset RESET_USB3_PORTA>;
 			reset-names = "ctl_rst";
+			clocks = <&ccu CLK_USB3_PORTA_BUS>;
+			clock-names = "bus";
 			ranges;
 			status = "disabled";
 			dwc3@cad00000 {
 				compatible = "snps,dwc3";
 				reg = <0x0 0xcad00000 0x0 0x10000>;
+			};
+		};
+
+		usb3_portb: usb3@1 {
+			compatible = "spacemit,k3-dwc3";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			resets = <&reset RESET_USB3_PORTB>;
+			reset-names = "ctl_rst";
+			clocks = <&ccu CLK_USB3_PORTB_BUS>;
+			clock-names = "bus";
+			ranges;
+			status = "disabled";
+			dwc3@815f0000 {
+				compatible = "snps,dwc3";
+				reg = <0x0 0x815f0000 0x0 0x10000>;
+			};
+		};
+
+		usb3_portc: usb3@2 {
+			compatible = "spacemit,k3-dwc3";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			resets = <&reset RESET_USB3_PORTC>;
+			reset-names = "ctl_rst";
+			clocks = <&ccu CLK_USB3_PORTC_BUS>;
+			clock-names = "bus";
+			ranges;
+			status = "disabled";
+			dwc3@818f0000 {
+				compatible = "snps,dwc3";
+				reg = <0x0 0x818f0000 0x0 0x10000>;
+			};
+		};
+
+		usb3_portd: usb3@3 {
+			compatible = "spacemit,k3-dwc3";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			resets = <&reset RESET_USB3_PORTD>;
+			reset-names = "ctl_rst";
+			clocks = <&ccu CLK_USB3_PORTD_BUS>;
+			clock-names = "bus";
+			ranges;
+			status = "disabled";
+			dwc3@81bf0000 {
+				compatible = "snps,dwc3";
+				reg = <0x0 0x81bf0000 0x0 0x10000>;
 			};
 		};
 
