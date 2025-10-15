@@ -1,0 +1,251 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * K3 FPGA SPL-specific device tree
+ * This is a minimal DTS for SPL boot stage only
+ *
+ * Copyright (C) 2025 SPACEMIT Micro Limited
+ */
+
+/dts-v1/;
+
+#include <config.h>
+#include "k3-cpus.dtsi"
+#include <dt-bindings/reset/reset-spacemit-k3.h>
+#include <dt-bindings/clock/spacemit-k3-clock.h>
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <2>;
+	compatible = "spacemit,k3";
+
+	chosen {
+		stdout-path = "uart0:115200";
+	};
+
+	aliases {
+		console = &uart0;
+		mmc0 = &sdhci0;
+		mmc2 = &sdhci2;
+	};
+
+	clocks {
+		clk0: osc {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <66667000>;
+		};
+		vctcxo_24: vctcxo_24 {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <24000000>;
+			clock-output-names = "vctcxo_24";
+		};
+		vctcxo_3: vctcxo_3 {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <3000000>;
+			clock-output-names = "vctcxo_3";
+		};
+		vctcxo_1: vctcxo_1 {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <1000000>;
+			clock-output-names = "vctcxo_1";
+		};
+		pll1_vco: pll1_vco {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <24576000>;
+			clock-output-names = "pll1_vco";
+		};
+		osc_32k: osc_32k {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <32000>;
+			clock-output-names = "osc_32k";
+		};
+		clk_dummy: clk_dummy {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <0>;
+			clock-output-names = "clk_dummy";
+		};
+	};
+
+	memory@120000000 {
+		u-boot,dm-spl;
+		device_type = "memory";
+		reg = <0x1 0x20000000 0x0 0x40000000>;
+	};
+
+	soc {
+		u-boot,dm-spl;
+		#address-cells = <2>;
+		#size-cells = <2>;
+		compatible = "simple-bus";
+		ranges;
+
+		ccu: clock-controller@d4050000 {
+			u-boot,dm-spl;
+			compatible = "spacemit,k3-ccu";
+			reg = <0x0 0xd4050000 0x0 0x209c>,
+				<0x0 0xd4282800 0x0 0x400>,
+				<0x0 0xd4015000 0x0 0x1000>,
+				<0x0 0xd4090000 0x0 0x1000>,
+				<0x0 0xd4282c00 0x0 0x400>,
+				<0x0 0xd8440000 0x0 0x98>,
+				<0x0 0xc0000000 0x0 0x4280>,
+				<0x0 0xf0610000 0x0 0x20>,
+				<0x0 0xc0880000 0x0 0xd100>;
+			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2", "rcpu";
+			clocks = <&vctcxo_24>, <&vctcxo_3>, <&vctcxo_1>, <&pll1_vco>,
+				<&osc_32k>, <&clk_dummy>;
+			clock-names = "vctcxo_24", "vctcxo_3", "vctcxo_1", "pll1_vco",
+				"osc_32k", "clk_dummy";
+			#clock-cells = <1>;
+			status = "okay";
+		};
+
+		reset: reset-controller@d4050000 {
+			u-boot,dm-spl;
+			compatible = "spacemit,k3-reset";
+			reg = <0x0 0xd4050000 0x0 0x209c>,
+				<0x0 0xd4282800 0x0 0x400>,
+				<0x0 0xd4015000 0x0 0x1000>,
+				<0x0 0xd4090000 0x0 0x1000>,
+				<0x0 0xd4282c00 0x0 0x400>,
+				<0x0 0xd8440000 0x0 0x98>,
+				<0x0 0xc0000000 0x0 0x4280>,
+				<0x0 0xf0610000 0x0 0x20>,
+				<0x0 0xc0880000 0x0 0xd100>;
+			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2", "rcpu";
+			#reset-cells = <1>;
+			status = "okay";
+		};
+
+		uart0: uart@d4017000 {
+			u-boot,dm-spl;
+			compatible = "ns16550";
+			reg = <0x00000000 0xD4017000 0x00000000 0x00000100>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			clock-frequency = <14745600>;
+		};
+
+		rcpu@0 {
+			u-boot,dm-spl;
+			compatible = "spacemit,k3-rproc";
+			reg = <0 0 0 0>;
+			remoteproc-name = "rcpu0";
+			coreid = <0>;
+			mem_heap_start = <0x1 0x500000>;
+			mem_heap_size = <0x200000>;
+			fw_boot_entry = <0x1 0x200000>;
+			status = "disabled";
+		};
+
+		rcpu@1 {
+			u-boot,dm-spl;
+			compatible = "spacemit,k3-rproc";
+			reg = <0 0 0 0>;
+			remoteproc-name = "rcpu1";
+			coreid = <1>;
+			mem_heap_start = <0x1 0xB04000>;
+			mem_heap_size = <0x200000>;
+			fw_boot_entry = <0x1 0x804000>;
+			status = "disabled";
+		};
+
+		ddr@3000000 {
+			u-boot,dm-spl;
+			compatible = "spacemit,snps-lp45";
+			reg = <0x00000000 0xc0000000 0x00000000 0x00400000>;
+			status = "okay";
+		};
+
+		qspi: spi@d420c000 {
+			u-boot,dm-spl;
+			compatible = "spacemit,k3-qspi";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x0 0xd420c000 0x0 0x1000>,
+			      <0x0 0xb8000000 0x0 0x4100000>;
+			reg-names = "qspi-base", "qspi-mmap";
+			qspi-sfa1ad = <0x4000000>;
+			qspi-sfa2ad = <0x100000>;
+			qspi-sfb1ad = <0x100000>;
+			qspi-sfb2ad = <0x100000>;
+			qspi-pmuap-reg = <0xd4282860>;
+			qspi-mpmu-acgr-reg = <0xd4051024>;
+			qspi-ahbread = <0>;
+			qspi-freq = <26500000>;
+			qspi-id = <4>;
+			resets = <&reset RESET_QSPI>,
+				<&reset RESET_QSPI_BUS>;
+			reset-names = "qspi_reset", "qspi_bus_reset";
+			status = "disabled";
+		};
+
+		sdhci0: sdh@d4280000 {
+			u-boot,dm-spl;
+			compatible = "spacemit,k3-sdhci";
+			bus-width = <4>;
+			broken-cd;
+			no-1-8-v;
+			cap-sd-highspeed;
+			sdh-phy-module = <0>;
+			reg = <0x0 0xd4280000 0x0 0x200>;
+			resets = <&reset RESET_SDH_AXI>,
+				 <&reset RESET_SDH0>;
+			reset-names = "sdh_axi", "sdh0";
+			status = "disabled";
+		};
+
+		sdhci2: sdh@d4281000 {
+			compatible = "spacemit,k3-sdhci";
+			u-boot,dm-spl;
+			bus-width = <8>;
+			non-removable;
+			cap-mmc-highspeed;
+			sdh-phy-module = <1>;
+			reg = <0x0 0xd4281000 0x0 0x200>;
+			resets = <&reset RESET_SDH_AXI>,
+				 <&reset RESET_SDH2>;
+			reset-names = "sdh_axi", "sdh2";
+			status = "disabled";
+		};
+
+		usb3_porta: usb3@0 {
+			u-boot,dm-spl;
+			compatible = "spacemit,k3-dwc3";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			resets = <&reset RESET_USB3_PORTA>;
+			reset-names = "ctl_rst";
+			ranges;
+			status = "disabled";
+
+				dwc3@cad00000 {
+					dr_mode = "peripheral";
+					maximum-speed = "high-speed";
+					phy_type = "utmi_wide";
+					snps,dis_enblslpm_quirk;
+					snps,dis_u2_susphy_quirk;
+					u-boot,dm-spl;
+				};
+		};
+
+		efuse: fuse@f0702800 {
+			u-boot,dm-spl;
+			compatible = "spacemit,k3-efuse";
+			reg = <0x0 0xf0702800 0x0 0x400>;
+			resets = <&reset RESET_AES_WTM>;
+			reset-names = "aes_reset";
+			/*
+			clocks = <&ccu CLK_AES_WTM>;
+			clock-names = "aes_core_wtm";
+			*/
+			status = "disabled";
+		};
+	};
+};
