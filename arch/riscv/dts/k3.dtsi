@@ -232,6 +232,7 @@
 			gpio-count = <128>;
 			#gpio-cells = <2>;
 			interrupts = <58 4>;
+			clocks = <&ccu CLK_GPIO>;
 			interrupt-names = "gpio_mux";
 			interrupt-parent = <&saplic>;
 		};
