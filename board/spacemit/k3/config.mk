@@ -33,9 +33,8 @@ cmd_build_itb = \
 		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb/ && \
 	cp $(srctree)/u-boot-nodtb.bin \
 		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/ && \
-	$(srctree)/tools/mkimage -f \
-		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/uboot_fdt.its \
-		-r $(srctree)/$2;\
+	$(srctree)/tools/mkimage -f $3 $4 \
+		-r $(srctree)/$2; \
 	rm -rf $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb && \
 	rm -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin
 
@@ -52,9 +51,15 @@ MRPROPER_FILES += bootinfo_spinor.bin bootinfo_spinand.bin bootinfo_emmc.bin boo
 MRPROPER_FILES += k3_fpga_1x1.dtb
 MRPROPER_DIRS += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb
 
-#INPUTS-y += u-boot.itb
+ifeq ($(CONFIG_RSA_VERIFY),)
+its := $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/uboot_fdt.its
+else
+its := $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/uboot_fdt_sign.its
+key_para := -k $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/key
+endif
+
 u-boot.itb: u-boot-nodtb.bin u-boot-dtb.bin u-boot.dtb FORCE
-	$(call if_changed,build_itb,$@)
+	$(call if_changed,build_itb,$@,$(its),$(key_para))
 
 ifneq ($(CONFIG_SPL_BUILD),)
 INPUTS-y += FSBL.bin

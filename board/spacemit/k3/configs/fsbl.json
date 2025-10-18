@@ -17,9 +17,9 @@
       "data": [
         {
           "pubkey": {
-            "name": "rsakeypair0",
+            "name": "root_key",
             "algorithm": "RSA2048",
-            "source": "key/rsakeypair0_prv.key",
+            "source": "key/root_key_prv.key",
             "align": 256
           }
         }
@@ -100,9 +100,9 @@
             "name, oem_key, 0",
             {
               "pubkey": {
-                "name": "spl_pubkey",
+                "name": "spl_key",
                 "algorithm": "RSA2048",
-                "source": "key/spl_pubkey_prv.key",
+                "source": "key/spl_key_prv.key",
                 "align": 256
               }
             },
@@ -110,27 +110,11 @@
               "pubkey": {
                 "name": "uboot_pubkey",
                 "algorithm": "RSA2048",
-                "source": "key/uboot_pubkey_pub.key",
+                "source": "key/uboot_key_pub.key",
                 "align": 256
               }
             },
-            {
-              "pubkey": {
-                "name": "kernel_pubkey",
-                "algorithm": "RSA2048",
-                "source": "key/kernel_pubkey_pub.key",
-                "align": 256
-              }
-            },
-            {
-              "pubkey": {
-                "name": "rootfs_pubkey",
-                "algorithm": "RSA2048",
-                "source": "key/rootfs_pubkey_pub.key",
-                "align": 256
-              }
-            },
-            "reserved, 0, 1024"
+            "reserved, 0, 1536"
           ]
         }
       ]
@@ -185,7 +169,7 @@
           "signature": {
             "name": "signature1",
             "algorithm": "SHA256+RSA2048",
-            "key": "spl_pubkey",
+            "key": "spl_key",
             "source": "header1 + fsbl",
             "align": 256
           }

@@ -1,5 +1,4 @@
 /dts-v1/;
-
 / {
 	description = "Signed U-boot FIT image for k3";
 	#address-cells = <2>;
@@ -13,36 +12,33 @@
 			arch = "riscv";
 			compression = "none";
 			load = <0x1 0x02000000>;
-			data = /incbin/("./u-boot-nodtb.bin");
-			hash-1 {
+			data = /incbin/("../u-boot-nodtb.bin");
+			hash {
 				algo = "sha256";
 			};
 		};
-
 		fdt_1 {
-			description = "k3_fpga.dtb";
+			description = "k3_fpga_1x1";
 			type = "flat_dt";
 			compression = "none";
-			data = /incbin/("./uboot/k3_fpga_1x1.dtb");
-			hash-1 {
+			data = /incbin/("../dtb/k3_fpga_1x1.dtb");
+			hash {
 				algo = "sha256";
 			};
 		};
-
 	};
-
 	configurations {
 		default = "conf_1";
 		conf_1 {
 			description = "k3_fpga";
 			loadables = "uboot";
 			fdt = "fdt_1";
-			signature-1 {
+			signature {
 				algo = "sha256,rsa2048";
-				key-name-hint = "uboot_pubkey_prv";
+				key-name-hint = "uboot_key_prv";
 				sign-images = "loadables", "fdt";
 			};
 		};
-
 	};
 };
+

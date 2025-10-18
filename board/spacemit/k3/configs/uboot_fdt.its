@@ -1,5 +1,4 @@
 /dts-v1/;
-
 / {
 	description = "U-boot FIT image for k3";
 	#address-cells = <2>;

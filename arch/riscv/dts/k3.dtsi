@@ -11,6 +11,7 @@
 #include "k3-cpus.dtsi"
 #include <dt-bindings/reset/reset-spacemit-k3.h>
 #include <dt-bindings/clock/spacemit-k3-clock.h>
+#include "secure_boot.dtsi"
 
 / {
 	#address-cells = <2>;
