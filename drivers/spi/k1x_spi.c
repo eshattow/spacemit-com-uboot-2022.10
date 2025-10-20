@@ -454,6 +454,7 @@ static const struct dm_spi_ops k1x_spi_ops = {
 
 static const struct udevice_id k1x_spi_ids[] = {
 	{ .compatible = "spacemit,k1x-spi" },
+	{ .compatible = "spacemit,k3-spi" },
 	{ }
 };
 
