@@ -1442,6 +1442,13 @@ config CMD_SPI
 	help
 	  SPI utility command.
 
+config CMD_ESPI
+	bool "espi - Command to access eSPI device"
+	depends on DM_ESPI
+	help
+	  eSPI (Enhanced SPI) utility command. This provides commands for
+	  initializing, testing, and debugging eSPI controllers and devices.
+
 config DEFAULT_SPI_BUS
 	int "default spi bus used by sspi command"
 	depends on CMD_SPI

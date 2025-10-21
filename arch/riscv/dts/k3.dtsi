@@ -738,6 +738,44 @@
 			#size-cells = <0>;
 			status = "disabled";
 		};
+
+		espi0: espi@cac8c000 {
+			u-boot,dm-spl;
+			compatible = "spacemit,k2-espi";
+			reg = <0x0 0xcac8c000 0x0 0x1000>;
+
+			pr_io_base = <0x86000000>;
+			pr-mem-base0 = <0x84000000>;
+			pr-mem-base1 = <0xCAC8C000>;
+
+			/* Virtual-wire GPIO mapping configuration */
+			vw-gpio-mapping = <0 0x80>,
+							<1 0x81>,
+							<2 0x82>,
+							<3 0x83>;
+
+			/* eSPI Master configuration */
+			operating-frequency = <25>;   /* 25MHz (will negotiate with slave) */
+			io-mode = "single";           /* "single", "dual", or "quad" */
+			alert-mode = "io1";           /* "pin" or "io1" */
+			alert-type = "open-drain";    /* "open-drain" or "push-pull" */
+
+			/* Features */
+			crc-enable;                    /* Enable CRC checking */
+			response-modifier-enable;      /* Enable response modifier */
+			auto-gating-enable;            /* Enable auto clock gating */
+
+			/* Channel support (master capabilities) */
+			peripheral-channel-enable;     /* Enable Peripheral channel */
+			vwire-channel-enable;          /* Enable Virtual Wire channel */
+			oob-channel-enable;            /* Enable OOB channel */
+			flash-channel-enable;          /* Enable Flash channel */
+
+			/* Timing configuration */
+			watchdog-timeout = <0xFFFF>;   /* Watchdog timeout value */
+			status = "disabled";
+		};
+
 	};
 
 };

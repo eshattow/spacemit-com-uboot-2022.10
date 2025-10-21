@@ -48,6 +48,7 @@ int spl_board_init_f(void)
 #endif
 
 	spl_load_env();
+
 	return 0;
 }
 

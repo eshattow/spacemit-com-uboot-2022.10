@@ -119,6 +119,7 @@ enum uclass_id {
 	UCLASS_SPI,		/* SPI bus */
 	UCLASS_SPI_FLASH,	/* SPI flash */
 	UCLASS_SPI_GENERIC,	/* Generic SPI flash target */
+	UCLASS_ESPI,		/* Enhanced SPI (eSPI) bus */
 	UCLASS_SPMI,		/* System Power Management Interface bus */
 	UCLASS_SYSCON,		/* System configuration device */
 	UCLASS_SYSINFO,		/* Device information from hardware */

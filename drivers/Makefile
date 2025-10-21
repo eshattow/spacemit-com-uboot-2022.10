@@ -123,6 +123,9 @@ obj-$(CONFIG_DM_HWSPINLOCK) += hwspinlock/
 obj-$(CONFIG_DM_RNG) += rng/
 endif
 
+# eSPI support in both U-Boot proper and SPL
+obj-$(CONFIG_$(SPL_)ESPI) += espi/
+
 obj-$(CONFIG_TARGET_SPACEMIT_K1X) += ddr/spacemit/k1x/
 obj-$(CONFIG_TARGET_SPACEMIT_K3) += ddr/spacemit/k3/
 obj-y += soc/
