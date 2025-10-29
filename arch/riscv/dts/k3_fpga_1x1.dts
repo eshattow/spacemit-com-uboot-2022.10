@@ -36,13 +36,12 @@
 	max-speed = <100>;
 	clk_tuning_enable;
 	clk-tuning-by-reg;
-	tx-phase = <10>;
-	rx-phase = <40>;
+	tx-phase = <0>;
+	rx-phase = <0>;
 
 	phy-mode = "rgmii";
 	phy-addr = <0>;
 	phy-handle = <&rgmii>;
-	ref-clock-from-phy;
 
 	status = "okay";
 
