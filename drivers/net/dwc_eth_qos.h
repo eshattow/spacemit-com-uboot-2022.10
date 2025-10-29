@@ -282,7 +282,7 @@ void eqos_flush_buffer_generic(void *buf, size_t size);
 int eqos_null_ops(struct udevice *dev);
 
 extern struct eqos_config eqos_imx_config;
-extern struct eqos_config eqos_spacemit_config;
-#if IS_ENABLED(CONFIG_DWC_ETH_QOS_K3)
+#if IS_ENABLED(CONFIG_DWC_ETH_QOS_SPACEMIT)
+extern struct eqos_config eqos_spacemit_k1pro_config;
 extern struct eqos_config eqos_spacemit_k3_config;
 #endif
