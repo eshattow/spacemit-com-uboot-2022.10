@@ -225,21 +225,13 @@ config DWC_ETH_QOS_TEGRA186
 	  The Synopsys Designware Ethernet QOS IP block with specific
 	  configuration used in NVIDIA's Tegra186 chip.
 
-config DWC_ETH_QOS_K3
-	bool "Synopsys DWC Ethernet QOS device support for Spacemit K3"
-	depends on DWC_ETH_QOS
-	default y if CONFIG_TARGET_SPACEMIT_K3
-	help
-	  The Synopsys Designware Ethernet QOS IP block with specific
-	  configuration used in Spacemit's K3 chip.
-
 config DWC_ETH_QOS_SPACEMIT
 	bool "Synopsys DWC Ethernet QOS device support for Spacemit"
 	depends on DWC_ETH_QOS
-	default y if CONFIG_TARGET_SPACEMIT_K1PRO
+	default y if TARGET_SPACEMIT_K1PRO || TARGET_SPACEMIT_K3
 	help
 	  The Synopsys Designware Ethernet QOS IP block with specific
-	  configuration used in Spacemit's k1pro chip.
+	  configuration used in Spacemit's chip.
 
 config E1000
 	bool "Intel PRO/1000 Gigabit Ethernet support"

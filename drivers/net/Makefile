@@ -20,7 +20,6 @@ obj-$(CONFIG_DRIVER_DM9000) += dm9000x.o
 obj-$(CONFIG_DSA_SANDBOX) += dsa_sandbox.o
 obj-$(CONFIG_DWC_ETH_QOS) += dwc_eth_qos.o
 obj-$(CONFIG_DWC_ETH_QOS_IMX) += dwc_eth_qos_imx.o
-obj-$(CONFIG_DWC_ETH_QOS_K3) += dwc_eth_qos_k3.o
 obj-$(CONFIG_DWC_ETH_QOS_SPACEMIT) += dwc_eth_qos_spacemit.o
 obj-$(CONFIG_E1000) += e1000.o
 obj-$(CONFIG_E1000_SPI) += e1000_spi.o
