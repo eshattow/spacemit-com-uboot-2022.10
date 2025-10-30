@@ -147,6 +147,13 @@ config PCIE_DW_K1X
 	  Say Y here if you want to enable PCIe controller support on
 	  Spacemit k1x SoCs.
 
+config PCIE_DW_SPACEMIT
+	bool "Enable Spacemit PCIe"
+	select PCIE_DW_COMMON
+	help
+	  Say Y here if you want to enable PCIe controller support on
+	  Spacemit SoCs.
+
 config SYS_FSL_PCI_VER_3_X
 	bool
 
