@@ -56,6 +56,10 @@
 	};
 };
 
+&pcie0_rc{
+	status = "okay";
+};
+
 &usb3_porta {
 	status = "disabled";
 	u-boot,dm-spl;
