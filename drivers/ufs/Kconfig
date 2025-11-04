@@ -21,4 +21,9 @@ config TI_J721E_UFS
 	  This selects the glue layer driver for Cadence controller
 	  present on TI's J721E devices.
 
+config SPACEMIT_K3_UFS
+	bool "SPACEMIT_K3 UFS controller platform driver"
+	depends on UFS
+	help
+	  This selects the platform driver for the SPACEMIT_K3 UFS
 endmenu

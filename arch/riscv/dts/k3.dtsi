@@ -777,6 +777,13 @@
 			status = "disabled";
 		};
 
+		ufs: ufs@c0a80000 {
+			compatible = "spacemit,k3-ufshci";
+			reg = <0x0 0xc0a80000 0x0 0x30000>;
+			clocks = <&ccu CLK_UFS_ACLK>;
+			clock-names = "aclk";
+			status = "disabled";
+		};
 	};
 
 };
