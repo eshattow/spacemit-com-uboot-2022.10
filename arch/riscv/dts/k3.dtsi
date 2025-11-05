@@ -538,6 +538,63 @@
 			status = "disabled";
 		};
 
+		dpu: dpu@c0300000 {
+			compatible = "spacemit,dpu";
+			reg = <0x0 0xc0300000 0x0 0x100000>,
+				  <0x0 0xc0440000 0x0 0x40000>;
+			reg-names = "dsi", "dp";
+			status = "disabled";
+
+			dpu_out: port {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				/*
+				dpu_out_dsi: endpoint@0 {
+					reg = <0>;
+					remote-endpoint = <&dsi_in_dpu>;
+				};
+				*/
+
+				dpu_out_dp: endpoint@1 {
+					reg = <1>;
+					remote-endpoint = <&dp_in_dpu>;
+				};
+			};
+		};
+
+		dp0: dp0@c0400500 {
+			compatible = "spacemit,inno-dp";
+			reg = <0x0 0xcac84000 0x0 0x4000>;
+			reg-names = "dp";
+			clocks = <&ccu CLK_LCD_PXCLK>,
+					 <&ccu CLK_LCD_MCLK>,
+					 <&ccu CLK_LCD_HCLK>,
+					 <&ccu CLK_LCD_DSC>,
+					 <&ccu CLK_DPU_ACLK>,
+					 <&ccu CLK_EDP0_PXCLK>;
+			clock-names = "pxclk", "mclk", "hclk", "dscclk", "aclk", "edp0pxclk";
+			resets = <&reset RESET_DPU_ACLK>,
+					 <&reset RESET_LCD_MCLK>,
+					 <&reset RESET_LCD_DSCCLK>,
+					 <&reset RESET_LCD>,
+					 <&reset RESET_EDP0>;
+			reset-names= "aclk_reset", "mclk_reset", "dscclk_reset", "lcd_reset", "edp0_reset";
+			// power-domains = <&pmu K3X_PMU_LCD_PWR_DOMAIN>;
+			status = "disabled";
+
+			ports {
+				dp_in: port {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					dp_in_dpu: endpoint@0 {
+						reg = <0>;
+						remote-endpoint = <&dpu_out_dp>;
+					};
+				};
+			};
+		};
+
         i2c8: twsi8@d401d800 {
 			compatible = "spacemit,i2c";
 			reg = <0x0 0xd401d800 0x0 0x38>;
