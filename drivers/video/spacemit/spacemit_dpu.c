@@ -127,6 +127,125 @@ static void hdmi_dpu_init(struct spacemit_mode_modeinfo *hdmi_modeinfo, ulong fb
 
 }
 
+#if 0
+static unsigned int dp_dpu_read(void __iomem *addr)
+{
+	unsigned int val = readl(addr + 0xc0340000);
+	pr_debug("## dpu read [0x%lx] = 0x%x\n", (unsigned long)addr + 0xc0340000, val);
+	return val;
+}
+#endif
+
+static void dp_dpu_write(void __iomem *addr, unsigned int val)
+{
+	pr_debug("## dpu write [0x%lx] = 0x%x\n", (unsigned long)addr + 0xc0340000, val);
+	writel(val, addr + 0xc0340000);
+}
+
+static void dp_dpu_init(struct spacemit_mode_modeinfo *spacemit_mode, ulong fbbase)
+{
+	unsigned int vsync, hsync, vbp, vfp, hbp, hfp, vsp, hsp;
+
+	vsync = spacemit_mode->vsync_len & 0x3ff;
+	hsync = spacemit_mode->hsync_len & 0x3ff;
+	vbp = spacemit_mode->upper_margin & 0xfff;
+	vfp = spacemit_mode->lower_margin & 0xfff;
+	hbp = spacemit_mode->left_margin & 0xfff;
+	hfp = spacemit_mode->right_margin & 0xfff;
+	vsp = spacemit_mode->hsync_invert ? 0 : 1;
+	hsp = spacemit_mode->hsync_invert ? 0 : 1;
+
+	pr_debug("dp_dpu_init hbp %d, hfp %d hsync %d vsp %d \n", hbp, hfp, hsync, vsp);
+	pr_debug("dp_dpu_init vbp %d, vfp %d vsync %d hsp %d \n", vbp, vfp, vsync, hsp);
+
+	dp_dpu_write((void __iomem *)0x129c, 0x2223);
+
+	/*
+	 * reg_0: split_en(bit0), cmd_screen(bit1), fm_timing_en(bit2),
+	 * cmd_wait_en(bit3), cmd_wait_te(bit4), disp_ready_man_en(bit5),
+	 * hsp(bit7), vsp(bit8)
+	 */
+	dp_dpu_write((void __iomem *)0x51200, (1 << 8) | (1 << 7) | (1 << 5) | (1 << 2));
+
+	/* reg_2: user(bit12-15) */
+	dp_dpu_write((void __iomem *)0x51208, spacemit_mode->pix_fmt_out << 12);
+
+	/* reg_3: hfp(bit16-27) */
+	dp_dpu_write((void __iomem *)0x5120C, (hfp + 2000) << 16);
+
+	/* reg_4: hsync_width(bit0-9), hbp(bit16-27) */
+	dp_dpu_write((void __iomem *)0x51210, (hbp << 16) | hsync);
+
+	/* reg_5: vfp(bit0-15), vsync_width(bit16-25) */
+	dp_dpu_write((void __iomem *)0x51214, (vsync << 16) | vfp);
+
+	/* reg_6: vbp(bit0-11), h_active(bit16-29) */
+	dp_dpu_write((void __iomem *)0x51218, (spacemit_mode->xres << 16) | vbp);
+
+	/* reg_7: v_active(bit0-13) */
+	dp_dpu_write((void __iomem *)0x5121C, spacemit_mode->yres);
+
+	/* (R=0, G=0, B=0xFF) */
+	dp_dpu_write((void __iomem *)0x51224, 0x0);
+	dp_dpu_write((void __iomem *)0x51228, 0xFF);
+
+	/*
+	 * reg_11: eof_1st_ln_dly_num(bit0-15), eof_2nd_ln_dly_num(bit16-31)
+	 */
+	dp_dpu_write((void __iomem *)0x5122C, ((vfp - 6) << 16) | (vfp - 7));
+
+	/* reg_14: sof_pre_ln_num(bit0-16) */
+	dp_dpu_write((void __iomem *)0x51238, 0x0);
+
+	/*
+	 * RDMA PATH
+	 * layer_mode 0, layer_cmpsr_id 1
+	 */
+	dp_dpu_write((void __iomem *)0xd000, 1 << 13);
+
+	/* base_addr0_low_ly0 */
+	dp_dpu_write((void __iomem *)0xd024, (unsigned int)(fbbase & 0xffffffff));
+
+	/* base_addr0_high_ly0 */
+	dp_dpu_write((void __iomem *)0xd028, (unsigned int)(fbbase >> 32));
+
+	/* reg15 rdma_stride0_layer0 */
+	dp_dpu_write((void __iomem *)0xd03c, spacemit_mode->xres * 4);
+
+	dp_dpu_write((void __iomem *)0xd040, spacemit_mode->xres | (spacemit_mode->yres << 16));
+	dp_dpu_write((void __iomem *)0xd044, 0x0);
+	dp_dpu_write((void __iomem *)0xd048, (spacemit_mode->xres - 1) | ((spacemit_mode->yres-1) << 16));
+
+	/* reg29 */
+	dp_dpu_write((void __iomem *)0xd074, 0X4); /* ARGB8888 */
+
+	/* dpu_run */
+	/* POSTPIPE_REG reg0（pp_base + 0x00）saturn_hee_conf_dpuctrl */
+	dp_dpu_write((void __iomem *)0x30300, 0x0);
+
+	/* POSTPIPE_REG reg13（pp_base + 0x34） */
+	dp_dpu_write((void __iomem *)0x30334, (spacemit_mode->xres | (spacemit_mode->yres << 16)));
+
+	/* saturn_hee_conf_dpuctrl */
+	/* dpu_ctl_reg_0（DPU_CTRL_BASE_ADDR 0x3c0）: nml_rch_en[9:0] + nml_scl_en[13:10] */
+	dp_dpu_write((void __iomem *)0x3c0, 0x840008);
+
+	/* dpu_ctl_reg_3 */
+	dp_dpu_write((void __iomem *)0x3cc, 0x821);
+
+	/* saturn_hee_cfg_ready */
+	/* dpu_int_reg_3 */
+	dp_dpu_write((void __iomem *)0x70c, 0x100);
+
+	dp_dpu_write((void __iomem *)0x3c8, 0x1);
+
+	/*
+	 * saturn_ctrl_sw_start
+	 * dev_id=1 → base = DPU_SCENE_CTRL2_BASE_ADDR(0x380)，reg_4 offset 0x10
+	 */
+	dp_dpu_write((void __iomem *)0x390, 0x1);
+}
+
 static int spacemit_panel_init(void)
 {
 	struct video_tx_device *tx = NULL;
@@ -327,9 +446,11 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 		dpu_id = DPU_MODE_MIPI;
 	} else if (strstr(compat, "hdmi")) {
 		dpu_id = DPU_MODE_HDMI;
+	} else if (strstr(compat, "dp")) {
+		dpu_id = DPU_MODE_DP;
 	} else {
 		pr_info("%s(%s): Failed to find dpu mode for %s\n",
-		      __func__, dev_read_name(dev), compat);
+			__func__, dev_read_name(dev), compat);
 		return -EINVAL;
 	}
 
@@ -365,6 +486,55 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 		flush_cache(fbbase, uc_priv->xsize * uc_priv->ysize * VNBYTES(uc_priv->bpix));
 
 		hdmi_dpu_init(&hdmi_1080p_modeinfo, fbbase);
+
+		return 0;
+	} if (dpu_id == DPU_MODE_DP) {
+		disp_uc_plat = dev_get_uclass_plat(disp);
+
+		pr_info("Found device '%s', disp_uc_priv=%p\n", disp->name, disp_uc_plat);
+
+		disp_uc_plat->source_id = remote_dpu_id;
+		disp_uc_plat->src_dev = dev;
+
+		ret = device_probe(disp);
+		if (ret) {
+			pr_info("%s: device '%s' display won't probe (ret=%d)\n",
+			  __func__, dev->name, ret);
+			return ret;
+		}
+
+		ret = display_read_timing(disp, &timing);
+		if (ret) {
+			pr_info("%s: Failed to read timings\n", __func__);
+			return ret;
+		}
+
+		ret = display_enable(disp, 1 << VIDEO_BPP32, &timing);
+		if (ret) {
+			pr_info("%s: Failed to read timings\n", __func__);
+			return ret;
+		}
+
+		spacemit_mode = &fbi.mode;
+		spacemit_mode->pixclock_freq = timing.pixelclock.typ;
+		spacemit_mode->left_margin = timing.hback_porch.typ;
+		spacemit_mode->right_margin = timing.hfront_porch.typ;
+		spacemit_mode->hsync_len = timing.hsync_len.typ;
+		spacemit_mode->upper_margin = timing.vback_porch.typ;
+		spacemit_mode->lower_margin = timing.vfront_porch.typ;
+		spacemit_mode->vsync_len = timing.vsync_len.typ;
+
+		spacemit_mode->xres = timing.hactive.typ;
+		spacemit_mode->yres = timing.vactive.typ;
+		spacemit_mode->hsync_invert = 0;
+		spacemit_mode->hsync_invert = 0;
+
+		pr_info("fb=%lx, size=%dx%d\n", fbbase, uc_priv->xsize, uc_priv->ysize);
+
+		memset((void *)fbbase, 0, uc_priv->xsize * uc_priv->ysize * VNBYTES(uc_priv->bpix));
+		flush_cache(fbbase, uc_priv->xsize * uc_priv->ysize * VNBYTES(uc_priv->bpix));
+
+		dp_dpu_init(spacemit_mode, fbbase);
 
 		return 0;
 	} else if (dpu_id == DPU_MODE_MIPI) {

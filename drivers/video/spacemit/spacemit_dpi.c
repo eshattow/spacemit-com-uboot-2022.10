@@ -9,12 +9,11 @@
 #include <dm.h>
 #include <mipi_dsi.h>
 #include <panel.h>
-#include <asm/gpio.h>
 #include <dm/device_compat.h>
 #include <linux/delay.h>
 #include <power/regulator.h>
 #include <i2c.h>
-#include <asm/arch/gpio.h>
+#include <asm/gpio.h>
 #include <asm/io.h>
 #include "./dsi/include/spacemit_dsi_common.h"
 #include "./dsi/include/spacemit_video_tx.h"
