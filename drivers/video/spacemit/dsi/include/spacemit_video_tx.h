@@ -121,9 +121,16 @@ struct lcd_mipi_panel_info {
 	unsigned int pxclk_div;
 };
 
+enum spacemit_dpu_work_mode {
+	SPACEMIT_DPU_MODE_VIDEO,
+	SPACEMIT_DPU_MODE_CMD,
+	SPACEMIT_DPU_MODE_MAX
+};
+
 struct video_tx_device {
 	const struct video_tx_driver *driver;
 	enum panel_type panel_type;
+	enum spacemit_dpu_work_mode work_mode;
 	void *private;
 };
 

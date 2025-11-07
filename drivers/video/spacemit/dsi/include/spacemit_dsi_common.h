@@ -147,5 +147,6 @@ int lcd_ft8201sinx101_init(void);
 int lcd_lt8911ext_edp_1080p_init(void);
 int lcd_tc358762xbg_dpi_800x480_init(void);
 int lcd_hxdm101_init(void);
+int lcd_co5300_init(void);
 
 #endif /*_SPACEMIT_DSI_COMMON_H_*/

@@ -242,6 +242,11 @@ static int lcd_mipi_identify(struct video_tx_device *dev)
 			lcd_name = video_tx_client->panel_info->lcd_name;
 			lcd_width = video_tx_client->panel_info->spacemit_modeinfo->xres;
 			lcd_height = video_tx_client->panel_info->spacemit_modeinfo->yres;
+			if (video_tx_client->panel_info->mipi_info->work_mode == SPACEMIT_DSI_MODE_CMD)
+				dev->work_mode = SPACEMIT_DPU_MODE_CMD;
+			else
+				dev->work_mode = SPACEMIT_DPU_MODE_VIDEO;
+
 			return 1;
 		}
 	}
@@ -475,6 +480,10 @@ int lcd_mipi_probe(void)
 		tx_device_client.panel_type = LCD_MIPI;
 		tx_device.panel_type = tx_device_client.panel_type;
 		lcd_hxdm101_init();
+	} else if(strcmp("co5300", priv->panel_name) == 0) {
+		tx_device_client.panel_type = LCD_MIPI;
+		tx_device.panel_type = tx_device_client.panel_type;
+		lcd_co5300_init();
 	} else {
 		// lcd_icnl9911c_init();
 		lcd_gx09inx101_init();

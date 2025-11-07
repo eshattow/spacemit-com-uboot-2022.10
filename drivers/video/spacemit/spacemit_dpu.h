@@ -11,14 +11,19 @@
 #include "./dsi/include/spacemit_video_tx.h"
 
 
-#define DPU_INT_REG_24	0x960
-#define DPU_INT_REG_14	0x938
+#define DPU_INT_REG_24		0x960
+#define DPU_INT_REG_14		0x938
 
 #define OUTFMT_RGB121212	0
 #define OUTFMT_RGB101010	1
 #define OUTFMT_RGB888		2
 #define OUTFMT_RGB666		12
 #define OUTFMT_RGB565		13
+
+#define CFG_DSI_HCLK_DIS	BIT(8)
+#define CFG_CPN_EN			BIT(1)
+#define CFG_VPN_EN			BIT(0)
+#define SPARE_CFG_ADDRESS	0xC0300318
 
 enum dpu_modes {
 	DPU_MODE_EDP = 0,
@@ -41,6 +46,7 @@ enum {
 struct fb_info {
 	struct spacemit_mode_modeinfo mode;
 	struct video_tx_device *tx;
+	ulong fbbase;
 };
 
 struct spacemit_dpu_priv {
