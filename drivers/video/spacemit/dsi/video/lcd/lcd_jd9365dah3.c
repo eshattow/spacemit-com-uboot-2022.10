@@ -300,8 +300,8 @@ static struct spacemit_dsi_cmd_desc jd9365dah3_sleep_in_cmds[] = {
 };
 
 
-struct lcd_mipi_panel_info lcd_jd9365dah3 = {
-	.lcd_name = "jd9365dah3",
+struct lcd_mipi_panel_info lcd_jd9365dah3_mipi = {
+	.lcd_name = "lcd_jd9365dah3_mipi",
 	.lcd_id = 0x9365,
 	.panel_id0 = 0x93,
 	.power_value = 0x18,
@@ -332,10 +332,10 @@ struct lcd_mipi_panel_info lcd_jd9365dah3 = {
 	.pxclk_div = 6,
 };
 
-int lcd_jd9365dah3_init(void)
+int lcd_jd9365dah3_mipi_init(void)
 {
 	int ret;
 
-	ret = lcd_mipi_register_panel(&lcd_jd9365dah3);
+	ret = lcd_mipi_register_panel(&lcd_jd9365dah3_mipi);
 	return ret;
 }

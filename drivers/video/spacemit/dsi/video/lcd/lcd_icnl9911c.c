@@ -120,8 +120,8 @@ static struct spacemit_dsi_cmd_desc icnl9911c_sleep_in_cmds[] = {
 };
 
 
-struct lcd_mipi_panel_info lcd_icnl9911c = {
-	.lcd_name = "icnl9911c",
+struct lcd_mipi_panel_info lcd_icnl9911c_mipi = {
+	.lcd_name = "lcd_icnl9911c_mipi",
 	.lcd_id = 0x7202,
 	.panel_id0 = 0x99,
 	.power_value = 0x9c,
@@ -152,10 +152,10 @@ struct lcd_mipi_panel_info lcd_icnl9911c = {
 	.pxclk_div = 6,
 };
 
-int lcd_icnl9911c_init(void)
+int lcd_icnl9911c_mipi_init(void)
 {
 	int ret;
 
-	ret = lcd_mipi_register_panel(&lcd_icnl9911c);
+	ret = lcd_mipi_register_panel(&lcd_icnl9911c_mipi);
 	return ret;
 }

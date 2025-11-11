@@ -17,6 +17,7 @@
 #include <regmap.h>
 #include <syscon.h>
 #include <video.h>
+#include <env.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -30,9 +31,10 @@
 
 #include "spacemit_dpu.h"
 
-extern bool is_video_connected;
-
 DECLARE_GLOBAL_DATA_PTR;
+
+#define ENV_LCD_NAME	"lcd_name"
+extern bool is_video_connected;
 
 struct fb_info fbi = {0};
 
@@ -379,6 +381,13 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 			return ret;
 		}
 		is_video_connected = true;
+
+		if (fbi.tx->lcd_name) {
+			pr_info("%s: lcd name %s\n", __func__, fbi.tx->lcd_name);
+#if defined(CONFIG_DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS)
+			env_set(ENV_LCD_NAME, fbi.tx->lcd_name);
+#endif
+		}
 
 		spacemit_mode = &fbi.mode;
 		uc_priv->xsize = spacemit_mode->xres;

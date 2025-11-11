@@ -103,8 +103,8 @@ static struct spacemit_dsi_cmd_desc co5300_sleep_in_cmds[] = {
 };
 
 
-struct lcd_mipi_panel_info lcd_co5300 = {
-	.lcd_name = "co5300",
+struct lcd_mipi_panel_info lcd_co5300_mipi = {
+	.lcd_name = "lcd_co5300_mipi",
 	.lcd_id = 0x5300,
 	.panel_id0 = 0x00,
 	.power_value = 0x9c,
@@ -135,10 +135,10 @@ struct lcd_mipi_panel_info lcd_co5300 = {
 	.pxclk_div = 6,
 };
 
-int lcd_co5300_init(void)
+int lcd_co5300_mipi_init(void)
 {
 	int ret;
 
-	ret = lcd_mipi_register_panel(&lcd_co5300);
+	ret = lcd_mipi_register_panel(&lcd_co5300_mipi);
 	return ret;
 }

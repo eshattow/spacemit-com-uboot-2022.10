@@ -89,8 +89,8 @@ static struct spacemit_dsi_cmd_desc lt8911ext_edp_1080p_sleep_in_cmds[] = {
 };
 
 
-struct lcd_mipi_panel_info lcd_lt8911ext_edp_1080p = {
-	.lcd_name = "lt8911ext_edp_1080p",
+struct lcd_mipi_panel_info lcd_lt8911_edp_1920x1080 = {
+	.lcd_name = "lcd_lt8911_edp_1920x1080",
 	.lcd_id = 0x00,
 	.panel_id0 = 0x00,
 	.power_value = 0x00,
@@ -121,10 +121,10 @@ struct lcd_mipi_panel_info lcd_lt8911ext_edp_1080p = {
 	.pxclk_div = 6,
 };
 
-int lcd_lt8911ext_edp_1080p_init(void)
+int lcd_lt8911_edp_1920x1080_init(void)
 {
 	int ret;
 
-	ret = lcd_mipi_register_panel(&lcd_lt8911ext_edp_1080p);
+	ret = lcd_mipi_register_panel(&lcd_lt8911_edp_1920x1080);
 	return ret;
 }

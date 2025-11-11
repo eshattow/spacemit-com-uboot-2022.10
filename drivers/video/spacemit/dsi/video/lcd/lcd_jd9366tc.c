@@ -96,8 +96,8 @@ static struct spacemit_dsi_cmd_desc jd9366tc_sleep_in_cmds[] = {
 };
 
 
-struct lcd_mipi_panel_info lcd_jd9366tc = {
-	.lcd_name = "jd9366tc",
+struct lcd_mipi_panel_info lcd_jd9366tc_mipi = {
+	.lcd_name = "lcd_jd9366tc_mipi",
 	.lcd_id = 0x9366,
 	.panel_id0 = 0x66,
 	.power_value = 0x9c,
@@ -128,10 +128,10 @@ struct lcd_mipi_panel_info lcd_jd9366tc = {
 	.pxclk_div = 6,
 };
 
-int lcd_jd9366tc_init(void)
+int lcd_jd9366tc_mipi_init(void)
 {
 	int ret;
 
-	ret = lcd_mipi_register_panel(&lcd_jd9366tc);
+	ret = lcd_mipi_register_panel(&lcd_jd9366tc_mipi);
 	return ret;
 }

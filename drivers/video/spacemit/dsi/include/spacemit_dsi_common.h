@@ -138,15 +138,15 @@ int spacemit_dsi_register_device(void *device);
 int spacemit_dsi_probe(void);
 int lcd_mipi_probe(void);
 
-int lcd_icnl9911c_init(void);
-int lcd_icnl9951r_init(void);
-int lcd_gx09inx101_init(void);
-int lcd_jd9365dah3_init(void);
-int lcd_jd9366tc_init(void);
-int lcd_ft8201sinx101_init(void);
-int lcd_lt8911ext_edp_1080p_init(void);
+int lcd_icnl9911c_mipi_init(void);
+int lcd_icnl9951r_mipi_init(void);
+int lcd_gx09inx101_mipi_init(void);
+int lcd_jd9365dah3_mipi_init(void);
+int lcd_jd9366tc_mipi_init(void);
+int lcd_ft8201sinx101_mipi_init(void);
+int lcd_lt8911_edp_1920x1080_init(void);
 int lcd_tc358762xbg_dpi_800x480_init(void);
-int lcd_hxdm101_init(void);
-int lcd_co5300_init(void);
+int lcd_hxdm101_mipi_init(void);
+int lcd_co5300_mipi_init(void);
 
 #endif /*_SPACEMIT_DSI_COMMON_H_*/
