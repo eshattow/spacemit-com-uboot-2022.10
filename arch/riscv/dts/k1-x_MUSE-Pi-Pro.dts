@@ -301,6 +301,6 @@
 };
 
 &panel {
-	force-attached = "lcd_tc358762xbg_dpi";
+	force-attached = "lcd_tc358762xbg_dpi_800x480";
 	status = "okay";
 };

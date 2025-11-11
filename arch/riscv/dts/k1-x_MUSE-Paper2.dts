@@ -364,7 +364,7 @@
 };
 
 &panel {
-	force-attached = "icnl9951r";
+	force-attached = "lcd_icnl9951r_mipi";
 	dcp-gpios = <&gpio 34 0>;
 	dcn-gpios = <&gpio 42 0>;
 	avee-gpios = <&gpio 35 0>;
