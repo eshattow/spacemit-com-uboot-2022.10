@@ -1306,7 +1306,7 @@ static int ft_board_info_fixup(void *blob, struct bd_info *bd)
 
 	part_number = env_get("part#");
 	if (NULL != part_number)
-		fdt_setprop(blob, node, "part-number", part_number, strlen(part_number));
+		fdt_setprop_string(blob, node, "part-number", part_number);
 
 	return 0;
 }
@@ -1329,7 +1329,7 @@ static int ft_board_mac_addr_fixup(void *blob, struct bd_info *bd)
 		if (NULL != addr_value) {
 			// memset(addr_str, 0, sizeof(addr_str));
 			// sprintf(addr_str, "%pM", addr_value);
-			fdt_setprop(blob, node, mac_item[i], addr_value, strlen(addr_value));
+			fdt_setprop_string(blob, node, mac_item[i], addr_value);
 		}
 	}
 
