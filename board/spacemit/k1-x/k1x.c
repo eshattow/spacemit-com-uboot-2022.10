@@ -1336,6 +1336,25 @@ static int ft_board_mac_addr_fixup(void *blob, struct bd_info *bd)
 	return 0;
 }
 
+static int ft_board_lcd_name_fixup(void *blob, struct bd_info *bd)
+{
+	int node;
+	const char *lcd_name = env_get("lcd_name");
+
+	if (NULL == lcd_name)
+		return 0;
+
+	// path of lcd_name is fixed at following node
+	node = fdt_path_offset(blob, "/soc/dsi2@d421a800/panel2@0");
+	if (node < 0) {
+		pr_err("Can't find lcd panel path!\n");
+		return -EINVAL;
+	}
+
+	fdt_setprop_string(blob, node, "force-attached", lcd_name);
+	return 0;
+}
+
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	struct fdt_memory mem;
@@ -1359,6 +1378,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	ft_board_cpu_fixup(blob, bd);
 	ft_board_info_fixup(blob, bd);
 	ft_board_mac_addr_fixup(blob, bd);
+	ft_board_lcd_name_fixup(blob, bd);
 	return 0;
 }
 
