@@ -45,7 +45,7 @@
 static int asynch_allowed;
 char usb_started; /* flag for the started/stopped USB status */
 
-#if !CONFIG_IS_ENABLED(DM_USB)
+#if CONFIG_IS_ENABLED(USB_HOST) && !CONFIG_IS_ENABLED(DM_USB)
 static struct usb_device usb_dev[USB_MAX_DEVICE];
 static int dev_index;
 
@@ -859,7 +859,7 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
  * the USB device are static allocated [USB_MAX_DEVICE].
  */
 
-#if !CONFIG_IS_ENABLED(DM_USB)
+#if CONFIG_IS_ENABLED(USB_HOST) && !CONFIG_IS_ENABLED(DM_USB)
 
 /* returns a pointer to the device with the index [index].
  * if the device is not assigned (dev->devnum==-1) returns NULL

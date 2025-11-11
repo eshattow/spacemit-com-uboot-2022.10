@@ -32,7 +32,7 @@ config USB_DWC3_GENERIC
 
 config SPL_USB_DWC3_GENERIC
 	bool "Generic implementation of a DWC3 wrapper (aka dwc3 glue) for the SPL"
-	depends on SPL_DM_USB && USB_DWC3 && SPL_MISC
+	depends on (SPL_DM_USB || SPL_DM_USB_GADGET) && USB_DWC3 && SPL_MISC
 	help
 	  Select this for Xilinx ZynqMP and similar Platforms.
 	  This wrapper supports Host and Peripheral operation modes.

@@ -55,14 +55,14 @@ config SPL_DM_USB
 
 config DM_USB_GADGET
 	bool "Enable driver model for USB Gadget"
-	depends on DM_USB
+	depends on DM
 	help
 	  Enable driver model for USB Gadget (Peripheral
 	  mode)
 
 config SPL_DM_USB_GADGET
 	bool "Enable driver model for USB Gadget in SPL"
-	depends on SPL_DM_USB
+	depends on SPL_DM
 	help
 	  Enable driver model for USB Gadget in SPL
 	  (Peripheral mode)
