@@ -247,5 +247,16 @@
 			*/
 			status = "disabled";
 		};
+
+		i2c8: twsi8@d401d800 {
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd401d800 0x0 0x38>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+		};
 	};
 };
+
+#include "k3_spm8821.dtsi"
+#include "k3_is6608.dtsi"
