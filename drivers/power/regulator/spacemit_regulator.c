@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright (C) 2025, Spacemit
+ */
 
 #include <common.h>
 #include <dm.h>
@@ -22,6 +25,8 @@ PM853_REGULATOR_BUCK_DESC; PM853_REGULATOR_LDO_DESC; PM853_REGULATOR_SWITCH_DESC
 PM853_REGULATOR_MATCH_DATA;
 
 SY8810L_BUCK_LINER_RANGE; SY8810L_REGULATOR_DESC; SY8810L_REGULATOR_MATCH_DATA;
+
+IS6608_BUCK_LINER_RANGE; IS6608_REGULATOR_DESC; IS6608_REGULATOR_MATCH_DATA;
 
 /**
  * linear_range_get_value - fetch a value from given range

@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
+/*
+ * Copyright (C) 2025, Spacemit
+ */
+
 #ifndef __SPACEMIT_PM853_H__
 #define __SPACEMIT_PM853_H__
 

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright (C) 2025, Spacemit
+ */
 
 #include <i2c.h>
 #include <common.h>
@@ -20,10 +23,13 @@ PM853_REGULATOR_BUCK_DESC; PM853_REGULATOR_LDO_DESC; /* PM853_REGULATOR_SWITCH_D
 
 SY8810L_BUCK_LINER_RANGE;SY8810L_REGULATOR_DESC;
 
+IS6608_BUCK_LINER_RANGE;IS6608_REGULATOR_DESC;
+
 static const char *global_compatible[] = {
 	"spacemit,pm853",
 	"spacemit,spm8821",
 	"spacemit,sy8810l",
+	"spacemit,is6608",
 };
 
 void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck_desc,
@@ -34,20 +40,23 @@ void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck
 		*num_buck = sizeof(pm853_buck_desc) / sizeof(pm853_buck_desc[0]);
 		*ldo_desc = pm853_ldo_desc;
 		*num_ldo = sizeof(pm853_ldo_desc) / sizeof(pm853_ldo_desc[0]);
-	}
-
-	if (strcmp(name, global_compatible[1]) == 0) {
+	} else if (strcmp(name, global_compatible[1]) == 0) {
 		*buck_desc = spm8821_buck_desc;
 		*num_buck = sizeof(spm8821_buck_desc) / sizeof(spm8821_buck_desc[0]);
 		*ldo_desc = spm8821_ldo_desc;
 		*num_ldo = sizeof(spm8821_ldo_desc) / sizeof(spm8821_ldo_desc[0]);
-	}
-
-	if (strcmp(name, global_compatible[2]) == 0) {
+	} else if (strcmp(name, global_compatible[2]) == 0) {
 		*buck_desc = sy8810l_buck_desc;
 		*num_buck = sizeof(sy8810l_buck_desc) / sizeof(sy8810l_buck_desc[0]);
 		*ldo_desc = NULL;
 		*num_ldo = 0;
+	} else if (strcmp(name, global_compatible[3]) == 0) {
+		*buck_desc = is6608_buck_desc;
+		*num_buck = sizeof(is6608_buck_desc) / sizeof(is6608_buck_desc[0]);
+		*ldo_desc = NULL;
+		*num_ldo = 0;
+	} else {
+		/* TODO */
 	}
 }
 

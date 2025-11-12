@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
+/*
+ * Copyright (C) 2025, Spacemit
+ */
+
 #ifndef __SPACEMIT_PMIC_H__
 #define __SPACEMIT_PMIC_H__
 
@@ -68,5 +73,6 @@ struct regulator_match_data {
 #include "spm8821.h"
 #include "pm853.h"
 #include "sy8810l.h"
+#include "is6608.h"
 
 #endif /* __SPACEMIT_PMIC_H__ */

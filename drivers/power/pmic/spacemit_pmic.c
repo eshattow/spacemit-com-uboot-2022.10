@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright (C) 2025, Spacemit
+ */
 
 #include <common.h>
 #include <dm.h>
@@ -12,6 +15,7 @@
 DECLEAR_PM853_REGULATOR_MATCH_DATA;
 DECLEAR_SPM8821_REGULATOR_MATCH_DATA;
 DECLEAR_SY8810L_REGULATOR_MATCH_DATA;
+DECLEAR_IS6608_REGULATOR_MATCH_DATA;
 
 static int pm8xx_reg_count(struct udevice *dev)
 {
@@ -57,6 +61,7 @@ static const struct udevice_id pm8xx_ids[] = {
 	{ .compatible = "spacemit,spm8821", .data = (ulong)&spm8821_regulator_match_data, },
 	{ .compatible = "spacemit,pm853", .data = (ulong)&pm853_regulator_match_data, },
 	{ .compatible = "spacemit,sy8810l", .data = (ulong)&sy8810l_regulator_match_data, },
+	{ .compatible = "spacemit,is6608", .data = (ulong)&is6608_regulator_match_data, },
 	{ }
 };
 
