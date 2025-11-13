@@ -595,6 +595,13 @@
 			status = "disabled";
 		};
 
+		usb2_host_u2phy: phy@c0a20000 {
+			compatible = "spacemit,usb2-phy";
+			reg = <0x0 0xc0a20000 0x0 0x200>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
 		usb2_host: usb2@0 {
 			compatible = "spacemit,k3-dwc3";
 			#address-cells = <2>;
@@ -609,7 +616,27 @@
 				compatible = "snps,dwc3";
 				reg = <0x0 0xc0a00000 0x0 0x10000>;
 				maximum-speed = "high-speed";
+				phys = <&usb2_host_u2phy>;
+				phy-names = "usb2-phy";
+				phy_type = "utmi";
 			};
+		};
+
+		usb3_porta_u2phy: phy@cad20000 {
+			compatible = "spacemit,usb2-phy";
+			reg = <0x0 0xcad20000 0x0 0x200>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		usb3_porta_u3phy: phy@0xcad30000{
+			compatible = "spacemit,k1x-combphy";
+			reg = <0x0 0xcad30000 0x0 0x200>,
+			      <0x0 0xcad40000 0x0 0x200>,
+			      <0x0 0xd4282800 0x0 0x114>;
+			reg-names = "puphy", "puphy1", "phy_sel", "apmu";
+			#phy-cells = <1>;
+			status = "disabled";
 		};
 
 		usb3_porta: usb3@0 {
@@ -625,7 +652,25 @@
 			dwc3@cad00000 {
 				compatible = "snps,dwc3";
 				reg = <0x0 0xcad00000 0x0 0x10000>;
+				phys = <&usb3_porta_u2phy>;
+				phy-names = "usb2-phy";
 			};
+		};
+
+		usb3_portb_u2phy: phy@81500000 {
+			compatible = "spacemit,usb2-phy";
+			reg = <0x0 0x81500000 0x0 0x200>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		usb3_portb_u3phy: phy@81f00000{
+			compatible = "spacemit,k1x-combphy";
+			reg = <0x0 0x81f00000 0x0 0x200>,
+			      <0x0 0xd4282800 0x0 0x114>;
+			reg-names = "puphy", "phy_sel", "apmu";
+			#phy-cells = <1>;
+			status = "disabled";
 		};
 
 		usb3_portb: usb3@1 {
@@ -644,6 +689,22 @@
 			};
 		};
 
+		usb3_portc_u2phy: phy@81800000 {
+			compatible = "spacemit,usb2-phy";
+			reg = <0x0 0x81800000 0x0 0x200>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		usb3_portc_u3phy: phy@82000000{
+			compatible = "spacemit,k1x-combphy";
+			reg = <0x0 0x82000000 0x0 0x200>,
+			      <0x0 0xd4282800 0x0 0x114>;
+			reg-names = "puphy", "apmu";
+			#phy-cells = <1>;
+			status = "disabled";
+		};
+
 		usb3_portc: usb3@2 {
 			compatible = "spacemit,k3-dwc3";
 			#address-cells = <2>;
@@ -658,6 +719,22 @@
 				compatible = "snps,dwc3";
 				reg = <0x0 0x818f0000 0x0 0x10000>;
 			};
+		};
+
+		usb3_portd_u2phy: phy@81b00000 {
+			compatible = "spacemit,usb2-phy";
+			reg = <0x0 0x81b00000 0x0 0x200>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		usb3_portd_u3phy: phy@82100000{
+			compatible = "spacemit,k1x-combphy";
+			reg = <0x0 0x82100000 0x0 0x200>,
+			      <0x0 0xd4282800 0x0 0x114>;
+			reg-names = "puphy", "apmu";
+			#phy-cells = <1>;
+			status = "disabled";
 		};
 
 		usb3_portd: usb3@3 {
