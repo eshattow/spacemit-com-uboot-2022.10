@@ -28,6 +28,16 @@
 			};
 		};
 
+		fdt_2 {
+			description = "k3_evb.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3_evb.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
+
 	};
 
 	configurations {
@@ -38,5 +48,10 @@
 			fdt = "fdt_1";
 		};
 
+		conf_2 {
+			description = "k3_evb";
+			loadables = "uboot";
+			fdt = "fdt_2";
+		};
 	};
 };
