@@ -107,8 +107,6 @@ static int k3_rproc_load(struct udevice *dev, ulong addr, ulong size)
 
 	writel(1, (void __iomem *)RCPU_EXECUTION_CTRL);
 
-	rproc_elf64_load_dtb_table(dev, addr, size);
-
 	return rproc_elf_load_image(dev, addr, size);
 }
 
