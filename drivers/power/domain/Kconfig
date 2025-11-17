@@ -110,4 +110,10 @@ config K1X_POWER_DOMAIN
 	depends on POWER_DOMAIN
 	help
 	  Generic power domain implementation for K1X devices.
+
+config K3_POWER_DOMAIN
+	bool "Enable the K3 Power domain driver"
+	depends on POWER_DOMAIN
+	help
+	  Generic power domain implementation for K3 devices.
 endmenu
