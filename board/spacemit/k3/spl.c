@@ -16,6 +16,7 @@
 #include <env_internal.h>
 #include <asm/io.h>
 #include <i2c.h>
+#include <espi.h>
 
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
 extern int board_pmic_init(void);
@@ -48,6 +49,19 @@ int spl_board_init_f(void)
 #endif
 
 	spl_load_env();
+
+#ifdef CONFIG_SPL_ESPI
+	/* Probe eSPI device */
+	ret = uclass_first_device(UCLASS_ESPI, &dev);
+	if (ret) {
+		pr_debug("eSPI: Init failed (ret=%d)\n", ret);
+		return 0;
+	}
+	if (!dev) {
+		pr_debug("eSPI: No device found\n");
+		return 0;
+	}
+#endif
 
 	return 0;
 }

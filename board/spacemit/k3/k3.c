@@ -45,6 +45,14 @@ int board_init(void)
 		pr_debug("%s: Cannot enable boot on regulator\n", __func__);
 #endif
 
+#ifdef CONFIG_ESPI
+	ret = uclass_probe_all(UCLASS_ESPI);
+	if (ret) {
+		printf("eSPI: Probe failed (ret=%d)\n", ret);
+		return CMD_RET_FAILURE;
+	}
+#endif
+
 	return ret;
 }
 
