@@ -140,6 +140,15 @@ static void spl_load_env(void)
 	int ret = -1;
 	u32 boot_mode = get_boot_mode();
 
+#ifdef CONFIG_SPL_RSA_VERIFY
+	/*
+	 * In secure boot mode, do not load environment from external flash
+	 * to prevent unauthorized environment modification
+	 */
+	pr_info("Secure boot enabled, skip loading environment from flash\n");
+	return;
+#endif
+
 	/*if boot from usb, spl should not find env*/
 	if (boot_mode == BOOT_MODE_USB){
 		return;

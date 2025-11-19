@@ -462,6 +462,15 @@ void import_env_from_bootfs(void)
 {
 	u32 boot_mode = get_boot_mode();
 
+#ifdef CONFIG_RSA_VERIFY
+	/*
+	 * In secure boot mode, do not load environment from external flash
+	 * to prevent unauthorized environment modification
+	 */
+	printf("Secure boot enabled, skip loading environment from bootfs\n");
+	return;
+#endif
+
 #ifdef CONFIG_ENV_IS_IN_NFS
 	// Check if local bootfs exists
 	if ((BOOT_MODE_USB != boot_mode) && check_bootfs_exists() != 0) {
