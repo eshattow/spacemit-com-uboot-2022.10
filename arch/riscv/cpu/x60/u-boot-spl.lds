@@ -79,6 +79,8 @@ SECTIONS
 		__ddr_training_end = .;
 	} > .spl_mem
 
+	ASSERT(__ddr_training_start < DDR_TRAINING_DATA_BASE, "SPL code MUST NOT overflow DDR training code area!")
+
 	_end = .;
 	_image_binary_end = .;
 

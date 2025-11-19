@@ -54,7 +54,7 @@ extern void spl_fixup_fdt(void *fdt_blob);
 char *product_name;
 extern u32 ddr_cs_num, ddr_datarate, ddr_tx_odt;
 extern const char *ddr_type;
-extern char _image_binary_end[], __ddr_training_start[], __ddr_training_end[];
+extern char _image_binary_end[];
 
 /* LED configurations for different boards */
 #define MAX_PRODUCT_NAMES 1
@@ -793,32 +793,18 @@ void *board_fdt_blob_setup(int *err)
 {
 	*err = 0;
 	void *dtb, *dtb_new;
-	unsigned long flush_lenth;
-	uint32_t dtb_length, code_size;
+	unsigned long dtb_length;
 
-	// copy dtb to temp buffer, DDR training code would overlap dtb data
+	// copy dtb to audio buffer, DDR training code would overlap dtb data
 	dtb = (void *)_image_binary_end;
+	dtb_new = (void *)AUDIO_BUFFER_ADDRESS;
 	dtb_length = fdt_totalsize(dtb);
-	dtb_new = malloc(dtb_length);
-	memcpy(dtb_new, dtb, dtb_length);
-
-	// move DDR training code to correct address(source and destination address is overlapped)
-	code_size = (size_t)__ddr_training_end - (size_t)__ddr_training_start;
-	memmove((void*)DDR_TRAINING_DATA_BASE, __ddr_training_start, code_size);
-	flush_lenth = round_up(code_size, CONFIG_RISCV_CBOM_BLOCK_SIZE);
-	flush_dcache_range(DDR_TRAINING_DATA_BASE, DDR_TRAINING_DATA_BASE + flush_lenth);
-
-	// copy dtb to new free buffer
-	if (dtb_length > (DDR_TRAINING_DATA_BASE - (size_t)__ddr_training_start)) {
-		pr_err("Error: dts size(0x%x) is too large\n", dtb_length);
+	if (dtb_length > AUDIO_BUFFER_SIZE) {
+		// dtb size MUST NOT larger than 16KB
 		*err = -1;
-		free(dtb_new);
 		return NULL;
 	}
-	else {
-		memcpy(__ddr_training_start, dtb_new, dtb_length);
-		free(dtb_new);
-		dtb_new = (void*)__ddr_training_start;
-		return dtb_new;
-	}
+
+	memcpy(dtb_new, dtb, dtb_length);
+	return dtb_new;
 }
