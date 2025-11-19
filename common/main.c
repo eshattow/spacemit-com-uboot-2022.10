@@ -66,6 +66,12 @@ void main_loop(void)
 
 	autoboot_command(s);
 
+#if defined(CONFIG_RSA_VERIFY)
+	/* In FIT signature verification mode, prevent entering shell for security */
+	pr_err("## Verified boot: FIT signature required, CLI disabled for security\n");
+	hang();
+#endif
+
 	cli_loop();
 	panic("No CLI available");
 }
