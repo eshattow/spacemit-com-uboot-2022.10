@@ -94,8 +94,8 @@ void board_fit_image_post_process(const void *fit, int node, void **p_image, siz
 #ifdef CONFIG_SPL_LOAD_FIT
 int board_fit_config_name_match(const char* name)
 {
-	/* boot using first FIT config */
-	return 0;
+	/* boot using default FIT config */
+	return 1;
 }
 #endif
 
