@@ -444,4 +444,8 @@ config TPL_USE_ARCH_MEMSET
 
 endmenu
 
+config RISCV_OPTEE_SUPPORT
+	bool "Enable OP-TEE related DTS nodes for RISC-V"
+	default n
+
 endmenu
