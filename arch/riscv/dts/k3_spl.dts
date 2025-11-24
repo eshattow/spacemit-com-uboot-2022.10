@@ -262,4 +262,4 @@
 };
 
 #include "k3_spm8821.dtsi"
-#include "k3_is6608.dtsi"
+#include "k3_mpq8655.dtsi"

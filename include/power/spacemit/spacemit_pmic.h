@@ -73,6 +73,6 @@ struct regulator_match_data {
 #include "spm8821.h"
 #include "pm853.h"
 #include "sy8810l.h"
-#include "is6608.h"
+#include "mpq8655.h"
 
 #endif /* __SPACEMIT_PMIC_H__ */

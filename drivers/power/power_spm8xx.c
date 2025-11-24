@@ -10,6 +10,7 @@
 #include <asm/global_data.h>
 #include <linux/bug.h>
 #include <asm/barrier.h>
+#include <asm/io.h>
 #include <power/spacemit/spacemit_pmic.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -23,13 +24,13 @@ PM853_REGULATOR_BUCK_DESC; PM853_REGULATOR_LDO_DESC; /* PM853_REGULATOR_SWITCH_D
 
 SY8810L_BUCK_LINER_RANGE;SY8810L_REGULATOR_DESC;
 
-IS6608_BUCK_LINER_RANGE;IS6608_REGULATOR_DESC;
+MPQ8655_BUCK_LINER_RANGE;MPQ8655_REGULATOR_DESC;
 
 static const char *global_compatible[] = {
 	"spacemit,pm853",
 	"spacemit,spm8821",
 	"spacemit,sy8810l",
-	"spacemit,is6608",
+	"spacemit,mpq8655",
 };
 
 void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck_desc,
@@ -51,8 +52,8 @@ void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck
 		*ldo_desc = NULL;
 		*num_ldo = 0;
 	} else if (strcmp(name, global_compatible[3]) == 0) {
-		*buck_desc = is6608_buck_desc;
-		*num_buck = sizeof(is6608_buck_desc) / sizeof(is6608_buck_desc[0]);
+		*buck_desc = mpq8655_buck_desc;
+		*num_buck = sizeof(mpq8655_buck_desc) / sizeof(mpq8655_buck_desc[0]);
 		*ldo_desc = NULL;
 		*num_ldo = 0;
 	} else {
@@ -235,6 +236,7 @@ static int regulator_map_voltage_linear_range(const struct pm8xx_buck_desc *desc
 static int __board_pmic_init(const char *name)
 {
 	unsigned char regval;
+	unsigned char regvals[2];
 	const char *s;
 	u32 value, min, max;
 	const struct pm8xx_buck_desc *buck_desc, *ldo_desc;
@@ -248,31 +250,6 @@ static int __board_pmic_init(const char *name)
 	if (!saddr)
 		return -EINVAL;
 
-#if CONFIG_IS_ENABLED(DM_I2C)
-	struct udevice *i2c_bus, *i2c_dev;
-
-	int parent_offset = fdt_parent_offset(gd->fdt_blob, offset);
-	if (parent_offset < 0)
-		return -EINVAL;
-
-	ret = uclass_get_device_by_ofnode(UCLASS_I2C, offset_to_ofnode(parent_offset), &i2c_bus);
-	if (ret) {
-		/* Probe all I2C devices and retry */
-		struct udevice *dev;
-		for (ret = uclass_first_device(UCLASS_I2C, &dev); dev;
-		     ret = uclass_next_device(&dev))
-			;
-
-		ret = uclass_get_device_by_ofnode(UCLASS_I2C, offset_to_ofnode(parent_offset), &i2c_bus);
-		if (ret)
-			return -EINVAL;
-	}
-
-	ret = dm_i2c_probe(i2c_bus, saddr, 0, &i2c_dev);
-	if (ret < 0)
-		return -EINVAL;
-
-#else
 	int bus;
 	/* Legacy I2C mode: use bus property */
 	bus = fdtdec_get_uint(gd->fdt_blob, offset, "bus", 0);
@@ -288,7 +265,6 @@ static int __board_pmic_init(const char *name)
 //		pr_info("%s: %s probe i2c failed\n", __func__, name);
 		return -EINVAL;
 	}
-#endif
 
 	__regulator_desc_find(name, &buck_desc, &ldo_desc, &num_buck, &num_ldo);
 
@@ -315,39 +291,59 @@ static int __board_pmic_init(const char *name)
 		/* find wich dcdc or ldo */
 		s = fdt_get_name(gd->fdt_blob, sub_offset, &len);
 
-		if ((strncmp(s, "DCDC_REG", 8) == 0) || (strncmp(s, "EDCDC_REG", 9) == 0)) {
-			for (i = 0; i < num_buck; ++i) {
-				if (strcmp(buck_desc[i].name, s) == 0) {
+		if (strncmp(name, "spacemit,mpq8655", 15) == 0) {
+			if ((strncmp(s, "EDCDC_REG", 9) == 0)) {
+				/* set the regulator */
+				if (value) {
+					sel = regulator_map_voltage_linear_range(buck_desc, value, value);
 
-					/* enable the regulator */
-#if CONFIG_IS_ENABLED(DM_I2C)
-					dm_i2c_read(i2c_dev, buck_desc[i].enable_reg, &regval, 1);
-					regval |= (1 << (ffs(buck_desc[i].enable_msk) - 1));
-					dm_i2c_write(i2c_dev, buck_desc[i].enable_reg, &regval, 1);
-#else
-					i2c_read(saddr, buck_desc[i].enable_reg, 1, &regval, 1);
-					regval |= (1 << (ffs(buck_desc[i].enable_msk) - 1));
-					i2c_write(saddr, buck_desc[i].enable_reg, 1, &regval, 1);
-#endif
+					/* first: set 0x29 to 0x2e0  */
+					regvals[0] = 0xe0;
+					regvals[1] = 0x2;
+					i2c_write(saddr, 0x29, 1, regvals, 2);
 
-					/* set the regulator */
-					if (value) {
-						sel = regulator_map_voltage_linear_range(buck_desc + i, value, value);
+					/* second: set 0xd1 */
+					i2c_read(saddr, 0xd1, 1, &regval, 1);
+					regval = 0x7c;
+					i2c_write(saddr, 0xd1, 1, &regval, 1);
 
-						if (sel >= 0) {
-							sel <<= ffs(buck_desc[i].vsel_msk) - 1;
-#if CONFIG_IS_ENABLED(DM_I2C)
-							dm_i2c_read(i2c_dev, buck_desc[i].vsel_reg, &regval, 1);
-							regval = (regval & ~buck_desc[i].vsel_msk) | sel;
-							dm_i2c_write(i2c_dev, buck_desc[i].vsel_reg, &regval, 1);
-#else
-							i2c_read(saddr, buck_desc[i].vsel_reg, 1, &regval, 1);
-							regval = (regval & ~buck_desc[i].vsel_msk) | sel;
-							i2c_write(saddr, buck_desc[i].vsel_reg, 1, &regval, 1);
-#endif
-						}
+					/* then: set 0x21 */
+					if (sel >= 0) {
+						sel <<= ffs(buck_desc[0].vsel_msk) - 1;
+						i2c_read(saddr, buck_desc[0].vsel_reg, 1, regvals, 2);
+						value = regvals[0] | ((unsigned short)regvals[1] << 8);
+						value = (value & ~buck_desc[0].vsel_msk) | sel;
+
+						regvals[0] = value & 0xff;
+						regvals[1] = (value >> 8) & 0xff;
+						i2c_write(saddr, buck_desc[i].vsel_reg, 1, regvals, 2);
 					}
-					break;
+				}
+				break;
+			}
+		} else {
+			if ((strncmp(s, "DCDC_REG", 8) == 0) || (strncmp(s, "EDCDC_REG", 9) == 0)) {
+				for (i = 0; i < num_buck; ++i) {
+					if (strcmp(buck_desc[i].name, s) == 0) {
+
+						/* enable the regulator */
+						i2c_read(saddr, buck_desc[i].enable_reg, 1, &regval, 1);
+						regval |= (1 << (ffs(buck_desc[i].enable_msk) - 1));
+						i2c_write(saddr, buck_desc[i].enable_reg, 1, &regval, 1);
+
+						/* set the regulator */
+						if (value) {
+							sel = regulator_map_voltage_linear_range(buck_desc + i, value, value);
+
+							if (sel >= 0) {
+								sel <<= ffs(buck_desc[i].vsel_msk) - 1;
+								i2c_read(saddr, buck_desc[i].vsel_reg, 1, &regval, 1);
+								regval = (regval & ~buck_desc[i].vsel_msk) | sel;
+								i2c_write(saddr, buck_desc[i].vsel_reg, 1, &regval, 1);
+							}
+						}
+						break;
+					}
 				}
 			}
 		}
@@ -356,15 +352,9 @@ static int __board_pmic_init(const char *name)
 			for (i = 0; i < num_ldo; ++i) {
 				if (strcmp(ldo_desc[i].name, s) == 0) {
 					/* enable the regulator */
-#if CONFIG_IS_ENABLED(DM_I2C)
-					dm_i2c_read(i2c_dev, ldo_desc[i].enable_reg, &regval, 1);
-					regval |= (1 << (ffs(ldo_desc[i].enable_msk) - 1));
-					dm_i2c_write(i2c_dev, ldo_desc[i].enable_reg, &regval, 1);
-#else
 					i2c_read(saddr, ldo_desc[i].enable_reg, 1, &regval, 1);
 					regval |= (1 << (ffs(ldo_desc[i].enable_msk) - 1));
 					i2c_write(saddr, ldo_desc[i].enable_reg, 1, &regval, 1);
-#endif
 
 					/* set the regulator */
 					if (value) {
@@ -372,15 +362,10 @@ static int __board_pmic_init(const char *name)
 
 						if (sel >= 0) {
 							sel <<= ffs(ldo_desc[i].vsel_msk) - 1;
-#if CONFIG_IS_ENABLED(DM_I2C)
-							dm_i2c_read(i2c_dev, ldo_desc[i].vsel_reg, &regval, 1);
-							regval = (regval & ~ldo_desc[i].vsel_msk) | sel;
-							dm_i2c_write(i2c_dev, ldo_desc[i].vsel_reg, &regval, 1);
-#else
+
 							i2c_read(saddr, ldo_desc[i].vsel_reg, 1, &regval, 1);
 							regval = (regval & ~ldo_desc[i].vsel_msk) | sel;
 							i2c_write(saddr, ldo_desc[i].vsel_reg, 1, &regval, 1);
-#endif
 						}
 					}
 

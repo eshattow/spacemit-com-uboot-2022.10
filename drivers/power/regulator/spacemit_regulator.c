@@ -25,8 +25,7 @@ PM853_REGULATOR_BUCK_DESC; PM853_REGULATOR_LDO_DESC; PM853_REGULATOR_SWITCH_DESC
 PM853_REGULATOR_MATCH_DATA;
 
 SY8810L_BUCK_LINER_RANGE; SY8810L_REGULATOR_DESC; SY8810L_REGULATOR_MATCH_DATA;
-
-IS6608_BUCK_LINER_RANGE; IS6608_REGULATOR_DESC; IS6608_REGULATOR_MATCH_DATA;
+MPQ8655_BUCK_LINER_RANGE; MPQ8655_REGULATOR_DESC; MPQ8655_REGULATOR_MATCH_DATA;
 
 /**
  * linear_range_get_value - fetch a value from given range
@@ -214,6 +213,7 @@ static int buck_get_value(struct udevice *dev)
 {
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
+	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 	int mask = info->vsel_msk;
 	int ret;
 	unsigned int val;
@@ -221,9 +221,20 @@ static int buck_get_value(struct udevice *dev)
 	if (info == NULL)
 		return -ENOSYS;
 
-	ret = pmic_reg_read(dev->parent, info->vsel_reg);
-	if (ret < 0)
-		return ret;
+	if (strcmp(priv->match->name, "mpq8655") == 0) {
+		unsigned char vals[2];
+
+		pmic_read(dev->parent, info->vsel_reg, vals, 2);
+		if (ret < 0)
+			return ret;
+
+		val = vals[0] | (((unsigned short)vals[1]) << 8);
+	} else {
+		ret = pmic_reg_read(dev->parent, info->vsel_reg);
+		if (ret < 0)
+			return ret;
+	}
+
 	val = ret & mask;
 
 	val >>= ffs(mask) - 1;
@@ -236,6 +247,7 @@ static int buck_set_value(struct udevice *dev, int uvolt)
 	int sel, ret = -EINVAL;
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
+	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 
 	if (info == NULL)
 		return -ENOSYS;
@@ -243,8 +255,25 @@ static int buck_set_value(struct udevice *dev, int uvolt)
 	sel = regulator_map_voltage_linear_range(info, uvolt, uvolt);
 	if (sel >=0) {
 		/* has get the selctor */
-		 sel <<= ffs(info->vsel_msk) - 1;
-		 ret = pmic_clrsetbits(dev->parent, info->vsel_reg, info->vsel_msk, sel);
+		sel <<= ffs(info->vsel_msk) - 1;
+		if (strcmp(priv->match->name, "mpq8655") == 0) {
+			unsigned char vals[2];
+			unsigned int val;
+
+			ret = pmic_read(dev->parent, info->vsel_reg, vals, 2);
+			if (ret < 0)
+				return ret;
+
+			val = vals[0] | (((unsigned short)vals[1]) << 8);
+			val = (val & ~info->vsel_msk) | sel;
+
+			vals[0] = val & 0xff;
+			vals[1] = (val >> 8) & 0xff;
+
+			ret = pmic_write(dev->parent, info->vsel_reg, vals, 2);
+		 } else {
+			 ret = pmic_clrsetbits(dev->parent, info->vsel_reg, info->vsel_msk, sel);
+		 }
 	}
 
 	return ret;
@@ -256,8 +285,12 @@ static int buck_set_suspend_value(struct udevice *dev, int uvolt)
 	int sel, ret = -EINVAL;
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
+	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 
 	if (info == NULL)
+		return -ENOSYS;
+
+	if (strcmp(priv->match->name, "mpq8655") == 0)
 		return -ENOSYS;
 
 	sel = regulator_map_voltage_linear_range(info, uvolt, uvolt);
@@ -276,10 +309,14 @@ static int buck_get_suspend_value(struct udevice *dev)
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
 	int mask = info->vsel_sleep_msk;
+	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 	int ret;
 	unsigned int val;
 
 	if (info == NULL)
+		return -ENOSYS;
+
+	if (strcmp(priv->match->name, "mpq8655") == 0)
 		return -ENOSYS;
 
 	ret = pmic_reg_read(dev->parent, info->vsel_sleep_reg);
@@ -297,10 +334,15 @@ static int buck_get_enable(struct udevice *dev)
 	int ret, val;
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
+	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 	int mask = info->enable_msk;
 
 	if (info == NULL)
 		return -ENOSYS;
+
+	/* enabled by default, controled by p1 */
+	if (strcmp(priv->match->name, "mpq8655") == 0)
+		return 1;
 
 	ret = pmic_reg_read(dev->parent, info->enable_reg);
 	if (ret < 0)
@@ -319,7 +361,16 @@ static int buck_set_enable(struct udevice *dev, bool enable)
 	unsigned int val = 0;
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
+	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 	int mask = info->enable_msk;
+
+	/* uboot can't disable it */
+	if (strcmp(priv->match->name, "mpq8655") == 0) {
+		if (enable == false)
+			return -EPERM;
+		else
+			return 0;
+	}
 
 	ret = pmic_reg_read(dev->parent, info->enable_reg);
 	if (ret < 0)
