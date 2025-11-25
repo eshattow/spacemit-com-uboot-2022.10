@@ -1742,3 +1742,23 @@ char *board_fdt_chosen_bootargs(void)
 
 	return merged;
 }
+
+void arch_print_bdinfo(void)
+{
+	const char *info;
+
+	info = fdt_getprop(gd->fdt_blob, 0, "model", NULL);
+	if (info)
+		printf("model: %s\n", info);
+	info = fdt_getprop(gd->fdt_blob, 0, "compatible", NULL);
+	if (info)
+		printf("compatible: %s\n", info);
+
+	if (ddr_type)
+		printf("DDR type: %s\n", ddr_type);
+
+	if (ddr_datarate)
+		printf("DDR speed: %d MT/s\n", ddr_datarate);
+
+	printf("DDR size: %d MB\n", ddr_get_density());
+}
