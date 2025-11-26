@@ -43,9 +43,9 @@ int spl_board_init_f(void)
 
 	/* Wait for boot image was downloaded by gdb */
 	printf("wait image\n");
-	read_data = readl((void*)0xc0820000);
+	read_data = readl((void*)0xc0800000);
 	while(read_data != 0xa55a)
-		read_data = readl((void*)0xc0820000);
+		read_data = readl((void*)0xc0800000);
 	printf("get new image\n");
 #endif
 
