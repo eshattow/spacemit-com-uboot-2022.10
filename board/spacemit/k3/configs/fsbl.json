@@ -1,6 +1,6 @@
 {
   "_comment": {
-    "info": "bootinfo build configuration script",
+    "info": "FSBL build configuration script",
     "key word": {
       "image": "image definition",
       "module": "image module definition",
@@ -35,9 +35,15 @@
             "version, 1, 1",
             "secure, 0, 1",
             "reserved, 0, 2",
-            "imgsize, 0x1000, 8",
-            "load_addr, 0, 8",
-            "pad, 0xA5, 8"
+            "imgsize, 0xFE0, 8",
+            "load_addr, 0xC0800000, 8"
+          ]
+        },
+        {
+          "structure": [
+            "name, crc0, 0",
+            "header_crc, crc32(header0), 4",
+            "img_crc, 0, 4"
           ]
         }
       ]
@@ -127,7 +133,7 @@
             "name": "signature0",
             "algorithm": "SHA256+RSA2048",
             "key": "rsakeypair0",
-            "source": "header0 + keydata + oem_key",
+            "source": "header0 + crc0 + keydata + oem_key",
             "align": 256
           }
         }
@@ -154,8 +160,14 @@
             "secure, 0, 1",
             "reserved, 0, 2",
             "imgsize, sizeof(fsbl), 8",
-            "load_addr, 0, 8",
-            "pad, 0xA5, 8"
+            "load_addr, 0, 8"
+          ]
+        },
+        {
+          "structure": [
+            "name, crc1, 0",
+            "header_crc, crc32(header1), 4",
+            "img_crc, crc32(fsbl), 4"
           ]
         },
         {
@@ -170,7 +182,7 @@
             "name": "signature1",
             "algorithm": "SHA256+RSA2048",
             "key": "spl_key",
-            "source": "header1 + fsbl",
+            "source": "header1 + crc1 + fsbl",
             "align": 256
           }
         }
