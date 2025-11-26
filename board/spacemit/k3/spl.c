@@ -18,6 +18,8 @@
 #include <i2c.h>
 #include <espi.h>
 
+#define GDB_DOWNLOAD_DEBUG
+
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
 extern int board_pmic_init(void);
 #endif
@@ -35,6 +37,18 @@ int spl_board_init_f(void)
 		debug("DRAM init failed: %d\n", ret);
 		return ret;
 	}
+
+#ifdef GDB_DOWNLOAD_DEBUG
+	u32 read_data;
+
+	/* Wait for boot image was downloaded by gdb */
+	printf("wait image\n");
+	read_data = readl((void*)0xc0820000);
+	while(read_data != 0xa55a)
+		read_data = readl((void*)0xc0820000);
+	printf("get new image\n");
+#endif
+
 #if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
 	/* init i2c */
 	i2c_init_board();
