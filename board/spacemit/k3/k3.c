@@ -231,39 +231,6 @@ enum board_boot_mode get_boot_mode(void)
 	return mode;
 }
 
-void board_boot_order(u32* spl_boot_list)
-{
-	u32 boot_mode = get_boot_mode();
-	pr_debug("boot_mode:0x%x\n", boot_mode);
-	if (boot_mode == BOOT_MODE_USB) {
-		spl_boot_list[0] = BOOT_DEVICE_BOARD;
-	} else {
-		switch (boot_mode) {
-		case BOOT_MODE_SD:
-			spl_boot_list[0] = BOOT_DEVICE_MMC1;
-			break;
-		case BOOT_MODE_EMMC:
-			spl_boot_list[0] = BOOT_DEVICE_MMC2;
-			break;
-		case BOOT_MODE_NAND:
-			spl_boot_list[0] = BOOT_DEVICE_NAND;
-			break;
-		case BOOT_MODE_NOR:
-			spl_boot_list[0] = BOOT_DEVICE_NOR;
-			break;
-		case BOOT_MODE_UFS:
-			spl_boot_list[0] = BOOT_DEVICE_UFS;
-			break;
-		default:
-			spl_boot_list[0] = BOOT_DEVICE_RAM;
-			break;
-		}
-
-		// reserve for debug/test to load/run uboot from ram.
-		spl_boot_list[1] = BOOT_DEVICE_RAM;
-	}
-}
-
 void setenv_boot_mode(void)
 {
 #ifdef CONFIG_ENV_IS_IN_NFS
