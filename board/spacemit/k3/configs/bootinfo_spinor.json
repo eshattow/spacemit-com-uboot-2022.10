@@ -9,7 +9,7 @@
   },
   "info": {
     "arch": "RISCV64",
-    "description": "spacemit k2 spinor bootinfo image"
+    "description": "spacemit spinor bootinfo image"
   },
   "image": [
     {
@@ -30,8 +30,8 @@
             "multi_plane, 0, 1",
             "reserved, 0, 3",
             "spl0_offset, 0x20000, 4",
-            "spl1_offset, 0x70000, 4",
-            "spl_size_limit, 0x36000, 4",
+            "spl1_offset, 0xA0000, 4",
+            "spl_size_limit, 0x74000, 4",
             "partitiontable0_offset, 0, 4",
             "partitiontable1_offset, 0, 4",
             "reserved, 0, 12"

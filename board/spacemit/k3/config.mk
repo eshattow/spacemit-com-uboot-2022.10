@@ -18,11 +18,8 @@ cmd_build_spl_platform = \
 		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_spinand.json \
 		-o $(srctree)/bootinfo_spinand.bin; \
 	python3 $(srctree)/tools/build_binary_file.py \
-		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_emmc.json \
-		-o $(srctree)/bootinfo_emmc.bin; \
-	python3 $(srctree)/tools/build_binary_file.py \
-		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_sd.json \
-		-o $(srctree)/bootinfo_sd.bin && \
+		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_block.json \
+		-o $(srctree)/bootinfo_block.bin; \
 	rm -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-spl.bin
 
 quiet_cmd_build_itb = BUILD   $2
@@ -47,7 +44,7 @@ cmd_build_default_env = \
 MRPROPER_FILES += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin
 MRPROPER_FILES += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-spl.bin
 MRPROPER_FILES += u-boot.itb FSBL.bin u-boot-env-default.*
-MRPROPER_FILES += bootinfo_spinor.bin bootinfo_spinand.bin bootinfo_emmc.bin bootinfo_sd.bin
+MRPROPER_FILES += bootinfo_spinor.bin bootinfo_spinand.bin bootinfo_block.bin
 MRPROPER_FILES += k3_fpga_1x1.dtb
 MRPROPER_DIRS += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb
 
