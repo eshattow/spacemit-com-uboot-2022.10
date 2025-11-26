@@ -20,6 +20,7 @@
 
 #define GDB_DOWNLOAD_DEBUG
 
+extern void spl_fixup_fdt(void *fdt_blob);
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
 extern int board_pmic_init(void);
 #endif
@@ -208,4 +209,10 @@ static void spl_load_env(void)
 		/*if load env from storage fail, it should not write bootmode to reg*/
 		boot_mode = BOOT_MODE_NONE;
 	}
+}
+
+void spl_perform_fixups(struct spl_image_info *spl_image)
+{
+	dram_init_banksize();
+	spl_fixup_fdt(spl_image->fdt_addr);
 }
