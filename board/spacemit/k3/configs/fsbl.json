@@ -89,7 +89,7 @@
               "hash": {
                 "name": "rotpk_hash",
                 "algorithm": "SHA256",
-                "source": "rsakeypair0",
+                "source": "root_key",
                 "align": 32
               }
             },
@@ -132,7 +132,7 @@
           "signature": {
             "name": "signature0",
             "algorithm": "SHA256+RSA2048",
-            "key": "rsakeypair0",
+            "key": "root_key",
             "source": "header0 + crc0 + keydata + oem_key",
             "align": 256
           }
