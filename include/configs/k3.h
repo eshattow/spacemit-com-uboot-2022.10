@@ -25,7 +25,7 @@
 #define CONFIG_STANDALONE_LOAD_ADDR 0x120200000
 
 #define RISCV_MMODE_TIMERBASE		0xf1810000
-#ifdef CONFIG_ASR_FPGA
+#ifdef CONFIG_K3_BOARD_FPGA
 #define RISCV_MMODE_TIMER_FREQ		5000000
 #else
 #define RISCV_MMODE_TIMER_FREQ		24000000
@@ -70,11 +70,10 @@ use (ram_base+4MB offset) as the address to loading image.
 #define RECOVERY_LOAD_IMG_SIZE (RECOVERY_LOAD_IMG_SIZE_MAX)
 
 /* boot mode configs */
-#define ASR_CIU_BASE		(0xD4282000)
-#define SYS_BOOT_CNTRL		(ASR_CIU_BASE + 0x020)		/* System boot control register */
-#define SQU_WR_SEC_ST		(ASR_CIU_BASE + 0x110)		/* Boot flag dummy register */
-#define BOOT_DEV_FLAG_REG	SQU_WR_SEC_ST				/* For compatibility */
-#define BOOT_PIN_SELECT		SQU_WR_SEC_ST
+/* System boot control register */
+#define BOOT_DEV_FLAG_REG	(0xD4282D10)
+/* Boot flag dummy register */
+#define BOOT_PIN_SELECT		(0xD4282c20)
 #define BOOT_STRAP_BIT_OFFSET	(9)
 #define BOOT_STRAP_BIT_EMMC	(0x0)
 #define BOOT_STRAP_BIT_NOR	(0x1)
@@ -120,8 +119,6 @@ enum board_boot_mode {
 	BOOT_MODE_BOOTSTRAP,
 };
 #endif
-
-#define ASR_DDR_TRAINING_DATA_BASE 0xc0829000
 
 /* ****************************************************************************************
  * Environment
