@@ -12,6 +12,7 @@
 
 extern int tlv_device_init(void);
 extern int init_tlv_from_eeprom(uint8_t *tlv_data, uint32_t tlv_size);
+extern bool tlvinfo_add_tlv(u8 *eeprom, int tcode, char *strval);
 
 /* File scope function prototypes */
 static bool is_checksum_valid(u8 *tlv_data);
@@ -206,3 +207,63 @@ int get_tlvinfo(int tcode, char *buf)
 	pr_info("can not get tlvinfo index:%x\n", tcode);
 	return -1;
 }
+
+#if !defined(CONFIG_SPL_BUILD)
+bool tlvinfo_delete_tlv(u8* tlv_data, u8 code)
+{
+	int index;
+	int tlength;
+	struct tlvinfo_header* tlv_hdr = (struct tlvinfo_header*)tlv_data;
+	struct tlvinfo_tlv* tlv;
+
+	// Find the TLV and then move all following TLVs "forward"
+	if (tlvinfo_find_tlv(tlv_data, code, &index)) {
+		tlv = (struct tlvinfo_tlv*)(&tlv_data[index]);
+		tlength = sizeof(struct tlvinfo_tlv) + tlv->length;
+		memcpy(&tlv_data[index], &tlv_data[index + tlength],
+			sizeof(struct tlvinfo_header) + be16_to_cpu(tlv_hdr->totallen) - index - tlength);
+		tlv_hdr->totallen = cpu_to_be16(be16_to_cpu(tlv_hdr->totallen) - tlength);
+		update_crc(tlv_data);
+		return true;
+	}
+	return false;
+}
+
+int set_tlvinfo(int tcode, char* val)
+{
+	/*init tlvinfo at first*/
+	if (read_tlvinfo(tlvinfo_buffer, sizeof(tlvinfo_buffer))) {
+		pr_err("init tlv info fail\n");
+		return -1;
+	}
+
+	tlvinfo_delete_tlv(tlvinfo_buffer, tcode);
+	if ((val != NULL) && tlvinfo_add_tlv(tlvinfo_buffer, tcode, val))
+		return 0;
+
+	return -1;
+}
+
+int flush_tlvinfo(void)
+{
+	struct tlvinfo_header* tlv_hdr;
+	int tlv_data_len;
+
+	/*init tlvinfo at first*/
+	if (read_tlvinfo(tlvinfo_buffer, sizeof(tlvinfo_buffer))) {
+		pr_err("init tlv info fail\n");
+		return -1;
+	}
+
+	tlv_hdr = (struct tlvinfo_header*)tlvinfo_buffer;
+	update_crc(tlvinfo_buffer);
+
+	tlv_data_len = sizeof(struct tlvinfo_header) + be16_to_cpu(tlv_hdr->totallen);
+	if (write_tlv_eeprom(tlvinfo_buffer, tlv_data_len)) {
+		pr_err("write to tlv_data fail\n");
+		return -1;
+	}
+
+	return 0;
+}
+#endif
