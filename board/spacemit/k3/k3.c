@@ -30,6 +30,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 void import_env_from_bootfs(void);
 void setenv_boot_mode(void);
+void set_env_ethaddr(void);
+
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 extern int set_tlvinfo(int tcode, char* val);
 extern int flush_tlvinfo(void);
@@ -61,6 +63,8 @@ int board_late_init(void)
 	ulong kernel_start;
 	ofnode chosen_node;
 	int ret;
+
+	set_env_ethaddr();
 
 	import_env_from_bootfs();
 
@@ -482,115 +486,6 @@ void import_env_from_bootfs(void)
 	return;
 }
 
-void read_from_eeprom(struct tlvinfo_tlv **tlv_data, u8 tcode)
-{
-	static u8 eeprom_data[256];
-	struct tlvinfo_header *tlv_hdr = NULL;
-	struct tlvinfo_tlv *tlv_entry;
-	unsigned int tlv_offset, tlv_len;
-	int ret = 0;
-
-	ret = read_tlvinfo_tlv_eeprom(eeprom_data, &tlv_hdr, &tlv_entry, 0);
-	if (ret < 0) {
-		pr_err("read tlvinfo from eeprom failed!\n");
-		return;
-	}
-
-	tlv_offset = sizeof(struct tlvinfo_header);
-	tlv_len = sizeof(struct tlvinfo_header) + be16_to_cpu(tlv_hdr->totallen);
-	while (tlv_offset < tlv_len) {
-		tlv_entry = (struct tlvinfo_tlv *)&eeprom_data[tlv_offset];
-		if (tlv_entry->type == tcode) {
-			*tlv_data = tlv_entry;
-			return;
-		}
-
-		tlv_offset += sizeof(struct tlvinfo_tlv) + tlv_entry->length;
-	}
-
-	*tlv_data = NULL;
-	return;
-}
-
-struct tlvinfo_tlv *find_tlv_in_buffer(u8 *eeprom_data, u8 tcode)
-{
-	struct tlvinfo_header *hdr = (struct tlvinfo_header *)eeprom_data;
-	int total_length = be16_to_cpu(hdr->totallen);
-	u8 *tlv_end = eeprom_data + sizeof(struct tlvinfo_header) + total_length;
-	u8 *ptr = eeprom_data + sizeof(struct tlvinfo_header);
-
-	while (ptr < tlv_end) {
-		struct tlvinfo_tlv *tlv = (struct tlvinfo_tlv *)ptr;
-
-		if (tlv->type == tcode) {
-			return tlv;
-		}
-
-		ptr += sizeof(struct tlvinfo_tlv) + tlv->length;
-	}
-
-	return NULL;
-}
-
-int mac_read_from_buffer(u8 *eeprom_data) {
-	unsigned int i;
-	struct tlvinfo_tlv *mac_size_tlv;
-	struct tlvinfo_tlv *mac_base_tlv;
-	int maccount;
-	u8 macbase[6];
-	struct tlvinfo_header *eeprom_hdr = (struct tlvinfo_header *)eeprom_data;
-
-	pr_info("EEPROM: ");
-
-	mac_size_tlv = find_tlv_in_buffer(eeprom_data, TLV_CODE_MAC_SIZE);
-	maccount = 1;
-	if (mac_size_tlv) {
-		maccount = (mac_size_tlv->value[0] << 8) | mac_size_tlv->value[1];
-	}
-
-	mac_base_tlv = find_tlv_in_buffer(eeprom_data, TLV_CODE_MAC_BASE);
-	if (mac_base_tlv) {
-		memcpy(macbase, mac_base_tlv->value, 6);
-	} else {
-		memset(macbase, 0, sizeof(macbase));
-	}
-
-	for (i = 0; i < maccount; i++) {
-		if (is_valid_ethaddr(macbase)) {
-			char ethaddr[18];
-			char enetvar[11];
-
-			sprintf(ethaddr, "%02X:%02X:%02X:%02X:%02X:%02X",
-				macbase[0], macbase[1], macbase[2],
-				macbase[3], macbase[4], macbase[5]);
-			sprintf(enetvar, i ? "eth%daddr" : "ethaddr", i);
-			/* Only initialize environment variables that are blank
-			 * (i.e. have not yet been set)
-			 */
-			if (!env_get(enetvar))
-				env_set(enetvar, ethaddr);
-
-			macbase[5]++;
-			if (macbase[5] == 0) {
-				macbase[4]++;
-				if (macbase[4] == 0) {
-					macbase[3]++;
-					if (macbase[3] == 0) {
-						macbase[0] = 0;
-						macbase[1] = 0;
-						macbase[2] = 0;
-					}
-				}
-			}
-		}
-	}
-
-	pr_info("%s v%u len=%u\n", eeprom_hdr->signature, eeprom_hdr->version,
-	       be16_to_cpu(eeprom_hdr->totallen));
-
-	return 0;
-}
-
 static void increase_eth_addr(uint8_t *mac_addr)
 {
 	mac_addr[5]++;
@@ -643,7 +538,7 @@ void set_env_ethaddr(void)
 {
 	uint8_t mac_addr[6];
 	char mac_str[32];
-	int maccount;
+	int i, maccount;
 
 	/* Determine source of MAC address and attempt to read it */
 	maccount = read_mac_from_tlv();
@@ -652,22 +547,30 @@ void set_env_ethaddr(void)
 		return;
 	}
 
-	/*if there is NO valid MAC address, create 2 random ethaddr */
-	pr_info("generate %d random ethaddr.\n", 2);
+	/*if there is NO valid MAC address, create 4 random ethaddr */
+	maccount = 4;
+	pr_info("generate %d random ethaddr.\n", maccount);
 	net_random_ethaddr(mac_addr);
 	mac_addr[0] = 0xfe;
 	mac_addr[1] = 0xfe;
 	mac_addr[2] = 0xfe;
 
-	/* save mac address to eeprom */
+	/* save mac address to TLV */
 	snprintf(mac_str, (sizeof(mac_str) - 1), "%02x:%02x:%02x:%02x:%02x:%02x",
 		mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
 	set_tlvinfo(TLV_CODE_MAC_BASE, mac_str);
-	set_tlvinfo(TLV_CODE_MAC_SIZE, "2");
+	sprintf(mac_str, "%d", maccount);
+	set_tlvinfo(TLV_CODE_MAC_SIZE, mac_str);
 	flush_tlvinfo();
 
-	/* write ethaddr and eth1addr to env */
+	/* write ethaddr to env */
 	eth_env_set_enetaddr("ethaddr", mac_addr);
-	increase_eth_addr(mac_addr);
-	eth_env_set_enetaddr("eth1addr", mac_addr);
+	for (i = 1; i < maccount; i++) {
+		/* Increase the last byte of MAC address for each additional interface */
+		increase_eth_addr(mac_addr);
+		sprintf(mac_str, "eth%daddr", i);
+		pr_info("Update env %s with mac address: %02x:%02x:%02x:%02x:%02x:%02x\n", mac_str,
+			mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+		eth_env_set_enetaddr(mac_str, mac_addr);
+	}
 }
