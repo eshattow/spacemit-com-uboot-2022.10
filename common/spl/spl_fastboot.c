@@ -28,7 +28,7 @@ static ulong spl_fastboot_load_read(struct spl_load_info *load, ulong sector,
 	pr_debug("%s: sector %lx, count %lx, buf %lx\n",
 	      __func__, sector, count, (ulong)buf);
 
-	addr = (ulong)CONFIG_SPL_LOAD_FIT_ADDRESS + sector;
+	addr = (ulong)CONFIG_FASTBOOT_BUF_ADDR + sector;
 	if (CONFIG_IS_ENABLED(IMAGE_PRE_LOAD))
 		addr += image_load_offset;
 
@@ -44,7 +44,7 @@ static int run_fastboot_usb(void)
 	int controller_index = 0;
 	int ret;
 
-	fastboot_init((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_FASTBOOT_BUF_SIZE);
+	fastboot_init((void *)CONFIG_FASTBOOT_BUF_ADDR, CONFIG_FASTBOOT_BUF_SIZE);
 	ret = usb_gadget_initialize(controller_index);
 	if (ret) {
 		pr_err("USB init failed: %d\n", ret);
@@ -93,7 +93,7 @@ static int spl_fastboot_load_image(struct spl_image_info *spl_image,
 		return -1;
 	}
 
-	header = (struct image_header *)CONFIG_SPL_LOAD_FIT_ADDRESS;
+	header = (struct image_header *)CONFIG_FASTBOOT_BUF_ADDR;
 	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) &&
 	    image_get_magic(header) == FDT_MAGIC) {
 		struct spl_load_info load;

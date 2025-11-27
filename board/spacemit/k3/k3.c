@@ -316,15 +316,15 @@ void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev
 	env_set("bootfs_devname", dev_name);
 
 	/*load env.txt and import to uboot*/
-	memset((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, 0, CONFIG_ENV_SIZE);
+	memset((void *)CONFIG_FASTBOOT_BUF_ADDR, 0, CONFIG_ENV_SIZE);
 	sprintf(cmd, "load %s %d:%d 0x%lx env_%s.txt", dev_name,
-			dev, part, CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
+			dev, part, CONFIG_FASTBOOT_BUF_ADDR, CONFIG_SYS_CONFIG_NAME);
 	pr_debug("cmd:%s\n", cmd);
 	if (run_command(cmd, 0))
 		return;
 
 	memset(cmd, '\0', 128);
-	sprintf(cmd, "env import -t 0x%lx", CONFIG_SPL_LOAD_FIT_ADDRESS);
+	sprintf(cmd, "env import -t 0x%lx", CONFIG_FASTBOOT_BUF_ADDR);
 	pr_debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0)){
 		pr_info("load env_%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
@@ -392,15 +392,15 @@ static int load_env_from_nand_bootfs(void)
 		return -1;
 	}
 
-	memset((void *)CONFIG_SPL_LOAD_FIT_ADDRESS, 0, CONFIG_ENV_SIZE);
-	sprintf(cmd, "ubifsload 0x%lx env_%s.txt", CONFIG_SPL_LOAD_FIT_ADDRESS, CONFIG_SYS_CONFIG_NAME);
+	memset((void *)CONFIG_FASTBOOT_BUF_ADDR, 0, CONFIG_ENV_SIZE);
+	sprintf(cmd, "ubifsload 0x%lx env_%s.txt", CONFIG_FASTBOOT_BUF_ADDR, CONFIG_SYS_CONFIG_NAME);
 	if (run_command(cmd, 0)) {
 		pr_err("Failed to load env_%s.txt from bootfs\n", CONFIG_SYS_CONFIG_NAME);
 		return -1;
 	}
 
 	memset(cmd, '\0', 128);
-	sprintf(cmd, "env import -t 0x%lx", CONFIG_SPL_LOAD_FIT_ADDRESS);
+	sprintf(cmd, "env import -t 0x%lx", CONFIG_FASTBOOT_BUF_ADDR);
 	if (!run_command(cmd, 0)) {
 		pr_debug("Imported environment from 'env_%s.txt'\n", CONFIG_SYS_CONFIG_NAME);
 		return 0;
