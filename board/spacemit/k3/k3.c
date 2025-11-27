@@ -58,6 +58,17 @@ int board_init(void)
 	return ret;
 }
 
+void run_fastboot_command(void)
+{
+	if (BOOT_MODE_USB == get_boot_mode()) {
+		/* show flash log*/
+		env_set("stdout", env_get("stdout_flash"));
+
+		char *cmd_para = "fastboot 0";
+		run_command(cmd_para, 0);
+	}
+}
+
 int board_late_init(void)
 {
 	ulong kernel_start;
@@ -65,6 +76,8 @@ int board_late_init(void)
 	int ret;
 
 	set_env_ethaddr();
+
+	run_fastboot_command();
 
 	import_env_from_bootfs();
 
