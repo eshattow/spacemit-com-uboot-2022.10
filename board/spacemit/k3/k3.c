@@ -48,7 +48,7 @@ int board_init(void)
 #ifdef CONFIG_ESPI
 	ret = uclass_probe_all(UCLASS_ESPI);
 	if (ret) {
-		printf("eSPI: Probe failed (ret=%d)\n", ret);
+		pr_err("eSPI: Probe failed (ret=%d)\n", ret);
 		return CMD_RET_FAILURE;
 	}
 #endif
@@ -253,7 +253,7 @@ void setenv_boot_mode(void)
 		int blk_index;
 
 		if (get_available_boot_blk_dev(&blk_name, &blk_index)){
-			printf("can not get available blk dev\n");
+			pr_err("can not get available blk dev\n");
 			return;
 		}
 
@@ -422,7 +422,7 @@ void import_env_from_bootfs(void)
 	 * In secure boot mode, do not load environment from external flash
 	 * to prevent unauthorized environment modification
 	 */
-	printf("Secure boot enabled, skip loading environment from bootfs\n");
+	pr_info("Secure boot enabled, skip loading environment from bootfs\n");
 	return;
 #endif
 
@@ -449,7 +449,7 @@ void import_env_from_bootfs(void)
 		int blk_index;
 
 		if (get_available_boot_blk_dev(&blk_name, &blk_index)){
-			printf("can not get available blk dev\n");
+			pr_err("can not get available blk dev\n");
 			return;
 		}
 
@@ -585,7 +585,7 @@ int mac_read_from_buffer(u8 *eeprom_data) {
 		}
 	}
 
-	printf("%s v%u len=%u\n", eeprom_hdr->signature, eeprom_hdr->version,
+	pr_info("%s v%u len=%u\n", eeprom_hdr->signature, eeprom_hdr->version,
 	       be16_to_cpu(eeprom_hdr->totallen));
 
 	return 0;

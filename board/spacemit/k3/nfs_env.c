@@ -335,7 +335,7 @@ int check_bootfs_exists(void)
 #ifdef CONFIG_CMD_NET
 static int initr_net(void)
 {
-	printf("Net:   ");
+	pr_info("Net:   ");
 	eth_initialize();
 #if defined(CONFIG_RESET_PHY_R)
 	debug("Reset Ethernet PHY\n");
@@ -403,9 +403,9 @@ int run_net_flash_command(void)
 	pr_info("Downloaded size: %lu bytes\n", filesize);
 	pr_info("Received content: '");
 	for (int i = 0; i < filesize && i < 64; i++) {
-		printf("%c", tftp_load_addr[i]);
+		pr_info("%c", tftp_load_addr[i]);
 	}
-	printf("'\n");
+	pr_info("'\n");
 
 	// Check for flash command prefix
 	char *path_start = strstr(tftp_load_addr, "net_data_path=");
@@ -453,7 +453,7 @@ int run_net_flash_command(void)
 	return 1;
 
 flash_fail:
-	printf(FAIL_BANNER);
+	pr_err(FAIL_BANNER);
 	while(1) {
 		/* do not return while flashing over! */
 		WATCHDOG_RESET();
@@ -486,13 +486,13 @@ int load_env_from_nfs(void)
 		env_set("rootfs_path", mapping.rootfs_path);
 		env_set("boot_override", "nfs");
 
-		printf("bootfs_path: %s\n", env_get("bootfs_path"));
-		printf("rootfs_path: %s\n", env_get("rootfs_path"));
-		printf("boot_override: %s\n", env_get("boot_override"));
+		pr_info("bootfs_path: %s\n", env_get("bootfs_path"));
+		pr_info("rootfs_path: %s\n", env_get("rootfs_path"));
+		pr_info("boot_override: %s\n", env_get("boot_override"));
 
-		sprintf(cmd, "nfs %lx %s/env_%s.txt", 
-				NFS_LOAD_ADDR, 
-				mapping.bootfs_path, 
+		sprintf(cmd, "nfs %lx %s/env_%s.txt",
+				NFS_LOAD_ADDR,
+				mapping.bootfs_path,
 				CONFIG_SYS_CONFIG_NAME);
 
 		if (run_command(cmd, 0) == 0) {
