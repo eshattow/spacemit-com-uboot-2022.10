@@ -137,7 +137,9 @@ struct ddr_training_info_t {
 	uint64_t mac_addr;
 	uint32_t version;
 	uint32_t cs_num;
-	uint8_t reserved[32];
+	uint32_t ddr_datarate;
+	char ddr_type[16];
+	uint8_t reserved[12];
 	uint8_t para[1024];
 	uint8_t reserved2[448];
 };

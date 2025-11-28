@@ -101,9 +101,9 @@ enum DCLK_BYPASS_sel {
 #define KHZ			1000
 #define FREQ_MAX		~(0U)
 
-u32 ddr_cs_num = DDR_CS_NUM;
-__section(".data") u32 ddr_size;
-const char *ddr_type;
+__section(".data") u32 ddr_cs_num = DDR_CS_NUM;
+__section(".data") u32 ddr_size, ddr_datarate;
+__section(".data") const char *ddr_type;
 
 static u32 mode_register_read(u32 MR, u32 CH, u32 CS)
 {

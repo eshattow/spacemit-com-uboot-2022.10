@@ -60,7 +60,8 @@ extern int update_tlvinfo(void);
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
-extern u32 ddr_cs_num;
+extern u32 ddr_cs_num, ddr_datarate;
+extern const char *ddr_type;
 bool is_video_connected = false;
 uint32_t reboot_config;
 void refresh_config_info(void);
@@ -313,9 +314,14 @@ void get_ddr_config_info(void)
 		(info->crc32 == crc32(0, (const uchar *)&info->chipid, sizeof(*info) - 8))) {
 		// get DDR cs number that is update in spl stage
 		ddr_cs_num = info->cs_num;
+		ddr_datarate = info->ddr_datarate;
+		ddr_type = info->ddr_type;
 	}
-	else
+	else {
 		ddr_cs_num = DDR_CS_NUM;
+		ddr_datarate = 2400;
+		ddr_type = "LPDDR4x";
+	}
 }
 
 u32 get_reboot_config(void)

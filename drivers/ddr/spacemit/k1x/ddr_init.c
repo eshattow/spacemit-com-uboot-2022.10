@@ -27,14 +27,12 @@
 #define DDR_CHECK_CNT			(0x1000)
 #define TOP_DDR_NUM				1
 
-extern u32 ddr_cs_num, ddr_tx_odt;
+extern u32 ddr_cs_num, ddr_tx_odt, ddr_datarate;
 extern const char *ddr_type;
 extern char _image_binary_end[], __ddr_training_start[], __ddr_training_end[];
 
 extern int ddr_freq_change(u32 data_rate);
 extern void qos_set_default(void);
-
-u32 ddr_datarate;
 
 int test_pattern(fdt_addr_t base, fdt_size_t size)
 {

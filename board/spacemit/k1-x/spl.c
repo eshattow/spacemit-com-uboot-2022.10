@@ -453,7 +453,7 @@ void update_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 	// flush_dcache_range(flush_start, flush_start + flush_lenth);
 }
 
-void update_ddr_config_info(uint32_t cs_num)
+void update_ddr_config_info(uint32_t cs_num, const char *ddr_type)
 {
 	struct ddr_training_info_t *info;
 
@@ -462,6 +462,8 @@ void update_ddr_config_info(uint32_t cs_num)
 	info->magic = DDR_TRAINING_INFO_MAGIC;
 	info->version = DDR_TRAINING_INFO_VER;
 	info->cs_num = cs_num;
+	info->ddr_datarate = ddr_datarate;
+	sprintf(info->ddr_type, "%s", ddr_type);
 	info->crc32 = crc32(0, (const uchar *)&info->chipid, sizeof(*info) - 8);
 }
 
@@ -516,7 +518,7 @@ int spl_board_init_f(void)
 	}
 
 	// update_ddr_training_info(chipid, mac_addr);
-	update_ddr_config_info(ddr_cs_num);
+	update_ddr_config_info(ddr_cs_num, ddr_type);
 	timer_init();
 
 	return 0;
