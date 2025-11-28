@@ -29,10 +29,13 @@
 
 extern u32 ddr_cs_num, ddr_tx_odt, ddr_datarate;
 extern const char *ddr_type;
-extern char _image_binary_end[], __ddr_training_start[], __ddr_training_end[];
+extern char _image_binary_end[], __ddr_training_start[], __ddr_training_end[], __ddr1_training_end[];
+extern uint8_t k1_lpddr3_training_img[], k1_lpddr4_training_img[];
 
-extern int ddr_freq_change(u32 data_rate);
+extern int ddr_freq_change(const char *ddr_type, u32 data_rate);
 extern void qos_set_default(void);
+extern uint32_t lpddr4_silicon_init(uint32_t base, const char *ddr_type, uint32_t data_rate);
+extern uint32_t lpddr3_silicon_init(uint32_t base, const char *ddr_type, uint32_t data_rate);
 
 int test_pattern(fdt_addr_t base, fdt_size_t size)
 {
@@ -92,29 +95,33 @@ ERR_HANDLE:
 	return err;
 }
 
-#ifdef CONFIG_K1_X_BOARD_ASIC
-extern uint32_t lpddr4_silicon_init(uint32_t base, const char *ddr_type, uint32_t data_rate);
-#endif
-
 int decompress_ddr_code(const char* ddr_type)
 {
 	void *dtb;
 	unsigned long flush_lenth;
 	size_t dtb_length, code_size, decompress_size;
 	int ret;
+	uint8_t *code_start;
 
 	// dtb was copied to AUDIO_BUFFER_ADDRESS during eraly boot stage
 	dtb = (void *)AUDIO_BUFFER_ADDRESS;
 	dtb_length = round_up(fdt_totalsize(dtb), 16);
 
 	// move compressed DDR training code to audio buffer
-	code_size = (size_t)__ddr_training_end - (size_t)__ddr_training_start;
+	if (0 == strcasecmp(ddr_type, "LPDDR3")) {
+		code_start = (uint8_t*)k1_lpddr3_training_img;
+		code_size = (size_t)__ddr1_training_end - (size_t)code_start;
+	}
+	else {
+		code_start = (uint8_t*)k1_lpddr4_training_img;
+		code_size = (size_t)__ddr_training_end - (size_t)code_start;
+	}
 	if ((code_size + dtb_length) > AUDIO_BUFFER_SIZE) {
 		pr_err("Error: DDR training code or dtb is too large: 0x%lx + 0x%lx > 0x%x\n",
 			code_size, dtb_length, AUDIO_BUFFER_SIZE);
 		return -EFBIG;
 	}
-	memcpy((void*)AUDIO_BUFFER_ADDRESS + dtb_length, __ddr_training_start, code_size);
+	memcpy((void*)AUDIO_BUFFER_ADDRESS + dtb_length, code_start, code_size);
 
 	// uint64_t start = get_timer_us(0);
 	decompress_size = CONFIG_SPL_BSS_START_ADDR - DDR_TRAINING_DATA_BASE;
@@ -184,11 +191,16 @@ static int spacemit_ddr_probe(struct udevice *dev)
 
 	/* init dram */
 	uint64_t start = get_timer(0);
-	data_rate = lpddr4_silicon_init(ddrc_base, ddr_type, ddr_datarate);
+	if (0 == strcasecmp(ddr_type, "LPDDR3")) {
+		data_rate = lpddr3_silicon_init(ddrc_base, ddr_type, ddr_datarate);
+	}
+	else {
+		data_rate = lpddr4_silicon_init(ddrc_base, ddr_type, ddr_datarate);
+	}
 	start = get_timer(start);
-	printf("lpddr4_silicon_init consume %lldms\n", start);
+	printf("lpddr3_silicon_init consume %lldms\n", start);
 #endif
-	ddr_freq_change(data_rate);
+	ddr_freq_change(ddr_type, data_rate);
 
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
 	if (ret < 0) {

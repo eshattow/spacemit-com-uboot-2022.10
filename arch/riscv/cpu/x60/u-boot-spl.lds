@@ -77,6 +77,8 @@ SECTIONS
 		__ddr_training_start = .;
 		KEEP(*(.code.ddr_training))
 		__ddr_training_end = .;
+		KEEP(*(.code.ddr_training1))
+		__ddr1_training_end = .;
 	} > .spl_mem
 
 	ASSERT(__ddr_training_start < DDR_TRAINING_DATA_BASE, "SPL code MUST NOT overflow DDR training code area!")
