@@ -82,6 +82,10 @@ static void run_ucmd(char *, char *);
 static void run_acmd(char *, char *);
 #endif
 
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_SPEED)
+static void oem_speed(char *cmd_parameter, char *response);
+#endif
+
 
 static const struct {
 	const char *command;
@@ -181,6 +185,12 @@ static const struct {
 	[FASTBOOT_COMMAND_ENV_ACCESS] = {
 		.command = "oem env",
 		.dispatch = oem_env,
+	},
+#endif
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_SPEED)
+	[FASTBOOT_COMMAND_OEM_SPEED] = {
+		.command = "oem speed",
+		.dispatch = oem_speed,
 	},
 #endif
 #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
@@ -872,5 +882,18 @@ static void oem_env(char *cmd_parameter, char *response)
 	operation = strsep(&cmd_str, " ");
 
     fastboot_env_access(operation, cmd_str, response);
+}
+#endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_SPEED)
+void fastboot_set_speed(char *operation, char *response);
+static void oem_speed(char *cmd_parameter, char *response)
+{
+    char *cmd_str, *operation;
+
+	cmd_str = cmd_parameter;
+	operation = strsep(&cmd_str, " ");
+
+    fastboot_set_speed(operation, response);
 }
 #endif

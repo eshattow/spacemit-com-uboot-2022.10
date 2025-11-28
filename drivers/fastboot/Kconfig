@@ -314,6 +314,22 @@ config SPL_FASTBOOT_CMD_OEM_ENV_ACCESS
 	  Add support for the "oem env:get/set" command from a fastboot client. This command
 	  include read, write env variabes in SPL stage.
 
+config FASTBOOT_CMD_OEM_SPEED
+	bool "Enable the 'oem speed' command"
+	help
+	  Add support for the "oem speed:[super-speed|high-speed]" command from a
+	  fastboot client. This command is used to pass desired USB maximum-speed
+	  selection to the bootloader.
+
+config SPL_FASTBOOT_CMD_OEM_SPEED
+	bool "Enable the 'oem speed' command in SPL"
+	depends on SPL_FASTBOOT
+	select FASTBOOT_CMD_OEM_SPEED
+	help
+	  Add support for the "oem speed:[super-speed|high-speed]" command in SPL
+	  stage. Typically SPL stores the requested speed in a scratch register so
+	  U-Boot proper can use it for its first USB enumeration.
+
 endif # FASTBOOT
 
 endmenu

@@ -1145,6 +1145,28 @@ void fastboot_env_access(char *operation, char *env, char *response)
 }
 #endif
 
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_SPEED)
+void fastboot_set_speed(char *operation, char *response)
+{
+	if (!operation || !*operation) {
+		fastboot_fail("missing parameter", response);
+		return;
+	}
+
+	if (0 == strcmp(operation, "super-speed")) {
+		pr_info("fastboot: set maximum-speed to super-speed\n");
+		spacemit_k3_fastboot_set_superspeed_flag(true);
+		fastboot_okay(NULL, response);
+	} else if (0 == strcmp(operation, "high-speed")) {
+		pr_info("fastboot: set maximum-speed to high-speed\n");
+		spacemit_k3_fastboot_set_superspeed_flag(false);
+		fastboot_okay(NULL, response);
+	} else {
+		fastboot_fail("NOT support", response);
+	}
+}
+#endif
+
 #define GZIP_HEADER_HEAD_CRC		2
 #define GZIP_HEADER_EXTRA_FIELD		4
 #define GZIP_HEADER_ORIG_NAME		8
