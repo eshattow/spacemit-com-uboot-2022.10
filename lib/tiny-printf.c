@@ -378,7 +378,7 @@ int sprintf(char *buf, const char *fmt, ...)
 	return ret;
 }
 
-#if CONFIG_IS_ENABLED(LOG)
+// #if CONFIG_IS_ENABLED(LOG)
 /* Note that size is ignored */
 int vsnprintf(char *buf, size_t size, const char *fmt, va_list va)
 {
@@ -392,7 +392,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list va)
 
 	return ret;
 }
-#endif
+// #endif
 
 /* Note that size is ignored */
 int snprintf(char *buf, size_t size, const char *fmt, ...)
