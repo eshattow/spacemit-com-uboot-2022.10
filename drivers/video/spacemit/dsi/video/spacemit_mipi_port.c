@@ -30,6 +30,7 @@ char *lcd_name = NULL;
 
 
 static const struct panel_config panel_configs[] = {
+	{"lcd_gx09inx101_mipi", LCD_MIPI, lcd_gx09inx101_mipi_init},
 	{"lcd_lt8911_edp_1920x1080", LCD_EDP, lcd_lt8911_edp_1920x1080_init},
 	{"lcd_tc358762xbg_dpi_800x480", LCD_DPI, lcd_tc358762xbg_dpi_800x480_init},
 	{"lcd_icnl9951r_mipi", LCD_MIPI, lcd_icnl9951r_mipi_init},
@@ -39,7 +40,7 @@ static const struct panel_config panel_configs[] = {
 	{"lcd_ft8201sinx101_mipi", LCD_MIPI, lcd_ft8201sinx101_mipi_init},
 	{"lcd_hxdm101_mipi", LCD_MIPI, lcd_hxdm101_mipi_init},
 	{"lcd_co5300_mipi", LCD_MIPI, lcd_co5300_mipi_init},
-	{"lcd_gx09inx101_mipi", LCD_MIPI, lcd_gx09inx101_mipi_init},
+	{"lcd_jd9366tcyh1095_mipi", LCD_MIPI, lcd_jd9366tcyh1095_mipi_init},
 };
 
 static const struct panel_config default_panel = {
@@ -84,9 +85,9 @@ static int lcd_mipi_reset(struct spacemit_panel_priv *priv)
 	/* reset lcm */
 	if (priv->reset_valid) {
 		dm_gpio_set_value(&priv->reset, 1);
-		mdelay(10);
+		mdelay(20);
 		dm_gpio_set_value(&priv->reset, 0);
-		mdelay(10);
+		mdelay(20);
 		dm_gpio_set_value(&priv->reset, 1);
 		mdelay(120);
 	}
@@ -534,6 +535,12 @@ int lcd_mipi_probe(void)
 			tx_device_client.panel_type = LCD_MIPI;
 			tx_device.panel_type = tx_device_client.panel_type;
 			lcd_gx09inx101_mipi_init();
+	#endif
+
+	#if defined(CONFIG_LCD_JD9366TCYH1095_MIPI)
+			tx_device_client.panel_type = LCD_MIPI;
+			tx_device.panel_type = tx_device_client.panel_type;
+			lcd_jd9366tcyh1095_mipi_init();
 	#endif
 
 #else

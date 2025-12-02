@@ -16,4 +16,5 @@ obj-y += video/lcd/lcd_lt8911ext_edp.o
 obj-y += video/lcd/lcd_tc358762xbg_dpi.o
 obj-y += video/lcd/lcd_hxdm101.o
 obj-y += video/lcd/lcd_co5300.o
+obj-y += video/lcd/lcd_jd9366tcyh1095.o
 

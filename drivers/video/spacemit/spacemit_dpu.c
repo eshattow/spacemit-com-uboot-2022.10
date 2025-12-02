@@ -246,6 +246,31 @@ static void dsi_dpu_init(struct spacemit_mode_modeinfo *spacemit_mode, enum spac
 	dsi_dpu_write((void __iomem *)0x58c, 0x1);
 }
 
+#if 0
+static void dsi_dpu_deinit(void)
+{
+	unsigned int val = 0;
+	unsigned int timeout = 50;
+
+	dsi_dpu_write((void __iomem *)0x560, 0x0);
+	dsi_dpu_write((void __iomem *)0x56c, 0x1);
+
+	val = dsi_dpu_read((void __iomem *)0x56c);
+	while ((val & BIT(0))) {
+			mdelay(1);
+			val = dsi_dpu_read((void __iomem *)0x56c);
+			if (0 == --timeout)
+					break;
+	};
+
+	if (timeout == 0) {
+			pr_info("%s timeout\n", __func__);
+	}
+
+	dsi_dpu_write((void __iomem *)0x938, 0x0);
+}
+#endif
+
 static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_node)
 {
 	// struct video_uc_plat *uc_plat = dev_get_uclass_plat(dev);
