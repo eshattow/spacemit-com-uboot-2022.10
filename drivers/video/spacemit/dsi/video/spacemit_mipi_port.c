@@ -29,7 +29,7 @@ int lcd_height = 0;
 char *lcd_name = NULL;
 
 
-static const struct panel_config panel_configs[] = {
+static const __maybe_unused struct panel_config panel_configs[] = {
 	{"lcd_gx09inx101_mipi", LCD_MIPI, lcd_gx09inx101_mipi_init},
 	{"lcd_lt8911_edp_1920x1080", LCD_EDP, lcd_lt8911_edp_1920x1080_init},
 	{"lcd_tc358762xbg_dpi_800x480", LCD_DPI, lcd_tc358762xbg_dpi_800x480_init},
@@ -43,7 +43,7 @@ static const struct panel_config panel_configs[] = {
 	{"lcd_jd9366tcyh1095_mipi", LCD_MIPI, lcd_jd9366tcyh1095_mipi_init},
 };
 
-static const struct panel_config default_panel = {
+static const __maybe_unused struct panel_config default_panel = {
 	"default_panel", LCD_MIPI, lcd_gx09inx101_mipi_init
 };
 
@@ -451,8 +451,6 @@ int lcd_mipi_probe(void)
 	int ret;
 	struct udevice *dev = NULL;
 	struct spacemit_panel_priv *priv = NULL;
-	size_t num_panels = sizeof(panel_configs) / sizeof(panel_configs[0]);
-	int panel_found = 0;
 
 	ret = uclass_get_device_by_driver(UCLASS_NOP,
 		DM_DRIVER_GET(spacemit_panel), &dev);
@@ -544,6 +542,9 @@ int lcd_mipi_probe(void)
 	#endif
 
 #else
+
+size_t num_panels = sizeof(panel_configs) / sizeof(panel_configs[0]);
+int panel_found = 0;
 
 for (size_t i = 0; i < num_panels; i++) {
 	if (strcmp(panel_configs[i].panel_name, priv->panel_name) == 0) {

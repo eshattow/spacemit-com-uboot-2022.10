@@ -360,6 +360,9 @@
 };
 
 &mipi_dsi {
+	esc-clk = <76800000>;
+	bit-clk = <1000000000>;
+	pix-clk = <153000000>;
 	status = "okay";
 };
 

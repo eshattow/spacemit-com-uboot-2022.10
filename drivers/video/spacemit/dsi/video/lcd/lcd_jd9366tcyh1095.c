@@ -50,9 +50,7 @@ struct spacemit_mipi_info jd9366tcyh1095_mipi_info = {
 	.rgb_mode = DSI_INPUT_DATA_RGB_MODE_888,
 	.lane_number = 4,
 	.phy_bit_clock = 1000000000,
-	.phy_esc_clock = 51200000,
-	// .phy_bit_clock = 1000000000,
-	// .phy_esc_clock = 76800000,
+	.phy_esc_clock = 76800000,
 	.split_enable = 0,
 	.eotp_enable = 0,
 
