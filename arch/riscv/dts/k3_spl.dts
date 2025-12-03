@@ -38,36 +38,42 @@
 			clock-frequency = <66667000>;
 		};
 		vctcxo_24: vctcxo_24 {
+			u-boot,dm-spl;
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <24000000>;
 			clock-output-names = "vctcxo_24";
 		};
 		vctcxo_3: vctcxo_3 {
+			u-boot,dm-spl;
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <3000000>;
 			clock-output-names = "vctcxo_3";
 		};
 		vctcxo_1: vctcxo_1 {
+			u-boot,dm-spl;
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <1000000>;
 			clock-output-names = "vctcxo_1";
 		};
 		pll1_vco: pll1_vco {
+			u-boot,dm-spl;
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <24576000>;
 			clock-output-names = "pll1_vco";
 		};
 		osc_32k: osc_32k {
+			u-boot,dm-spl;
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <32000>;
 			clock-output-names = "osc_32k";
 		};
 		clk_dummy: clk_dummy {
+			u-boot,dm-spl;
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <0>;
