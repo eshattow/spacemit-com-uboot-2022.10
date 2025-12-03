@@ -1234,7 +1234,7 @@ static SPACEMIT_CCU_DIV_FC_MUX_GATE(sdh2_clk, "sdh2_clk", sdh2_parent_names,
 	5, 3, BIT(4), BIT(4), 0x0,
 	0);
 
-static SPACEMIT_CCU_GATE(usb2_bus_clk, "usb_axi_clk", "axi_clk",
+static SPACEMIT_CCU_GATE(usb2_bus_clk, "usb2_bus_clk", "axi_clk",
 	BASE_TYPE_APMU, APMU_USB_CLK_RES_CTRL,
 	BIT(0), BIT(0), 0x0,
 	0);
@@ -1395,7 +1395,7 @@ static SPACEMIT_CCU_DIV_FC_MUX_GATE(dpu_aclk, "dpu_aclk", dpu_aclk_parents,
 	0);
 
 static const char * const ufs_aclk_parents[] = {
-	 "pll1_d6_409p6", "pll1_d5_491p52", "pll1_d4_614p4", "pll1_d8_307p2", "pll2_d4"
+	 "pll1_d5_491p52", "pll1_d6_409p6", "pll2_d6", "pll2_d5"
 };
 static SPACEMIT_CCU_DIV_FC_MUX_GATE(ufs_aclk, "ufs_aclk", ufs_aclk_parents,
 	BASE_TYPE_APMU, APMU_UFS_CLK_RES_CTRL,
