@@ -16,6 +16,7 @@
 #include "ccu_mix.h"
 #include "ccu_plla.h"
 #include "ccu_ddn.h"
+#include "ccu-k3.h"
 
 /* APBS register offset */
 #define APBS_PLL1_SWCR1			0x100
@@ -217,6 +218,233 @@
 
 struct spacemit_ccu_clk k3_clock_controller;
 struct clk vctcxo_24, vctcxo_3, vctcxo_1, pll1_vco, osc_32k, clk_dummy;
+
+#ifdef CONFIG_SPL_BUILD
+//apbs
+static SPACEMIT_CCU_FACTOR(pll1_2457p6_vco, "pll1_2457p6_vco", "pll1_vco",
+	1, 100);
+
+static const struct ccu_plla_rate_tbl pll2_rate_tbl[] = {
+	PLLA_RATE(3000000000UL, 0x0b3e2000, 0x00000000, 0xa0558c8c),
+};
+
+static SPACEMIT_CCU_PLLA(pll2, "pll2", &pll2_rate_tbl, ARRAY_SIZE(pll2_rate_tbl),
+	BASE_TYPE_APBS, APBS_PLL2_SWCR1, APBS_PLL2_SWCR2, APBS_PLL2_SWCR3,
+	MPMU_POSR, POSR_PLL2_LOCK, 1,
+	0);
+
+//pll1
+static SPACEMIT_CCU_GATE_FACTOR(pll1_d3, "pll1_d3", "pll1_2457p6_vco",
+	BASE_TYPE_APBS, APBS_PLL1_SWCR2,
+	BIT(2), BIT(2), 0x0,
+	3, 1, 0);
+
+static SPACEMIT_CCU_GATE_FACTOR(pll1_d4, "pll1_d4", "pll1_2457p6_vco",
+	BASE_TYPE_APBS, APBS_PLL1_SWCR2,
+	BIT(3), BIT(3), 0x0,
+	4, 1, 0);
+static SPACEMIT_CCU_GATE_FACTOR(pll1_d5, "pll1_d5", "pll1_2457p6_vco",
+	BASE_TYPE_APBS, APBS_PLL1_SWCR2,
+	BIT(4), BIT(4), 0x0,
+	5, 1, 0);
+static SPACEMIT_CCU_GATE_FACTOR(pll1_d6, "pll1_d6", "pll1_2457p6_vco",
+	BASE_TYPE_APBS, APBS_PLL1_SWCR2,
+	BIT(5), BIT(5), 0x0,
+	6, 1, 0);
+static SPACEMIT_CCU_GATE_FACTOR(pll1_d8, "pll1_d8", "pll1_2457p6_vco",
+	BASE_TYPE_APBS, APBS_PLL1_SWCR2,
+	BIT(7), BIT(7), 0x0,
+	8, 1, 0);
+
+static SPACEMIT_CCU_DIV_GATE(pll1_dx, "pll1_dx", "pll1_2457p6_vco",
+	BASE_TYPE_APBS, APBS_PLL1_SWCR2,
+	23, 5, BIT(22), BIT(22), 0x0,
+	0);
+
+//pll2
+static SPACEMIT_CCU_GATE_FACTOR(pll2_d5, "pll2_d5", "pll2",
+	BASE_TYPE_APBS, APBS_PLL2_SWCR2,
+	BIT(4), BIT(4), 0x0,
+	5, 1, 0);
+static SPACEMIT_CCU_GATE_FACTOR(pll2_d6, "pll2_d6", "pll2",
+	BASE_TYPE_APBS, APBS_PLL2_SWCR2,
+	BIT(5), BIT(5), 0x0,
+	6, 1, 0);
+static SPACEMIT_CCU_GATE_FACTOR(pll2_d8, "pll2_d8", "pll2",
+	BASE_TYPE_APBS, APBS_PLL2_SWCR2,
+	BIT(7), BIT(7), 0x0,
+	8, 1, 0);
+
+//pll1_d8
+static SPACEMIT_CCU_GATE(pll1_d8_307p2, "pll1_d8_307p2", "pll1_d8",
+	BASE_TYPE_MPMU, MPMU_ACGR,
+	BIT(13), BIT(13), 0x0,
+	0);
+//pll1_d6
+static SPACEMIT_CCU_GATE(pll1_d6_409p6, "pll1_d6_409p6", "pll1_d6",
+	BASE_TYPE_MPMU, MPMU_ACGR,
+	BIT(0), BIT(0), 0x0,
+	0);
+//pll1_d5
+static SPACEMIT_CCU_GATE(pll1_d5_491p52, "pll1_d5_491p52", "pll1_d5",
+	BASE_TYPE_MPMU, MPMU_ACGR,
+	BIT(21), BIT(21), 0x0,
+	0);
+static SPACEMIT_CCU_GATE_FACTOR(pll1_d10_245p76, "pll1_d10_245p76", "pll1_d5",
+	BASE_TYPE_MPMU, MPMU_ACGR,
+	BIT(18), BIT(18), 0x0,
+	2, 1, 0);
+//pll1_d4
+static SPACEMIT_CCU_GATE(pll1_d4_614p4, "pll1_d4_614p4", "pll1_d4",
+	BASE_TYPE_MPMU, MPMU_ACGR,
+	BIT(15), BIT(15), 0x0,
+	0);
+//pll1_d3
+static SPACEMIT_CCU_GATE(pll1_d3_819p2, "pll1_d3_819p2", "pll1_d3",
+	BASE_TYPE_MPMU, MPMU_ACGR,
+	BIT(14), BIT(14), 0x0,
+	0);
+
+//apmu
+static SPACEMIT_CCU_GATE(sdh_axi_aclk, "sdh_axi_aclk", "clk_dummy",
+	BASE_TYPE_APMU, APMU_SDH0_CLK_RES_CTRL,
+	BIT(3), BIT(3), 0x0,
+	0);
+static const char * const sdh01_parent_names[] = {"pll1_d6_409p6",
+	"pll1_d4_614p4", "pll2_d8", "pll2_d5", "clk_dummy", "clk_dummy", "pll1_dx"
+};
+
+static SPACEMIT_CCU_DIV_FC_MUX_GATE(sdh0_clk, "sdh0_clk", sdh01_parent_names,
+	BASE_TYPE_APMU, APMU_SDH0_CLK_RES_CTRL,
+	8, 3, BIT(11),
+	5, 3, BIT(4), BIT(4), 0x0,
+	0);
+
+static const char * const sdh2_parent_names[] = {"pll1_d6_409p6",
+	"pll1_d4_614p4", "pll2_d8", "pll1_d3_819p2", "clk_dummy", "clk_dummy", "pll1_dx"
+};
+static SPACEMIT_CCU_DIV_FC_MUX_GATE(sdh2_clk, "sdh2_clk", sdh2_parent_names,
+	BASE_TYPE_APMU, APMU_SDH2_CLK_RES_CTRL,
+	8, 3, BIT(11),
+	5, 3, BIT(4), BIT(4), 0x0,
+	0);
+
+static const char * const qspi_parent_names[] = {
+	"pll1_d6_409p6", "pll2_d8", "pll1_d8_307p2", "pll1_d10_245p76",
+	"clk_dummy", "pll1_dx", "pll1_d5_491p52", "clk_dummy"
+};
+static SPACEMIT_CCU_DIV_MFC_MUX_GATE(qspi_clk, "qspi_clk", qspi_parent_names,
+	BASE_TYPE_APMU, APMU_QSPI_CLK_RES_CTRL,
+	9, 3, BIT(12),
+	6, 3, BIT(4), BIT(4), 0x0,
+	0);
+static SPACEMIT_CCU_GATE(qspi_bus_clk, "qspi_bus_clk", "clk_dummy",
+	BASE_TYPE_APMU, APMU_QSPI_CLK_RES_CTRL,
+	BIT(3), BIT(3), 0x0,
+	0);
+
+static const char * const ufs_aclk_parents[] = {
+	 "pll1_d5_491p52", "pll1_d6_409p6", "pll2_d6", "pll2_d5"
+};
+static SPACEMIT_CCU_DIV_FC_MUX_GATE(ufs_aclk, "ufs_aclk", ufs_aclk_parents,
+	BASE_TYPE_APMU, APMU_UFS_CLK_RES_CTRL,
+	5, 3, BIT(8),
+	2, 3,
+	BIT(1), BIT(1), 0x0,
+	0);
+
+static u32 transfer_to_spl_list[][2] = {
+	{CLK_PLL1_2457P6, CLK_PLL1_2457P6_SPL},
+	{CLK_PLL2, CLK_PLL2_SPL},
+	{CLK_PLL1_D3, CLK_PLL1_D3_SPL},
+	{CLK_PLL1_D4, CLK_PLL1_D4_SPL},
+	{CLK_PLL1_D5, CLK_PLL1_D5_SPL},
+	{CLK_PLL1_D6, CLK_PLL1_D6_SPL},
+	{CLK_PLL1_D8, CLK_PLL1_D8_SPL},
+	{CLK_PLL1_DX, CLK_PLL1_DX_SPL},
+	{CLK_PLL2_D5, CLK_PLL2_D5_SPL},
+	{CLK_PLL2_D6, CLK_PLL2_D6_SPL},
+	{CLK_PLL2_D8, CLK_PLL2_D8_SPL},
+	//MPMU
+	{CLK_PLL1_307P2, CLK_PLL1_307P2_SPL},
+	{CLK_PLL1_409P6, CLK_PLL1_409P6_SPL},
+	{CLK_PLL1_491, CLK_PLL1_491_SPL},
+	{CLK_PLL1_245P76, CLK_PLL1_245P76_SPL},
+	{CLK_PLL1_614, CLK_PLL1_614_SPL},
+	{CLK_PLL1_819, CLK_PLL1_819_SPL},
+	//APMU
+	{CLK_SDH_AXI, CLK_SDH_AXI_SPL},
+	{CLK_SDH0, CLK_SDH0_SPL},
+	{CLK_SDH2, CLK_SDH2_SPL},
+	{CLK_QSPI, CLK_QSPI_SPL},
+	{CLK_QSPI_BUS, CLK_QSPI_BUS_SPL},
+	{CLK_UFS_ACLK, CLK_UFS_ACLK_SPL},
+};
+
+static struct spacemit_clk_table spacemit_k3_clks = {
+	.clks	= {
+		[CLK_PLL1_2457P6_SPL]	= &pll1_2457p6_vco.common.clk,
+		[CLK_PLL2_SPL]		= &pll2.common.clk,
+		[CLK_PLL1_D3_SPL]	= &pll1_d3.common.clk,
+		[CLK_PLL1_D4_SPL]	= &pll1_d4.common.clk,
+		[CLK_PLL1_D5_SPL]	= &pll1_d5.common.clk,
+		[CLK_PLL1_D6_SPL]	= &pll1_d6.common.clk,
+		[CLK_PLL1_D8_SPL]	= &pll1_d8.common.clk,
+		[CLK_PLL1_DX_SPL]	= &pll1_dx.common.clk,
+		[CLK_PLL2_D5_SPL]	= &pll2_d5.common.clk,
+		[CLK_PLL2_D6_SPL]	= &pll2_d6.common.clk,
+		[CLK_PLL2_D8_SPL]	= &pll2_d8.common.clk,
+		//MPMU
+		[CLK_PLL1_307P2_SPL]	= &pll1_d8_307p2.common.clk,
+		[CLK_PLL1_409P6_SPL]	= &pll1_d6_409p6.common.clk,
+		[CLK_PLL1_491_SPL]	= &pll1_d5_491p52.common.clk,
+		[CLK_PLL1_245P76_SPL]	= &pll1_d10_245p76.common.clk,
+		[CLK_PLL1_614_SPL]	= &pll1_d4_614p4.common.clk,
+		[CLK_PLL1_819_SPL]	= &pll1_d3_819p2.common.clk,
+		//APMU
+		[CLK_SDH_AXI_SPL]	= &sdh_axi_aclk.common.clk,
+		[CLK_SDH0_SPL] 		= &sdh0_clk.common.clk,
+		[CLK_SDH2_SPL]		= &sdh2_clk.common.clk,
+		[CLK_QSPI_SPL]		= &qspi_clk.common.clk,
+		[CLK_QSPI_BUS_SPL]	= &qspi_bus_clk.common.clk,
+		[CLK_UFS_ACLK_SPL]	= &ufs_aclk.common.clk,
+	},
+	.num = CLK_MAX_NO_SPL,
+};
+
+ulong transfer_clk_id_to_spl(ulong id)
+{
+	u32 listsize = ARRAY_SIZE(transfer_to_spl_list);
+
+	for (int i = 0; i < listsize; i++){
+		if (id == transfer_to_spl_list[i][0]){
+			pr_info("id:%ld, %d,\n", id, transfer_to_spl_list[i][1]);
+			return transfer_to_spl_list[i][1];
+		}
+	}
+	return id;
+}
+
+static int ccu_of_xlate(struct clk *clk,
+			struct ofnode_phandle_args *args)
+{
+	if (args->args_count > 1) {
+		pr_debug("Invalid args_count: %d\n", args->args_count);
+		return -EINVAL;
+	}
+
+	if (args->args_count) {
+		clk->id = args->args[0];
+		clk->id = transfer_clk_id_to_spl(clk->id);
+	}
+	else
+		clk->id = 0;
+
+	clk->data = 0;
+	return 0;
+}
+
+#else
 
 //apbs
 static SPACEMIT_CCU_FACTOR(pll1_2457p6_vco, "pll1_2457p6_vco", "pll1_vco",
@@ -1904,6 +2132,7 @@ static struct spacemit_clk_table spacemit_k3_clks = {
 	},
 	.num = CLK_MAX_NO,
 };
+#endif
 
 struct spacemit_clk_init_rate init_rate_tbl[] = {
 	{CLK_AXICLK, 307200000},
@@ -1920,6 +2149,7 @@ ulong ccu_clk_get_rate(struct clk *clk)
 {
 	const struct clk_ops *ops;
 	struct clk *c = spacemit_k3_clks.clks[clk->id];
+
 	if (!clk_valid(c))
 		return 0;
 	ops = ccu_clk_dev_ops(c->dev);
@@ -1932,6 +2162,7 @@ ulong ccu_clk_round_rate(struct clk *clk, unsigned long rate)
 {
 	const struct clk_ops *ops;
 	struct clk *c = spacemit_k3_clks.clks[clk->id];
+
 	if (!clk_valid(c))
 		return 0;
 	ops = ccu_clk_dev_ops(c->dev);
@@ -1943,9 +2174,9 @@ ulong ccu_clk_round_rate(struct clk *clk, unsigned long rate)
 int ccu_clk_set_parent(struct clk *clk, struct clk *parent)
 {
 	const struct clk_ops *ops;
-
 	struct clk *c = spacemit_k3_clks.clks[clk->id];
 	struct clk *p = spacemit_k3_clks.clks[parent->id];
+
 	if (!clk_valid(c))
 		return 0;
 	ops = ccu_clk_dev_ops(c->dev);
@@ -2000,6 +2231,9 @@ const struct clk_ops ccu_clk_ops = {
 	.disable = ccu_clk_disable,
 	.set_rate = ccu_clk_set_rate,
 	.enable = ccu_clk_enable,
+#ifdef CONFIG_SPL_BUILD
+	.of_xlate = ccu_of_xlate,
+#endif
 };
 
 int ccu_common_init(struct clk * clk, struct spacemit_ccu_clk *clk_info, struct spacemit_clk_table *clks)
@@ -2064,17 +2298,32 @@ int spacemit_ccu_probe(struct spacemit_ccu_clk *clk_info,
 {
 	int i;
 
+#ifdef CONFIG_SPL_BUILD
+	for (i = CLK_PLL1_2457P6_SPL; i < clks->num ; i++) {
+#else
 	for (i = CLK_PLL1_2457P6; i < clks->num ; i++) {
+#endif
 		struct clk *clk = clks->clks[i];
 
 		if (!clk)
 			continue;
 
+#ifdef CONFIG_SPL_BUILD
+		if(clk->id >= CLK_VCTCXO_24_SPL)
+#else
 		if(clk->id >= CLK_VCTCXO_24)
+#endif
 			continue;
 
 		clk->id = i;
 		ccu_common_init(clk, clk_info, clks);
+	}
+#ifndef CONFIG_SPL_BUILD
+	//init pll2 freq
+	if (clk_info->pll2_freq) {
+		struct clk *clk =clks->clks[CLK_PLL2];
+		if (clk)
+			clk_set_rate(clk, clk_info->pll2_freq);
 	}
 
 	//init clk default rate
@@ -2085,7 +2334,7 @@ int spacemit_ccu_probe(struct spacemit_ccu_clk *clk_info,
 
 		clk_set_rate(clk, init_rate_tbl[i].dft_rate);
 	}
-
+#endif
 	return 0;
 }
 
@@ -2128,7 +2377,7 @@ static int spacemit_k3_ccu_probe(struct udevice *dev)
 		pr_err("failed to map apbs registers\n");
 		goto out;
 	}
-
+#ifndef CONFIG_SPL_BUILD
 	clk_info->ciu_base = (void __iomem *)dev_remap_addr_index(dev, 4);
 	if (!clk_info->ciu_base) {
 		pr_err("failed to map ciu registers\n");
@@ -2158,7 +2407,21 @@ static int spacemit_k3_ccu_probe(struct udevice *dev)
 		pr_err("failed to map rcpu registers\n");
 		goto out;
 	}
-
+#endif
+#ifdef CONFIG_SPL_BUILD
+	clk_get_by_name(dev, "vctcxo_24", &vctcxo_24);
+	ccu_clk_dm(CLK_VCTCXO_24_SPL, dev_get_clk_ptr(vctcxo_24.dev));
+	clk_get_by_name(dev, "vctcxo_3", &vctcxo_3);
+	ccu_clk_dm(CLK_VCTCXO_3_SPL, dev_get_clk_ptr(vctcxo_3.dev));
+	clk_get_by_name(dev, "vctcxo_1", &vctcxo_1);
+	ccu_clk_dm(CLK_VCTCXO_1_SPL, dev_get_clk_ptr(vctcxo_1.dev));
+	clk_get_by_name(dev, "pll1_vco", &pll1_vco);
+	ccu_clk_dm(CLK_PLL1_SPL, dev_get_clk_ptr(pll1_vco.dev));
+	clk_get_by_name(dev, "osc_32k", &osc_32k);
+	ccu_clk_dm(OSC_32K_SPL, dev_get_clk_ptr(osc_32k.dev));
+	clk_get_by_name(dev, "clk_dummy", &clk_dummy);
+	ccu_clk_dm(CLK_DUMMY_SPL, dev_get_clk_ptr(clk_dummy.dev));
+#else
 	clk_get_by_name(dev, "vctcxo_24", &vctcxo_24);
 	ccu_clk_dm(CLK_VCTCXO_24, dev_get_clk_ptr(vctcxo_24.dev));
 	clk_get_by_name(dev, "vctcxo_3", &vctcxo_3);
@@ -2171,6 +2434,7 @@ static int spacemit_k3_ccu_probe(struct udevice *dev)
 	ccu_clk_dm(OSC_32K, dev_get_clk_ptr(osc_32k.dev));
 	clk_get_by_name(dev, "clk_dummy", &clk_dummy);
 	ccu_clk_dm(CLK_DUMMY, dev_get_clk_ptr(clk_dummy.dev));
+#endif
 
 	ret = spacemit_ccu_probe(clk_info, clks);
 	pr_debug("init clock finish ret=%d \n", ret);

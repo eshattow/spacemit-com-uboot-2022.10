@@ -76,7 +76,11 @@ struct spacemit_ccu_clk {
 
 struct spacemit_clk_table{
 #ifdef CONFIG_SPL_BUILD
+#if defined(CONFIG_TARGET_SPACEMIT_K1X) || defined(CONFIG_TARGET_SPACEMIT_K1X)
 	struct clk* clks[CLK_MAX_NO_SPL];
+#else
+	struct clk* clks[CLK_MAX_NO];
+#endif
 #else
 	struct clk* clks[CLK_MAX_NO];
 #endif

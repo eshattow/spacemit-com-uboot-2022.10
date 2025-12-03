@@ -21,6 +21,10 @@
 
 #include "ccu_mix.h"
 
+#if defined(CONFIG_TARGET_SPACEMIT_K1X) && defined(CONFIG_SPL_BUILD)
+#define CLIP_CCU_MIX_IN_SPL
+#endif
+
 #define TIMEOUT_LIMIT (20000) /* max timeout 10000us */
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
 static int twsi8_reg_val = 0x04;
@@ -28,7 +32,7 @@ static int twsi8_reg_val = 0x04;
 
 static int ccu_mix_trigger_fc(struct clk *clk)
 {
-#ifdef CONFIG_SPL_BUILD
+#ifdef CLIP_CCU_MIX_IN_SPL
 	return 0;
 #else
 	struct ccu_mix *mix = clk_to_ccu_mix(clk);
@@ -75,7 +79,7 @@ static int ccu_mix_trigger_fc(struct clk *clk)
 #endif
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CLIP_CCU_MIX_IN_SPL
 static int ccu_mix_disable(struct clk *clk)
 {
 	struct ccu_mix *mix = clk_to_ccu_mix(clk);
@@ -204,7 +208,7 @@ static int ccu_mix_set_parent(struct clk *clk, struct clk *parent)
 
 static int ccu_mix_enable(struct clk *clk)
 {
-#ifdef CONFIG_SPL_BUILD
+#ifdef CLIP_CCU_MIX_IN_SPL
 	clk->id = transfer_clk_id_to_spl(clk->id);
 #endif
 	struct ccu_mix *mix = clk_to_ccu_mix(clk);
@@ -284,7 +288,7 @@ static int ccu_mix_enable(struct clk *clk)
 
 static ulong ccu_mix_get_rate(struct clk *clk)
 {
-#ifdef CONFIG_SPL_BUILD
+#ifdef CLIP_CCU_MIX_IN_SPL
 	clk->id = transfer_clk_id_to_spl(clk->id);
 #endif
 	struct ccu_mix *mix = clk_to_ccu_mix(clk);
@@ -383,7 +387,7 @@ u32 *mux_val, u32 *div_val, u32 *parent_id)
 
 static ulong ccu_mix_set_rate(struct clk *clk, unsigned long rate)
 {
-#ifdef CONFIG_SPL_BUILD
+#ifdef CLIP_CCU_MIX_IN_SPL
 	clk->id = transfer_clk_id_to_spl(clk->id);
 #endif
 	struct ccu_mix *mix = clk_to_ccu_mix(clk);
@@ -508,7 +512,7 @@ unsigned int ccu_mix_get_parent(struct clk *clk)
 }
 
 const struct clk_ops ccu_mix_ops = {
-#ifndef CONFIG_SPL_BUILD
+#ifndef CLIP_CCU_MIX_IN_SPL
 	.disable 	= ccu_mix_disable,
 	.round_rate 	= ccu_mix_round_rate,
 	.set_parent 	= ccu_mix_set_parent,

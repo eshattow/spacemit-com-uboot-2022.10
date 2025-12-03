@@ -9,6 +9,8 @@
 
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
 #include "ccu-k1x.h"
+#elifdef CONFIG_TARGET_SPACEMIT_K3X
+#include "ccu-k3.h"
 #endif
 #include "common.h"
 
