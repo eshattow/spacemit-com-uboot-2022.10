@@ -8,6 +8,7 @@
 #include <reset.h>
 #include <clk.h>
 #include <i2c.h>
+#include <log.h>
 #include <asm/io.h>
 #include <linux/delay.h>
 #include "spacemit_i2c.h"
@@ -381,7 +382,9 @@ static uint32_t apbc_clk_reg[] = {
 	REG_APBC_APBC_TWSI4_CLK_RST,
 	REG_APBC_APBC_TWSI5_CLK_RST,
 	REG_APBC_APBC_TWSI6_CLK_RST,
+#if defined(CONFIG_TARGET_SPACEMIT_K1X)
 	REG_APBC_APBC_TWSI7_CLK_RST,
+#endif
 	REG_APBC_APBC_TWSI8_CLK_RST,
 };
 
@@ -446,6 +449,7 @@ static int __i2c_probe_chip(struct spacemit_i2c *base, uchar chip)
 
 static void spacemit_i2c_init(struct i2c_adapter *adap, int speed, int slaveadd)
 {
+	assert_noisy(adap->hwadapnr != -1);
 	__i2c_init_chip(i2c_base[adap->hwadapnr], speed, slaveadd);
 }
 
@@ -454,6 +458,7 @@ static void spacemit_i2c_init(struct i2c_adapter *adap, int speed, int slaveadd)
  */
 static int spacemit_i2c_probe(struct i2c_adapter *adap, uchar chip)
 {
+	assert_noisy(adap->hwadapnr != -1);
 	return __i2c_probe_chip(i2c_base[adap->hwadapnr], chip);
 }
 
@@ -479,6 +484,7 @@ static int spacemit_i2c_read(struct i2c_adapter *adap, uchar chip, uint addr, in
 	addr_bytes[2] = (addr >> 16) & 0xFF;
 	addr_bytes[3] = (addr >> 24) & 0xFF;
 
+	assert_noisy(adap->hwadapnr != -1);
 	return __i2c_read(i2c_base[adap->hwadapnr], chip, addr_bytes, alen, buffer, len);
 }
 
@@ -504,6 +510,7 @@ static int spacemit_i2c_write(struct i2c_adapter *adap, uchar chip, uint addr, i
 	addr_bytes[2] = (addr >> 16) & 0xFF;
 	addr_bytes[3] = (addr >> 24) & 0xFF;
 
+	assert_noisy(adap->hwadapnr != -1);
 	return __i2c_write(i2c_base[adap->hwadapnr], chip, addr_bytes, alen, buffer, len);
 }
 
@@ -535,10 +542,17 @@ U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c6, spacemit_i2c_init, spacemit_i2c_probe,
 		spacemit_i2c_read, spacemit_i2c_write,
 		NULL, 100000, 0x50,
 		6);
+#if defined(CONFIG_TARGET_SPACEMIT_K3)
+U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c7, spacemit_i2c_init, spacemit_i2c_probe,
+		spacemit_i2c_read, spacemit_i2c_write,
+		NULL, 100000, 0x31,
+		-1);
+#elif defined(CONFIG_TARGET_SPACEMIT_K1X)
 U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c7, spacemit_i2c_init, spacemit_i2c_probe,
 		spacemit_i2c_read, spacemit_i2c_write,
 		NULL, 100000, 0x31,
 		7);
+#endif
 U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c8, spacemit_i2c_init, spacemit_i2c_probe,
 		spacemit_i2c_read, spacemit_i2c_write,
 		NULL, 100000, 0x31,
