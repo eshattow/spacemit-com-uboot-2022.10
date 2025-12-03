@@ -399,10 +399,8 @@ void i2c_init_board(void)
 	int i = 0;
 
 	mmio_write_32(0xd4051024, (*(unsigned int *)0xd4051024) | (1 << 6));
-	mmio_write_32(0xd4090104, (*(unsigned int *)0xd4090104) | (1 << 4));
+	mmio_write_32(0xd4090104, (*(unsigned int *)0xd4090104) | (1 << 3));
 
-	mmio_write_32(0xd401e228, (*(unsigned int *)0xd401e228) | (1 << 1));
-        mmio_write_32(0xd401e22c, (*(unsigned int *)0xd401e22c) | (1 << 1));
 	/* init the clk & reset or pinctrl */
 	for (i = 0; i < sizeof(apbc_clk_reg) / sizeof(apbc_clk_reg[0]); ++i) {
 		mmio_write_32(apbc_clk_reg[i], (I2C_FUNCLK_33MHz << 4) | 0x4);
