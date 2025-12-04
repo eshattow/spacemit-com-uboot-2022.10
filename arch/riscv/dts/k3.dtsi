@@ -426,25 +426,8 @@
 			ranges = <0x01000000 0x11 0x00010000 0x11 0x00010000 0x0 0x00100000>,
 				 <0x02000000 0x0 0x80000000 0x11 0x00110000 0x0 0x80000000>,
 				 <0x43000000 0x18 0x00000000 0x18 0x00000000 0x1 0x00000000>;
-
-			interrupt-parent = <&saplic>;
-			interrupts = <141 4>, <145 4>;
-
-			#interrupt-cells = <1>;
-			interrupt-map-mask = <0 0 0 0x7>;
-			interrupt-map = <0000 0 0 1 &pcie0_intc 1>, /* int_a */
-					<0000 0 0 2 &pcie0_intc 2>, /* int_b */
-					<0000 0 0 3 &pcie0_intc 3>, /* int_c */
-					<0000 0 0 4 &pcie0_intc 4>; /* int_d */
 			linux,pci-domain = <0>;
-			msi-parent = <&simsic>;
 			status = "disabled";
-			pcie0_intc: interrupt-controller@0 {
-				interrupt-controller;
-				reg = <0 0 0 0 0>;
-				#address-cells = <0>;
-				#interrupt-cells = <1>;
-			};
 		};
 
 		pcie1_rc: pcie@80400000 {
@@ -470,24 +453,8 @@
 			ranges = <0x01000000 0x11 0x80010000 0x11 0x80010000 0x0 0x00100000>,
 				 <0x02000000 0x0  0x80000000 0x11 0x80110000 0x0 0x80000000>,
 				 <0x43000000 0x16 0x00000000 0x16 0x00000000 0x1 0x00000000>;
-
-			interrupt-parent = <&saplic>;
-			interrupts = <142 4>, <146 4>;
-			#interrupt-cells = <1>;
-			interrupt-map-mask = <0 0 0 0x7>;
-			interrupt-map = <0000 0 0 1 &pcie1_intc 1>, /* int_a */
-					<0000 0 0 2 &pcie1_intc 2>, /* int_b */
-					<0000 0 0 3 &pcie1_intc 3>, /* int_c */
-					<0000 0 0 4 &pcie1_intc 4>; /* int_d */
 			linux,pci-domain = <1>;
-			msi-parent = <&simsic>;
 			status = "disabled";
-			pcie1_intc: interrupt-controller@0  {
-				interrupt-controller;
-				reg = <0 0 0 0 0>;
-				#address-cells = <0>;
-				#interrupt-cells = <1>;
-			};
 		};
 
 		pcie2_rc: pcie@80800000 {
@@ -513,24 +480,63 @@
 			ranges = <0x01000000 0x12 0x00010000 0x12 0x00010000 0x0 0x00100000>,
 				<0x02000000 0x0  0x80000000 0x12 0x00110000 0x0 0x80000000>,
 				<0x43000000 0x15 0x00000000 0x15 0x00000000 0x1 0x00000000>;
-
-			interrupt-parent = <&saplic>;
-			interrupts = <143 4>, <147 4>;
-			#interrupt-cells = <1>;
-			interrupt-map-mask = <0 0 0 0x7>;
-			interrupt-map = <0000 0 0 1 &pcie2_intc 1>, /* int_a */
-					<0000 0 0 2 &pcie2_intc 2>, /* int_b */
-					<0000 0 0 3 &pcie2_intc 3>, /* int_c */
-					<0000 0 0 4 &pcie2_intc 4>; /* int_d */
 			linux,pci-domain = <2>;
-			msi-parent = <&simsic>;
 			status = "disabled";
-			pcie2_intc: interrupt-controller@0 {
-				interrupt-controller;
-				reg = <0 0 0 0 0>;
-				#address-cells = <0>;
-				#interrupt-cells = <1>;
-			};
+		};
+
+
+		pcie3_rc: pcie@80c00000 {
+			compatible = "spacemit,k3-pcie";
+			reg = <0x0 0x80c00000 0x0 0x00001000>, /* dbi */
+			      <0x0 0x80d00000 0x0 0x00001000>, /* dbi2 */
+			      <0x0 0x80f00000 0x0 0x00003f20>, /* atu registers */
+			      <0x12 0x80000000 0x0 0x00010000>, /* config space */
+			      <0x0 0xd42829e0 0x0 0x00000008>, /* k3 soc config addr */
+			      <0x0 0x82a00000 0x0 0x00001000>; /* phy ahb */
+			reg-names = "dbi", "dbi2", "atu", "config", "app", "phy_ahb";
+
+			clocks = <&ccu CLK_PCIED>;
+			resets = <&reset RESET_PCIE_PORTD>;
+			reset-names = "pcie-reset";
+
+			bus-range = <0x00 0xff>;
+			max-link-speed = <2>;
+			num-lanes = <1>;
+			device_type = "pci";
+			#address-cells = <3>;
+			#size-cells = <2>;
+			ranges = <0x01000000 0x12 0x80010000 0x12 0x80010000 0x0 0x00100000>,
+				 <0x02000000 0x0  0x80000000 0x12 0x80110000 0x0 0x80000000>,
+				 <0x43000000 0x14 0x00000000 0x14 0x00000000 0x1 0x00000000>;
+			linux,pci-domain = <2>;
+			status = "disabled";
+		};
+
+		pcie4_rc: pcie@81000000 {
+			compatible = "spacemit,k3-pcie";
+			reg = <0x0 0x81000000 0x0 0x00001000>, /* dbi */
+			      <0x0 0x81100000 0x0 0x00001000>, /* dbi2 */
+			      <0x0 0x81300000 0x0 0x00003f20>, /* atu registers */
+			      <0x12 0xc0000000 0x0 0x00010000>, /* config space */
+			      <0x0 0xd42829e8 0x0 0x00000008>, /* k3 soc config addr */
+			      <0x0 0x82b00000 0x0 0x00001000>; /* phy ahb */
+			reg-names = "dbi", "dbi2", "atu", "config", "app", "phy_ahb";
+
+			clocks = <&ccu CLK_PCIEE>;
+			resets = <&reset RESET_PCIE_PORTE>;
+			reset-names = "pcie-reset";
+
+			bus-range = <0x00 0xff>;
+			max-link-speed = <2>;
+			num-lanes = <1>;
+			device_type = "pci";
+			#address-cells = <3>;
+			#size-cells = <2>;
+			ranges = <0x01000000 0x12 0xc0010000 0x12 0xc0010000 0x0 0x00100000>,
+				 <0x02000000 0x0  0x80000000 0x12 0xc0110000 0x0 0x80000000>,
+				 <0x43000000 0x13 0x00000000 0x13 0x00000000 0x1 0x00000000>;
+			linux,pci-domain = <2>;
+			status = "disabled";
 		};
 
 		qspi: spi@d420c000 {
