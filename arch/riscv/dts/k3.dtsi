@@ -738,11 +738,91 @@
 			};
 		};
 
+		i2c0: twsi0@d4010800 {
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4010800 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI0>;
+			resets = <&reset RESET_TWSI0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <100000>;
+			status = "disabled";
+		};
+
+		i2c1: twsi1@d4011000 {
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4011000 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI1>;
+			resets = <&reset RESET_TWSI1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <100000>;
+			status = "disabled";
+		};
+
+		i2c2: twsi2@d4012000 {
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4012000 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI2>;
+			resets = <&reset RESET_TWSI2>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <100000>;
+			status = "disabled";
+		};
+
+		i2c3: twsi3@f0614000 {
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xf0614000 0x0 0x38>;
+			clocks = <&ccu CLK_SEC_TWSI3>;
+			resets = <&reset RESET_SEC_TWSI3>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <100000>;
+			status = "disabled";
+		};
+
+		i2c4: twsi4@d4012800 {
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4012800 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI4>;
+			resets = <&reset RESET_TWSI4>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <100000>;
+			status = "disabled";
+		};
+
+		i2c5: twsi5@d4013800 {
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4013800 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI5>;
+			resets = <&reset RESET_TWSI5>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <100000>;
+			status = "disabled";
+		};
+
+		i2c6: twsi6@d4018800 {
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xd4018800 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI6>;
+			resets = <&reset RESET_TWSI6>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <100000>;
+			status = "disabled";
+		};
+
 		i2c8: twsi8@d401d800 {
 			compatible = "spacemit,i2c";
 			reg = <0x0 0xd401d800 0x0 0x38>;
+			clocks = <&ccu CLK_TWSI8>;
+			resets = <&reset RESET_TWSI8>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			clock-frequency = <100000>;
 			status = "disabled";
 		};
 
