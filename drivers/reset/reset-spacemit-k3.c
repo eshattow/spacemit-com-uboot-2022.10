@@ -15,6 +15,7 @@
 #include <dm/lists.h>
 #include <linux/bitops.h>
 #include <dt-bindings/reset/reset-spacemit-k3.h>
+#include "reset-spacemit-k3.h"
 
 /* APBC register offset */
 #define APBC_UART0_CLK_RST      0x00
@@ -195,6 +196,51 @@ struct spacemit_reset {
 
 struct spacemit_reset k3_reset_controller;
 
+#ifdef CONFIG_SPL_BUILD
+static const struct spacemit_reset_signal
+	k3_reset_signals[RESET_NUMBER_SPL] = {
+	[RESET_SDH_AXI_SPL]     = { APMU_SDH0_CLK_RES_CTRL, BIT(0), BIT(0), 0, RST_BASE_TYPE_APMU },
+	[RESET_SDH0_SPL]        = { APMU_SDH0_CLK_RES_CTRL, BIT(1), BIT(1), 0, RST_BASE_TYPE_APMU },
+	[RESET_SDH2_SPL]        = { APMU_SDH2_CLK_RES_CTRL, BIT(1), BIT(1), 0, RST_BASE_TYPE_APMU },
+	[RESET_QSPI_SPL]        = { APMU_QSPI_CLK_RES_CTRL, BIT(1), BIT(1), 0, RST_BASE_TYPE_APMU },
+	[RESET_QSPI_BUS_SPL]    = { APMU_QSPI_CLK_RES_CTRL, BIT(0), BIT(0), 0, RST_BASE_TYPE_APMU },
+	[RESET_UFS_ACLK_SPL]    = { APMU_UFS_CLK_RES_CTRL, BIT(0), BIT(0), 0, RST_BASE_TYPE_APMU },
+};
+
+static u32 transfer_to_spl_list[][2] = {
+	{RESET_SDH_AXI, RESET_SDH_AXI_SPL},
+	{RESET_SDH0, RESET_SDH0_SPL},
+	{RESET_SDH2, RESET_SDH2_SPL},
+	{RESET_QSPI, RESET_QSPI_SPL},
+	{RESET_QSPI_BUS, RESET_QSPI_BUS_SPL},
+	{RESET_UFS_ACLK, RESET_UFS_ACLK_SPL},
+};
+
+ulong transfer_reset_id_to_spl(ulong id)
+{
+	u32 listsize = ARRAY_SIZE(transfer_to_spl_list);
+
+	for (int i = 0; i < listsize; i++){
+		if (id == transfer_to_spl_list[i][0]){
+			pr_info("id:%ld, %d,\n", id, transfer_to_spl_list[i][1]);
+			return transfer_to_spl_list[i][1];
+		}
+	}
+	return id;
+}
+
+static int reset_of_xlate(struct reset_ctl *reset_ctl,
+			struct ofnode_phandle_args *args)
+{
+	if (args->args_count != 1) {
+		debug("Invalid args_count: %d\n", args->args_count);
+		return -EINVAL;
+	}
+	reset_ctl->id = args->args[0];
+	reset_ctl->id = transfer_reset_id_to_spl(reset_ctl->id);
+	return 0;
+}
+#else
 static const struct spacemit_reset_signal
 	k3_reset_signals[RESET_NUMBER] = {
 	//APBC
@@ -365,6 +411,7 @@ static const struct spacemit_reset_signal
 	[RESET_RCPU5_RT24_CORE0] = { RCPU5_RT24_CORE0_SW_RESET, BIT(0), 0, BIT(0), RST_BASE_TYPE_RCPU },
 	[RESET_RCPU5_RT24_CORE1] = { RCPU5_RT24_CORE1_SW_RESET, BIT(0), 0, BIT(0), RST_BASE_TYPE_RCPU },
 };
+#endif
 
 static u32 spacemit_reset_read(struct spacemit_reset *reset, u32 id)
 {
@@ -549,6 +596,9 @@ out:
 const struct reset_ops k3_reset_ops = {
 	.rst_assert = spacemit_reset_assert,
 	.rst_deassert = spacemit_reset_deassert,
+#ifdef CONFIG_SPL_BUILD
+	.of_xlate = reset_of_xlate,
+#endif
 };
 
 static const struct udevice_id k3_reset_ids[] = {
