@@ -114,8 +114,9 @@ int dram_init(void)
 #else
 	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
 #endif
-	gd->ram_size = dram_size;
+	// initial 32MB of memory is invisible, reserved for openSBI and esos.
 	gd->ram_base = CONFIG_SYS_SDRAM_BASE;
+	gd->ram_size = dram_size - SEC_IMG_SIZE;
 
 	return 0;
 }
@@ -123,20 +124,15 @@ int dram_init(void)
 int dram_init_banksize(void)
 {
 	memset(gd->bd->bi_dram, 0, sizeof(gd->bd->bi_dram));
-	gd->bd->bi_dram[0].start = gd->ram_base + SEC_IMG_SIZE;
-	gd->bd->bi_dram[0].size = gd->ram_size - SEC_IMG_SIZE;
+	gd->bd->bi_dram[0].start = gd->ram_base;
+	gd->bd->bi_dram[0].size = gd->ram_size;
 
 	return 0;
 }
 
 ulong board_get_usable_ram_top(ulong total_size)
 {
-	/* Some devices (like the EMAC) have a 32-bit DMA limit. */
-	if(gd->ram_size > SZ_2GB) {
-		return gd->ram_base + SZ_2GB;
-	} else {
-		return gd->ram_base + gd->ram_size;
-	}
+	return gd->ram_base + gd->ram_size;
 }
 
 void *board_fdt_blob_setup(int *err)
