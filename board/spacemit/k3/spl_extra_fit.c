@@ -370,31 +370,31 @@ static int load_fit_from_mtd(struct spl_image_info *caller_spl_image, const char
 
 #if defined(CONFIG_SPL_FS_FAT) || defined(CONFIG_SPL_FS_EXT4)
 /**
- * Load all firmware from bootfs partition
+ * Load all firmware from bootloader file system partition
  * Loads u-boot-opensbi.itb and esos.itb FIT images, same as legacy mode
  *
  * @spl_image: SPL image info structure
  * @uboot_entry: Output parameter for U-Boot entry address
  * @return: 0 on success, negative on error
  */
-static int load_all_from_bootfs(struct spl_image_info *spl_image, ulong *uboot_entry)
+static int load_all_from_blfs(struct spl_image_info *spl_image, ulong *uboot_entry)
 {
 	struct blk_desc *bd;
 	const char *uboot_itb_path, *esos_itb_path;
-	int bootfs_partition = CONFIG_SYS_MMCSD_FS_BOOT_PARTITION;
+	int blfs_partition = CONFIG_SYS_MMCSD_FS_BOOT_PARTITION;
 	int ret = -1;
 
 	/* Get block device */
 	bd = get_default_mmc_blk_desc();
 	if (!bd) {
-		pr_err("BOOTFS: failed to get block device\n");
+		pr_err("BLFS: failed to get block device\n");
 		return -ENODEV;
 	}
 
 	/* Get environment variables for file paths */
-	/* Use bootfs-specific env vars for file names (not partition names) */
-	esos_itb_path = env_get("bootfs_esos_itb");
-	uboot_itb_path = env_get("bootfs_uboot_itb");
+	/* Use blfs-specific env vars for file names (not partition names) */
+	esos_itb_path = env_get("esos_itb_path");
+	uboot_itb_path = env_get("uboot_itb_path");
 
 	/* Fallback to hardcoded paths if env_get fails or returns wrong value */
 	if (!esos_itb_path || !strcmp(esos_itb_path, uboot_itb_path)) {
@@ -408,35 +408,35 @@ static int load_all_from_bootfs(struct spl_image_info *spl_image, ulong *uboot_e
 	if (esos_itb_path && *esos_itb_path) {
 		struct spl_image_info esos_image = { 0 };
 #ifdef CONFIG_SPL_FS_FAT
-		ret = spl_load_image_fat(&esos_image, NULL, bd, bootfs_partition, esos_itb_path);
+		ret = spl_load_image_fat(&esos_image, NULL, bd, blfs_partition, esos_itb_path);
 #endif
 #ifdef CONFIG_SPL_FS_EXT4
 		if (ret)
-			ret = spl_load_image_ext(&esos_image, NULL, bd, bootfs_partition,
+			ret = spl_load_image_ext(&esos_image, NULL, bd, blfs_partition,
 						 esos_itb_path);
 #endif
 		if (ret) {
-			pr_debug("BOOTFS: ESOS load failed (non-fatal)\n");
+			pr_debug("BLFS: ESOS load failed (non-fatal)\n");
 		}
 	}
 
 	/* Step 2: Load and parse u-boot.itb (use temp to avoid overwriting opensbi entry_point) */
 	if (!uboot_itb_path || !*uboot_itb_path) {
-		pr_debug("BOOTFS: ERROR - missing uboot_itb_path\n");
+		pr_debug("BLFS: ERROR - missing uboot_itb_path\n");
 		return -EINVAL;
 	}
 
 	/* Use temporary spl_image_info to load U-Boot without affecting caller's entry_point */
 	struct spl_image_info uboot_image = { 0 };
 #ifdef CONFIG_SPL_FS_FAT
-	ret = spl_load_image_fat(&uboot_image, NULL, bd, bootfs_partition, uboot_itb_path);
+	ret = spl_load_image_fat(&uboot_image, NULL, bd, blfs_partition, uboot_itb_path);
 #endif
 #ifdef CONFIG_SPL_FS_EXT4
 	if (ret)
-		ret = spl_load_image_ext(&uboot_image, NULL, bd, bootfs_partition, uboot_itb_path);
+		ret = spl_load_image_ext(&uboot_image, NULL, bd, blfs_partition, uboot_itb_path);
 #endif
 	if (ret) {
-		pr_debug("BOOTFS: ERROR - U-Boot FIT load failed\n");
+		pr_debug("BLFS: ERROR - U-Boot FIT load failed\n");
 		return ret;
 	}
 
@@ -466,54 +466,53 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 	case BOOT_DEVICE_MMC2:
 	case BOOT_DEVICE_MMC2_2: {
 #if defined(CONFIG_SPL_FS_FAT) || defined(CONFIG_SPL_FS_EXT4)
-		const char *bootfs_mode_str;
-		int bootfs_load_mode = 0;
-		int bootfs_failed = 1;
+		const char *blfs_mode_str;
+		int blfs_load_mode = 0;
+		bool blfs_load_failed = false;
 
-		/* Check if bootfs load mode is enabled,default to enabled*/
-		bootfs_mode_str = env_get("bootfs_load_mode");
-		if (bootfs_mode_str)
-			bootfs_load_mode = simple_strtol(bootfs_mode_str, NULL, 10);
+		/* Check if bootloader file system load mode is enabled, default to be enabled */
+		blfs_mode_str = env_get("bootloader_from_fs");
+		if (blfs_mode_str)
+			blfs_load_mode = simple_strtol(blfs_mode_str, NULL, 10);
 		else
-			bootfs_load_mode = 1;
+			blfs_load_mode = 1;
 
-		if (bootfs_load_mode) {
-			/* Try new mode: load all firmware from bootfs (FAT/EXT4) */
-			int ret = load_all_from_bootfs(spl_image, uboot_entry);
+		if (blfs_load_mode) {
+			/* Try new mode: load all firmware from bootloader file system (FAT12) */
+			int ret = load_all_from_blfs(spl_image, uboot_entry);
 			if (ret == 0) {
 				load_esos_res = 0;
 				load_uboot_res = 0;
-				bootfs_failed = 0;
 			} else {
-				bootfs_failed = 1;
+				blfs_load_failed = true;
 			}
 		}
 
-		/* Fallback to legacy mode if bootfs disabled or failed */
-		if (bootfs_failed)
+		/* Fallback to legacy mode if bootloader file system disabled or failed */
+		if (blfs_load_failed)
 #endif /* CONFIG_SPL_FS_FAT || CONFIG_SPL_FS_EXT4 */
 		{
 			/* Legacy mode: load FIT images from partitions */
 			const char *tmp;
 			char *part_esos = NULL, *part_uboot = NULL;
 			pr_debug("MMC: using legacy FIT load mode\n");
-			tmp = env_get("extra_fit_esos");
+			tmp = env_get("extra_esos_partition");
 			if (tmp)
 				part_esos = strdup(tmp);
-			tmp = env_get("extra_fit_uboot");
+			tmp = env_get("extra_uboot_partition");
 			if (tmp)
 				part_uboot = strdup(tmp);
 
 			if (part_esos && *part_esos) {
 				load_esos_res = load_fit_from_mmc(spl_image, part_esos, NULL);
 			} else {
-				pr_debug("extra_fit_esos not set, skip MMC esos\n");
+				pr_debug("extra_esos_partition not set, skip MMC esos\n");
 			}
 			if (part_uboot && *part_uboot) {
 				load_uboot_res =
 					load_fit_from_mmc(spl_image, part_uboot, uboot_entry);
 			} else {
-				pr_debug("extra_fit_uboot not set, skip MMC uboot\n");
+				pr_debug("extra_uboot_partition not set, skip MMC uboot\n");
 			}
 
 			if (part_esos)
@@ -529,10 +528,10 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 	case BOOT_DEVICE_NAND: {
 		const char *tmp;
 		char *part_esos = NULL, *part_uboot = NULL;
-		tmp = env_get("extra_fit_esos");
+		tmp = env_get("extra_esos_partition");
 		if (tmp)
 			part_esos = strdup(tmp);
-		tmp = env_get("extra_fit_uboot");
+		tmp = env_get("extra_uboot_partition");
 		if (tmp)
 			part_uboot = strdup(tmp);
 
@@ -541,14 +540,14 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 			load_esos_res = load_fit_from_mtd(
 				spl_image, strcmp(part_esos, "1") == 0 ? "esos" : part_esos, NULL);
 		} else {
-			pr_debug("extra_fit_esos not set, skip MTD esos\n");
+			pr_debug("extra_esos_partition not set, skip MTD esos\n");
 		}
 		if (part_uboot && *part_uboot) {
 			load_uboot_res = load_fit_from_mtd(
 				spl_image, strcmp(part_uboot, "1") == 0 ? "uboot" : part_uboot,
 				uboot_entry);
 		} else {
-			pr_debug("extra_fit_uboot not set, skip MTD uboot\n");
+			pr_debug("extra_uboot_partition not set, skip MTD uboot\n");
 		}
 
 		if (part_esos)
