@@ -829,11 +829,21 @@ static const struct nand_ops spinand_ops = {
 };
 
 static const struct spinand_manufacturer *spinand_manufacturers[] = {
+#ifdef CONFIG_SPI_NAND_GIGADEVICE
 	&gigadevice_spinand_manufacturer,
+#endif
+#ifdef CONFIG_SPI_NAND_MACRONIX
 	&macronix_spinand_manufacturer,
+#endif
+#ifdef CONFIG_SPI_NAND_MICRON
 	&micron_spinand_manufacturer,
+#endif
+#ifdef CONFIG_SPI_NAND_TOSHIBA
 	&toshiba_spinand_manufacturer,
+#endif
+#ifdef CONFIG_SPI_NAND_WINBOND
 	&winbond_spinand_manufacturer,
+#endif
 	&other_spinand_manufacturer,
 };
 
