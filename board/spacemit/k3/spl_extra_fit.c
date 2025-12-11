@@ -370,84 +370,40 @@ static int load_fit_from_mtd(struct spl_image_info *caller_spl_image, const char
 
 #if defined(CONFIG_SPL_FS_FAT) || defined(CONFIG_SPL_FS_EXT4)
 /**
- * Load all firmware from bootloader file system partition
- * Loads u-boot-opensbi.itb and esos.itb FIT images, same as legacy mode
+ * Load firmware from bootloader file system partition
+ * Loads u-boot-opensbi.itb or esos.itb FIT images, same as legacy mode
  *
- * @spl_image: SPL image info structure
- * @uboot_entry: Output parameter for U-Boot entry address
+ * @image:      SPL image info structure
+ * @image_path: Image path and name.
  * @return: 0 on success, negative on error
  */
-static int load_all_from_blfs(struct spl_image_info *spl_image, ulong *uboot_entry)
+static int load_image_from_mmc_blfs(struct spl_image_info *image, const char *image_path)
 {
 	struct blk_desc *bd;
-	const char *uboot_itb_path, *esos_itb_path;
 	int blfs_partition = CONFIG_SYS_MMCSD_FS_BOOT_PARTITION;
 	int ret = -1;
 
-	/* Get block device */
+	/* Get mmc block device */
 	bd = get_default_mmc_blk_desc();
 	if (!bd) {
 		pr_err("BLFS: failed to get block device\n");
 		return -ENODEV;
 	}
 
-	/* Get environment variables for file paths */
-	/* Use blfs-specific env vars for file names (not partition names) */
-	esos_itb_path = env_get("esos_itb_path");
-	uboot_itb_path = env_get("uboot_itb_path");
-
-	/* Fallback to hardcoded paths if env_get fails or returns wrong value */
-	if (!esos_itb_path || !strcmp(esos_itb_path, uboot_itb_path)) {
-		esos_itb_path = "esos.itb";
-	}
-	if (!uboot_itb_path) {
-		uboot_itb_path = "u-boot.itb";
-	}
-
-	/* Step 1: Load and parse esos.itb first if specified */
-	if (esos_itb_path && *esos_itb_path) {
-		struct spl_image_info esos_image = { 0 };
 #ifdef CONFIG_SPL_FS_FAT
-		ret = spl_load_image_fat(&esos_image, NULL, bd, blfs_partition, esos_itb_path);
+	// first try in FAT
+	ret = spl_load_image_fat(image, NULL, bd, blfs_partition, image_path);
 #endif
 #ifdef CONFIG_SPL_FS_EXT4
-		if (ret)
-			ret = spl_load_image_ext(&esos_image, NULL, bd, blfs_partition,
-						 esos_itb_path);
-#endif
-		if (ret) {
-			pr_debug("BLFS: ESOS load failed (non-fatal)\n");
-		}
-	}
-
-	/* Step 2: Load and parse u-boot.itb (use temp to avoid overwriting opensbi entry_point) */
-	if (!uboot_itb_path || !*uboot_itb_path) {
-		pr_debug("BLFS: ERROR - missing uboot_itb_path\n");
-		return -EINVAL;
-	}
-
-	/* Use temporary spl_image_info to load U-Boot without affecting caller's entry_point */
-	struct spl_image_info uboot_image = { 0 };
-#ifdef CONFIG_SPL_FS_FAT
-	ret = spl_load_image_fat(&uboot_image, NULL, bd, blfs_partition, uboot_itb_path);
-#endif
-#ifdef CONFIG_SPL_FS_EXT4
+	// then try in EXT4
 	if (ret)
-		ret = spl_load_image_ext(&uboot_image, NULL, bd, blfs_partition, uboot_itb_path);
+		ret = spl_load_image_ext(image, NULL, bd, blfs_partition, image_path);
 #endif
 	if (ret) {
-		pr_debug("BLFS: ERROR - U-Boot FIT load failed\n");
-		return ret;
+		pr_err("BLFS: image(%s) load failed (non-fatal)\n", image_path);
 	}
 
-	/* Copy DTB address to caller's spl_image (shared between opensbi and uboot) */
-	if (uboot_image.fdt_addr)
-		spl_image->fdt_addr = uboot_image.fdt_addr;
-
-	/* Extract U-Boot entry point for opensbi to jump to */
-	if (uboot_entry && uboot_image.entry_point)
-		*uboot_entry = uboot_image.entry_point;
-	return 0;
+	return ret;
 }
 #endif /* CONFIG_SPL_FS_FAT || CONFIG_SPL_FS_EXT4 */
 
@@ -469,6 +425,8 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 		const char *blfs_mode_str;
 		int blfs_load_mode = 0;
 		bool blfs_load_failed = false;
+		const char *uboot_itb_path, *esos_itb_path;
+		struct spl_image_info image;
 
 		/* Check if bootloader file system load mode is enabled, default to be enabled */
 		blfs_mode_str = env_get("bootloader_from_fs");
@@ -478,11 +436,32 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 			blfs_load_mode = 1;
 
 		if (blfs_load_mode) {
-			/* Try new mode: load all firmware from bootloader file system (FAT12) */
-			int ret = load_all_from_blfs(spl_image, uboot_entry);
-			if (ret == 0) {
+			/* Get environment variables for file paths */
+			/* Use blfs-specific env vars for file names (not partition names) */
+			esos_itb_path = env_get("esos_itb_path");
+			uboot_itb_path = env_get("uboot_itb_path");
+
+			/* Fallback to hardcoded paths if env_get fails or returns wrong value */
+			if (!uboot_itb_path) {
+				uboot_itb_path = "u-boot.itb";
+			}
+			if (!esos_itb_path || !strcmp(esos_itb_path, uboot_itb_path)) {
+				esos_itb_path = "esos.itb";
+			}
+
+			/* load firmware from bootloader file system, MUST load uboot at the last */
+			if ((0 == load_image_from_mmc_blfs(&image, esos_itb_path)) &&
+				(0 == load_image_from_mmc_blfs(&image, uboot_itb_path))) {
 				load_esos_res = 0;
 				load_uboot_res = 0;
+
+				/* Copy DTB address to caller's spl_image (shared between opensbi and uboot) */
+				if (image.fdt_addr)
+					spl_image->fdt_addr = image.fdt_addr;
+
+				/* Extract U-Boot entry point for opensbi to jump to */
+				if (uboot_entry && image.entry_point)
+					*uboot_entry = image.entry_point;
 			} else {
 				blfs_load_failed = true;
 			}
