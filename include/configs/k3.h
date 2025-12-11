@@ -84,6 +84,7 @@
 
 #define DEFAULT_PRODUCT_NAME		"k3_fpga_1x1"
 #define BOOTFS_NAME			("bootfs")
+#define BOOTLOADER_PARTITION_NAME	("bootloader")
 
 #ifndef __ASSEMBLY__
 enum board_boot_mode {

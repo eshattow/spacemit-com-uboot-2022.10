@@ -380,8 +380,9 @@ static int load_fit_from_mtd(struct spl_image_info *caller_spl_image, const char
 static int load_image_from_mmc_blfs(struct spl_image_info *image, const char *image_path)
 {
 	struct blk_desc *bd;
-	int blfs_partition = CONFIG_SYS_MMCSD_FS_BOOT_PARTITION;
-	int ret = -1;
+	struct disk_partition info;
+	int ret = -1, part;
+	const char *blfs_name;
 
 	/* Get mmc block device */
 	bd = get_default_mmc_blk_desc();
@@ -390,14 +391,21 @@ static int load_image_from_mmc_blfs(struct spl_image_info *image, const char *im
 		return -ENODEV;
 	}
 
+	blfs_name = BOOTLOADER_PARTITION_NAME;
+	part = part_get_info_by_name(bd, blfs_name, &info);
+	if (part < 0) {
+		pr_err("Partition %s NOT exist\n", blfs_name);
+		return -ENOENT;
+	}
+
 #ifdef CONFIG_SPL_FS_FAT
 	// first try in FAT
-	ret = spl_load_image_fat(image, NULL, bd, blfs_partition, image_path);
+	ret = spl_load_image_fat(image, NULL, bd, part, image_path);
 #endif
 #ifdef CONFIG_SPL_FS_EXT4
 	// then try in EXT4
 	if (ret)
-		ret = spl_load_image_ext(image, NULL, bd, blfs_partition, image_path);
+		ret = spl_load_image_ext(image, NULL, bd, part, image_path);
 #endif
 	if (ret) {
 		pr_err("BLFS: image(%s) load failed (non-fatal)\n", image_path);
