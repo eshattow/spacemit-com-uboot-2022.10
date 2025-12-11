@@ -18,45 +18,51 @@ DECLARE_GLOBAL_DATA_PTR;
 SPM8821_BUCK_LINER_RANGE; SPM8821_LDO_LINER_RANGE /* ; SPM8821_SWITCH_LINER_RANGE */;
 SPM8821_REGULATOR_BUCK_DESC; SPM8821_REGULATOR_LDO_DESC/* ; SPM8821_REGULATOR_SWITCH_DESC */;
 
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
 PM853_BUCK_LINER_RANGE1; PM853_BUCK_LINER_RANGE2; PM853_LDO_LINER_RANGE1; PM853_LDO_LINER_RANGE2;
 PM853_LDO_LINER_RANGE3; PM853_LDO_LINER_RANGE4; /* PM853_SWITCH_LINER_RANGE; */
 PM853_REGULATOR_BUCK_DESC; PM853_REGULATOR_LDO_DESC; /* PM853_REGULATOR_SWITCH_DESC; */
 
 SY8810L_BUCK_LINER_RANGE;SY8810L_REGULATOR_DESC;
+#endif
 
 MPQ8655_BUCK_LINER_RANGE;MPQ8655_REGULATOR_DESC;
 
 static const char *global_compatible[] = {
-	"spacemit,pm853",
 	"spacemit,spm8821",
-	"spacemit,sy8810l",
 	"spacemit,mpq8655",
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
+	"spacemit,pm853",
+	"spacemit,sy8810l",
+#endif
 };
 
 void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck_desc,
 		const struct pm8xx_buck_desc **ldo_desc, int *num_buck, int *num_ldo)
 {
 	if (strcmp(name, global_compatible[0]) == 0) {
-		*buck_desc = pm853_buck_desc;
-		*num_buck = sizeof(pm853_buck_desc) / sizeof(pm853_buck_desc[0]);
-		*ldo_desc = pm853_ldo_desc;
-		*num_ldo = sizeof(pm853_ldo_desc) / sizeof(pm853_ldo_desc[0]);
-	} else if (strcmp(name, global_compatible[1]) == 0) {
 		*buck_desc = spm8821_buck_desc;
 		*num_buck = sizeof(spm8821_buck_desc) / sizeof(spm8821_buck_desc[0]);
 		*ldo_desc = spm8821_ldo_desc;
 		*num_ldo = sizeof(spm8821_ldo_desc) / sizeof(spm8821_ldo_desc[0]);
-	} else if (strcmp(name, global_compatible[2]) == 0) {
-		*buck_desc = sy8810l_buck_desc;
-		*num_buck = sizeof(sy8810l_buck_desc) / sizeof(sy8810l_buck_desc[0]);
-		*ldo_desc = NULL;
-		*num_ldo = 0;
-	} else if (strcmp(name, global_compatible[3]) == 0) {
+	} else if (strcmp(name, global_compatible[1]) == 0) {
 		*buck_desc = mpq8655_buck_desc;
 		*num_buck = sizeof(mpq8655_buck_desc) / sizeof(mpq8655_buck_desc[0]);
 		*ldo_desc = NULL;
 		*num_ldo = 0;
-	} else {
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
+	} else if (strcmp(name, global_compatible[ARRAY_SIZE(global_compatible) - 2]) == 0) {
+		*buck_desc = pm853_buck_desc;
+		*num_buck = sizeof(pm853_buck_desc) / sizeof(pm853_buck_desc[0]);
+		*ldo_desc = pm853_ldo_desc;
+		*num_ldo = sizeof(pm853_ldo_desc) / sizeof(pm853_ldo_desc[0]);
+	} else if (strcmp(name, global_compatible[ARRAY_SIZE(global_compatible) - 1]) == 0) {
+		*buck_desc = sy8810l_buck_desc;
+		*num_buck = sizeof(sy8810l_buck_desc) / sizeof(sy8810l_buck_desc[0]);
+		*ldo_desc = NULL;
+		*num_ldo = 0;
+#endif
+ 	} else {
 		/* TODO */
 	}
 }
