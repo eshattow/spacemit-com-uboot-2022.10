@@ -38,6 +38,15 @@
 			};
 		};
 
+		fdt_3 {
+			description = "k3_deb1.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3_deb1.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -52,6 +61,12 @@
 			description = "k3_evb";
 			loadables = "uboot";
 			fdt = "fdt_2";
+		};
+
+		conf_3 {
+			description = "k3_deb1";
+			loadables = "uboot";
+			fdt = "fdt_3";
 		};
 	};
 };
