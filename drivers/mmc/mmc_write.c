@@ -98,7 +98,7 @@ ulong mmc_berase(struct blk_desc *block_dev, lbaint_t start, lbaint_t blkcnt)
 	err = div_u64_rem(start, mmc->erase_grp_size, &start_rem);
 	err = div_u64_rem(blkcnt, mmc->erase_grp_size, &blkcnt_rem);
 	if (start_rem || blkcnt_rem)
-		printf("\n\nCaution! Your devices Erase group is 0x%x\n"
+		pr_warn("\n\nCaution! Your devices Erase group is 0x%x\n"
 		       "The erase range would be change to "
 		       "0x" LBAF "~0x" LBAF "\n\n",
 		       mmc->erase_grp_size, start & ~(mmc->erase_grp_size - 1),
@@ -135,7 +135,7 @@ static ulong mmc_write_blocks(struct mmc *mmc, lbaint_t start,
 	int timeout_ms = 1000;
 
 	if ((start + blkcnt) > mmc_get_blk_desc(mmc)->lba) {
-		printf("MMC: block number 0x" LBAF " exceeds max(0x" LBAF ")\n",
+		pr_warn("MMC: block number 0x" LBAF " exceeds max(0x" LBAF ")\n",
 		       start + blkcnt, mmc_get_blk_desc(mmc)->lba);
 		return 0;
 	}
@@ -145,7 +145,7 @@ static ulong mmc_write_blocks(struct mmc *mmc, lbaint_t start,
 		cmd.cmdarg = blkcnt & 0x0000FFFF;
 		cmd.resp_type = MMC_RSP_R1;
 		if (mmc_send_cmd(mmc, &cmd, NULL)) {
-			printf("mmc fail to set block count\n");
+			pr_err("mmc fail to set block count\n");
 			return 0;
 		}
 	}
@@ -170,7 +170,7 @@ static ulong mmc_write_blocks(struct mmc *mmc, lbaint_t start,
 	data.flags = MMC_DATA_WRITE;
 
 	if (mmc_send_cmd(mmc, &cmd, &data)) {
-		printf("mmc write failed\n");
+		pr_err("mmc write failed\n");
 		return 0;
 	}
 

@@ -389,10 +389,10 @@ void print_mmc_devices(char separator)
 
 		pr_info("%s: %d", m->cfg->name, mmc_get_blk_desc(m)->devnum);
 		if (mmc_type)
-			printf(" (%s)", mmc_type);
+			pr_info(" (%s)", mmc_type);
 	}
 
-	printf("\n");
+	pr_info("\n");
 }
 
 #else
