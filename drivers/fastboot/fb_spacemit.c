@@ -300,6 +300,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			else
 				node_part = "";
 
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
 			/*bootinfo should be hidden as default in gpt partition*/
 			if (!parse_mtd_partition){
 				if (strlen(node_part) > 0 && !strncmp("bootinfo", node_part, 8)){
@@ -307,7 +308,7 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 					continue;
 				}
 			}
-
+#endif
 			cJSON *cj_hidden = cJSON_GetObjectItem(arraypart, "hidden");
 			if (cj_hidden){
 				if ((cj_hidden->type == cJSON_String && strcmp("true", cj_hidden->valuestring) == 0)

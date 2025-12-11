@@ -203,13 +203,13 @@ void fastboot_blk_flash_write(const char *cmd, void *download_buffer,
 		memset(fdev->mtd_table, '\0', 10);
 		printf("init fdev success\n");
 	}
-
-	/*blk device would not flash bootinfo except emmc*/
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
+	/* blk device would not flash bootinfo except emmc in k1 */
 	if (strcmp(cmd, "bootinfo") == 0) {
 		fastboot_okay(NULL, response);
 		return;
 	}
-
+#endif
 	if (strcmp(cmd, "gpt") == 0) {
 		fastboot_oem_flash_gpt(cmd, fastboot_buf_addr, download_bytes,
 						response, fdev);

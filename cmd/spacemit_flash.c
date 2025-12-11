@@ -170,7 +170,7 @@ int download_file_via_tftp(char *file_name, char *load_addr) {
 
 		retry_count++;
 		if (retry_count < TFTP_RETRY_COUNT) {
-			printf("TFTP download failed, retrying (%d/%d)...\n", 
+			printf("TFTP download failed, retrying (%d/%d)...\n",
 					retry_count, TFTP_RETRY_COUNT);
 		}
 	}
@@ -948,8 +948,11 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 		if (flash_image(cmdtp, fdev)) {
 			return RESULT_FAIL;
 		}
-		/*if flash to emmc，it should write bootinfo to boot0/boot1*/
+#ifdef CONFIG_TARGET_SPACEMIT_K1X
+		/* when flash emmc，bootinfo should be writen to boot0/boot1 */
+		// this special operation ONLY need to be done in K1
 		specific_flash_mmc_opt(cmdtp, fdev);
+#endif //CONFIG_TARGET_SPACEMIT_K1X
 		break;
 #endif //CONFIG_FASTBOOT_FLASH_MMC_DEV
 
