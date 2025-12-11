@@ -203,6 +203,39 @@ void run_fastboot_command(void)
 	}
 }
 
+void try_flash_image_from_card(void)
+{
+#ifdef CONFIG_MMC
+	struct mmc *mmc;
+	struct disk_partition info;
+	int part;
+	char cmd[128] = {"\0"};
+
+	mmc = find_mmc_device(MMC_DEV_SD);
+	if ((NULL == mmc) || (0 != mmc_init(mmc)))
+		return;
+
+	part = part_get_info_by_name(mmc_get_blk_desc(mmc), BOOTFS_NAME, &info);
+	if (part < 0) {
+		pr_err("NO partition %s in card\n", BOOTFS_NAME);
+		return;
+	}
+
+	/*check if flash config file is in sd card*/
+	sprintf(cmd, "fatsize mmc %d:%d %s", MMC_DEV_SD, part, FLASH_CONFIG_FILE_NAME);
+	pr_debug("cmd: %s\n", cmd);
+	if (0 != run_command(cmd, 0)) {
+		pr_err("Can NOT find partition table %s in card\n", FLASH_CONFIG_FILE_NAME);
+		return;
+	}
+
+	/* show flash log*/
+	env_set("stdout", env_get("stdout_flash"));
+	run_command("flash_image mmc", 0);
+#endif
+	return;
+}
+
 int board_late_init(void)
 {
 	ulong kernel_start;
@@ -212,6 +245,10 @@ int board_late_init(void)
 	set_env_ethaddr();
 
 	run_fastboot_command();
+
+	if (BOOT_MODE_SD == get_boot_mode()) {
+		try_flash_image_from_card();
+	}
 
 	import_env_from_bootfs();
 
