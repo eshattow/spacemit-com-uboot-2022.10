@@ -116,6 +116,9 @@ enum board_boot_mode {
 	"esos_itb_path=esos.itb\0" \
 	"uboot_itb_path=u-boot.itb\0" \
 	"extra_esos_partition=esos\0" \
-	"extra_uboot_partition=uboot\0"
+	"extra_uboot_partition=uboot\0" \
+	"splashimage=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
+	"splashpos=m,m\0" \
+	"splashfile=bianbu.bmp\0"
 
 #endif /* __SPACEMIT_K3_CONFIG_H */
