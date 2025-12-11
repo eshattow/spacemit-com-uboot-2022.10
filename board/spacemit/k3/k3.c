@@ -288,12 +288,6 @@ void *board_fdt_blob_setup(int *err)
 /******************************************************************************
  * Boot mode support function
  *******************************************************************************/
-
-void set_boot_mode(enum board_boot_mode boot_mode)
-{
-	writel(boot_mode, (void *)BOOT_DEV_FLAG_REG);
-}
-
 /*
  * Boot mode strap pins (4 bits total)
  *
