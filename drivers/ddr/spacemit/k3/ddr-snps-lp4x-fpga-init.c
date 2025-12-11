@@ -4,26 +4,9 @@
  */
 
 #include <common.h>
-#include <cpu_func.h>
-#include <dm.h>
-#include <errno.h>
-#include <div64.h>
-#include <fdtdec.h>
-#include <init.h>
-#include <log.h>
-#include <ram.h>
-#include <asm/cache.h>
-#include <asm/global_data.h>
-#include <asm/io.h>
-#include <dm/device_compat.h>
-#include <linux/sizes.h>
 #include "ddr3_config.h"
-#include <linux/delay.h>
 
 #define DDR_FPGA_PHY
-#define DDR_CHECK_SIZE			(0x4000)
-#define DDR_CHECK_STEP			(0x2000)
-#define DDR_CHECK_CNT			(0x1000)
 #define REG32(x)                        (*((volatile uint32_t *)((uintptr_t)(x))))
 #define LOGLEVEL 1
 #define LogMsg(level, format, args...) \
@@ -31,83 +14,6 @@
 		if (level < LOGLEVEL) \
 		printf(format, ##args); \
 	} while (0)
-
-static int test_pattern(fdt_addr_t base, fdt_size_t size)
-{
-	fdt_addr_t addr;
-	fdt_size_t check_size;
-	uint32_t offset;
-	uint32_t* ddr_data = NULL;
-	uint32_t* save_data;
-	int err;
-
-	err = 0;
-
-	check_size = (DDR_CHECK_SIZE / DDR_CHECK_STEP) * DDR_CHECK_CNT;
-	ddr_data = malloc(check_size);
-	if (!ddr_data) {
-		printf("test zone malloc fail size 0x%llx\n", check_size);
-		return -1;
-	}
-
-	save_data = ddr_data;
-	/* to avoid overlap important data as image or ramdump  */
-	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
-		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
-			*save_data = readl((void*)addr + offset);
-			save_data++;
-		}
-	}
-
-	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
-		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
-			writel((uint32_t)(addr + offset), (void*)addr + offset);
-		}
-	}
-	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
-		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
-			if (readl((void*)addr + offset) != (uint32_t)(addr + offset)) {
-				printf("ddr check error %x vs %x\n", (uint32_t)(addr + offset), readl((void*)addr + offset));
-				err++;
-				if (err > 10)
-					goto ERR_HANDLE;
-			}
-		}
-	}
-
-	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
-		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
-			writel((~(uint32_t)(addr + offset)), (void*)addr + offset);
-		}
-	}
-	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
-		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
-			if (readl((void*)addr + offset) != (~(uint32_t)(addr + offset))) {
-				printf("ddr check error %x vs %x\n", (uint32_t)(~(addr + offset)), readl((void*)addr + offset));
-				err++;
-				if (err > 10)
-					goto ERR_HANDLE;
-			}
-		}
-	}
-
-ERR_HANDLE:
-	save_data = ddr_data;
-	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
-		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
-			writel(*save_data, (void*)addr + offset);
-			save_data++;
-		}
-	}
-	if (err == 0)
-		printf("*********ch0 is pass\n");
-	else
-		printf("*********ch0 is fail!\n");
-
-	free(ddr_data);
-
-	return err;
-}
 
 void init_snps_mr(unsigned DDRC_BASE, unsigned mr)
 {
@@ -658,12 +564,13 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code) // ddr3 init
 	// X:read address 0x00010b88 and get 0x36000000;
 }
 #endif //~OLDDCODE
-static int spacemit_ddr_probe(struct udevice *dev){
-	int ret;
 
+void fpga_ddr_init(void)
+{
 	LogMsg(0,"=== start init_lpddr() ===\n");
 	init_snps_lp45(0xcb000000,22);
 	LogMsg(0,"=== finish init_lpddr() ===\n");
+
 	LogMsg(0,"=== start init_lpddr1() ===\n");
 #if defined(OLDCODE)
 	init_snps_lp45(0xcc000000,23);
@@ -671,22 +578,4 @@ static int spacemit_ddr_probe(struct udevice *dev){
 	init_snps_lp45(0xcc000000,22);
 #endif
 	LogMsg(0,"=== finish init_lpddr1() ===\n");
-	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
-	if (ret < 0) {
-		while (1);
-	}
-	printf("init done\n");
-	return 0;
 }
-
-static const struct udevice_id spacemit_ddr_ids[] = {
-	{ .compatible = "spacemit,snps-lp45" },
-	{ /* sentinel */ }
-};
-
-U_BOOT_DRIVER(spacemit_ddr) = {
-	.name = "spacemit_ddr_ctrl",
-	.id = UCLASS_RAM,
-	.of_match = spacemit_ddr_ids,
-	.probe = spacemit_ddr_probe,
-};

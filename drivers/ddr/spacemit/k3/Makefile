@@ -4,7 +4,7 @@
 #
 
 ifdef CONFIG_SPL_BUILD
-obj-y += ddr-snps-lp4x-fpga-init.o ddr_freq.o
+obj-y += ddr_init.o ddr-snps-lp4x-fpga-init.o ddr_freq.o
 else
 obj-$(CONFIG_DYNAMIC_DDR_CLK_FREQ) += ddr_freq.o
 endif
