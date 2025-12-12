@@ -19,6 +19,7 @@
 #include <asm/sections.h>
 #include <power/regulator.h>
 #include <fb_spacemit.h>
+#include <misc.h>
 #include <net.h>
 #include <tlv_eeprom.h>
 #include "nfs_env.h"
@@ -36,6 +37,111 @@ extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 extern int set_tlvinfo(int tcode, char* val);
 extern int flush_tlvinfo(void);
 extern int update_tlvinfo(void);
+
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+int get_chipid_from_efuse(uint64_t *chipid)
+{
+	struct udevice *dev;
+	uint8_t fuses[9];
+	int ret;
+
+	if (NULL == chipid)
+		return EACCES;
+
+	/* retrieve the device */
+	ret = uclass_get_device_by_driver(UCLASS_MISC,
+			DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
+	if (ret) {
+		return ENODEV;
+	}
+
+	// read from efuse, each bank has 32byte efuse data
+	// chipid in bank7 bit191~251
+	ret = misc_read(dev, 7 * 32 + 23, fuses, sizeof(fuses));
+	if (0 == ret) {
+		// 1. get bit 192~251
+		// 2. left shift 1bit, and merge with efuse_bank[7].bit191
+		*chipid = 0;
+		memcpy(chipid, &fuses[1], 8);
+		*chipid <<= 1;
+		*chipid |= (fuses[0] & 0x80) >> 7;
+		pr_debug("Get chipid %llx\n", *chipid);
+	}
+
+	return ret;
+}
+
+int get_dro_from_efuse(uint32_t *dro)
+{
+	struct udevice *dev;
+	uint8_t fuses[2];
+	int ret;
+
+	if (NULL == dro)
+		return EACCES;
+
+	*dro = SVT_DRO_DEFAULT_VALUE;
+
+	/* retrieve the device */
+	ret = uclass_get_device_by_driver(UCLASS_MISC,
+			DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
+	if (ret) {
+		return ENODEV;
+	}
+
+	// read from efuse, each bank has 32byte efuse data
+	// SVT-DRO in bank7 bit173~bit181
+	ret = misc_read(dev, 7 * 32 + 21, fuses, sizeof(fuses));
+	if (0 == ret) {
+		// (byte1 bit0~bit5) << 3 | (byte0 bit5~7) >> 5
+		*dro = (fuses[0] >> 5) & 0x07;
+		*dro |= (fuses[1] & 0x3F) << 3;
+	}
+
+	return 0;
+}
+
+int get_chipinfo_from_efuse(uint32_t *product_id, uint32_t *wafer_tid)
+{
+	struct udevice *dev;
+	uint8_t fuses[3];
+	int ret;
+
+	if ((NULL == product_id) || (NULL == wafer_tid))
+		return EACCES;
+
+	*product_id = 0;
+	*wafer_tid = 0;
+
+	/* retrieve the device */
+	ret = uclass_get_device_by_driver(UCLASS_MISC,
+			DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
+	if (ret) {
+		return ENODEV;
+	}
+
+	// read from efuse, each bank has 32byte efuse data
+	// product id in bank7 bit182~bit190
+	ret = misc_read(dev, 7 * 32 + 22, fuses, sizeof(fuses));
+	if (0 == ret) {
+		// (byte1 bit0~bit6) << 2 | (byte0 bit6~7) >> 6
+		*product_id = (fuses[0] >> 6) & 0x03;
+		*product_id |= (fuses[1] & 0x7F) << 2;
+	}
+
+	// read from efuse, each bank has 32byte efuse data
+	// product id in bank7 bit139~bit154
+	ret = misc_read(dev, 7 * 32 + 17, fuses, sizeof(fuses));
+	if (0 == ret) {
+		// (byte1 bit0~bit6) << 2 | (byte0 bit3~7) >> 3
+		*wafer_tid = (fuses[0] >> 3) & 0x1F;
+		*wafer_tid |= fuses[1] << 5;
+		*wafer_tid |= (fuses[2] & 0x07) << 13;
+	}
+
+	return ret;
+}
+#endif
 
 int board_init(void)
 {

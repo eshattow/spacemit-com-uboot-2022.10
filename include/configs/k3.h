@@ -86,6 +86,9 @@
 #define BOOTFS_NAME			("bootfs")
 #define BOOTLOADER_PARTITION_NAME	("bootloader")
 
+// for those has NOT been through test procedure(ATE)
+#define SVT_DRO_DEFAULT_VALUE		(120)
+
 #ifndef __ASSEMBLY__
 enum board_boot_mode {
 	BOOT_MODE_NONE	= 0,
