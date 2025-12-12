@@ -717,3 +717,21 @@ void set_env_ethaddr(void)
 		eth_env_set_enetaddr(mac_str, mac_addr);
 	}
 }
+
+#if !defined(CONFIG_SPL_BUILD)
+int board_fit_config_name_match(const char *name)
+{
+	char *product_name = env_get("product_name");
+
+	if (NULL == product_name) {
+		product_name = DEFAULT_PRODUCT_NAME;
+	}
+
+	if (0 == strcmp(product_name, name)) {
+		log_info("Boot from fit configuration %s\n", name);
+		return 0;
+	}
+	else
+		return -1;
+}
+#endif

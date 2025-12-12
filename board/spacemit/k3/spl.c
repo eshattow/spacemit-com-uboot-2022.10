@@ -17,6 +17,7 @@
 #include <asm/io.h>
 #include <i2c.h>
 #include <espi.h>
+#include <tlv_eeprom.h>
 
 #define GDB_DOWNLOAD_DEBUG
 
@@ -26,8 +27,24 @@ extern int board_pmic_init(void);
 #endif
 extern enum board_boot_mode get_boot_mode(void);
 extern void update_usb_serial_number(void);
+extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 
 static void spl_load_env(void);
+
+int get_product_name(char *name, int max_size)
+{
+	if (NULL == name)
+		return EINVAL;
+
+	if (get_tlvinfo(TLV_CODE_PRODUCT_NAME, name, max_size) > 0) {
+		pr_info("Get product name from eeprom %s\n", name);
+		return 0;
+	}
+
+	// Use default product name
+	strlcpy(name, DEFAULT_PRODUCT_NAME, max_size);
+	return 0;
+}
 
 int spl_board_init_f(void)
 {
@@ -113,8 +130,17 @@ void board_fit_image_post_process(const void *fit, int node, void **p_image, siz
 #ifdef CONFIG_SPL_LOAD_FIT
 int board_fit_config_name_match(const char* name)
 {
-	/* boot using default FIT config */
-	return 1;
+	char product_name[64];
+
+	if ((0 == get_product_name(product_name, sizeof(product_name))) &&
+		(0 == strcmp(product_name, name))) {
+		log_emerg("Boot from fit configuration %s\n", name);
+		return 0;
+	}
+	else {
+		/* boot using default FIT config */
+		return -1;
+	}
 }
 #endif
 
