@@ -175,7 +175,7 @@ static int read_tlvinfo(u8 *tlv_data, u32 tlv_size)
 	return ret;
 }
 
-int get_tlvinfo(int tcode, char *buf)
+int get_tlvinfo(int tcode, char *buf, int max_size)
 {
 	int tlv_end;
 	int offset;
@@ -198,7 +198,7 @@ int get_tlvinfo(int tcode, char *buf)
 		}
 
 		if (tlv->type == tcode) {
-			memcpy(buf, tlv->value, tlv->length);
+			memcpy(buf, tlv->value, min((uint32_t)tlv->length, (uint32_t)max_size));
 			pr_info("get tlvinfo value:%x,%s\n", tcode, buf);
 			return 0;
 		}
