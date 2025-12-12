@@ -8,6 +8,7 @@
 #include <dm/ofnode.h>
 #include <env.h>
 #include <fdtdec.h>
+#include <g_dnl.h>
 #include <image.h>
 #include <log.h>
 #include <mapmem.h>
@@ -143,6 +144,31 @@ int get_chipinfo_from_efuse(uint32_t *product_id, uint32_t *wafer_tid)
 }
 #endif
 
+void update_usb_serial_number(void)
+{
+	uint64_t chipid;
+	uint32_t i, seed;
+	int ret = -1;
+	char temp[20];
+
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+	ret = get_chipid_from_efuse(&chipid);
+#endif
+
+	if (0 != ret) {
+		seed = get_ticks();
+		for (i = 0; i < sizeof(chipid); i++) {
+			((uint8_t*)&chipid)[i] = rand_r(&seed);
+		}
+	}
+
+	snprintf(temp, sizeof(temp), "%016llx", chipid);
+
+#ifdef CONFIG_USB_SET_SERIAL_NUMBER
+	g_dnl_set_serialnumber(temp);
+#endif
+}
+
 int board_init(void)
 {
 	int ret = 0;
@@ -169,6 +195,8 @@ void run_fastboot_command(void)
 	if (BOOT_MODE_USB == get_boot_mode()) {
 		/* show flash log*/
 		env_set("stdout", env_get("stdout_flash"));
+
+		update_usb_serial_number();
 
 		char *cmd_para = "fastboot 0";
 		run_command(cmd_para, 0);

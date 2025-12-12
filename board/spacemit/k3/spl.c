@@ -24,7 +24,9 @@ extern void spl_fixup_fdt(void *fdt_blob);
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
 extern int board_pmic_init(void);
 #endif
-enum board_boot_mode get_boot_mode(void);
+extern enum board_boot_mode get_boot_mode(void);
+extern void update_usb_serial_number(void);
+
 static void spl_load_env(void);
 
 int spl_board_init_f(void)
@@ -84,6 +86,8 @@ int spl_board_init_f(void)
 void spl_board_init(void)
 {
 	spl_load_env();
+
+	update_usb_serial_number();
 }
 
 #if CONFIG_IS_ENABLED(FIT_IMAGE_POST_PROCESS)
