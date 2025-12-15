@@ -319,6 +319,13 @@
 			status = "disabled";
 		};
 
+		rpmi_mpxy_hsm: rpmi-mpxy-hsm@0 {
+			compatible = "riscv,rpmi-hsm";
+			mboxes = <&rpmi_shmem_mbox 5>;
+			riscv,sbi-mpxy-channel-id = <5>;
+			status = "disabled";
+		};
+
 		rpmi_mpxy_domain: rpmi-mpxy-domain@0 {
 			compatible = "riscv,rpmi-mpxy-domain";
 			mboxes = <&rpmi_shmem_mbox 9>;
