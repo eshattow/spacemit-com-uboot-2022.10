@@ -14,6 +14,7 @@
 #define DDR_CHECK_CNT			(0x1000)
 
 void fpga_ddr_init(void);
+void lpddr5_silicon_init(void);
 
 static int test_pattern(fdt_addr_t base, fdt_size_t size)
 {
@@ -95,9 +96,11 @@ ERR_HANDLE:
 static int spacemit_ddr_probe(struct udevice *dev)
 {
 	int ret;
-
+#ifdef CONFIG_K3_BOARD_FPGA
 	fpga_ddr_init();
-
+#else
+	lpddr5_silicon_init();
+#endif
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
 	if (ret < 0) {
 		while (1);
