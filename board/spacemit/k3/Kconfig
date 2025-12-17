@@ -42,6 +42,11 @@ config K3_BOARD_FPGA
 	help
 	  k3 board is fpga.
 
+config K3_BOARD_ASIC
+	bool "k3 board asic"
+	help
+	  k3 board is asic.
+
 endchoice
 
 endif
