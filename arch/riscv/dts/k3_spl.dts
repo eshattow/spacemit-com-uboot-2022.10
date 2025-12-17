@@ -224,6 +224,14 @@
 			status = "disabled";
 		};
 
+		usb3_porta_u2phy: phy@cad20000 {
+			u-boot,dm-spl;
+			compatible = "spacemit,usb2-phy";
+			reg = <0x0 0xcad20000 0x0 0x200>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
 		usb3_porta: usb3@0 {
 			u-boot,dm-spl;
 			compatible = "spacemit,k3-dwc3";
@@ -234,14 +242,19 @@
 			ranges;
 			status = "disabled";
 
-				dwc3@cad00000 {
-					dr_mode = "peripheral";
-					maximum-speed = "high-speed";
-					phy_type = "utmi_wide";
-					snps,dis_enblslpm_quirk;
-					snps,dis_u2_susphy_quirk;
-					u-boot,dm-spl;
-				};
+			dwc3@cad00000 {
+				dr_mode = "peripheral";
+				maximum-speed = "high-speed";
+				/* this breaks FPGA usb,
+				 * set utmi_wide if running on FPGA */
+				phy_type = "utmi";
+				snps,dis_enblslpm_quirk;
+				snps,dis_u2_susphy_quirk;
+				snps,dis_u3_susphy_quirk;
+				phys = <&usb3_porta_u2phy>;
+				phy-names = "usb2-phy";
+				u-boot,dm-spl;
+			};
 		};
 
 		efuse: fuse@f0702800 {
