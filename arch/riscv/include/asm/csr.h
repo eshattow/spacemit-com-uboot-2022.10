@@ -144,6 +144,26 @@
 #define CSR_INSTRETH		0xc82
 #define CSR_MHARTID		0xf14
 
+#define CSR_PMACFG0		0x7DE
+#define CSR_PMACFG2		0x7DF
+
+#define CSR_PMAADDR0		0x7E0
+#define CSR_PMAADDR1		0x7E1
+#define CSR_PMAADDR2		0x7E2
+#define CSR_PMAADDR3		0x7E3
+#define CSR_PMAADDR4		0x7E4
+#define CSR_PMAADDR5		0x7E5
+#define CSR_PMAADDR6		0x7E6
+#define CSR_PMAADDR7		0x7E7
+#define CSR_PMAADDR8		0x7E8
+#define CSR_PMAADDR9		0x7E9
+#define CSR_PMAADDR10		0x7EA
+#define CSR_PMAADDR11		0x7EB
+#define CSR_PMAADDR12		0x7EC
+#define CSR_PMAADDR13		0x7ED
+#define CSR_PMAADDR14		0x7EE
+#define CSR_PMAADDR15		0x7EF
+
 #ifndef __ASSEMBLY__
 
 #define csr_swap(csr, val)					\
