@@ -10,20 +10,11 @@
 #include <stdlib.h>
 #include <linux/delay.h>
 #include <tlv_eeprom.h>
+#include <dt-bindings/pinctrl/k3-pinctrl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#define MUX_MODE0 0		  /* func 0 */
-#define MUX_MODE1 BIT(0)	  /* func 1 */
-#define MUX_MODE2 BIT(1)	  /* func 2 */
-#define MUX_MODE3 BIT(0) | BIT(1) /* func 3 */
-#define MUX_MODE4 BIT(2)	  /* func 4 */
-#define MUX_MODE5 BIT(0) | BIT(2) /* func 5 */
-#define EDGE_NONE BIT(6)	  /* edge-detection is unabled */
-#define PAD_1V8_DS2 BIT(12)	  /* voltage:1.8v, driver strength: 2 */
-#define PULL_UP BIT(14) | BIT(15) /* pull-up */
-
-#define I2C_PIN_CONFIG(x) ((x) | EDGE_NONE | PULL_UP | PAD_1V8_DS2)
+#define I2C_PIN_CONFIG(x) ((x) | EDGE_NONE | PULL_UP | PAD_DS0)
 #define READ_I2C_LINE_LEN (16)
 
 #if CONFIG_IS_ENABLED(DM_I2C)
@@ -32,10 +23,6 @@ int _read_from_i2c(struct udevice *dev, u32 addr, u32 size, uchar *buf);
 int _read_from_i2c(int chip, u32 addr, u32 size, uchar *buf);
 #endif
 bool _is_valid_tlvinfo_header(struct tlvinfo_header *hdr);
-
-char *spacemit_i2c_eeprom[] = {
-	"atmel,24c02",
-};
 
 struct tlv_eeprom {
 	uint8_t type;
@@ -51,10 +38,8 @@ struct eeprom_config {
 };
 
 const struct eeprom_config eeprom_info[] = {
-	// eeprom @deb1 & deb2: I2C2, pin group(GPIO_84, GPIO_85)
-	{ 2, 0x50, MUX_MODE4, 0xd401e154, 0xd401e158 },
-	// eeprom @evb: I2C6, pin group(GPIO_118, GPIO_119)
-	{ 6, 0x50, MUX_MODE2, 0xd401e228, 0xd401e22c },
+	// eeprom @evb: I2C6, pin group(PWR_SSP_TXD, PWR_SSP_RXD)
+	{ 6, 0x50, MUX_MODE2, 0xd401e264, 0xd401e268 },
 };
 
 #if CONFIG_IS_ENABLED(DM_I2C)
