@@ -112,6 +112,7 @@
 #define APMU_SDH2_CLK_RES_CTRL          0xe0
 #define APMU_PMUA_MC_CTRL               0xe8
 #define APMU_PMU_CC2_AP                 0x100
+#define APMU_UCIE_CTRL                  0x11c
 #define APMU_AUDIO_CLK_RES_CTRL         0x14c
 #define APMU_LCD_CLK_RES_CTRL3          0x26C
 #define APMU_UFS_CLK_RES_CTRL           0x268
@@ -366,6 +367,7 @@ static const struct spacemit_reset_signal
 	[RESET_CPU7_SW]     = { APMU_PMU_CC2_AP, BIT(26), 0, BIT(26), RST_BASE_TYPE_APMU },
 	[RESET_C1_MPSUB_SW]      = { APMU_PMU_CC2_AP, BIT(28), 0, BIT(28), RST_BASE_TYPE_APMU },
 	[RESET_MPSUB_DBG]        = { APMU_PMU_CC2_AP, BIT(29), 0, BIT(29), RST_BASE_TYPE_APMU },
+	[RESET_UCIE]             = { APMU_UCIE_CTRL, BIT(1)|BIT(2)|BIT(3), 0, BIT(1)|BIT(2)|BIT(3), RST_BASE_TYPE_APMU },
 	[RESET_RCPU]             = { APMU_AUDIO_CLK_RES_CTRL, BIT(0)|BIT(2)|BIT(3), BIT(0)|BIT(2)|BIT(3), 0, RST_BASE_TYPE_APMU },
 	[RESET_DSI4LN2_ESCCLK]   = { APMU_LCD_CLK_RES_CTRL3, BIT(3), BIT(3), 0, RST_BASE_TYPE_APMU },
 	[RESET_DSI4LN2_LCD_SW]   = { APMU_LCD_CLK_RES_CTRL3, BIT(4), BIT(4), 0, RST_BASE_TYPE_APMU },
