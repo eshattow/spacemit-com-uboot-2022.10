@@ -1553,7 +1553,7 @@ static const char * const ucie_parents[] = {
 };
 static SPACEMIT_CCU_MUX_GATE(ucie_clk, "ucie_clk", ucie_parents,
 	BASE_TYPE_APMU, APMU_UCIE_CTRL,
-	4, 3, 0x3, 0x3, 0x0,
+	4, 3, 0x1, 0x1, 0x0,
 	0);
 static SPACEMIT_CCU_GATE(ucie_sbclk, "ucie_sbclk", "axi_clk",
 	BASE_TYPE_APMU, APMU_UCIE_CTRL,
