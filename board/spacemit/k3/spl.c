@@ -31,6 +31,13 @@ extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 
 static void spl_load_env(void);
 
+void restore_ddr_pma_attribute(void)
+{
+	// map DDR address to entry8
+	csr_write(CSR_PMAADDR8, SYS_SDRAM_UPPER_LIMIT_ADDR >> 2);
+	asm("sfence.vma zero, zero");
+}
+
 int get_product_name(char *name, int max_size)
 {
 	if (NULL == name)
@@ -57,6 +64,7 @@ int spl_board_init_f(void)
 		debug("DRAM init failed: %d\n", ret);
 		return ret;
 	}
+	restore_ddr_pma_attribute();
 
 #ifdef GDB_DOWNLOAD_DEBUG
 	u32 read_data;
