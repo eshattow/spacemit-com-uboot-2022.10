@@ -28,6 +28,8 @@ SY8810L_BUCK_LINER_RANGE;SY8810L_REGULATOR_DESC;
 
 MPQ8655_BUCK_LINER_RANGE;MPQ8655_REGULATOR_DESC;
 
+extern int get_product_name(char *name, int max_size);
+
 static const char *global_compatible[] = {
 	"spacemit,spm8821",
 	"spacemit,mpq8655",
@@ -247,6 +249,11 @@ static int __board_pmic_init(const char *name)
 	u32 value, min, max;
 	const struct pm8xx_buck_desc *buck_desc, *ldo_desc;
 	int offset, ret, sub_offset, len, saddr, i, num_buck, num_ldo, sel;
+	char product_name[64];
+
+	ret = get_product_name(product_name, sizeof(product_name));
+	if (ret != 0)
+		return -EINVAL;
 
 	offset = fdt_node_offset_by_compatible(gd->fdt_blob, -1, name);
 	if (offset < 0)
@@ -303,10 +310,17 @@ static int __board_pmic_init(const char *name)
 				if (value) {
 					sel = regulator_map_voltage_linear_range(buck_desc, value, value);
 
-					/* first: set 0x29 to 0x2e0  */
-					regvals[0] = 0xe0;
-					regvals[1] = 0x2;
-					i2c_write(saddr, 0x29, 1, regvals, 2);
+					if (0 == strcmp(product_name, "k3_evb")) {
+						/* evb's parameters: default:0.8v */
+						regvals[0] = 0xeb;
+						regvals[1] = 0x2;
+						i2c_write(saddr, 0x29, 1, regvals, 2);
+					} else {
+						/* default:0.9v */
+						regvals[0] = 0x9b;
+						regvals[1] = 0x2;
+						i2c_write(saddr, 0x29, 1, regvals, 2);
+					}
 
 					/* second: set 0xd1 */
 					i2c_read(saddr, 0xd1, 1, &regval, 1);
@@ -325,7 +339,6 @@ static int __board_pmic_init(const char *name)
 						i2c_write(saddr, buck_desc[i].vsel_reg, 1, regvals, 2);
 					}
 				}
-				break;
 			}
 		} else {
 			if ((strncmp(s, "DCDC_REG", 8) == 0) || (strncmp(s, "EDCDC_REG", 9) == 0)) {

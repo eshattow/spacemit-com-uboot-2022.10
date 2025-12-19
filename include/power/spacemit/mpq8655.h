@@ -22,7 +22,7 @@ enum MPQ8655_reg {
 
 #define MPQ8655_BUCK_LINER_RANGE					\
 static const struct pm8xx_linear_range mpq8655_buck_ranges[] = {	\
-        REGULATOR_LINEAR_RANGE(534000, 0x10b, 0x1b8, 2000),		\
+        REGULATOR_LINEAR_RANGE(534000, 0x10b, 0x1f4, 2000),		\
 };
 
 #define MPQ8655_REGULATOR_DESC		\
