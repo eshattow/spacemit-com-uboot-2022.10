@@ -46,11 +46,11 @@
 };
 
 &usb3_porta_u2phy {
-	status = "disabled";
+	status = "okay";
 };
 
 &usb3_porta {
-	status = "disabled";
+	status = "okay";
 	u-boot,dm-spl;
 	dwc3@cad00000 {
 		dr_mode = "peripheral";

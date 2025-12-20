@@ -229,7 +229,7 @@
 			compatible = "spacemit,usb2-phy";
 			reg = <0x0 0xcad20000 0x0 0x200>;
 			#phy-cells = <0>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		usb3_porta: usb3@0 {
@@ -239,10 +239,13 @@
 			#size-cells = <2>;
 			resets = <&reset RESET_USB3_PORTA>;
 			reset-names = "ctl_rst";
+			clocks = <&ccu CLK_USB3_PORTA_BUS>;
+			clock-names = "bus";
 			ranges;
-			status = "disabled";
+			status = "okay";
 
 			dwc3@cad00000 {
+				reg = <0x0 0xcad00000 0x0 0x10000>;
 				dr_mode = "peripheral";
 				maximum-speed = "high-speed";
 				/* this breaks FPGA usb,
