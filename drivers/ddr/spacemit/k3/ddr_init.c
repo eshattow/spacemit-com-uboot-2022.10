@@ -84,9 +84,9 @@ ERR_HANDLE:
 		}
 	}
 	if (err == 0)
-		printf("*********ch0 is pass\n");
+		printf("memory verify pass\n");
 	else
-		pr_err("*********ch0 is fail!\n");
+		pr_err("memory verify fail!\n");
 
 	free(ddr_data);
 

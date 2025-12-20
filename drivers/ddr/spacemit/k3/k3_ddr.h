@@ -11,7 +11,7 @@
 #define DDR_CTRL_REG_BASE	(0xCB000000)
 #define DDR_CTRL1_REG_BASE	(0xCC000000)
 
-#define CONFIG_DDR_DATARATE     (6400)
+#define CONFIG_DDR_DATARATE	(1066)
 
 #ifndef REG32
 #define REG32(x) (*((volatile uint32_t*)((uintptr_t)(x))))
@@ -47,7 +47,7 @@ typedef struct {
 	} sequence[];
 } phy_init_config;
 
-extern const phy_init_config* lp5_pre_train_table[54];
-extern const phy_init_config* lp5_train_table[30];
+extern const phy_init_config* lp5_pre_train_table[];
+extern const phy_init_config* lp5_train_table[];
 
 #endif /* _K3_DDR_H_ */
