@@ -121,8 +121,10 @@ call_board_init_f_0:
 	/* Configure proprietary settings and customized CSRs of harts */
 call_harts_early_init:
 #if CONFIG_IS_ENABLED(RISCV_MMODE)
-	csrsi 0x7c0, 0x1
-	csrsi 0x7c0, 0x2
+	/* Enable cache and snoop */
+	jal	icache_enable
+	jal	dcache_enable
+	jal	snoop_enable
 #endif
 
 	jal	harts_early_init
@@ -188,11 +190,6 @@ wait_for_gd_init:
 	 */
 	bnez	s2, secondary_hart_loop
 #endif
-
-	/* Enable cache */
-	jal	icache_enable
-	jal	dcache_enable
-	jal	snoop_enable
 
 	/* Enable prefetch and branch predict*/
 	jal branch_predict_enable
