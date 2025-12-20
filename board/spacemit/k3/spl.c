@@ -251,6 +251,9 @@ static void spl_load_env(void)
 
 void board_boot_order(u32* spl_boot_list)
 {
+#ifdef GDB_DOWNLOAD_DEBUG
+	spl_boot_list[0] = BOOT_DEVICE_RAM;
+#else
 	u32 boot_mode = get_boot_mode();
 	pr_debug("boot_mode:0x%x\n", boot_mode);
 	if (boot_mode == BOOT_MODE_USB) {
@@ -280,6 +283,7 @@ void board_boot_order(u32* spl_boot_list)
 		// reserve for debug/test to load/run uboot from ram.
 		spl_boot_list[1] = BOOT_DEVICE_RAM;
 	}
+#endif
 }
 
 void spl_perform_fixups(struct spl_image_info *spl_image)
