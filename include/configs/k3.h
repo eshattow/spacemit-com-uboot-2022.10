@@ -86,7 +86,7 @@
 #endif
 #define MMC_DEV_SD			(0)
 
-#define DEFAULT_PRODUCT_NAME		"k3_fpga_1x1"
+#define DEFAULT_PRODUCT_NAME		"k3_evb"
 #define BOOTFS_NAME			("bootfs")
 #define BOOTLOADER_PARTITION_NAME	("bootloader")
 
