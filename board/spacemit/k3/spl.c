@@ -19,7 +19,9 @@
 #include <espi.h>
 #include <tlv_eeprom.h>
 
+#if defined(CONFIG_K3_BOARD_FPGA)
 #define GDB_DOWNLOAD_DEBUG
+#endif
 
 extern void spl_fixup_fdt(void *fdt_blob);
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
