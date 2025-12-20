@@ -477,6 +477,12 @@ static int dwc3_glue_reset_init(struct udevice *dev,
 	else if (ret)
 		return ret;
 
+	if (device_is_compatible(dev, "spacemit,k3-dwc3")) {
+		udelay(10);
+		reset_assert_bulk(&glue->resets);
+		udelay(10);
+	}
+
 	ret = reset_deassert_bulk(&glue->resets);
 	if (ret) {
 		reset_release_bulk(&glue->resets);
