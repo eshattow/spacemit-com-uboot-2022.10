@@ -206,6 +206,7 @@ static const struct spacemit_reset_signal
 	[RESET_QSPI_SPL]        = { APMU_QSPI_CLK_RES_CTRL, BIT(1), BIT(1), 0, RST_BASE_TYPE_APMU },
 	[RESET_QSPI_BUS_SPL]    = { APMU_QSPI_CLK_RES_CTRL, BIT(0), BIT(0), 0, RST_BASE_TYPE_APMU },
 	[RESET_UFS_ACLK_SPL]    = { APMU_UFS_CLK_RES_CTRL, BIT(0), BIT(0), 0, RST_BASE_TYPE_APMU },
+	[RESET_USB3_PORTA_SPL]  = { APMU_USB_CLK_RES_CTRL, BIT(5)|BIT(6)|BIT(7), BIT(5)|BIT(6)|BIT(7), 0, RST_BASE_TYPE_APMU },
 };
 
 static u32 transfer_to_spl_list[][2] = {
@@ -215,6 +216,7 @@ static u32 transfer_to_spl_list[][2] = {
 	{RESET_QSPI, RESET_QSPI_SPL},
 	{RESET_QSPI_BUS, RESET_QSPI_BUS_SPL},
 	{RESET_UFS_ACLK, RESET_UFS_ACLK_SPL},
+	{RESET_USB3_PORTA, RESET_USB3_PORTA_SPL},
 };
 
 ulong transfer_reset_id_to_spl(ulong id)
