@@ -189,10 +189,23 @@
 			qspi-ahbread = <0>;
 			qspi-freq = <26500000>;
 			qspi-id = <4>;
+			clocks = <&ccu CLK_QSPI>,
+			          <&ccu CLK_QSPI_BUS>;
+			clock-names = "qspi_clk", "qspi_bus_clk";
 			resets = <&reset RESET_QSPI>,
 				<&reset RESET_QSPI_BUS>;
 			reset-names = "qspi_reset", "qspi_bus_reset";
-			status = "disabled";
+			status = "okay";
+
+			flash@0 {
+				u-boot,dm-spl;
+				compatible = "jedec,spi-nor";
+				reg = <0>;
+				spi-max-frequency = <26500000>;
+				m25p,fast-read;
+				broken-flash-reset;
+				status = "okay";
+			};
 		};
 
 		sdhci0: sdh@d4280000 {
