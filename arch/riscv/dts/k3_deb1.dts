@@ -16,6 +16,20 @@
 	status = "okay";
 };
 
+&i2c2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c2_1>;
+	status = "okay";
+
+	eeprom@50{
+		compatible = "atmel,24c02";
+		reg = <0x50>;
+		status = "okay";
+	};
+};
+
 &eth0 {
 	phy-reset-pin = <15>;
 	max-speed = <1000>;

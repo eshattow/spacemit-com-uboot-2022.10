@@ -16,6 +16,20 @@
 	status = "okay";
 };
 
+&i2c6 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c6_4>;
+	status = "okay";
+
+	eeprom@50{
+		compatible = "atmel,24c02";
+		reg = <0x50>;
+		status = "okay";
+	};
+};
+
 &sdhci0 {
 	bus-width = <4>;
 	broken-cd;

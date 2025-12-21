@@ -16,6 +16,20 @@
 	status = "okay";
 };
 
+&i2c1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c1_1>;
+	status = "okay";
+
+	eeprom@50{
+		compatible = "atmel,24c02";
+		reg = <0x50>;
+		status = "okay";
+	};
+};
+
 &sdhci0 {
 	pinctrl-names = "default","fast";
 	pinctrl-0 = <&pinctrl_mmc1>;
