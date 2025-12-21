@@ -1050,11 +1050,28 @@ static int spansion_erase_non_uniform(struct spi_nor *nor, u32 addr,
 static int write_sr_and_check(struct spi_nor *nor, u8 status_new, u8 mask)
 {
 	int ret;
+	u8 sr_cr[2];
 
-	write_enable(nor);
-	ret = write_sr(nor, status_new);
-	if (ret)
-		return ret;
+	/*
+	 * For GigaDevice and other flash chips, writing only SR1 may clear SR2
+	 * (which contains the QE bit). To preserve SR2, we need to read it
+	 * first and write both SR1 and SR2 together using 2-byte write.
+	 */
+	ret = read_cr(nor);
+	if (ret < 0) {
+		/* If reading CR fails, fall back to writing only SR1 */
+		write_enable(nor);
+		ret = write_sr(nor, status_new);
+		if (ret)
+			return ret;
+	} else {
+		sr_cr[0] = status_new;
+		sr_cr[1] = ret;  /* Preserve CR (SR2) including QE bit */
+		write_enable(nor);
+		ret = nor->write_reg(nor, SPINOR_OP_WRSR, sr_cr, 2);
+		if (ret)
+			return ret;
+	}
 
 	ret = spi_nor_wait_till_ready(nor);
 	if (ret)
@@ -3700,8 +3717,20 @@ static int spi_nor_init(struct spi_nor *nor)
 	     JEDEC_MFR(nor->info) == SNOR_MFR_INTEL ||
 	     JEDEC_MFR(nor->info) == SNOR_MFR_SST ||
 	     nor->info->flags & SPI_NOR_HAS_LOCK)) {
-		write_enable(nor);
-		write_sr(nor, 0);
+		u8 sr_cr[2] = {0};
+
+		/* Read CR to preserve QE bit on GigaDevice and similar flash */
+		err = nor->read_reg(nor, SPINOR_OP_RDCR, &sr_cr[1], 1);
+		if (err < 0) {
+			/* Fallback to 1-byte write if read fails */
+			write_enable(nor);
+			write_sr(nor, 0);
+		} else {
+			sr_cr[0] = 0;  /* Clear SR1 protection bits */
+			/* sr_cr[1] preserves QE bit from read */
+			write_enable(nor);
+			nor->write_reg(nor, SPINOR_OP_WRSR, sr_cr, 2);
+		}
 		spi_nor_wait_till_ready(nor);
 	}
 
@@ -3842,54 +3871,45 @@ void spi_nor_set_fixups(struct spi_nor *nor)
 static int generic_unlock(struct spi_nor *nor, loff_t ofs, uint64_t len)
 {
 	int ret;
-	u8 val[1] = {0};
+	u8 sr_cr[2] = {0};
 
 	/*if not define SPI_NOR_HAS_LOCK flag, it should not clear the protect bit*/
 	if (!(nor->info->flags & SPI_NOR_HAS_LOCK))
 		return 0;
 
-	/*read register 1*/
-	ret = nor->read_reg(nor, SPINOR_OP_RDSR, val, 1);
+	/*read register 1 (SR1)*/
+	ret = nor->read_reg(nor, SPINOR_OP_RDSR, &sr_cr[0], 1);
+	if (ret < 0) {
+		dev_dbg(nor->dev, "error %d reading SR\n", ret);
+		return ret;
+	}
+
+	/*read register 2 (CR/SR2) to preserve QE bit*/
+	ret = nor->read_reg(nor, SPINOR_OP_RDCR, &sr_cr[1], 1);
 	if (ret < 0) {
 		dev_dbg(nor->dev, "error %d reading CR\n", ret);
 		return ret;
 	}
 
-	/*clear block protect bit at register 1*/
-	val[0] &= ~(SR_BP0 | SR_BP1 | SR_BP2 | SR_TB | SR_SP);
+	/*clear block protect bits in SR1*/
+	sr_cr[0] &= ~(SR_BP0 | SR_BP1 | SR_BP2 | SR_TB | SR_SP);
+	/*clear CMP and LB bits in CR/SR2, but preserve QE bit*/
+	sr_cr[1] &= ~(SR_LB1 | SR_LB2 | SR_LB3 | SR_CMP);
+
+	/*
+	 * Write both SR1 and CR/SR2 together using 2-byte write.
+	 * This preserves the QE bit in SR2 for GigaDevice and similar flashes.
+	 */
 	write_enable(nor);
-	ret = nor->write_reg(nor, SPINOR_OP_WRSR, val, 1);
+	ret = nor->write_reg(nor, SPINOR_OP_WRSR, sr_cr, 2);
 	if (ret < 0) {
-		dev_dbg(nor->dev, "error while writing configuration register\n");
+		dev_dbg(nor->dev, "error while writing status registers\n");
 		return ret;
 	}
 
 	ret = spi_nor_wait_till_ready(nor);
 	if (ret) {
-		dev_dbg(nor->dev, "timeout while writing configuration register\n");
-		return ret;
-	}
-
-
-	/*read register 2*/
-	ret = nor->read_reg(nor, SPINOR_OP_RDCR, val, 1);
-	if (ret < 0) {
-		dev_dbg(nor->dev, "error %d reading CR\n", ret);
-		return ret;
-	}
-
-	/*write register 2*/
-	val[0] &= ~(SR_LB1 | SR_LB2 | SR_LB3 | SR_CMP);
-	write_enable(nor);
-	ret = nor->write_reg(nor, SPINOR_OP_WDCR, val, 1);
-	if (ret < 0) {
-		dev_dbg(nor->dev, "error while writing configuration register\n");
-		return -EINVAL;
-	}
-
-	ret = spi_nor_wait_till_ready(nor);
-	if (ret) {
-		dev_dbg(nor->dev, "timeout while writing configuration register\n");
+		dev_dbg(nor->dev, "timeout while writing status registers\n");
 		return ret;
 	}
 
@@ -3902,7 +3922,7 @@ static int generic_lock(struct spi_nor *nor, loff_t ofs, uint64_t len)
 	/* TODO: should protect area by offset and len*/
 
 	int ret;
-	u8 val[1] = {0};
+	u8 sr_cr[2] = {0};
 
 	/*if not define SPI_NOR_HAS_LOCK flag, it should not clear the protect bit*/
 	if (!(nor->info->flags & SPI_NOR_HAS_LOCK))
@@ -3912,47 +3932,39 @@ static int generic_lock(struct spi_nor *nor, loff_t ofs, uint64_t len)
 	if (nor->size != len && ofs != 0)
 		return 0;
 
-	/*read register 1*/
-	ret = nor->read_reg(nor, SPINOR_OP_RDSR, val, 1);
+	/*read register 1 (SR1)*/
+	ret = nor->read_reg(nor, SPINOR_OP_RDSR, &sr_cr[0], 1);
+	if (ret < 0) {
+		dev_dbg(nor->dev, "error %d reading SR\n", ret);
+		return ret;
+	}
+
+	/*read register 2 (CR/SR2) to preserve QE bit*/
+	ret = nor->read_reg(nor, SPINOR_OP_RDCR, &sr_cr[1], 1);
 	if (ret < 0) {
 		dev_dbg(nor->dev, "error %d reading CR\n", ret);
 		return ret;
 	}
 
-	/*clear block protect bit at register 1*/
-	val[0] &= ~(SR_BP0 | SR_BP1 | SR_BP2);
+	/*clear block protect bits in SR1*/
+	sr_cr[0] &= ~(SR_BP0 | SR_BP1 | SR_BP2);
+	/*set CMP bit in CR/SR2, but preserve QE bit*/
+	sr_cr[1] |= SR_CMP;
+
+	/*
+	 * Write both SR1 and CR/SR2 together using 2-byte write.
+	 * This preserves the QE bit in SR2 for GigaDevice and similar flashes.
+	 */
 	write_enable(nor);
-	ret = nor->write_reg(nor, SPINOR_OP_WRSR, val, 1);
+	ret = nor->write_reg(nor, SPINOR_OP_WRSR, sr_cr, 2);
 	if (ret < 0) {
-		dev_dbg(nor->dev, "error while writing configuration register\n");
+		dev_dbg(nor->dev, "error while writing status registers\n");
 		return ret;
 	}
 
 	ret = spi_nor_wait_till_ready(nor);
 	if (ret) {
-		dev_dbg(nor->dev, "timeout while writing configuration register\n");
-		return ret;
-	}
-
-	/*read register 2*/
-	ret = nor->read_reg(nor, SPINOR_OP_RDCR, val, 1);
-	if (ret < 0) {
-		dev_dbg(nor->dev, "error %d reading CR\n", ret);
-		return ret;
-	}
-
-	/*write register 2*/
-	val[0] |= SR_CMP;
-	write_enable(nor);
-	ret = nor->write_reg(nor, SPINOR_OP_WDCR, val, 1);
-	if (ret < 0) {
-		dev_dbg(nor->dev, "error while writing configuration register\n");
-		return -EINVAL;
-	}
-
-	ret = spi_nor_wait_till_ready(nor);
-	if (ret) {
-		dev_dbg(nor->dev, "timeout while writing configuration register\n");
+		dev_dbg(nor->dev, "timeout while writing status registers\n");
 		return ret;
 	}
 
