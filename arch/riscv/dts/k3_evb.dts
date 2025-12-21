@@ -34,6 +34,19 @@
 	status = "disabled";
 };
 
+&qspi {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <26500000>;
+		m25p,fast-read;
+		broken-flash-reset;
+		status = "okay";
+	};
+};
+
 &eth0 {
 	phy-reset-pin = <40>;
 	max-speed = <100>;
