@@ -19,6 +19,9 @@
 	#size-cells = <2>;
 	compatible = "spacemit,k3";
 
+	/* Enable debug JTAG on MMC1 pins */
+	spacemit,enable-debug-jtag;
+
 	chosen {
 		stdout-path = "uart0:115200";
 	};

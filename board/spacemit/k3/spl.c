@@ -18,10 +18,20 @@
 #include <i2c.h>
 #include <espi.h>
 #include <tlv_eeprom.h>
+#include <dt-bindings/pinctrl/k3-pinctrl.h>
 
 #if defined(CONFIG_K3_BOARD_FPGA)
 #define GDB_DOWNLOAD_DEBUG
 #endif
+
+/* MFPR (Multi-Function Pin Register) definitions */
+#define MFPR_BASE          0xD401E000
+#define MMC1_DAT3_MFPR     (MFPR_BASE + 0x218)
+#define MMC1_DAT2_MFPR     (MFPR_BASE + 0x21C)
+#define MMC1_DAT1_MFPR     (MFPR_BASE + 0x220)
+#define MMC1_DAT0_MFPR     (MFPR_BASE + 0x224)
+#define MMC1_CMD_MFPR      (MFPR_BASE + 0x228)
+#define MMC1_CLK_MFPR      (MFPR_BASE + 0x22C)
 
 extern void spl_fixup_fdt(void *fdt_blob);
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
@@ -32,6 +42,52 @@ extern void update_usb_serial_number(void);
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 
 static void spl_load_env(void);
+
+/**
+ * mfpr_set_pin_mux - Set pin mux mode via MFPR register
+ * @reg_addr: MFPR register physical address
+ * @mux_mode: Mux mode value (MUX_MODE0~MUX_MODE7)
+ *
+ * Note: This function directly writes MFPR registers without using
+ * pinctrl framework, which is intended for early SPL stage before
+ * pinctrl driver initialization.
+ */
+static void mfpr_set_pin_mux(uintptr_t reg_addr, u32 mux_mode)
+{
+	u32 reg_val;
+
+	reg_val = readl((void __iomem *)reg_addr);
+	reg_val &= ~MUX_MODE7;  /* Clear mux mode bits [2:0] */
+	reg_val |= mux_mode;
+	writel(reg_val, (void __iomem *)reg_addr);
+}
+
+/**
+ * setup_debug_jtag_on_mmc1_pins - Configure MMC1 pins as JTAG interface
+ *
+ * This function reconfigures MMC1 data/cmd/clk pins to JTAG mode (MUX_MODE5)
+ * for hardware debugging purposes. Only call this when explicitly enabled
+ * via device tree property "spacemit,enable-debug-jtag".
+ *
+ * Pin mapping (MUX_MODE5):
+ *   MMC1_DAT3 -> JTAG_TDI
+ *   MMC1_DAT2 -> JTAG_TDO
+ *   MMC1_DAT1 -> JTAG_TMS
+ *   MMC1_DAT0 -> JTAG_TCK
+ *   MMC1_CMD  -> (Reserved for JTAG)
+ *   MMC1_CLK  -> (Reserved for JTAG)
+ */
+static void setup_debug_jtag_on_mmc1_pins(void)
+{
+	mfpr_set_pin_mux(MMC1_DAT3_MFPR, MUX_MODE5);
+	mfpr_set_pin_mux(MMC1_DAT2_MFPR, MUX_MODE5);
+	mfpr_set_pin_mux(MMC1_DAT1_MFPR, MUX_MODE5);
+	mfpr_set_pin_mux(MMC1_DAT0_MFPR, MUX_MODE5);
+	mfpr_set_pin_mux(MMC1_CMD_MFPR, MUX_MODE5);
+	mfpr_set_pin_mux(MMC1_CLK_MFPR, MUX_MODE5);
+
+	printf("Debug JTAG enabled on MMC1 pins\n");
+}
 
 void restore_ddr_pma_attribute(void)
 {
@@ -67,6 +123,16 @@ int spl_board_init_f(void)
 		return ret;
 	}
 	restore_ddr_pma_attribute();
+
+	/*
+	 * Check if debug JTAG is enabled via device tree
+	 * Add "spacemit,enable-debug-jtag;" to root node in DTS to enable
+	 */
+	if (ofnode_read_bool(ofnode_root(), "spacemit,enable-debug-jtag")) {
+		setup_debug_jtag_on_mmc1_pins();
+	} else {
+		debug("SPL: Debug JTAG disabled (not configured in DTS)\n");
+	}
 
 #ifdef GDB_DOWNLOAD_DEBUG
 	u32 read_data;
