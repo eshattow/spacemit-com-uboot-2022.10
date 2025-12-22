@@ -804,7 +804,7 @@ static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 		return -1;
 	}
 
-	if (!strcmp(compat, "spacemit_k3,ufshci")) {
+	if (!strcmp(compat, "spacemit,k3-ufshci")) {
 		priv->phy_mng_base = UFS_ARASAN_PHY_MNG_BASE;
 		priv->atop_base = UFS_ARASAN_TOP_BASE;
 	}
@@ -830,7 +830,7 @@ static int spacemit_k3_ufs_pltfm_remove(struct udevice *dev)
 
 static const struct udevice_id spacemit_k3_ufs_pltfm_ids[] = {
 	{
-		.compatible = "spacemit_k3,k3-ufshci",
+		.compatible = "spacemit,k3-ufshci",
 		.data = (ulong) &spacemit_k3_ufs_vops,
 	},
 	{ /* sentinel */ }
