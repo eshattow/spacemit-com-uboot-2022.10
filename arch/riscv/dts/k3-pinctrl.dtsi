@@ -414,6 +414,13 @@
 		>;
 	};
 
+	pinctrl_i2c6_4: i2c6_4_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(PWR_SSP_TXD, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS0)) /* i2c6_scl */
+			K3_PADCONF(PWR_SSP_RXD, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS0)) /* i2c6_sda */
+		>;
+	};
+
 	pinctrl_i2c8: i2c8_grp {
 		pinctrl-single,pins =<
 			K3_PADCONF(PWR_SCL, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS0)) /* pwr_scl */
