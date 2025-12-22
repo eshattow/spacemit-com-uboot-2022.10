@@ -577,6 +577,9 @@
 			resets = <&reset RESET_SDH_AXI>,
 				 <&reset RESET_SDH0>;
 			reset-names = "sdh_axi", "sdh0";
+			clocks = <&ccu CLK_SDH0>,
+				 <&ccu CLK_SDH_AXI>;
+			clock-names = "sdh-io", "sdh-core";
 			status = "disabled";
 		};
 
@@ -586,6 +589,9 @@
 			resets = <&reset RESET_SDH_AXI>,
 				 <&reset RESET_SDH1>;
 			reset-names = "sdh_axi", "sdh1";
+			clocks = <&ccu CLK_SDH1>,
+				 <&ccu CLK_SDH_AXI>;
+			clock-names = "sdh-io", "sdh-core";
 			status = "disabled";
 		};
 
@@ -595,6 +601,9 @@
 			resets = <&reset RESET_SDH_AXI>,
 				 <&reset RESET_SDH2>;
 			reset-names = "sdh_axi", "sdh2";
+			clocks = <&ccu CLK_SDH2>,
+				 <&ccu CLK_SDH_AXI>;
+			clock-names = "sdh-io", "sdh-core";
 			status = "disabled";
 		};
 

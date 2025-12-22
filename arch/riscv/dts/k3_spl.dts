@@ -211,30 +211,37 @@
 		sdhci0: sdh@d4280000 {
 			u-boot,dm-spl;
 			compatible = "spacemit,k3-sdhci";
+			reg = <0x0 0xd4280000 0x0 0x200>;
+			resets = <&reset RESET_SDH_AXI>,
+				 <&reset RESET_SDH0>;
+			reset-names = "sdh_axi", "sdh0";
+			clocks = <&ccu CLK_SDH0>,
+				 <&ccu CLK_SDH_AXI>;
+			clock-names = "sdh-io", "sdh-core";
 			bus-width = <4>;
 			broken-cd;
 			no-1-8-v;
 			cap-sd-highspeed;
 			sdh-phy-module = <0>;
-			reg = <0x0 0xd4280000 0x0 0x200>;
-			resets = <&reset RESET_SDH_AXI>,
-				 <&reset RESET_SDH0>;
-			reset-names = "sdh_axi", "sdh0";
-			status = "disabled";
+			status = "okay";
 		};
 
 		sdhci2: sdh@d4281000 {
 			compatible = "spacemit,k3-sdhci";
 			u-boot,dm-spl;
-			bus-width = <8>;
-			non-removable;
-			cap-mmc-highspeed;
-			sdh-phy-module = <1>;
 			reg = <0x0 0xd4281000 0x0 0x200>;
 			resets = <&reset RESET_SDH_AXI>,
 				 <&reset RESET_SDH2>;
 			reset-names = "sdh_axi", "sdh2";
-			status = "disabled";
+			clocks = <&ccu CLK_SDH2>,
+				 <&ccu CLK_SDH_AXI>;
+			clock-names = "sdh-io", "sdh-core";
+			bus-width = <8>;
+			non-removable;
+			mmc-hs400-1_8v;
+			mmc-hs400-enhanced-strobe;
+			sdh-phy-module = <1>;
+			status = "okay";
 		};
 
 		usb3_porta_u2phy: phy@cad20000 {
