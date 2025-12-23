@@ -960,6 +960,10 @@
 			u-boot,dm-spl;
 			compatible = "spacemit,k2-espi";
 			reg = <0x0 0xcac8c000 0x0 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_espi0>;
 
 			pr_io_base = <0x86000000>;
 			pr-mem-base0 = <0x84000000>;
