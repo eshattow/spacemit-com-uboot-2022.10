@@ -398,6 +398,7 @@ static int load_image_from_mmc_blfs(struct spl_image_info *image, const char *im
 		return -ENOENT;
 	}
 
+	memset(image, 0, sizeof(struct spl_image_info));
 #ifdef CONFIG_SPL_FS_FAT
 	// first try in FAT
 	ret = spl_load_image_fat(image, NULL, bd, part, image_path);
