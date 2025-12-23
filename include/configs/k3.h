@@ -89,7 +89,6 @@
 
 #define DEFAULT_PRODUCT_NAME		"k3_evb"
 #define BOOTFS_NAME			("bootfs")
-#define BOOTLOADER_PARTITION_NAME	("bootloader")
 
 // for those has NOT been through test procedure(ATE)
 #define SVT_DRO_DEFAULT_VALUE		(120)

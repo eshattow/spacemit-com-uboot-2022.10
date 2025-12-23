@@ -368,7 +368,7 @@ static int load_fit_from_mtd(struct spl_image_info *caller_spl_image, const char
 }
 #endif /* CONFIG_SPL_MTD_LOAD */
 
-#if defined(CONFIG_SPL_FS_FAT) || defined(CONFIG_SPL_FS_EXT4)
+#if defined(CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME)
 /**
  * Load firmware from bootloader file system partition
  * Loads u-boot-opensbi.itb or esos.itb FIT images, same as legacy mode
@@ -391,7 +391,7 @@ static int load_image_from_mmc_blfs(struct spl_image_info *image, const char *im
 		return -ENODEV;
 	}
 
-	blfs_name = BOOTLOADER_PARTITION_NAME;
+	blfs_name = CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME;
 	part = part_get_info_by_name(bd, blfs_name, &info);
 	if (part < 0) {
 		pr_err("Partition %s NOT exist\n", blfs_name);
@@ -430,7 +430,7 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 	case BOOT_DEVICE_MMC1:
 	case BOOT_DEVICE_MMC2:
 	case BOOT_DEVICE_MMC2_2: {
-#if defined(CONFIG_SPL_FS_FAT) || defined(CONFIG_SPL_FS_EXT4)
+#if defined(CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME)
 		const char *blfs_mode_str;
 		int blfs_load_mode = 0;
 		bool blfs_load_failed = false;
@@ -478,7 +478,7 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 
 		/* Fallback to legacy mode if bootloader file system disabled or failed */
 		if (blfs_load_failed)
-#endif /* CONFIG_SPL_FS_FAT || CONFIG_SPL_FS_EXT4 */
+#endif /* CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME */
 		{
 			/* Legacy mode: load FIT images from partitions */
 			const char *tmp;
