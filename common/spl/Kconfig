@@ -815,14 +815,6 @@ config SPL_MMC
 	  this option to build the drivers in drivers/mmc as part of an SPL
 	  build.
 
-config SYS_MMCSD_FS_BOOT_PARTITION
-	int "MMC Boot Partition"
-	default 1
-	help
-	  Partition on the MMC to load U-Boot from when the MMC is being
-	  used in fs mode.
-	  Use -1 as a special value to use the first bootable partition.
-
 config SPL_MMC_TINY
 	bool "Tiny MMC framework in SPL"
 	depends on SPL_MMC
@@ -1318,6 +1310,14 @@ config SPL_MTD_LOAD
 	  SPI NOR in U-Boot SPL. it would dynamic to get the current mtd dev.
 
 endif # SPL_SPI_FLASH_SUPPORT
+
+config SYS_BOOTLOADER_FS_PARTITION_NAME
+	string "name of the partition that contain bootloader files"
+	default "bootloader"
+	depends on SPL_FS_EXT4 || SPL_FS_FAT || SPL_FS_SQUASHFS
+	help
+	  Partition name on the block device(such as emmc, sdcard, ufs, nvme)
+	  to load bootloader files from.
 
 config SYS_LOAD_IMAGE_PARTITION_NAME
 	string "Partition name to use to load U-Boot from"

@@ -272,37 +272,22 @@ int spl_start_uboot(void)
 }
 #endif
 
-#ifdef CONFIG_SYS_MMCSD_FS_BOOT_PARTITION
+#ifdef CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME
 static int spl_mmc_do_fs_boot(struct spl_image_info *spl_image,
 			      struct spl_boot_device *bootdev,
 			      struct mmc *mmc,
 			      const char *filename)
 {
 	int err = -ENOSYS;
+	int partition;
+	struct disk_partition info;
 
-	__maybe_unused int partition = CONFIG_SYS_MMCSD_FS_BOOT_PARTITION;
-
-#if CONFIG_SYS_MMCSD_FS_BOOT_PARTITION == -1
-	{
-		struct disk_partition info;
-		debug("Checking for the first MBR bootable partition\n");
-		for (int type_part = 1; type_part <= DOS_ENTRY_NUMBERS; type_part++) {
-			err = part_get_info(mmc_get_blk_desc(mmc), type_part, &info);
-			if (err)
-				continue;
-			debug("Partition %d is of type %d and bootable=%d\n", type_part, info.sys_ind, info.bootable);
-			if (info.bootable != 0) {
-				debug("Partition %d is bootable, using it\n", type_part);
-				partition = type_part;
-				break;
-			}
-		}
-		printf("Using first bootable partition: %d\n", partition);
-		if (partition == CONFIG_SYS_MMCSD_FS_BOOT_PARTITION) {
-			return -ENOSYS;
-		}
+	partition = part_get_info_by_name(mmc_get_blk_desc(mmc),
+		CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME, &info);
+	if (partition < 0) {
+		pr_err("Partition %s NOT exist\n", CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME);
+		return -ENOSYS;
 	}
-#endif
 
 #ifdef CONFIG_SPL_FS_FAT
 	if (!spl_start_uboot()) {
