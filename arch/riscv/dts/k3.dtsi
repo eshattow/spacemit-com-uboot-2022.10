@@ -964,6 +964,12 @@
 			#size-cells = <0>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_espi0>;
+			clocks = <&ccu CLK_ESPI_SCLK_SRC>, <&ccu CLK_ESPI_SCLK>, <&ccu CLK_ESPI_MCLK>;
+			clock-names = "sclk_src", "sclk", "mclk";
+			resets = <&reset RESET_ESPI>;
+			reset-names = "espi_reset";
+			assigned-clocks = <&ccu CLK_ESPI_SCLK>;
+			assigned-clock-parents = <&ccu CLK_ESPI_SCLK_SRC>;
 
 			pr_io_base = <0x86000000>;
 			pr-mem-base0 = <0x84000000>;

@@ -10,6 +10,8 @@
 #include <asm/io.h>
 #include <linux/bitops.h>
 #include <linux/types.h>
+#include <clk.h>
+#include <reset.h>
 
 struct spacemit_espi_priv {
 	phys_addr_t cfg_base;
@@ -38,6 +40,12 @@ struct spacemit_espi_priv {
 	/* VW GPIO configuration */
 	int vw_gpio_count;     /* Number of VW GPIO mappings */
 	u16 vw_gpio_map[4][2]; /* VW GPIO mappings: [group][index] */
+
+	/* Clock and reset */
+	struct clk clk_sclk_src; /* Serial clock source */
+	struct clk clk_sclk;     /* Serial clock */
+	struct clk clk_mclk;     /* Master clock */
+	struct reset_ctl reset_espi; /* eSPI reset control */
 };
 
 /**************************************************************************************/

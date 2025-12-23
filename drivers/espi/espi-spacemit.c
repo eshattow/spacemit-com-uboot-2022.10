@@ -15,6 +15,7 @@
 #include <dm/ofnode.h>
 #include <espi.h>
 #include <fdt_support.h>
+#include <clk.h>
 #include "espi-spacemit.h"
 
 /* Global pointer to current eSPI instance */
@@ -419,8 +420,10 @@ static int spacemit_espi_negotiate_config(struct spacemit_espi_priv *priv)
 	u32 negotiated_config = 0;
 
 	debug("Starting eSPI configuration negotiation\n");
+
 	/* Step 1: Get slave general capabilities */
 	espi_get_config(ESPI_SLAVE_GEN_CFG);
+
 	if (espi_poll_status(&status) == 0) {
 		if (status & ESPI_DNCMD_INT) {
 			u8 header[4];
@@ -436,7 +439,6 @@ static int spacemit_espi_negotiate_config(struct spacemit_espi_priv *priv)
 
 	/* Step 2: Negotiate general configuration */
 	negotiated_config = 0;
-	/* Negotiate general configuration */
 	espi_configure_basic_features(priv, &negotiated_config);
 	espi_configure_alert_mode(priv, slave_gen_caps, &negotiated_config);
 	espi_configure_frequency(priv, slave_gen_caps, &negotiated_config);
@@ -451,7 +453,6 @@ static int spacemit_espi_negotiate_config(struct spacemit_espi_priv *priv)
 	espi_gen_config = negotiated_config;
 	espi_set_config(ESPI_SLAVE_GEN_CFG, espi_gen_config);
 
-	printf("Sent general config to Slave: 0x%08x\n", espi_gen_config);
 	debug("eSPI configuration negotiation and Slave setup completed\n");
 	return 0;
 }
@@ -485,21 +486,54 @@ static int espi_apply_config(struct spacemit_espi_priv *priv)
 }
 
 /**
- * Release eSPI controller system reset
+ * Release eSPI controller system reset and configure clock
  * @dev: device instance
  * @return: 0 on success, negative on error
  */
 static int espi_release_reset(struct udevice *dev)
 {
-	/*need to use clock/reset framwork*/
+	struct spacemit_espi_priv *priv = dev_get_priv(dev);
+	/* PMUAP ESPI_SCLK_CFG register (0xD4282800 + 0x240) */
+	phys_addr_t espi_clk_cfg_addr = 0xD4282A40ULL;
+	u32 reg_val, clk_src;
 
-	/* Use phys_addr_t to access the reset register (0xD4282800 + 0x240) */
-	phys_addr_t reset_addr = 0xD4282A40ULL;
-	/* Write 0x5 to deassert the eSPI controller system reset */
-	writel(0x5, (void *) reset_addr);
-	dev_info(dev, "eSPI controller reset released\n");
-	/* Wait for reset deassertion to take effect */
-	udelay(100);
+	/* Determine clock source bits based on operating frequency
+	 * Bits [6:4]: Clock source (0=20MHz, 1=25MHz, 2=33MHz, 3=50MHz, 4=66MHz)
+	 */
+	switch (priv->op_freq) {
+	case 20:
+		clk_src = 0 << 4;
+		break;
+	case 25:
+		clk_src = 1 << 4;
+		break;
+	case 33:
+		clk_src = 2 << 4;
+		break;
+	case 50:
+		clk_src = 3 << 4;
+		break;
+	case 66:
+		clk_src = 4 << 4;
+		break;
+	default:
+		dev_warn(dev, "Unsupported frequency %d MHz, defaulting to 25MHz\n", priv->op_freq);
+		clk_src = 1 << 4;
+		break;
+	}
+
+	/* Read-Modify-Write to preserve CCU settings */
+	reg_val = readl((void *)espi_clk_cfg_addr);
+	reg_val &= ~(0x7 << 4);    /* Clear bits [6:4] */
+	reg_val |= clk_src;        /* Set clock source */
+	reg_val |= BIT(2);         /* Deassert SCLK reset */
+	writel(reg_val, (void *)espi_clk_cfg_addr);
+
+	dev_dbg(dev, "eSPI controller reset released and clock configured\n");
+
+	/* Wait for clock stabilization */
+	udelay(1000);
+
 	return 0;
 }
 
@@ -691,59 +725,134 @@ static int spacemit_espi_probe(struct udevice *dev)
 	struct spacemit_espi_priv *priv = dev_get_priv(dev);
 	int ret;
 
-	/* Step 0: Release eSPI controller system reset */
-	ret = espi_release_reset(dev);
+	/* Step 0: Get and enable clocks */
+	ret = clk_get_by_name(dev, "sclk_src", &priv->clk_sclk_src);
 	if (ret) {
-		dev_err(dev, "Failed to release eSPI controller reset\n");
+		dev_err(dev, "Failed to get sclk_src: %d\n", ret);
 		return ret;
 	}
 
-	/* Step 1: Parse device tree configuration */
+	ret = clk_get_by_name(dev, "sclk", &priv->clk_sclk);
+	if (ret) {
+		dev_err(dev, "Failed to get sclk: %d\n", ret);
+		return ret;
+	}
+
+	ret = clk_get_by_name(dev, "mclk", &priv->clk_mclk);
+	if (ret) {
+		dev_err(dev, "Failed to get mclk: %d\n", ret);
+		return ret;
+	}
+
+	/* Enable source clock first */
+	ret = clk_enable(&priv->clk_sclk_src);
+	if (ret) {
+		dev_err(dev, "Failed to enable sclk_src: %d\n", ret);
+		return ret;
+	}
+
+	/* Set sclk parent to sclk_src (select mux) */
+	ret = clk_set_parent(&priv->clk_sclk, &priv->clk_sclk_src);
+	if (ret)
+		dev_dbg(dev, "Failed to set sclk parent: %d (continuing anyway)\n", ret);
+
+	/* Then enable sclk (which muxes from sclk_src) */
+	ret = clk_enable(&priv->clk_sclk);
+	if (ret) {
+		dev_err(dev, "Failed to enable sclk: %d\n", ret);
+		goto err_disable_sclk_src;
+	}
+
+	ret = clk_enable(&priv->clk_mclk);
+	if (ret) {
+		dev_err(dev, "Failed to enable mclk: %d\n", ret);
+		goto err_disable_sclk;
+	}
+
+	/* Release MCLK and SCLK reset (bit 0 and bit 2) */
+	{
+		u32 clk_reg = readl((void *)0xD4282A40ULL);
+		printf("  Before reset release: 0x%08x\n", clk_reg);
+		clk_reg |= BIT(0) | BIT(2);  /* ESPI_MCLK_RST | ESPI_SCLK_RST */
+		writel(clk_reg, (void *)0xD4282A40ULL);
+		clk_reg = readl((void *)0xD4282A40ULL);
+		printf("  After reset release: 0x%08x\n", clk_reg);
+	}
+
+	/* Step 0.5: Get and deassert reset */
+	ret = reset_get_by_name(dev, "espi_reset", &priv->reset_espi);
+	if (ret) {
+		dev_dbg(dev, "Failed to get espi_reset: %d (continuing anyway)\n", ret);
+	} else {
+		ret = reset_deassert(&priv->reset_espi);
+		if (ret) {
+			dev_err(dev, "Failed to deassert eSPI reset: %d\n", ret);
+			goto err_disable_clocks;
+		}
+		udelay(100);
+	}
+
+	/* Step 1: Parse device tree configuration (need op_freq before reset config) */
 	ret = spacemit_espi_init_from_dt(priv, dev);
 	if (ret) {
 		dev_err(dev, "Failed to initialize from device tree\n");
-		return ret;
+		goto err_disable_clocks;
 	}
 
-	/* Step 2: Set global pointer for legacy functions */
+	/* Step 2: Release eSPI controller system reset and configure clock */
+	ret = espi_release_reset(dev);
+	if (ret) {
+		dev_err(dev, "Failed to release eSPI controller reset\n");
+		goto err_disable_clocks;
+	}
+
+	/* Step 3: Set global pointer for legacy functions */
 	g_espi_priv = priv;
 
-	/* Step 3: Basic hardware initialization for communication */
+	/* Step 4: Basic hardware initialization for communication */
 	ret = espi_basic_hw_init(priv);
 	if (ret) {
 		dev_err(dev, "Basic hardware initialization failed\n");
-		return ret;
+		goto err_disable_clocks;
 	}
 
-	/* Step 4: Negotiate configuration with slave device */
+	/* Step 5: Negotiate configuration with slave device */
 	ret = spacemit_espi_negotiate_config(priv);
 	if (ret) {
 		dev_err(dev, "eSPI configuration negotiation failed\n");
-		return ret;
+		goto err_disable_clocks;
 	}
 
-	/* Step 5: Apply negotiated configuration to master */
+	/* Step 6: Apply negotiated configuration to master */
 	ret = espi_apply_config(priv);
 	if (ret) {
 		dev_err(dev, "Failed to apply negotiated configuration\n");
-		return ret;
+		goto err_disable_clocks;
 	}
 
-	/* Step 6: Configure peripheral memory mapping */
+	/* Step 7: Configure peripheral memory mapping */
 	ret = espi_mem_cfg();
 	if (ret) {
 		dev_err(dev, "Failed to configure peripheral memory mapping\n");
-		return ret;
+		goto err_disable_clocks;
 	}
 
-	/* Step 7: Configure VW GPIO mappings if available */
+	/* Step 8: Configure VW GPIO mappings if available */
 	if (priv->vw_gpio_count > 0) {
-		dev_info(dev, "Configuring VW GPIO mappings...\n");
+		dev_dbg(dev, "Configuring VW GPIO mappings...\n");
 		espi_config_vwgpio(priv);
 	}
 
 	dev_info(dev, "SpacemiT eSPI controller initialized successfully\n");
 	return 0;
+
+err_disable_clocks:
+	clk_disable(&priv->clk_mclk);
+err_disable_sclk:
+	clk_disable(&priv->clk_sclk);
+err_disable_sclk_src:
+	clk_disable(&priv->clk_sclk_src);
+	return ret;
 }
 
 static const struct espi_ops spacemit_espi_ops = {
@@ -762,6 +871,13 @@ static const struct espi_ops spacemit_espi_ops = {
 
 static int spacemit_espi_remove(struct udevice *dev)
 {
+	struct spacemit_espi_priv *priv = dev_get_priv(dev);
+
+	/* Disable clocks in reverse order */
+	clk_disable(&priv->clk_mclk);
+	clk_disable(&priv->clk_sclk);
+	clk_disable(&priv->clk_sclk_src);
+
 	g_espi_priv = NULL;
 	return 0;
 }
