@@ -310,35 +310,35 @@
 			reg-names = "a2p-req", "p2a-ack", "p2a-req", "a2p-ack", "db-reg";
 			riscv,slot-size = <256>;
 			#mbox-cells = <1>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		rpmi_mpxy_clk: rpmi-mpxy-clk@0 {
 			compatible = "riscv,rpmi-mpxy-clock";
 			mboxes = <&rpmi_shmem_mbox 8>;
 			riscv,sbi-mpxy-channel-id = <8>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		rpmi_mpxy_voltage: rpmi-mpxy-voltage@0 {
 			compatible = "riscv,rpmi-mpxy-voltage";
 			mboxes = <&rpmi_shmem_mbox 7>;
 			riscv,sbi-mpxy-channel-id = <7>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		rpmi_mpxy_hsm: rpmi-mpxy-hsm@0 {
 			compatible = "riscv,rpmi-hsm";
 			mboxes = <&rpmi_shmem_mbox 5>;
 			riscv,sbi-mpxy-channel-id = <5>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		rpmi_mpxy_domain: rpmi-mpxy-domain@0 {
 			compatible = "riscv,rpmi-mpxy-domain";
 			mboxes = <&rpmi_shmem_mbox 9>;
 			riscv,sbi-mpxy-channel-id = <9>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		rpmi_mpxy_rtc: rpmi-mpxy-rtc@0 {
