@@ -679,11 +679,11 @@ int read_mac_from_tlv(void)
 	int maccount;
 
 	maccount = 1;
-	if (get_tlvinfo(TLV_CODE_MAC_SIZE, (char*)&mac_size, 2) == 0) {
+	if (get_tlvinfo(TLV_CODE_MAC_SIZE, (char*)&mac_size, 2) > 0) {
 		maccount = be16_to_cpu(mac_size);
 	}
 
-	if ((get_tlvinfo(TLV_CODE_MAC_BASE, (char*)macbase, 6) != 0)
+	if ((get_tlvinfo(TLV_CODE_MAC_BASE, (char*)macbase, 6) <= 0)
 		|| !is_valid_ethaddr(macbase)) {
 		return 0;
 	}

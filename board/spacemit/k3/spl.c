@@ -101,7 +101,8 @@ int get_product_name(char *name, int max_size)
 	if (NULL == name)
 		return EINVAL;
 
-	if (get_tlvinfo(TLV_CODE_PRODUCT_NAME, name, max_size) == 0) {
+	memset(name, 0, max_size);
+	if (get_tlvinfo(TLV_CODE_PRODUCT_NAME, name, max_size) > 0) {
 		pr_info("Get product name from eeprom %s\n", name);
 		return 0;
 	}
