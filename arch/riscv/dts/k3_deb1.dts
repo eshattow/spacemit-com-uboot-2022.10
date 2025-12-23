@@ -107,6 +107,10 @@
 	};
 };
 
+&espi0{
+	status = "okay";
+};
+
 &i2c8 {
 	clock-frequency = <100000>;
 	u-boot,dm-spl;
