@@ -8,6 +8,10 @@
 #include "k3.dtsi"
 #include "k3-pinctrl.dtsi"
 
+/ {
+	model = "spacemit k3 fpga 1x1 board";
+};
+
 &uart0 {
 	status = "okay";
 };

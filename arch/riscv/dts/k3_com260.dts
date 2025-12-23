@@ -8,6 +8,10 @@
 #include "k3.dtsi"
 #include "k3-pinctrl.dtsi"
 
+/ {
+	model = "spacemit k3 com260 board";
+};
+
 &cpus {
 	timebase-frequency = <24000000>;
 };
