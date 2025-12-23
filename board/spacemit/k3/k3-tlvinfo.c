@@ -200,12 +200,12 @@ int get_tlvinfo(int tcode, char *buf, int max_size)
 		if (tlv->type == tcode) {
 			size = min((uint32_t)tlv->length, (uint32_t)max_size);
 			memcpy(buf, tlv->value, size);
-			pr_info("get tlvinfo value:%x,%s\n", tcode, buf);
+			pr_debug("get tlvinfo value:%x,%s\n", tcode, buf);
 			return size;
 		}
 		offset += sizeof(struct tlvinfo_tlv) + tlv->length;
 	}
-	pr_info("can not get tlvinfo index:%x\n", tcode);
+	pr_debug("can not get tlvinfo index:%x\n", tcode);
 	return -1;
 }
 
