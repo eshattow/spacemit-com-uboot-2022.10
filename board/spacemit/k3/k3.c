@@ -33,6 +33,7 @@ DECLARE_GLOBAL_DATA_PTR;
 void import_env_from_bootfs(void);
 void setenv_boot_mode(void);
 void set_env_ethaddr(void);
+void refresh_config_info(void);
 
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 extern int set_tlvinfo(int tcode, char* val);
@@ -200,6 +201,9 @@ void run_fastboot_command(void)
 
 		char *cmd_para = "fastboot 0";
 		run_command(cmd_para, 0);
+
+		// it may update tlv during USB fastboot stage
+		refresh_config_info();
 	}
 }
 
@@ -243,6 +247,7 @@ int board_late_init(void)
 	int ret;
 
 	set_env_ethaddr();
+	refresh_config_info();
 
 	run_fastboot_command();
 
@@ -747,6 +752,52 @@ void set_env_ethaddr(void)
 			mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
 		eth_env_set_enetaddr(mac_str, mac_addr);
 	}
+}
+
+void refresh_config_info(void)
+{
+	char *strval = malloc(64);
+	int i, num, ret;
+
+	const struct code_desc_info {
+		u8    m_code;
+		u8    is_data;
+		char *m_name;
+	} info[] = {
+		{ TLV_CODE_PRODUCT_NAME,   false, "product_name"},
+		{ TLV_CODE_PART_NUMBER,    false, "part#"},
+		{ TLV_CODE_SERIAL_NUMBER,  false, "serial#"},
+		{ TLV_CODE_MANUF_DATE,     false, "manufacture_date"},
+		{ TLV_CODE_MANUF_NAME,     false, "manufacturer"},
+		{ TLV_CODE_WIFI_MAC_ADDR,  false, "wifi_addr"},
+		{ TLV_CODE_BLUETOOTH_ADDR, false, "bt_addr"},
+		{ TLV_CODE_DEVICE_VERSION, true,  "device_version"},
+		{ TLV_CODE_SDK_VERSION,    true,  "sdk_version"},
+		{ TLV_CODE_DDR_DATARATE,   true,  "ddr_datarate"},
+		{ TLV_CODE_DDR_PARTNUMBER, false,  "ddr_partnumber"},
+	};
+
+	for (i = 0; i < ARRAY_SIZE(info); i++) {
+		ret = get_tlvinfo(info[i].m_code, strval, 64 - 1);
+		if (ret <= 0) {
+			continue;
+		}
+
+		if (info[i].is_data) {
+			num = 0;
+			// Convert the numeric value to string
+			for (int j = 0; j < ret && j < sizeof(num); j++) {
+				num = (num << 8) | strval[j];
+			}
+			sprintf(strval, "%d", num);
+		} else {
+			strval[ret] = '\0';
+		}
+		pr_info("TLV item: %s = %s\n", info[i].m_name, strval);
+		env_set(info[i].m_name, strval);
+	}
+
+	free(strval);
 }
 
 #if !defined(CONFIG_SPL_BUILD)
