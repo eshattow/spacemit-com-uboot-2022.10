@@ -19,8 +19,12 @@
 	#size-cells = <2>;
 	compatible = "spacemit,k3";
 
-	/* Enable debug JTAG on MMC1 pins */
-	spacemit,enable-debug-jtag;
+	/* The pins of the SDCard share the same pins
+	 * as the JTAG. If you want to use the SDCard
+	 * slot for JTAG connection and debugging,
+	 * enable this bool property.
+	 */
+	//spacemit,enable-debug-jtag;
 
 	chosen {
 		stdout-path = "uart0:115200";
