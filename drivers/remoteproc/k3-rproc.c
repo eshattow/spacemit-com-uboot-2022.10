@@ -112,7 +112,7 @@ static int k3_rproc_load(struct udevice *dev, ulong addr, ulong size)
 
 static int k3_rproc_start(struct udevice *dev)
 {
-	// unsigned int val;
+	int try_count = 6000;
 	struct k3_rproc_privdata *priv;
 
 	priv = dev_get_priv(dev);
@@ -126,12 +126,25 @@ static int k3_rproc_start(struct udevice *dev)
 		/* set the hartid */
 		writel(priv->coreid, (void __iomem *)RCPU_CORE0_HART_ID_SET);
 
+		/* sync flag */
+		writel(0, (void __iomem *)RCPU_CORE1_BOOT_ENTRY_LO);
+
 		/* reset core0 sw reset */
 		writel(1, (void __iomem *)RT24_CORE0_SW_RESET_REG);
 
 		/* sw wakeup core 0 */
 		writel(1, (void __iomem *)RT24_CORE0_SW_WAKEUP_REG);
-	break;
+
+		/* sync flag */
+		while (try_count-- >= 0) {
+			if (readl((void __iomem *)RCPU_CORE1_BOOT_ENTRY_LO) != 0)
+				break;
+			mdelay(1);
+		}
+		if (try_count <= 0)
+			dev_err(dev, "try start rproc-0 failed\n");
+		break;
+
 	case 1:
 		/* set the boot-entry */
 		writel(priv->fw_boot_entry & 0xffffffff, (void __iomem *)RCPU_CORE1_BOOT_ENTRY_LO);
@@ -140,12 +153,25 @@ static int k3_rproc_start(struct udevice *dev)
 		/* set the hartid */
 		writel(priv->coreid, (void __iomem *)RCPU_CORE1_HART_ID_SET);
 
+		/* sync flag */
+		writel(0, (void __iomem *)RCPU_CORE0_BOOT_ENTRY_LO);
+
 		/* reset core1 sw reset */
 		writel(1, (void __iomem *)RT24_CORE1_SW_RESET_REG);
 
 		/* sw wakeup core 1 */
 		writel(1, (void __iomem *)RT24_CORE1_SW_WAKEUP_REG);
-	break;
+
+		/* sync flag */
+		while (try_count-- >= 0) {
+			if (readl((void __iomem *)RCPU_CORE0_BOOT_ENTRY_LO) != 0)
+				break;
+			mdelay(1);
+		}
+		if (try_count <= 0)
+			dev_err(dev, "try start rproc-1 failed\n");
+		break;
+
 	default:
 		break;
 	}
