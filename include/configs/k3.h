@@ -20,6 +20,7 @@
 #define SYS_SDRAM_UPPER_LIMIT_ADDR	(0x1100000000ULL)
 
 #define CONFIG_I2C_MULTI_BUS		1
+#define RAMDISK_LOAD_ADDR		0x120000000
 #define KERNEL_DTB_ADDR			0x128000000
 
 #define PMIC_I2C_BUS			8
@@ -112,15 +113,12 @@ enum board_boot_mode {
  * Environment
  * ***************************************************************************************/
 #define CONFIG_EXTRA_ENV_SETTINGS \
-	"fdt_high=0xffffffffffffffff\0" \
-	"initrd_high=0xffffffffffffffff\0" \
-	"kernel_addr_r=0x124000000\0" \
-	"kernel_comp_addr_r=0x128000000\0" \
-	"kernel_comp_size=0x4000000\0" \
-	"fdt_addr_r=0x12c000000\0" \
-	"scriptaddr=0x12c100000\0" \
-	"pxefile_addr_r=0x12c200000\0" \
-	"ramdisk_addr_r=0x12c300000\0" \
+	"kernel_comp_addr_r=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
+	"kernel_comp_size=" __stringify(CONFIG_FASTBOOT_BUF_SIZE) "\0" \
+	"kernel_addr_r=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
+	"ramdisk_addr_r=" __stringify(RAMDISK_LOAD_ADDR) "\0" \
+	"fdt_addr_r=" __stringify(KERNEL_DTB_ADDR) "\0" \
+	"pxefile_addr_r=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
 	"esos_itb_path=esos.itb\0" \
 	"uboot_itb_path=u-boot.itb\0" \
 	"extra_esos_partition=esos\0" \
