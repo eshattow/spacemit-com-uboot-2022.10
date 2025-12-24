@@ -1647,25 +1647,25 @@ static SPACEMIT_CCU_MUX_GATE(edp1_pxclk, "edp1_pxclk", edp1_pclk_parents,
 	18, 1, BIT(17), BIT(17), 0x0,
 	0);
 
-static SPACEMIT_CCU_GATE(pciea_clk, "pciea_clk", "axi_clk",
+static SPACEMIT_CCU_GATE(pciea_clk, "pciea_clk", "pll2_d6",
 	BASE_TYPE_APMU, APMU_PCIE_CLK_RES_CTRL_A,
-	0x6, 0x6, 0x0,
+	0x7, 0x7, 0x0,
 	0);
-static SPACEMIT_CCU_GATE(pcieb_clk, "pcieb_clk", "axi_clk",
+static SPACEMIT_CCU_GATE(pcieb_clk, "pcieb_clk", "pll2_d6",
 	BASE_TYPE_APMU, APMU_PCIE_CLK_RES_CTRL_B,
-	0x6, 0x6, 0x0,
+	0x7, 0x7, 0x0,
 	0);
-static SPACEMIT_CCU_GATE(pciec_clk, "pciec_clk", "axi_clk",
+static SPACEMIT_CCU_GATE(pciec_clk, "pciec_clk", "pll2_d6",
 	BASE_TYPE_APMU, APMU_PCIE_CLK_RES_CTRL_C,
-	0x6, 0x6, 0x0,
+	0x7, 0x7, 0x0,
 	0);
-static SPACEMIT_CCU_GATE(pcied_clk, "pcied_clk", "axi_clk",
+static SPACEMIT_CCU_GATE(pcied_clk, "pcied_clk", "pll2_d6",
 	BASE_TYPE_APMU, APMU_PCIE_CLK_RES_CTRL_D,
-	0x6, 0x6, 0x0,
+	0x7, 0x7, 0x0,
 	0);
-static SPACEMIT_CCU_GATE(pciee_clk, "pciee_clk", "axi_clk",
+static SPACEMIT_CCU_GATE(pciee_clk, "pciee_clk", "pll2_d6",
 	BASE_TYPE_APMU, APMU_PCIE_CLK_RES_CTRL_E,
-	0x6, 0x6, 0x0,
+	0x7, 0x7, 0x0,
 	0);
 
 static const char * const emac_1588_parents[] = {
