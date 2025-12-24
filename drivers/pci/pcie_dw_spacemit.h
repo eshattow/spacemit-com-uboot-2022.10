@@ -35,6 +35,7 @@ enum dw_pcie_device_mode {
 #define	PCIE_IGNORE_PERSTN				BIT(31)
 /* Perst GPIO en in RC mode 1: perst# low, 0: perst# high */
 #define	PCIE_PERSTN_OE					BIT(24)
+#define PCIE_PERSTN_OUT					BIT(25)
 
 #define	SPACEMIT_PHY_AHB_LINK_STS			0x0004
 #define	SMLH_LINK_UP					BIT(1)
@@ -42,5 +43,7 @@ enum dw_pcie_device_mode {
 #define   PCIE_CLIENT_DEBUG_LTSSM_MASK			GENMASK(11, 6)
 #define   PCIE_CLIENT_DEBUG_LTSSM_L1			(BIT(10) | BIT(8))
 #define   PCIE_CLIENT_DEBUG_LTSSM_L2			(BIT(10) | BIT(8) | BIT(6))
+
+#define GEN3_EQ_CONTROL_OFF				0x8a8
 
 #endif

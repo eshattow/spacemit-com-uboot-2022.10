@@ -42,7 +42,11 @@ struct spacemit_pcie {
 	/* reset, clock resources */
 	struct clk clock;
 	struct reset_ctl reset;
+
+	int num_lanes;
 };
+
+extern void init_phy(void);
 
 static inline u32 spacemit_pcie_readl(struct spacemit_pcie *pcie, u32 offset)
 {
@@ -62,6 +66,16 @@ static inline u32 spacemit_pcie_phy_ahb_readl(struct spacemit_pcie *pcie, u32 of
 static inline void spacemit_pcie_phy_ahb_writel(struct spacemit_pcie *pcie, u32 offset, u32 value)
 {
 	writel(value, pcie->phy_ahb + offset);
+}
+
+static void pcie_eq_preset(struct spacemit_pcie *pci)
+{
+	u32 val;
+
+	val = readl(pci->dw.dbi_base + GEN3_EQ_CONTROL_OFF);
+	val &= ~(0xffff<<8);
+	val |= ((0x1<<4)<<8);
+	writel(val, pci->dw.dbi_base + GEN3_EQ_CONTROL_OFF);
 }
 
 /*
@@ -173,7 +187,7 @@ static void pcie_dw_configure(struct spacemit_pcie *pcie, u32 cap_speed)
 	val |= cap_speed;
 	writel(val, pcie->dw.dbi_base + PCIE_LINK_CTL_2);
 
-	spacemit_set_max_link_width(pcie, 1);
+	spacemit_set_max_link_width(pcie, pcie->num_lanes);
 
 	dw_pcie_dbi_write_enable(&pcie->dw, false);
 }
@@ -290,7 +304,7 @@ static int spacemit_pcie_host_init(struct spacemit_pcie *pcie)
 	mdelay(100);
 	/* set Perst# gpio high state*/
 	reg = spacemit_pcie_readl(pcie, PCIE_CTRL_LOGIC);
-	reg &= ~PCIE_PERSTN_OE;
+	reg |= PCIE_PERSTN_OUT;
 	spacemit_pcie_writel(pcie, PCIE_CTRL_LOGIC, reg);
 
 	return 0;
@@ -326,25 +340,30 @@ static int spacemit_pcie_probe(struct udevice *dev)
 	/* set Perst# (fundamental reset) gpio low state*/
 	reg = spacemit_pcie_readl(pcie, PCIE_CTRL_LOGIC);
 	reg |= PCIE_PERSTN_OE;
+	reg |= PCIE_PERSTN_OUT;
+	spacemit_pcie_writel(pcie, PCIE_CTRL_LOGIC, reg);
+
+	reg = spacemit_pcie_readl(pcie, PCIE_CTRL_LOGIC);
+	reg &= ~PCIE_PERSTN_OUT;
 	spacemit_pcie_writel(pcie, PCIE_CTRL_LOGIC, reg);
 
 	ret = generic_phy_get_by_name(dev, "pcie-phy0", &phy0);
 	if (ret) {
-		dev_err(dev, "Unable to get phy0\n");
-		return ret;
+		dev_info(dev, "Unable to get phy0\n");
+	} else {
+		generic_phy_reset(&phy0);
+		generic_phy_init(&phy0);
+		generic_phy_power_on(&phy0);
 	}
-	generic_phy_reset(&phy0);
-	generic_phy_init(&phy0);
-	generic_phy_power_on(&phy0);
 
 	ret = generic_phy_get_by_name(dev, "pcie-phy1", &phy1);
 	if (ret) {
-		dev_err(dev, "Unable to get phy1\n");
-		return ret;
+		dev_info(dev, "Unable to get phy1\n");
+	} else {
+		generic_phy_reset(&phy1);
+		generic_phy_init(&phy1);
+		generic_phy_power_on(&phy1);
 	}
-	generic_phy_reset(&phy1);
-	generic_phy_init(&phy1);
-	generic_phy_power_on(&phy1);
 
 	pcie->dw.first_busno = dev_seq(dev);
 	pcie->dw.dev = dev;
@@ -352,10 +371,12 @@ static int spacemit_pcie_probe(struct udevice *dev)
 	pcie_set_mode(pcie, DW_PCIE_RC_TYPE);
 
 	spacemit_pcie_host_init(pcie);
+	init_phy();
+	pcie_eq_preset(pcie);
 	pcie_dw_setup_host(&pcie->dw);
 	pcie_dw_init_id(pcie);
 
-	if (!spacemit_pcie_link_up(pcie, LINK_SPEED_GEN_1)) {
+	if (!spacemit_pcie_link_up(pcie, LINK_SPEED_GEN_3)) {
 		printf("PCIE-%d: Link down\n", dev_seq(dev));
 		return -ENODEV;
 	}
@@ -421,6 +442,13 @@ static int spacemit_pcie_of_to_plat(struct udevice *dev)
 	ret = reset_get_by_index(dev, 0, &pcie->reset);
 	if (ret) {
 		dev_warn(dev, "It has no reset: %d\n", ret);
+		return -EINVAL;
+	}
+
+	pcie->num_lanes = dev_read_u32_default(dev, "num-lanes", 1);
+	dev_info(dev, "num-lanes: %u\n", pcie->num_lanes);
+	if (!pcie->num_lanes || pcie->num_lanes > 8) {
+		dev_err(dev, "num-lanes %u: invalid value\n", pcie->num_lanes);
 		return -EINVAL;
 	}
 
