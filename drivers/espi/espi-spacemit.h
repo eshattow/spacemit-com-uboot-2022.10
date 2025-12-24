@@ -543,6 +543,14 @@ struct spacemit_espi_priv {
 #define ESPI_FREQ_50MHZ 3
 #define ESPI_FREQ_66MHZ 4
 
+/* eSPI poll status types */
+enum espi_poll_type {
+	ESPI_POLL_DNCMD,
+	ESPI_POLL_FLASH_REQ,
+	ESPI_POLL_RXOOB,
+	ESPI_POLL_RXMSG,
+};
+
 /* Function prototypes for U-Boot */
 int espi_mem_cfg(void);
 void espi_config_clk_freq(u32 freq);
@@ -554,7 +562,8 @@ void espi_set_config(u16 slave_address, u32 configs);
 void espi_slave_get_config(u16 slave_address);
 void espi_controller_config_apply(u32 slave_id, u16 slave_address);
 void espi_hw_get_config_rsp(u8 opcode, u8 head_len, u8 *head_buf, u8 data_len, u8 *data_buf);
-int espi_poll_status(u32 *status);
+int espi_poll_status_mask(u32 *status, u32 expected);
+int espi_poll_status(u32 *status, enum espi_poll_type type);
 int espi_rx_oob(u8 *buffer);
 int espi_tx_oob(uint16_t len, uint8_t *buf);
 int espi_tx_vw(u16 vwire, bool state);

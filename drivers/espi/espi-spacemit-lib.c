@@ -357,21 +357,71 @@ err_exit:
 }
 
 /**
- * Poll eSPI status register
+ * Poll eSPI status register for expected interrupt
  * @status: pointer to store status
- * @return: 0 on success, -ETIMEDOUT on timeout
+ * @expected: expected interrupt bit(s) to wait for (e.g., ESPI_DNCMD_INT)
+ * @return: 0 on success, -ETIMEDOUT on timeout, -EIO on error interrupt
  */
-int espi_poll_status(u32 *status)
+int espi_poll_status_mask(u32 *status, u32 expected)
 {
-	int count = 1000;
+	int count = 5000;  /* 5000 * 10us = 50ms max timeout */
 	phys_addr_t espi_cfg_base = espi_get_cfg_base();
+	u32 error_mask = ESPI_PROTOCOL_INT | ESPI_RESPONSE_INT;
+
 	do {
 		*status = readl((void *) espi_cfg_base + ESPI_SLAVE0_INT_STS);
-		writel(*status, (void *) espi_cfg_base + ESPI_SLAVE0_INT_STS);
-		if (*status)
-			return 0;
+		if (*status) {
+			/* Clear the interrupt bits */
+			writel(*status, (void *) espi_cfg_base + ESPI_SLAVE0_INT_STS);
+
+			/* Check for expected interrupt first */
+			if (*status & expected)
+				return 0;
+
+			/* Check for error interrupts */
+			if (*status & error_mask) {
+				debug("eSPI error interrupt: 0x%08x\n", *status);
+				return -EIO;
+			}
+		}
+		udelay(10);  /* Small delay to avoid tight loop */
 	} while (count--);
 	return -ETIMEDOUT;
+}
+
+/**
+ * Poll eSPI status register for specific event type
+ * @status: pointer to store status
+ * @type: poll type (ESPI_POLL_DNCMD, ESPI_POLL_FLASH_REQ, etc.)
+ * @return: 0 on success, -ETIMEDOUT on timeout, -EIO on error
+ */
+int espi_poll_status(u32 *status, enum espi_poll_type type)
+{
+	u32 expected;
+	phys_addr_t espi_cfg_base = espi_get_cfg_base();
+
+	switch (type) {
+	case ESPI_POLL_DNCMD:
+		expected = ESPI_DNCMD_INT;
+		break;
+	case ESPI_POLL_FLASH_REQ:
+		expected = ESPI_FLASH_REQ_INT;
+		break;
+	case ESPI_POLL_RXOOB:
+		expected = ESPI_RXOOB_INT;
+		break;
+	case ESPI_POLL_RXMSG:
+		expected = ESPI_RXMSG_INT;
+		break;
+	default:
+		expected = ESPI_DNCMD_INT;
+		break;
+	}
+
+	/* Clear any pending expected interrupt before polling */
+	writel(expected, (void *)(espi_cfg_base + ESPI_SLAVE0_INT_STS));
+
+	return espi_poll_status_mask(status, expected);
 }
 
 /**

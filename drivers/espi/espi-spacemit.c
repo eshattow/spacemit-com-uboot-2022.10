@@ -420,17 +420,15 @@ static int spacemit_espi_negotiate_config(struct spacemit_espi_priv *priv)
 	u32 negotiated_config = 0;
 
 	debug("Starting eSPI configuration negotiation\n");
-
 	/* Step 1: Get slave general capabilities */
 	espi_get_config(ESPI_SLAVE_GEN_CFG);
-
-	if (espi_poll_status(&status) == 0) {
+	if (espi_poll_status(&status, ESPI_POLL_DNCMD) == 0) {
 		if (status & ESPI_DNCMD_INT) {
 			u8 header[4];
 			espi_hw_get_config_rsp(ESPI_CMD_GET_CONFIGURATION, 4, header, 0, NULL);
 			slave_gen_caps = MAKELONG(MAKEWORD(header[0], header[1]),
 						  MAKEWORD(header[2], header[3]));
-			debug("Slave general capabilities: 0x%08x\n", slave_gen_caps);
+			pr_info("Slave general capabilities: 0x%08x\n", slave_gen_caps);
 		}
 	} else {
 		debug("Failed to get slave general capabilities\n");
@@ -717,6 +715,44 @@ static int spacemit_espi_receive_oob(struct udevice *dev, u8 *buf, size_t len)
 }
 #endif /* !CONFIG_SPL_BUILD */
 
+
+
+/**********************Debug functions,need to use pinctrl framwork*****************************/
+#define AIB_GPIO4_IO_REG               0xD401E820
+#define APBC_ASFAR                     0xD4015050
+#define AKEY_ASFAR                     0xbaba
+#define AKEY_ASSAR                     0xeb10
+
+void set_gpio4_power_domain_1v8(void)
+{
+	u32 tmp;
+	void __iomem *apbc_asfar = (void *)((ulong)(APBC_ASFAR));
+	void __iomem *aib_gp4_io = (void *)((ulong)(AIB_GPIO4_IO_REG));
+
+	/* unlock sequence */
+	writel(AKEY_ASFAR, apbc_asfar);
+	writel(AKEY_ASSAR, apbc_asfar + 4);
+
+	tmp = readl(aib_gp4_io);
+	printk("===> GPIO4 IO domain before: 0x%08x\n", tmp);
+
+	/* bit2: 1.8v */
+	tmp |= 0x1 << 2; /* 1.8v */
+
+	/* write back with unlock sequence */
+	writel(AKEY_ASFAR, apbc_asfar);
+	writel(AKEY_ASSAR, apbc_asfar + 4);
+	writel(tmp, aib_gp4_io);
+
+	/* read back */
+	writel(AKEY_ASFAR, apbc_asfar);
+	writel(AKEY_ASSAR, apbc_asfar + 4);
+	tmp = readl(aib_gp4_io);
+
+	printk("===> AIB GPIO4 IO set 1.8v read back: 0x%08x\n", tmp);
+}
+/******************************************************************************************/
+
 /**
  * U-Boot driver model probe function
  */
@@ -724,6 +760,8 @@ static int spacemit_espi_probe(struct udevice *dev)
 {
 	struct spacemit_espi_priv *priv = dev_get_priv(dev);
 	int ret;
+
+	set_gpio4_power_domain_1v8();
 
 	/* Step 0: Get and enable clocks */
 	ret = clk_get_by_name(dev, "sclk_src", &priv->clk_sclk_src);
@@ -772,11 +810,11 @@ static int spacemit_espi_probe(struct udevice *dev)
 	/* Release MCLK and SCLK reset (bit 0 and bit 2) */
 	{
 		u32 clk_reg = readl((void *)0xD4282A40ULL);
-		printf("  Before reset release: 0x%08x\n", clk_reg);
+		pr_info("  Before reset release: 0x%08x\n", clk_reg);
 		clk_reg |= BIT(0) | BIT(2);  /* ESPI_MCLK_RST | ESPI_SCLK_RST */
 		writel(clk_reg, (void *)0xD4282A40ULL);
 		clk_reg = readl((void *)0xD4282A40ULL);
-		printf("  After reset release: 0x%08x\n", clk_reg);
+		pr_info("  After reset release: 0x%08x\n", clk_reg);
 	}
 
 	/* Step 0.5: Get and deassert reset */
