@@ -109,6 +109,22 @@
 
 &espi0{
 	status = "okay";
+
+	ec: ec@0 {
+		compatible = "google,cros-ec-espi";
+		reg = <0x0>;
+
+		/* eSPI VW GPIO interrupt configuration */
+		espi-vw-gpio-wire = <0>;       /* Wire 0 within the group */
+		espi-vw-gpio-index = <0x82>;   /* VM index 0x82 (Group 2/130) */
+		i2c_tunnel: i2c-tunnel {
+			compatible = "google,cros-ec-i2c-tunnel";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			google,remote-bus = <0>;
+
+		};
+	};
 };
 
 &i2c8 {
