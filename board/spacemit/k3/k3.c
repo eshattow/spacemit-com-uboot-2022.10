@@ -23,6 +23,7 @@
 #include <misc.h>
 #include <net.h>
 #include <tlv_eeprom.h>
+#include <clk.h>
 #include "nfs_env.h"
 
 bool is_video_connected = false;
@@ -170,6 +171,72 @@ void update_usb_serial_number(void)
 #endif
 }
 
+static int cpu_frequency_set(void)
+{
+	int ret;
+	unsigned int cluster0_frequency;
+	unsigned int cluster1_frequency;
+	unsigned int cluster2_frequency;
+	unsigned int cluster3_frequency;
+	struct clk cluster0_clk, cluster1_clk, cluster2_clk, cluster3_clk;
+	ofnode cpu_node;
+
+	cpu_node = ofnode_path("/cpus");
+	if (!ofnode_valid(cpu_node)) {
+		debug("No cpus node found\n");
+		return -1;
+	}
+
+	ret = clk_get_by_name_nodev(cpu_node, "cluster0", &cluster0_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "cluster1", &cluster1_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "cluster2", &cluster2_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "cluster3", &cluster3_clk);
+	if (ret) {
+		pr_err("Get cluster clk error\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "cluster0_frequency",
+			      (u32 *)&cluster0_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "cluster1_frequency",
+			      (u32 *)&cluster1_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "cluster2_frequency",
+			      (u32 *)&cluster2_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "cluster3_frequency",
+			      (u32 *)&cluster3_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	clk_enable(&cluster0_clk);
+	clk_enable(&cluster1_clk);
+	clk_enable(&cluster2_clk);
+	clk_enable(&cluster3_clk);
+
+	clk_set_rate(&cluster0_clk, cluster0_frequency);
+	clk_set_rate(&cluster1_clk, cluster1_frequency);
+	clk_set_rate(&cluster2_clk, cluster2_frequency);
+	clk_set_rate(&cluster3_clk, cluster3_frequency);
+
+	return 0;
+}
+
 int board_init(void)
 {
 	int ret = 0;
@@ -179,6 +246,8 @@ int board_init(void)
 	if (ret)
 		pr_debug("%s: Cannot enable boot on regulator\n", __func__);
 #endif
+
+	cpu_frequency_set();
 
 #ifdef CONFIG_ESPI
 	ret = uclass_probe_all(UCLASS_ESPI);
