@@ -24,6 +24,10 @@ config SPL_OPENSBI_LOAD_ADDR
 	hex
 	default 0x21000000
 
+config FDT_ADD_MEMORY_NODE
+	bool "enable to add memory node to fdt before boot kernel"
+	default n
+
 config SPACEMIT_BUILD_BIN
        bool "build fsbl.bin for spacemit image"
        default n
