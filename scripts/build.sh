@@ -2,8 +2,8 @@
 
 PACKAGE_SRC_NAME="u-boot-spacemit"
 CLEAN_CMD='make distclean'
-BUILD_CMD='make k3_defconfig && make -j$(nproc)'
-BUILD_DEB_CMD='GIT_VERSION=$(git rev-parse --short HEAD 2>/dev/null); VERSION=$(if [ -n "$GIT_VERSION" ]; then echo "0~g$GIT_VERSION"; else echo "0~$(date +%Y%m%d%H%M%S)"; fi); rm -rf debian/changelog; dch --create --package '"$PACKAGE_SRC_NAME"' -v ${VERSION} --distribution resolute-porting --force-distribution "Bianbu Test"; DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -us -uc -b -ariscv64 -d'
+BUILD_CMD='make k3_defconfig && make -j${JOBS:-$(nproc)}'
+BUILD_DEB_CMD='GIT_VERSION=$(git rev-parse --short HEAD 2>/dev/null); VERSION=$(if [ -n "$GIT_VERSION" ]; then echo "0~g$GIT_VERSION"; else echo "0~$(date +%Y%m%d%H%M%S)"; fi); rm -rf debian/changelog; dch --create --package '"$PACKAGE_SRC_NAME"' -v ${VERSION} --distribution resolute-porting --force-distribution "Bianbu Test"; DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -us -uc -b -ariscv64 -d -j${JOBS:-$(nproc)}'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -14,6 +14,7 @@ CROSS_COMPILE="${CROSS_COMPILE:-riscv64-unknown-linux-gnu-}"
 TOOLCHAIN_PATH="${TOOLCHAIN_PATH:-/opt/spacemit-toolchain-linux-glibc-x86_64-v1.2.2/bin}"
 
 DIRECT_BUILD="${DIRECT_BUILD:-0}"
+JOBS=""
 
 CLEAN=false
 BUILD_DEB=false
@@ -122,6 +123,7 @@ usage() {
     echo "  -c, --clean          Clean build (CLEAN_CMD before BUILD[_DEB]_CMD)"
     echo "  -d, --deb            Build DEB packages (BUILD_DEB_CMD)"
     echo "  -h, --help           Show this help message"
+    echo "  -j, --jobs NUM       Number of parallel jobs (default: nproc)"
     echo "  -x, --debug          Enable debug output (show docker command)"
     echo ""
     echo "Commands (run inside container):"
@@ -149,6 +151,10 @@ while [[ $# -gt 0 ]]; do
             usage
             exit 0
             ;;
+        -j|--jobs)
+            JOBS="$2"
+            shift 2
+            ;;
         -x|--debug)
             DEBUG=true
             shift
@@ -164,6 +170,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ -n "$JOBS" && ! "$JOBS" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Invalid jobs value: $JOBS (must be a positive integer)"
+    exit 1
+fi
 
 # Check if Docker is available
 if [ -z "$DIRECT_BUILD" ] || [ "$DIRECT_BUILD" = "0" ]; then
@@ -194,6 +205,9 @@ if [ -z "$DEBFULLNAME" ]; then
 fi
 
 CONTAINER_ENV=("-e" "ARCH=riscv" "-e" "CROSS_COMPILE=$CROSS_COMPILE" "-e" "PATH=$TOOLCHAIN_PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" "-e" "DEBEMAIL=$DEBEMAIL" "-e" "DEBFULLNAME=$DEBFULLNAME")
+if [[ -n "$JOBS" ]]; then
+    CONTAINER_ENV+=("-e" "JOBS=$JOBS")
+fi
 
 # Function to create user permission files for container
 create_user_files() {
@@ -267,6 +281,9 @@ run_command() {
         (echo "Install cross compile and add to PATH" && exit 1)
         export ARCH=riscv
         export CROSS_COMPILE=riscv64-unknown-linux-gnu-
+        if [[ -n "$JOBS" ]]; then
+            export JOBS
+        fi
         bash -c "$cmd"
     else
         [ "$DEBUG" = true ] && echo "Building in container..."
