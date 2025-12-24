@@ -530,6 +530,29 @@ static int do_cros_ec(struct cmd_tbl *cmdtp, int flag, int argc,
 		} else {
 			printf("Error: %d\n", ret);
 		}
+	} else if (0 == strcmp("update", cmd)) {
+		unsigned long addr;
+		unsigned long size;
+		char *endp;
+
+		/* Expect: crosec update <addr> <size> */
+		if (argc < 4)
+			return CMD_RET_USAGE;
+
+		addr = hextoul(argv[2], &endp);
+		if (*argv[2] == 0 || *endp != 0)
+			return CMD_RET_USAGE;
+
+		size = hextoul(argv[3], &endp);
+		if (*argv[3] == 0 || *endp != 0)
+			return CMD_RET_USAGE;
+
+		ret = cros_ec_flash_update_rw(dev, (const uint8_t *)addr, (int)size);
+		if (ret) {
+			printf("EC RW firmware update failed (ret=%d)\n", ret);
+			return 1;
+		}
+		printf("EC RW firmware update succeeded\n");
 	} else {
 		return CMD_RET_USAGE;
 	}
@@ -561,6 +584,7 @@ U_BOOT_CMD(
 	"crosec erase <ro|rw>       Erase EC image\n"
 	"crosec read <ro|rw> <addr> [<size>]   Read EC image\n"
 	"crosec write <ro|rw> <addr> [<size>]  Write EC image\n"
+	"crosec update <addr> <size>          Update EC RW firmware from memory\n"
 	"crosec vbnvcontext [hexstring]        Read [write] VbNvContext from EC\n"
 	"crosec ldo <idx> [<state>] Switch/Read LDO state\n"
 	"crosec sku                 Read board SKU ID\n"

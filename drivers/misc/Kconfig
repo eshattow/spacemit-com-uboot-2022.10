@@ -259,6 +259,12 @@ config CROS_EC_SPI
 	  provides a faster and more robust interface than I2C but the bugs
 	  are less interesting.
 
+config CROS_EC_ESPI
+	bool "Enable Chrome OS EC ESPI driver"
+	depends on CROS_EC
+	help
+	  Enable ESPI access to the Chrome OS EC.
+
 config DS4510
 	bool "Enable support for DS4510 CPU supervisor"
 	help
