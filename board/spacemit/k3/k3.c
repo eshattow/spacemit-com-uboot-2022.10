@@ -343,31 +343,23 @@ void *board_fdt_blob_setup(int *err)
  */
 enum board_boot_mode get_boot_pin_select(void)
 {
-    /* Decode full 4-bit strap field starting at BOOT_STRAP_BIT_OFFSET */
-    u32 strap = readl((void *)BOOT_PIN_SELECT);
-    u32 pins = (strap >> BOOT_STRAP_BIT_OFFSET) & 0xF; /* bit3:bit0 */
-    pr_debug("strap_pins:%#x\n", pins);
+	/* Decode full 4-bit strap field starting at BOOT_STRAP_BIT_OFFSET */
+	u32 strap = readl((void *)BOOT_PIN_SELECT);
+	u32 pins = (strap >> BOOT_STRAP_BIT_OFFSET) & 0xF; /* bit3:bit0 */
+	pr_debug("strap_pins:%#x\n", pins);
 
-    /* Update modes when bit3 == 1 */
-    if (pins & 0x8) {
-        if (pins & 0x4)
-            return BOOT_MODE_UART; /* bit3=1, bit2=1 */
-        else
-            return BOOT_MODE_USB;  /* bit3=1, bit2=0 */
-    }
-
-    /* Normal boot by storage when bit3 == 0, select by bit1-0 */
-    switch (pins & 0x3) {
-    case BOOT_STRAP_BIT_EMMC: /* 00 */
-        return BOOT_MODE_EMMC;
-    case BOOT_STRAP_BIT_NAND: /* 10 */
-        return BOOT_MODE_NAND;
-    case BOOT_STRAP_BIT_NOR: /* 01 */
-        return BOOT_MODE_NOR;
-    case BOOT_STRAP_BIT_UFS: /* 11 */
-        return BOOT_MODE_UFS;
-    default:
-        return BOOT_MODE_SD;
+	/* boot storage only use bit1-0 */
+	switch (pins & 0x3) {
+	case BOOT_STRAP_BIT_EMMC: /* 00 */
+		return BOOT_MODE_EMMC;
+	case BOOT_STRAP_BIT_NOR:  /* 01 */
+		return BOOT_MODE_NOR;
+	case BOOT_STRAP_BIT_NAND: /* 10 */
+		return BOOT_MODE_NAND;
+	case BOOT_STRAP_BIT_UFS:  /* 11 */
+		return BOOT_MODE_UFS;
+	default:
+		return BOOT_MODE_SD;
     }
 }
 
