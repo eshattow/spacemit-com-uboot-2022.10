@@ -14,6 +14,15 @@
 
 &cpus {
 	timebase-frequency = <24000000>;
+	clocks = <&ccu CLK_CPU_C0_CORE>,
+			<&ccu CLK_CPU_C1_CORE>,
+			<&ccu CLK_CPU_C2_CORE>,
+			<&ccu CLK_CPU_C3_CORE>;
+	clock-names = "cluster0", "cluster1", "cluster2", "cluster3";
+	cluster0_frequency = <1500000000>;
+	cluster1_frequency = <1500000000>;
+	cluster2_frequency = <1500000000>;
+	cluster3_frequency = <1500000000>;
 };
 
 &uart0 {
