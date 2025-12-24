@@ -74,27 +74,31 @@
 	};
 };
 
-&eth0 {
-	phy-reset-pin = <40>;
-	max-speed = <100>;
+&eth1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_gmac1>;
+
+	phy-reset-pin = <37>;
+	max-speed = <1000>;
 	clk_tuning_enable;
-	clk-tuning-by-reg;
-	tx-phase = <0>;
-	rx-phase = <0>;
+	clk-tuning-by-delayline;
+
+	tx-phase = <70>;
+	rx-phase = <58>;
 
 	phy-mode = "rgmii";
 	phy-addr = <0>;
-	phy-handle = <&rgmii>;
+	phy-handle = <&rgmii1>;
 
-	status = "disabled";
+	status = "okay";
 
 	mdio {
 		#address-cells = <0x1>;
 		#size-cells = <0x0>;
-		rgmii: phy@0 {
+		rgmii1: phy@1 {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			device_type = "ethernet-phy";
-			reg = <0x0>;
+			reg = <0x1>;
 		};
 	};
 };
