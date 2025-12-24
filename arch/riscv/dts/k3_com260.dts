@@ -129,6 +129,15 @@
 	>;
 };
 
+&pcie0_rc {
+       pinctrl-names = "default";
+       pinctrl-0 = <&pinctrl_pcie0_1>;
+
+       num-lanes = <4>;
+
+       status = "okay";
+};
+
 &i2c8 {
 	clock-frequency = <100000>;
 	u-boot,dm-spl;
