@@ -382,6 +382,32 @@
 			status = "disabled";
 		};
 
+		eth1: ethernet@cac82000 {
+			compatible = "spacemit,k3-dwmac-eqos";
+			reg = <0x00000000 0xcac82000 0x00000000 0x00002000>;
+			apmu-base-reg = <0xd4282800>;
+			ctrl-reg = <0x3ec>;
+			dline-reg = <0x3f0>;
+			clocks = <&ccu CLK_EMAC1_BUS>;
+			clock-names = "master_bus_clk";
+			resets = <&reset RESET_EMAC1>;
+			reset-names = "mac_reset";
+			status = "disabled";
+		};
+
+		eth2: ethernet@cac8e000 {
+			compatible = "spacemit,k3-dwmac-eqos";
+			reg = <0x00000000 0xcac8e000 0x00000000 0x00002000>;
+			apmu-base-reg = <0xd4282800>;
+			ctrl-reg = <0x248>;
+			dline-reg = <0x24c>;
+			clocks = <&ccu CLK_EMAC2_BUS>;
+			clock-names = "master_bus_clk";
+			resets = <&reset RESET_EMAC2>;
+			reset-names = "mac_reset";
+			status = "disabled";
+		};
+
 		spi0: spi0@d4040000 {
 			compatible = "spacemit,k3-spi";
 			reg = <0x0 0xd4040000 0x0 0x30>;

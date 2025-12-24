@@ -66,6 +66,35 @@
 	};
 };
 
+&eth1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_gmac1>;
+
+	phy-reset-pin = <37>;
+	max-speed = <1000>;
+	clk_tuning_enable;
+	clk-tuning-by-delayline;
+
+	tx-phase = <0>;
+	rx-phase = <0>;
+
+	phy-mode = "rgmii";
+	phy-addr = <0>;
+	phy-handle = <&rgmii1>;
+
+	status = "okay";
+
+	mdio {
+		#address-cells = <0x1>;
+		#size-cells = <0x0>;
+		rgmii1: phy@1 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			device_type = "ethernet-phy";
+			reg = <0x1>;
+		};
+	};
+};
+
 &qspi {
 	status = "okay";
 
