@@ -700,7 +700,7 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 
 		void *decompress_addr = (void *)GZIP_DECOMPRESS_ADDR;
 		pr_info("decompress_addr:%p\n", decompress_addr);
-		if (run_commandf("unzip %x %x", download_buffer, decompress_addr)){
+		if (run_commandf("unzip %lx %lx", download_buffer, decompress_addr)){
 			printf("unzip gzip data fail, \n");
 			fastboot_fail("unzip gzip data fail", response);
 			return;
