@@ -44,12 +44,17 @@
 };
 
 &sdhci0 {
+	pinctrl-names = "default","fast";
+	pinctrl-0 = <&pinctrl_mmc1>;
+	pinctrl-1 = <&pinctrl_mmc1_fast>;
 	bus-width = <4>;
-	broken-cd;
-	no-1-8-v;
-	cap-sd-highspeed;
+	cd-gpios = <&gpio 86 0>;
+	cd-inverted;
+	vqmmc-supply = <&ldo_1>;
+	clock-frequency = <204800000>;
+	spacemit,tx_delaycode = <0x9f>;
 	sdh-phy-module = <0>;
-	status = "disabled";
+	status = "okay";
 };
 
 /* eMMC */
@@ -125,10 +130,22 @@
 	};
 };
 
+&pinctrl {
+	pinctrl-single,gpio-range = <
+		&range GPIO_86  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_DS4)
+	>;
+};
+
+&gpio{
+	gpio-ranges = <
+		&pinctrl 86 GPIO_86 1
+	>;
+};
+
 &i2c8 {
 	clock-frequency = <100000>;
 	u-boot,dm-spl;
-	status = "disabled";
+	status = "okay";
 
 	spm8821: pmic@41 {
 		compatible = "spacemit,spm8821";
