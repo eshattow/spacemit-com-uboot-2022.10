@@ -1333,7 +1333,7 @@ int cros_ec_i2c_tunnel(struct udevice *dev, int port, struct i2c_msg *in,
 
 	/* Parse response */
 	if (r->i2c_status & EC_I2C_STATUS_ERROR) {
-		printf("Transfer failed with status=0x%x\n", r->i2c_status);
+		debug("Transfer failed with status=0x%x\n", r->i2c_status);
 		return -1;
 	}
 
