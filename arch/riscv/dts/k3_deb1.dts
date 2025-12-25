@@ -121,7 +121,7 @@
 			compatible = "google,cros-ec-i2c-tunnel";
 			#address-cells = <1>;
 			#size-cells = <0>;
-			google,remote-bus = <0>;
+			google,remote-bus = <1>;
 
 		};
 	};
