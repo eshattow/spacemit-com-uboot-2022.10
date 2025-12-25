@@ -159,8 +159,6 @@ int spl_board_init_f(void)
 	rproc_init();
 #endif
 
-	spl_load_env();
-
 #ifdef CONFIG_SPL_ESPI
 	/* Probe eSPI device */
 	ret = uclass_first_device(UCLASS_ESPI, &dev);
