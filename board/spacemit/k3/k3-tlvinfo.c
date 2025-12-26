@@ -145,7 +145,11 @@ static void update_crc(u8 *tlv_data)
 
 static int init_tlv_data(uint8_t *buffer, u32 tlv_size)
 {
+#if defined(CONFIG_SPL_BUILD)
 	return init_tlv_from_eeprom(buffer, tlv_size);
+#else
+	return read_tlv_eeprom(buffer, 0, tlv_size, 0);
+#endif
 }
 
 static int read_tlvinfo(u8 *tlv_data, u32 tlv_size)
