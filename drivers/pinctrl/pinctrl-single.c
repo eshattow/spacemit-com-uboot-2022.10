@@ -15,6 +15,22 @@
 #include <asm/io.h>
 #include <sort.h>
 
+#define IOPWRDOM_BASE		0xD401E800
+#define APBC_ASFAR		0xD4015050
+#define AKEY_ASFAR		0xBABA
+#define AKEY_ASSAR		0xEB10
+#define IO_PWR_DOMAIN_1V8EN	BIT(2)
+
+#define AIB_GPIO1_IO_REG_K3	0x4
+#define AIB_GPIO2_IO_REG_Kx	0xC
+#define AIB_GPIO4_IO_REG_K3	0x20
+#define AIB_GPIO5_IO_REG_K3	0x10
+#define AIB_SD_IO_REG_K3	0x1C
+#define AIB_QSPI_IO_REG_K3	0x2C
+#define AIB_GPIO3_IO_REG_K1	0x10
+#define AIB_QSPI_IO_REG_K1	0x20
+#define AIB_MMC1_IO_REG_K1	0x1C
+
 /**
  * struct single_pdata - platform data
  * @base: first configuration register
@@ -446,12 +462,119 @@ static int single_configure_bits(struct udevice *dev,
 	list_add(&func->node, &priv->functions);
 	return 0;
 }
+
+static inline int k1_prop2pin(const u32 *prop)
+{
+	return (fdt32_to_cpu(prop[0]) / 4) - 1;
+}
+
+static inline int k3_prop2pin(const u32 *prop)
+{
+	return (fdt32_to_cpu(prop[0]) / 4);
+}
+
+static int k1_pin2pwr_domain_offset(int pin)
+{
+	int offset;
+
+	switch (pin) {
+	case 47 ... 51:
+		offset = AIB_GPIO3_IO_REG_K1;
+		break;
+	case 75 ... 80:
+		offset = AIB_GPIO2_IO_REG_Kx;
+		break;
+	case 89 ... 94:
+		offset = AIB_QSPI_IO_REG_K1;
+		break;
+	case 109 ... 114:
+		offset = AIB_QSPI_IO_REG_K1;
+		break;
+	default:
+		offset = -1;
+		break;
+	}
+
+	return offset;
+}
+
+static int k3_pin2pwr_domain_offset(int pin)
+{
+	int offset;
+
+	switch (pin) {
+	case 0 ... 20:
+		offset = AIB_GPIO1_IO_REG_K3;
+		break;
+	case 21 ... 41:
+		offset = AIB_GPIO2_IO_REG_Kx;
+		break;
+	case 76 ... 98:
+		offset = AIB_GPIO4_IO_REG_K3;
+		break;
+	case 99 ... 127:
+		offset = AIB_GPIO5_IO_REG_K3;
+		break;
+	case 134 ... 139:
+		offset = AIB_SD_IO_REG_K3;
+		break;
+	case 140 ... 146:
+		offset = AIB_QSPI_IO_REG_K3;
+		break;
+	default:
+		offset = -1;
+		break;
+	}
+
+	return offset;
+}
+
+static void k1_set_pwr_domain(const u32 *prop)
+{
+	int offset;
+	int pin;
+
+	pin = k1_prop2pin(prop);
+	offset = k1_pin2pwr_domain_offset(pin);
+	if (offset < 0)
+		pr_err("pinctrl: pwr domain: unsupported pin\n");
+
+	void __iomem *apbc_asfar = (void *)((ulong)(APBC_ASFAR));
+	void __iomem *aib_io = (void *)((ulong)(IOPWRDOM_BASE + offset));
+
+	/* unlock */
+	writel(AKEY_ASFAR, apbc_asfar);
+	writel(AKEY_ASSAR, apbc_asfar + 4);
+
+	writel(IO_PWR_DOMAIN_1V8EN, aib_io);
+}
+
+static void k3_set_pwr_domain(const u32 *prop)
+{
+	int offset;
+	int pin;
+
+	pin = k3_prop2pin(prop);
+	offset = k3_pin2pwr_domain_offset(pin);
+	if (offset < 0)
+		pr_err("pinctrl: pwr domain: unsupported pin\n");
+
+	void __iomem *apbc_asfar = (void *)((ulong)(APBC_ASFAR));
+	void __iomem *aib_io = (void *)((ulong)(IOPWRDOM_BASE + offset));
+
+	/* unlock */
+	writel(AKEY_ASFAR, apbc_asfar);
+	writel(AKEY_ASSAR, apbc_asfar + 4);
+
+	writel(IO_PWR_DOMAIN_1V8EN, aib_io);
+}
 static int single_set_state(struct udevice *dev,
 			    struct udevice *config)
 {
 	const u32 *prop;
 	const struct single_fdt_bits_cfg *prop_bits;
 	int len;
+	u32 power;
 
 	prop = dev_read_prop(config, "pinctrl-single,pins", &len);
 
@@ -460,6 +583,12 @@ static int single_set_state(struct udevice *dev,
 		if (len % sizeof(u32)) {
 			dev_dbg(dev, "  invalid pin configuration in fdt\n");
 			return -FDT_ERR_BADSTRUCTURE;
+		}
+		if (!dev_read_u32(config, "power-source", &power)) {
+			if (power == 1800)
+				k3_set_pwr_domain(prop);
+			else
+				pr_warn("pinctrl: pwr domain: only support 1.8V switch, 3.3V is default\n");
 		}
 		single_configure_pins(dev, prop, len, config->name);
 		return 0;
