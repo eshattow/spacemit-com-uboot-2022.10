@@ -251,13 +251,11 @@ int board_init(void)
 
 #ifdef CONFIG_ESPI
 	ret = uclass_probe_all(UCLASS_ESPI);
-	if (ret) {
-		pr_err("eSPI: Probe failed (ret=%d)\n", ret);
-		return CMD_RET_FAILURE;
-	}
+	if (ret)
+		pr_warn("eSPI: Probe failed (ret=%d), continuing...\n", ret);
 #endif
 
-	return ret;
+	return 0;
 }
 
 void run_fastboot_command(void)
