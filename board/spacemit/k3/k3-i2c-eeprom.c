@@ -38,9 +38,7 @@ struct eeprom_config {
 };
 
 const struct eeprom_config eeprom_info[] = {
-	// eeprom @com260: I2C1, pin group(GPIO_54, GPIO_55)
-	{ 1, 0x50, MUX_MODE5, 0xd401e0d8, 0xd401e0dc },
-	// eeprom @deb: I2C2, pin group(GPIO_46, GPIO_47)
+	// eeprom @deb and com260: I2C2, pin group(GPIO_46, GPIO_47)
 	{ 2, 0x50, MUX_MODE5, 0xd401e0b8, 0xd401e0bc },
 	// eeprom @evb: I2C6, pin group(PWR_SSP_TXD, PWR_SSP_RXD)
 	{ 6, 0x50, MUX_MODE2, 0xd401e264, 0xd401e268 },

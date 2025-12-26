@@ -29,11 +29,11 @@
 	status = "okay";
 };
 
-&i2c1 {
+&i2c2 {
 	#address-cells = <1>;
 	#size-cells = <0>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c1_1>;
+	pinctrl-0 = <&pinctrl_i2c2_1>;
 	status = "okay";
 
 	eeprom@50{
@@ -336,13 +336,11 @@
 		u-boot,dm-spl;
 
 		regulators {
-			u-boot,dm-spl;
-
 			edcdc_1: EDCDC_REG1 {
 				regulator-name = "edcdc1";
 				regulator-min-microvolt = <600000>;
 				regulator-max-microvolt = <1000000>;
-				regulator-init-microvolt = <800000>;
+				regulator-init-microvolt = <850000>;
 				regulator-always-on;
 				regulator-boot-on;
 				u-boot,dm-spl;
