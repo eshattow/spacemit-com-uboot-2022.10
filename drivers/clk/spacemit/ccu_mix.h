@@ -325,6 +325,24 @@ struct ccu_mix {
 		},							\
 	}
 
+#define SPACEMIT_CCU_MUX_FC_GATE(_struct, _name, _parents, _base_type, _reg_ctrl,		\
+			_fc, _muxshift, _muxwidth, _gate_mask, _val_enable, _val_disable, _flags)	\
+	struct ccu_mix _struct = {					\
+		.gate	= CCU_GATE_INIT(_gate_mask, _val_enable, _val_disable, 0),	 \
+		.mux	= CCU_MUX_INIT(_muxshift, _muxwidth, NULL, 0), \
+		.common = { 					\
+			.reg_type = CLK_DIV_TYPE_1REG_FC_V2,	\
+			.reg_ctrl		= _reg_ctrl,			\
+			.fc 			= _fc,		   \
+			.base_type		= _base_type,		\
+			.name			= _name,	\
+			.parent_names	= _parents, \
+			.num_parents	= ARRAY_SIZE(_parents), \
+			.driver_name	= CCU_CLK_MIX, \
+			.flags			= _flags, \
+		},							\
+	}
+
 #define SPACEMIT_CCU_MUX_FC(_struct, _name, _parents, _base_type, _reg_ctrl,		\
 			_fc, _muxshift, _muxwidth, _flags)					\
 	struct ccu_mix _struct = {					\
