@@ -182,7 +182,10 @@ static int cpu_frequency_set(void)
 	unsigned int cluster1_frequency;
 	unsigned int cluster2_frequency;
 	unsigned int cluster3_frequency;
-	struct clk cluster0_clk, cluster1_clk, cluster2_clk, cluster3_clk;
+	unsigned int topd_frequency;
+	unsigned int axi_frequency;
+	unsigned int cci_frequency;
+	struct clk top_dclk, axi_clk, cci_clk, cluster0_clk, cluster1_clk, cluster2_clk, cluster3_clk;
 	ofnode cpu_node;
 
 	cpu_node = ofnode_path("/cpus");
@@ -195,6 +198,9 @@ static int cpu_frequency_set(void)
 	ret |= clk_get_by_name_nodev(cpu_node, "cluster1", &cluster1_clk);
 	ret |= clk_get_by_name_nodev(cpu_node, "cluster2", &cluster2_clk);
 	ret |= clk_get_by_name_nodev(cpu_node, "cluster3", &cluster3_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "topd", &top_dclk);
+	ret |= clk_get_by_name_nodev(cpu_node, "axi", &axi_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "cci", &cci_clk);
 	if (ret) {
 		pr_err("Get cluster clk error\n");
 		return -1;
@@ -228,15 +234,42 @@ static int cpu_frequency_set(void)
 		return -1;
 	}
 
+	ret = ofnode_read_u32(cpu_node, "cci_frequency",
+			      (u32 *)&cci_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "topd_frequency",
+			      (u32 *)&topd_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "axi_frequency",
+			      (u32 *)&axi_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
 	clk_enable(&cluster0_clk);
 	clk_enable(&cluster1_clk);
 	clk_enable(&cluster2_clk);
 	clk_enable(&cluster3_clk);
+	clk_enable(&top_dclk);
+	clk_enable(&axi_clk);
+	clk_enable(&cci_clk);
 
+	clk_set_rate(&top_dclk, topd_frequency);
+	clk_set_rate(&axi_clk, axi_frequency);
 	clk_set_rate(&cluster0_clk, cluster0_frequency);
 	clk_set_rate(&cluster1_clk, cluster1_frequency);
 	clk_set_rate(&cluster2_clk, cluster2_frequency);
 	clk_set_rate(&cluster3_clk, cluster3_frequency);
+	clk_set_rate(&cci_clk, cci_frequency);
 
 	return 0;
 }
