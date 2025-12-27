@@ -529,7 +529,7 @@ static int k3_pin2pwr_domain_offset(int pin)
 	return offset;
 }
 
-static void k1_set_pwr_domain(const u32 *prop)
+static void __maybe_unused k1_set_pwr_domain(const u32 *prop)
 {
 	int offset;
 	int pin;
