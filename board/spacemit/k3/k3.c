@@ -26,6 +26,10 @@
 #include <clk.h>
 #include "nfs_env.h"
 
+#ifdef CONFIG_ESPI
+extern bool spacemit_espi_is_ready(void);
+#endif
+
 bool is_video_connected = false;
 static char found_partition[64] = {0};
 
@@ -249,12 +253,6 @@ int board_init(void)
 
 	cpu_frequency_set();
 
-#ifdef CONFIG_ESPI
-	ret = uclass_probe_all(UCLASS_ESPI);
-	if (ret)
-		pr_warn("eSPI: Probe failed (ret=%d), continuing...\n", ret);
-#endif
-
 	return 0;
 }
 
@@ -312,6 +310,14 @@ int board_late_init(void)
 	ulong kernel_start;
 	ofnode chosen_node;
 	int ret;
+
+#ifdef CONFIG_ESPI
+	ret = uclass_probe_all(UCLASS_ESPI);
+	if (ret || !spacemit_espi_is_ready()) {
+		pr_warn("eSPI not ready, disabling kernel EC driver\n");
+		run_command("setenv bootargs ${bootargs} cros_ec_espi.disable=1", 0);
+	}
+#endif
 
 	set_env_ethaddr();
 	refresh_config_info();

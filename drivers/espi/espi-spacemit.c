@@ -51,6 +51,23 @@ void spacemit_espi_write32(struct spacemit_espi_priv *priv, u32 value, u32 offse
 }
 
 /**
+ * spacemit_espi_is_ready - Check if eSPI controller is fully initialized
+ *
+ * This function checks if the eSPI controller has completed all
+ * initialization steps successfully. It should be used by other
+ * drivers (like cros_ec) to determine if eSPI is available.
+ *
+ * Return: true if eSPI is fully initialized and ready, false otherwise
+ */
+bool spacemit_espi_is_ready(void)
+{
+	if (!g_espi_priv)
+		return false;
+
+	return g_espi_priv->initialized;
+}
+
+/**
  * Initialize eSPI controller from device tree
  * @priv: driver private data
  * @dev: device instance
@@ -881,10 +898,14 @@ static int spacemit_espi_probe(struct udevice *dev)
 		espi_config_vwgpio(priv);
 	}
 
+	/* Mark initialization complete - this must be the last step */
+	priv->initialized = true;
+
 	dev_info(dev, "SpacemiT eSPI controller initialized successfully\n");
 	return 0;
 
 err_disable_clocks:
+	g_espi_priv = NULL;
 	clk_disable(&priv->clk_mclk);
 err_disable_sclk:
 	clk_disable(&priv->clk_sclk);
@@ -935,3 +956,4 @@ U_BOOT_DRIVER(spacemit_espi) = {
 	.ops = &spacemit_espi_ops,
 	.flags = DM_FLAG_PRE_RELOC,  /* Enable in SPL/pre-relocation */
 };
+

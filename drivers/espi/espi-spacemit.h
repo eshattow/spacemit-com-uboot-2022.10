@@ -46,7 +46,20 @@ struct spacemit_espi_priv {
 	struct clk clk_sclk;     /* Serial clock */
 	struct clk clk_mclk;     /* Master clock */
 	struct reset_ctl reset_espi; /* eSPI reset control */
+
+	/* Initialization state - set true only after full successful init */
+	bool initialized;
 };
+
+/* Global pointer to current eSPI instance */
+extern struct spacemit_espi_priv *g_espi_priv;
+
+/**
+ * spacemit_espi_is_ready - Check if eSPI controller is fully initialized
+ *
+ * Return: true if eSPI is fully initialized and ready, false otherwise
+ */
+bool spacemit_espi_is_ready(void);
 
 /**************************************************************************************/
 #define LOHALF(b) (b & 0x0F)
