@@ -37,14 +37,6 @@
 
 #define USB2D_CTRL_RESET_TIME_MS	50
 
-#ifdef CONFIG_TARGET_SPACEMIT_K3
-// TODO: this codes is pcie/usb3.0 phy related, but
-// 	 spl won't load the usb3phy driver for now.
-#define PUPHY8_REG_BASE 		0xcad30000
-#define PCIE_PHY_PU_SEL 		(PUPHY8_REG_BASE + 0x40)
-#define PUPHY_OVRD_STATUS 		(1 << 10)
-#define PUPHY_CFG_PHY_STATUS 		(1 << 9)
-#endif
 
 struct mv_usb_phy_priv {
 	void __iomem		*phy_base;
@@ -55,16 +47,6 @@ static int mv_usb_phy_init(struct phy *phy)
 	struct mv_usb_phy_priv *priv = dev_get_priv(phy->dev);
 	void __iomem *base = priv->phy_base;
 	uint32_t loops, temp;
-
-#ifdef CONFIG_TARGET_SPACEMIT_K3
-	// TODO: this codes is pcie/usb3.0 phy related, but
-	// 	 spl won't load the usb3phy driver for now.
-	temp = readl((void __iomem *)PCIE_PHY_PU_SEL);
-	temp &= ~(PUPHY_CFG_PHY_STATUS);
-	temp |= PUPHY_OVRD_STATUS;
-	writel(temp, (void __iomem *)PCIE_PHY_PU_SEL);
-	udelay(200);
-#endif
 
 	loops = USB2D_CTRL_RESET_TIME_MS * 1000;
 
