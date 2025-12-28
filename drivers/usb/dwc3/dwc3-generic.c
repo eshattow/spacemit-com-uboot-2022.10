@@ -52,7 +52,7 @@ struct dwc3_generic_priv {
 struct dwc3_generic_host_priv {
 	struct xhci_ctrl xhci_ctrl;
 	struct dwc3_generic_priv gen_priv;
-#if defined(CONFIG_K1_X_BOARD_ASIC)
+#if defined(CONFIG_K1_X_BOARD_ASIC) || defined(CONFIG_K3_BOARD_ASIC)
 	struct udevice *vbus_supply;
 #endif
 };
@@ -222,8 +222,9 @@ static int dwc3_generic_host_probe(struct udevice *dev)
 	if (rc)
 		return rc;
 
-#if CONFIG_IS_ENABLED(K1_X_BOARD_ASIC)
-	if (device_is_compatible(dev->parent, "spacemit,k1-x-dwc3")) {
+#if CONFIG_IS_ENABLED(K1_X_BOARD_ASIC) || CONFIG_IS_ENABLED(K3_BOARD_ASIC)
+	if (device_is_compatible(dev->parent, "spacemit,k1-x-dwc3") ||
+	    device_is_compatible(dev->parent, "spacemit,k3-dwc3")) {
 		rc = device_get_supply_regulator(dev->parent, "vbus-supply",
 						&priv->vbus_supply);
 		if (rc && rc != -ENOENT) {
@@ -247,8 +248,10 @@ static int dwc3_generic_host_remove(struct udevice *dev)
 	struct dwc3_generic_host_priv *priv = dev_get_priv(dev);
 	int rc;
 
-#if CONFIG_IS_ENABLED(K1_X_BOARD_ASIC)
-	if (device_is_compatible(dev->parent, "spacemit,k1-x-dwc3") && priv->vbus_supply) {
+#if CONFIG_IS_ENABLED(K1_X_BOARD_ASIC) || CONFIG_IS_ENABLED(K3_BOARD_ASIC)
+	if ((device_is_compatible(dev->parent, "spacemit,k1-x-dwc3") ||
+	    device_is_compatible(dev->parent, "spacemit,k3-dwc3")) &&
+	    priv->vbus_supply) {
 		regulator_set_enable(priv->vbus_supply, false);
 	}
 #endif
@@ -522,6 +525,7 @@ static int dwc3_glue_probe(struct udevice *dev)
 	int index = 0;
 	int ret;
 	struct phy phy;
+	enum usb_device_speed max_speed;
 
 	ret = generic_phy_get_by_name(dev, "usb3-phy", &phy);
 	if (!ret) {
@@ -565,6 +569,20 @@ static int dwc3_glue_probe(struct udevice *dev)
 		enum usb_dr_mode dr_mode;
 
 		dr_mode = usb_get_dr_mode(dev_ofnode(child));
+		max_speed = usb_get_maximum_speed(dev_ofnode(child));
+
+		if (device_is_compatible(dev, "spacemit,k3-dwc3")) {
+			ret = generic_phy_get_by_name(child, "usb3-phy", &phy);
+			if (!ret) {
+				ret = generic_phy_set_speed(&phy, max_speed);
+				if (ret)
+					return ret;
+			} else if (ret != -ENOENT && ret != -ENODATA) {
+				pr_err("could not get phy (err %d)\n", ret);
+				return ret;
+			}
+		}
+
 		device_find_next_child(&child);
 		if (ops && ops->glue_configure)
 			ops->glue_configure(dev, index, dr_mode);
