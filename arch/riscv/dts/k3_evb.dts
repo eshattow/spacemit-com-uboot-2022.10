@@ -353,7 +353,7 @@
 				regulator-name = "edcdc1";
 				regulator-min-microvolt = <534000>;
 				regulator-max-microvolt = <880000>;
-				/* regulator-init-microvolt = <800000>; */
+				regulator-init-microvolt = <850000>;
 				regulator-always-on;
 				regulator-boot-on;
 				u-boot,dm-spl;
