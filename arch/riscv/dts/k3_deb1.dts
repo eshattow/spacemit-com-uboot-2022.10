@@ -31,6 +31,12 @@
 	cluster3_frequency = <1500000000>;
 };
 
+&pinctrl {
+	gmac0_grp {
+		power-source = <1800>;
+	};
+};
+
 &uart0 {
 	status = "okay";
 };
