@@ -456,38 +456,6 @@ static void k3_eqos_set_clk_phase(struct spacemit_plat_data *pdata)
 	}
 }
 
-#define AIB_GPIO2_IO_REG		0xD401E80C
-#define APBC_ASFAR			0xD4015050
-#define AKEY_ASFAR			0xbaba
-#define AKEY_ASSAR			0xeb10
-
-void set_gpio_group_power_domain(u32 reg)
-{
-	u32 tmp;
-	void __iomem *apbc_asfar = (void *)((ulong)(APBC_ASFAR));
-	void __iomem *aib_gp1_io = (void *)((ulong)(reg));
-
-	/* unlock sequence */
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_asfar + 4);
-
-	tmp = readl(aib_gp1_io);
-	/* bit2: 1.8v */
-	tmp |= 0x1 << 2; /* 1.8v */
-
-	/* write back with unlock sequence */
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_asfar + 4);
-	writel(tmp, aib_gp1_io);
-
-	/* read back */
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_asfar + 4);
-	tmp = readl(aib_gp1_io);
-
-	printk("===> AIB GPIO1 IO set 1.8v read back: 0x%08x\n", tmp);
-}
-
 static int k3_eqos_probe_resources(struct udevice *dev)
 {
 	struct eqos_priv *eqos = dev_get_priv(dev);
@@ -615,8 +583,6 @@ static int k3_eqos_probe_resources(struct udevice *dev)
 		pr_err("k3_eqos_phy_reset() failed\n");
 		goto err_disable_phy_clk;
 	}
-
-	set_gpio_group_power_domain(AIB_GPIO2_IO_REG);
 
 	/* After k3_validate_iface_and_refclk() passes, these won't fail */
 	k3_eqos_iface_config(pdata);
