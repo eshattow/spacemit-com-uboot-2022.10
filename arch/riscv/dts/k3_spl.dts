@@ -262,6 +262,20 @@
 			status = "okay";
 		};
 
+		usb3_porta_u3phy: phy@0cad30000{
+			u-boot,dm-spl;
+			compatible = "spacemit,k3-usb3-phy";
+			reg = <0x0 0xcad30000 0x0 0x200>,
+			      <0x0 0xd4282800 0x0 0x114>,
+			      <0x0 0xd4090000 0x0 0x200>;
+			reg-names = "puphy",
+				    "spacemit,syscon-apmu",
+				    "spacemit,syscon-apb-spare";
+			phy-nums = <1>;
+			#phy-cells = <0>;
+			status = "okay";
+		};
+
 		usb3_porta: usb3@0 {
 			u-boot,dm-spl;
 			compatible = "spacemit,k3-dwc3";
@@ -284,8 +298,11 @@
 				snps,dis_enblslpm_quirk;
 				snps,dis_u2_susphy_quirk;
 				snps,dis_u3_susphy_quirk;
-				phys = <&usb3_porta_u2phy>;
-				phy-names = "usb2-phy";
+				snps,del_phy_power_chg_quirk;
+				snps,dis-tx-ipgap-linecheck-quirk;
+				snps,parkmode-disable-ss-quirk;
+				phys = <&usb3_porta_u3phy>, <&usb3_porta_u2phy>;
+				phy-names = "usb3-phy", "usb2-phy";
 				u-boot,dm-spl;
 			};
 		};
