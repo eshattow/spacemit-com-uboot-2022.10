@@ -39,10 +39,6 @@
 	gmac1_grp {
 		power-source = <1800>;
 	};
-
-	gmac2_grp {
-		power-source = <1800>;
-	};
 };
 
 &uart0 {
