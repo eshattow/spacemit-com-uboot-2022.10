@@ -407,15 +407,22 @@ void recovery_show_result(struct flash_dev *fdev, int ret)
 
 }
 
-int get_part_info(struct blk_desc *dev_desc, const char *name,
+int get_blk_part_info(struct flash_parts_info *parts_info, const char *name,
 		struct disk_partition *info)
 {
-	int ret;
+	int i;
 
-	if (dev_desc) {
-		ret = part_get_info_by_name(dev_desc, name, info);
-		if (ret >= 0)
-			return ret;
+	if ((NULL != parts_info) && (NULL != name) && (NULL != info)) {
+		for (i = 0; i < MAX_PARTITION_NUM; i++) {
+			if (parts_info[i].part_name == NULL)
+				break;
+			if (strcmp(parts_info[i].part_name, name) == 0) {
+				info->blksz = 512;
+				info->start = parts_info[i].part_offset / info->blksz;
+				info->size = parts_info[i].part_size / info->blksz;
+				return 0;
+			}
+		}
 	}
 
 	printf("%s, can not find part info\n", __func__);
@@ -610,8 +617,8 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 		return RESULT_FAIL;
 	}
 
-	if (fdev->blk_write != NULL && get_part_info(fdev->dev_desc, partition, &info) < 0) {
-		printf("can not get part %s in gpt tabel\n", partition);
+	if (fdev->blk_write != NULL && get_blk_part_info(fdev->parts_info, partition, &info) < 0) {
+		printf("can not get part %s in partition table\n", partition);
 		return RESULT_FAIL;
 	}
 	if(fdev->mtd_write != NULL){
