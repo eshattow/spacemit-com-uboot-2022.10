@@ -26,7 +26,7 @@
 #endif
 
 #define TRAINING_DEBUG	0
-#define LOGLEVEL	1
+#define LOGLEVEL	0
 
 #define LogMsg(level, format, args...)		\
 	do {					\
