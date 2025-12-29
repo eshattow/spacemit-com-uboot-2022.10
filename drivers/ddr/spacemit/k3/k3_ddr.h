@@ -11,6 +11,7 @@
 #define DDR_CTRL_REG_BASE	(0xCB000000)
 #define DDR_CTRL1_REG_BASE	(0xCC000000)
 
+// current only support 1066MT/s(8GB) and 4266MT/s(16GB)
 #define CONFIG_DDR_DATARATE	(1066)
 
 #ifndef REG32
