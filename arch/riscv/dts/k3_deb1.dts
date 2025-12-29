@@ -44,6 +44,10 @@
 
 		power-source = <1800>;
 	};
+
+	espi0_grp {
+		power-source = <1800>;
+	};
 };
 
 &uart0 {
