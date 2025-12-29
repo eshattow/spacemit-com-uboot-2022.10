@@ -77,9 +77,11 @@
 &sdhci2 {
 	bus-width = <8>;
 	non-removable;
-	cap-mmc-highspeed;
+	mmc-hs400-1_8v;
+	mmc-hs400-enhanced-strobe;
+	clock-frequency = <375000000>;
 	sdh-phy-module = <1>;
-	status = "disabled";
+	status = "okay";
 };
 
 &qspi {
