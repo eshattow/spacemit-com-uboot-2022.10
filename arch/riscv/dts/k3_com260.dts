@@ -10,6 +10,13 @@
 
 / {
 	model = "spacemit k3 com260 board";
+
+	usb3hub:usb3hub {
+		compatible = "spacemit,usb-hub";
+		hub-gpios = <&gpio 53 0>;	/* usb3 hub rst*/
+		vbus_delay_ms = <100>;
+		status = "okay";
+	};
 };
 
 &cpus {
@@ -78,18 +85,29 @@
 	status = "okay";
 };
 
+&usb3_porta_u3phy {
+	status = "okay";
+};
+
 &usb3_porta {
 	status = "okay";
-	u-boot,dm-spl;
 	dwc3@cad00000 {
-		dr_mode = "peripheral";
 		maximum-speed = "high-speed";
-		phy_type = "utmi";
-		snps,dis_enblslpm_quirk;
-		snps,dis_u2_susphy_quirk;
-		snps,dis_u3_susphy_quirk;
-		u-boot,dm-spl;
+		dr_mode = "peripheral";
 	};
+};
+
+&usb3_portb_u2phy {
+	status = "okay";
+};
+
+&usb3_portb_u3phy {
+	status = "okay";
+};
+
+&usb3_portb {
+	vbus-supply = <&usb3hub>;
+	status = "okay";
 };
 
 &ufs {
@@ -141,12 +159,14 @@
 &pinctrl {
 	pinctrl-single,gpio-range = <
 		&range GPIO_04  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_DS4)
+		&range GPIO_53  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_DS4)
 	>;
 };
 
 &gpio{
 	gpio-ranges = <
 		&pinctrl 04 GPIO_04 1
+		&pinctrl 53 GPIO_53 1
 	>;
 };
 
