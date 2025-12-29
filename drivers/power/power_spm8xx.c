@@ -39,6 +39,8 @@ static const char *global_compatible[] = {
 #endif
 };
 
+#define NRESET_BIT 1 << 6
+
 void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck_desc,
 		const struct pm8xx_buck_desc **ldo_desc, int *num_buck, int *num_ldo)
 {
@@ -278,6 +280,15 @@ static int __board_pmic_init(const char *name)
 //		pr_info("%s: %s probe i2c failed\n", __func__, name);
 		return -EINVAL;
 	}
+
+#if defined(CONFIG_K3_BOARD_ASIC)
+	if (!strncmp(name, "spacemit,spm8821", 16)) {
+		/* enable p1 wdt reset */
+		i2c_read(saddr, 0x7c, 1, &regval, 1);
+		regval |= NRESET_BIT;
+		i2c_write(saddr, 0x7c, 1, &regval, 1);
+	}
+#endif
 
 	__regulator_desc_find(name, &buck_desc, &ldo_desc, &num_buck, &num_ldo);
 
