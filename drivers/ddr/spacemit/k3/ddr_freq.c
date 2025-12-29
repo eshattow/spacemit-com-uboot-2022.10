@@ -9,6 +9,7 @@
 #include <linux/errno.h>
 #include <linux/delay.h>
 #include "ddr_freq.h"
+#include "k3_ddr.h"
 
 #define AP_ALLOW_FREQ_CHG			BIT(18)
 #define MC_REG_TABLE_EN				BIT(10)
@@ -128,9 +129,9 @@ u32 ddr_get_mr8(void)
 
 u32 ddr_get_density(void)
 {
-	u32 ddr_size = 2048;
-	pr_info("DDR size fixed to be %d MB\n", ddr_size);
-	return ddr_size;
+	u32 ddr_size_mb = DDR_SIZE_GB * 1024 * 2;
+	pr_info("DDR size fixed to be %d MB\n", ddr_size_mb);
+	return ddr_size_mb;
 }
 
 uint32_t get_manufacture_id(void)

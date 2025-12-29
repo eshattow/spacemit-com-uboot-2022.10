@@ -11,8 +11,15 @@
 #define DDR_CTRL_REG_BASE	(0xCB000000)
 #define DDR_CTRL1_REG_BASE	(0xCC000000)
 
+#define DDR_SIZE_GB		(8)
 // current only support 1066MT/s(8GB) and 4266MT/s(16GB)
+#if (DDR_SIZE_GB == 8)
 #define CONFIG_DDR_DATARATE	(1066)
+#elif (DDR_SIZE_GB == 16)
+#define CONFIG_DDR_DATARATE	(4266)
+#else
+#error "Unsupported DDR size"
+#endif
 
 #ifndef REG32
 #define REG32(x) (*((volatile uint32_t*)((uintptr_t)(x))))
