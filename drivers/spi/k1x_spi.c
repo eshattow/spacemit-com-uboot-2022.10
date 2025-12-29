@@ -381,41 +381,11 @@ static int k1x_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	return ret;
 }
 
-/**********************Debug functions,need to use pinctrl framwork*****************************/
-#define AIB_GPIO5_IO_REG               0xD401E810
-#define APBC_ASFAR                     0xD4015050
-#define AKEY_ASFAR                     0xbaba
-#define AKEY_ASSAR                     0xeb10
-void set_gpio5_power_domain_1v8(void)
-{
-	u32 tmp;
-	void __iomem *apbc_asfar = (void *)((ulong)(APBC_ASFAR));
-	void __iomem *aib_gp5_io = (void *)((ulong)(AIB_GPIO5_IO_REG));
-	/* unlock sequence */
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_asfar + 4);
-	tmp = readl(aib_gp5_io);
-	printk("===> GPIO5 IO domain before: 0x%08x\n", tmp);
-	/* bit2: 1.8v */
-	tmp |= 0x1 << 2; /* 1.8v */
-	/* write back with unlock sequence */
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_asfar + 4);
-	writel(tmp, aib_gp5_io);
-	/* read back */
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_asfar + 4);
-	tmp = readl(aib_gp5_io);
-	printk("===> AIB GPIO5 IO set 1.8v read back: 0x%08x\n", tmp);
-}
-/******************************************************************************************/
-
 static int k1x_spi_probe(struct udevice *dev)
 {
 	struct k1x_spi *priv = dev_get_priv(dev);
 	int ret;
 
-	set_gpio5_power_domain_1v8();
 	priv->base = dev_remap_addr(dev);
 	if (!priv->base)
 		return -EINVAL;
