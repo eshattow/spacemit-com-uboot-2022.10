@@ -508,43 +508,16 @@ static int espi_apply_config(struct spacemit_espi_priv *priv)
 static int espi_release_reset(struct udevice *dev)
 {
 	struct spacemit_espi_priv *priv = dev_get_priv(dev);
-	/* PMUAP ESPI_SCLK_CFG register (0xD4282800 + 0x240) */
-	phys_addr_t espi_clk_cfg_addr = 0xD4282A40ULL;
-	u32 reg_val, clk_src;
+	ulong rate_hz;
+	int ret;
 
-	/* Determine clock source bits based on operating frequency
-	 * Bits [6:4]: Clock source (0=20MHz, 1=25MHz, 2=33MHz, 3=50MHz, 4=66MHz)
-	 */
-	switch (priv->op_freq) {
-	case 20:
-		clk_src = 0 << 4;
-		break;
-	case 25:
-		clk_src = 1 << 4;
-		break;
-	case 33:
-		clk_src = 2 << 4;
-		break;
-	case 50:
-		clk_src = 3 << 4;
-		break;
-	case 66:
-		clk_src = 4 << 4;
-		break;
-	default:
-		dev_warn(dev, "Unsupported frequency %d MHz, defaulting to 25MHz\n", priv->op_freq);
-		clk_src = 1 << 4;
-		break;
-	}
+	if (!priv->op_freq)
+		return 0;
 
-	/* Read-Modify-Write to preserve CCU settings */
-	reg_val = readl((void *)espi_clk_cfg_addr);
-	reg_val &= ~(0x7 << 4);    /* Clear bits [6:4] */
-	reg_val |= clk_src;        /* Set clock source */
-	reg_val |= BIT(2);         /* Deassert SCLK reset */
-	writel(reg_val, (void *)espi_clk_cfg_addr);
-
-	dev_dbg(dev, "eSPI controller reset released and clock configured\n");
+	rate_hz = (ulong)priv->op_freq * 1000000UL;
+	ret = clk_set_rate(&priv->clk_sclk, rate_hz);
+	if (ret)
+		dev_dbg(dev, "Failed to set sclk rate to %lu Hz: %d\n", rate_hz, ret);
 
 	/* Wait for clock stabilization */
 	udelay(1000);
@@ -732,44 +705,6 @@ static int spacemit_espi_receive_oob(struct udevice *dev, u8 *buf, size_t len)
 }
 #endif /* !CONFIG_SPL_BUILD */
 
-
-
-/**********************Debug functions,need to use pinctrl framwork*****************************/
-#define AIB_GPIO4_IO_REG               0xD401E820
-#define APBC_ASFAR                     0xD4015050
-#define AKEY_ASFAR                     0xbaba
-#define AKEY_ASSAR                     0xeb10
-
-void set_gpio4_power_domain_1v8(void)
-{
-	u32 tmp;
-	void __iomem *apbc_asfar = (void *)((ulong)(APBC_ASFAR));
-	void __iomem *aib_gp4_io = (void *)((ulong)(AIB_GPIO4_IO_REG));
-
-	/* unlock sequence */
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_asfar + 4);
-
-	tmp = readl(aib_gp4_io);
-	printk("===> GPIO4 IO domain before: 0x%08x\n", tmp);
-
-	/* bit2: 1.8v */
-	tmp |= 0x1 << 2; /* 1.8v */
-
-	/* write back with unlock sequence */
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_asfar + 4);
-	writel(tmp, aib_gp4_io);
-
-	/* read back */
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_asfar + 4);
-	tmp = readl(aib_gp4_io);
-
-	printk("===> AIB GPIO4 IO set 1.8v read back: 0x%08x\n", tmp);
-}
-/******************************************************************************************/
-
 /**
  * U-Boot driver model probe function
  */
@@ -777,8 +712,6 @@ static int spacemit_espi_probe(struct udevice *dev)
 {
 	struct spacemit_espi_priv *priv = dev_get_priv(dev);
 	int ret;
-
-	set_gpio4_power_domain_1v8();
 
 	/* Step 0: Get and enable clocks */
 	ret = clk_get_by_name(dev, "sclk_src", &priv->clk_sclk_src);
@@ -822,16 +755,6 @@ static int spacemit_espi_probe(struct udevice *dev)
 	if (ret) {
 		dev_err(dev, "Failed to enable mclk: %d\n", ret);
 		goto err_disable_sclk;
-	}
-
-	/* Release MCLK and SCLK reset (bit 0 and bit 2) */
-	{
-		u32 clk_reg = readl((void *)0xD4282A40ULL);
-		pr_info("  Before reset release: 0x%08x\n", clk_reg);
-		clk_reg |= BIT(0) | BIT(2);  /* ESPI_MCLK_RST | ESPI_SCLK_RST */
-		writel(clk_reg, (void *)0xD4282A40ULL);
-		clk_reg = readl((void *)0xD4282A40ULL);
-		pr_info("  After reset release: 0x%08x\n", clk_reg);
 	}
 
 	/* Step 0.5: Get and deassert reset */
@@ -956,4 +879,3 @@ U_BOOT_DRIVER(spacemit_espi) = {
 	.ops = &spacemit_espi_ops,
 	.flags = DM_FLAG_PRE_RELOC,  /* Enable in SPL/pre-relocation */
 };
-
