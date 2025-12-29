@@ -1021,5 +1021,10 @@
 		};
 	};
 
+	wdt_reboot {
+		compatible = "wdt-reboot";
+		status = "okay";
+	};
+
 };
 
