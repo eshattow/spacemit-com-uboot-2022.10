@@ -529,15 +529,17 @@ static int k3_pin2pwr_domain_offset(int pin)
 	return offset;
 }
 
-static void __maybe_unused k1_set_pwr_domain(const u32 *prop)
+static int __maybe_unused k1_set_pwr_domain(const u32 *prop)
 {
 	int offset;
 	int pin;
 
 	pin = k1_prop2pin(prop);
 	offset = k1_pin2pwr_domain_offset(pin);
-	if (offset < 0)
+	if (offset < 0) {
 		pr_err("pinctrl: pwr domain: unsupported pin\n");
+		return -1;
+	}
 
 	void __iomem *apbc_asfar = (void *)((ulong)(APBC_ASFAR));
 	void __iomem *aib_io = (void *)((ulong)(IOPWRDOM_BASE + offset));
@@ -547,17 +549,20 @@ static void __maybe_unused k1_set_pwr_domain(const u32 *prop)
 	writel(AKEY_ASSAR, apbc_asfar + 4);
 
 	writel(IO_PWR_DOMAIN_1V8EN, aib_io);
+	return 0;
 }
 
-static void k3_set_pwr_domain(const u32 *prop)
+static int k3_set_pwr_domain(const u32 *prop)
 {
 	int offset;
 	int pin;
 
 	pin = k3_prop2pin(prop);
 	offset = k3_pin2pwr_domain_offset(pin);
-	if (offset < 0)
+	if (offset < 0) {
 		pr_err("pinctrl: pwr domain: unsupported pin\n");
+		return -1;
+	}
 
 	void __iomem *apbc_asfar = (void *)((ulong)(APBC_ASFAR));
 	void __iomem *aib_io = (void *)((ulong)(IOPWRDOM_BASE + offset));
@@ -567,6 +572,7 @@ static void k3_set_pwr_domain(const u32 *prop)
 	writel(AKEY_ASSAR, apbc_asfar + 4);
 
 	writel(IO_PWR_DOMAIN_1V8EN, aib_io);
+	return 0;
 }
 static int single_set_state(struct udevice *dev,
 			    struct udevice *config)
@@ -585,10 +591,12 @@ static int single_set_state(struct udevice *dev,
 			return -FDT_ERR_BADSTRUCTURE;
 		}
 		if (!dev_read_u32(config, "power-source", &power)) {
-			if (power == 1800)
-				k3_set_pwr_domain(prop);
-			else
+			if (power == 1800) {
+				if (k3_set_pwr_domain(prop) < 0)
+					pr_err("pinctrl: pwr domain: set pwr domain failed\n");
+			} else {
 				pr_warn("pinctrl: pwr domain: only support 1.8V switch, 3.3V is default\n");
+			}
 		}
 		single_configure_pins(dev, prop, len, config->name);
 		return 0;
