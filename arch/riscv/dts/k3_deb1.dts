@@ -35,6 +35,15 @@
 	gmac0_grp {
 		power-source = <1800>;
 	};
+
+	pcie0_1_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_79, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15))
+			K3_PADCONF(GPIO_81, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15))
+		>;
+
+		power-source = <1800>;
+	};
 };
 
 &uart0 {
@@ -84,8 +93,12 @@
 	};
 };
 
-&pcie0_rc{
-	status = "disabled";
+&pcie0_rc {
+       pinctrl-names = "default";
+       pinctrl-0 = <&pinctrl_pcie0_1>;
+       num-lanes = <4>;
+
+       status = "okay";
 };
 
 &usb3_porta_u2phy {
