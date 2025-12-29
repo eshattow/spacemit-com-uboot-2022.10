@@ -1010,6 +1010,15 @@
 			clock-names = "aclk";
 			status = "disabled";
 		};
+
+		watchdog: watchdog@d4014000 {
+			compatible = "spacemit,k1x-wdt";
+			reg = <0x0 0xd4014000 0x0 0x1000>,
+			      <0x0 0xd4051020 0x0 0x4>;
+			clocks = <&ccu CLK_TIMERS0>;
+			resets = <&reset RESET_TIMERS0>;
+			status = "okay";
+		};
 	};
 
 };
