@@ -209,7 +209,7 @@ int board_fit_config_name_match(const char* name)
 
 	if ((0 == get_product_name(product_name, sizeof(product_name))) &&
 		(0 == strcmp(product_name, name))) {
-		log_emerg("Boot from fit configuration %s\n", name);
+		pr_info("Boot from fit configuration %s\n", name);
 		return 0;
 	}
 	else {
