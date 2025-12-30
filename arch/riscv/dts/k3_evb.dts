@@ -68,7 +68,7 @@
 	cd-inverted;
 	vqmmc-supply = <&ldo_1>;
 	clock-frequency = <204800000>;
-	spacemit,tx_delaycode = <0x9f>;
+	spacemit,tx_delaycode = <0x1f>;
 	sdh-phy-module = <0>;
 	status = "okay";
 };
