@@ -26,6 +26,9 @@
 #include <tlv_eeprom.h>
 #include <clk.h>
 #include <scsi.h>
+#include <fs.h>
+#include <usb.h>
+#include <part.h>
 #include "nfs_env.h"
 
 #ifdef CONFIG_ESPI
@@ -369,6 +372,55 @@ void try_flash_image_from_card(void)
 	return;
 }
 
+#ifdef CONFIG_BOOT_FROM_USB_DISK
+#define USB_BOOT_DEV 0
+
+static void try_boot_from_udisk(void)
+{
+	char bootfs_part[16] = "";
+	struct blk_desc *dev_desc;
+	struct disk_partition info;
+	int part_num;
+	printf("Try varifying if USB dev 0 is a boot disk\n");
+
+	if (run_command("usb start", 0) != 0) {
+	    printf("usb start failed");
+	    return;
+	}
+
+	dev_desc = blk_get_dev("usb", USB_BOOT_DEV);
+	if (!dev_desc) {
+		printf("Could not find usb device %d\n", USB_BOOT_DEV);
+		return;
+	}
+	part_num = part_get_info_by_name(dev_desc, "bootfs", &info);
+	if (part_num < 0) {
+		printf("Partition 'bootfs' not found on usb %d\n", USB_BOOT_DEV);
+		return;
+	}
+
+	printf("Found 'bootfs' at partition %d\n", part_num);
+
+	sprintf(bootfs_part, "%d:%d", USB_BOOT_DEV, part_num);
+	if (fs_set_blk_dev("usb", bootfs_part, FS_TYPE_ANY) != 0) {
+		printf("set blk dev fail\n");
+		return;
+	}
+
+	if (!fs_exists("env_k3.txt")) {
+		printf("file %s not found\n", "env_k3.txt");
+		return;
+	}
+
+	printf("found %s! setting environment value...\n", "env_k3.txt");
+
+	env_set("boot_device", "udisk");
+	env_set("boot_devname", "usb");
+	env_set("bootfs_devname", "usb");
+	env_set("boot_devnum", "0");
+}
+#endif
+
 int board_late_init(void)
 {
 #if CONFIG_IS_ENABLED(HWMON_SENSORS_CTF2301) || CONFIG_IS_ENABLED(RT7451_RETIMER)
@@ -413,6 +465,10 @@ int board_late_init(void)
 	if (BOOT_MODE_SD == get_boot_mode()) {
 		try_flash_image_from_card();
 	}
+
+#ifdef CONFIG_BOOT_FROM_USB_DISK
+	try_boot_from_udisk();
+#endif
 
 	import_env_from_bootfs();
 
