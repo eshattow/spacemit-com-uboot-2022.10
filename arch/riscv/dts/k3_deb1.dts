@@ -25,10 +25,10 @@
 	topd_frequency = <1066000000>;
 	axi_frequency =  <409000000>;
 	cci_frequency =  <1228000000>;
-	cluster0_frequency = <1500000000>;
-	cluster1_frequency = <1500000000>;
-	cluster2_frequency = <1500000000>;
-	cluster3_frequency = <1500000000>;
+	cluster0_frequency = <2200000000>;
+	cluster1_frequency = <2200000000>;
+	cluster2_frequency = <2200000000>;
+	cluster3_frequency = <2200000000>;
 };
 
 &pinctrl {
@@ -360,7 +360,7 @@
 				regulator-name = "edcdc1";
 				regulator-min-microvolt = <600000>;
 				regulator-max-microvolt = <1000000>;
-				regulator-init-microvolt = <850000>;
+				regulator-init-microvolt = <880000>;
 				regulator-always-on;
 				regulator-boot-on;
 				u-boot,dm-spl;
