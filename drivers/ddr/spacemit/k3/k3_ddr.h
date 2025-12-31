@@ -12,7 +12,7 @@
 #define DDR_CTRL1_REG_BASE	(0xCC000000)
 
 // current only support 8GB or 16GB
-#define DDR_SIZE_GB		(8)
+#define DDR_SIZE_GB		(16)
 
 #if (DDR_SIZE_GB == 8)
 // only support 1066MT/s @8GB
