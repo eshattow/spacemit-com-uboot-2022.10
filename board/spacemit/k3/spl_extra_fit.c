@@ -25,6 +25,12 @@
 #include <blk.h>
 #endif
 
+#ifdef CONFIG_SPL_UFS
+#include <ufs.h>
+#include <scsi.h>
+#include <blk.h>
+#endif
+
 enum board_boot_mode get_boot_mode(void);
 
 #ifdef CONFIG_SPL_MMC
@@ -197,6 +203,139 @@ static int load_fit_from_mmc(struct spl_image_info *caller_spl_image, const char
 	return ret;
 }
 #endif /* CONFIG_SPL_MMC */
+
+#ifdef CONFIG_SPL_UFS
+/* ================= UFS support ================= */
+static ulong spl_extra_ufs_read(struct spl_load_info *load, ulong sector, ulong count, void *buf)
+{
+	struct blk_desc *bd = load->dev;
+	ulong n;
+
+	pr_debug("%s: sector %lx, count %lx, buf %lx\n", __func__, sector, count, (ulong) buf);
+	n = blk_dread(bd, sector, count, buf);
+	return n == count ? count : 0;
+}
+
+static int extra_ufs_load_image(struct spl_image_info *spl_image, struct blk_desc *bd,
+				ulong start_lba)
+{
+	struct image_header *header;
+	int err = 0;
+	ulong hdr_cnt = DIV_ROUND_UP(sizeof(*header), bd->blksz);
+
+	header = spl_get_load_buffer(-sizeof(*header), sizeof(*header));
+
+	if (blk_dread(bd, start_lba, hdr_cnt, header) != hdr_cnt) {
+		pr_err("UFS: read header failed\n");
+		return -EIO;
+	}
+
+	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) && image_get_magic(header) == FDT_MAGIC) {
+		struct spl_load_info load;
+		pr_debug("UFS: found FIT at LBA 0x%lx\n", start_lba);
+		load.dev = bd;
+		load.priv = NULL;
+		load.filename = NULL;
+		/* bl_len must be the block size in bytes for FIT loader */
+		load.bl_len = bd->blksz;
+		load.read = spl_extra_ufs_read;
+		err = spl_load_simple_fit(spl_image, &load, start_lba, header);
+	} else {
+		pr_err("UFS: unsupported legacy image\n");
+		return -EINVAL;
+	}
+	return err;
+}
+
+/* Helper to get UFS/SCSI block device */
+static struct blk_desc *get_ufs_blk_desc(void)
+{
+	struct blk_desc *bd;
+
+	/* UFS devices appear as SCSI block devices */
+	bd = blk_get_devnum_by_type(IF_TYPE_SCSI, 0);
+	if (bd) {
+		pr_debug("UFS: got SCSI block device, blksz=%lu, lba=%lu\n",
+			 bd->blksz, bd->lba);
+		return bd;
+	}
+
+	pr_err("UFS: no SCSI block device available\n");
+	return NULL;
+}
+
+/* Unified UFS loader using partition name
+ * image: partition name like "esos" or "uboot"
+ * out_entry: only meaningful when image == "uboot"
+ */
+static int __maybe_unused load_fit_from_ufs(struct spl_image_info *caller_spl_image, const char *image,
+			     ulong *out_entry)
+{
+	int ret = -1;
+	ulong lba = 0;
+	struct blk_desc *bd = get_ufs_blk_desc();
+	struct spl_image_info temp = { 0 };
+
+	if (!bd)
+		return -ENODEV;
+
+	/* Strategy:
+	 * 1) If 'image' is decimal digits -> treat as raw LBA
+	 * 2) Else, treat 'image' as partition name -> scan partitions and use info.start
+	 */
+
+	if (image && *image) {
+		bool all_digit = true;
+		const char *p = image;
+		while (*p) {
+			if (*p < '0' || *p > '9') {
+				all_digit = false;
+				break;
+			}
+			p++;
+		}
+
+		if (all_digit) {
+			/* numeric string -> raw LBA */
+			lba = simple_strtoul(image, NULL, 10);
+			pr_debug("UFS: interpret '%s' as LBA=%lu\n", image, lba);
+			ret = extra_ufs_load_image(&temp, bd, lba);
+		} else {
+			/* treat as partition name and scan */
+			struct disk_partition info;
+			int found = 0;
+			for (int part = 1; part <= MAX_SEARCH_PARTITIONS; part++) {
+				int pe = part_get_info(bd, part, &info);
+				if (pe)
+					continue;
+				if (!strcmp(image, info.name)) {
+					lba = info.start;
+					found = 1;
+					break;
+				}
+			}
+			if (found) {
+				pr_debug("UFS: found partition '%s' at LBA %lu\n", image, lba);
+				ret = extra_ufs_load_image(&temp, bd, lba);
+			} else {
+				pr_debug("UFS: partition '%s' not found\n", image);
+			}
+		}
+	}
+
+	if (!ret) {
+		if (temp.fdt_addr)
+			caller_spl_image->fdt_addr = temp.fdt_addr;
+		if (out_entry && image && !strcmp(image, "uboot")) {
+			if (temp.entry_point)
+				*out_entry = temp.entry_point;
+			else
+				*out_entry = CONFIG_SYS_TEXT_BASE;
+		}
+	}
+	return ret;
+}
+#endif /* CONFIG_SPL_UFS */
 
 #ifdef CONFIG_SPL_MTD_LOAD
 static uint mtd_len_to_pages(struct mtd_info *mtd, u64 len)
@@ -414,7 +553,54 @@ static int load_image_from_mmc_blfs(struct spl_image_info *image, const char *im
 
 	return ret;
 }
-#endif /* CONFIG_SPL_FS_FAT || CONFIG_SPL_FS_EXT4 */
+
+#ifdef CONFIG_SPL_UFS
+/**
+ * Load firmware from UFS bootloader file system partition
+ * Similar to MMC version but uses UFS block device
+ *
+ * @image:      SPL image info structure
+ * @image_path: Image path and name.
+ * @return: 0 on success, negative on error
+ */
+static int load_image_from_ufs_blfs(struct spl_image_info *image, const char *image_path)
+{
+	struct blk_desc *bd;
+	struct disk_partition info;
+	int ret = -1, part;
+	const char *blfs_name;
+
+	/* Get UFS block device */
+	bd = get_ufs_blk_desc();
+	if (!bd) {
+		pr_err("UFS BLFS: failed to get block device\n");
+		return -ENODEV;
+	}
+
+	blfs_name = CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME;
+	part = part_get_info_by_name(bd, blfs_name, &info);
+	if (part < 0) {
+		pr_err("UFS BLFS: partition '%s' not found\n", blfs_name);
+		return -ENOENT;
+	}
+
+	memset(image, 0, sizeof(struct spl_image_info));
+#ifdef CONFIG_SPL_FS_FAT
+	/* first try in FAT */
+	ret = spl_load_image_fat(image, NULL, bd, part, image_path);
+#endif
+#ifdef CONFIG_SPL_FS_EXT4
+	/* then try in EXT4 */
+	if (ret)
+		ret = spl_load_image_ext(image, NULL, bd, part, image_path);
+#endif
+	if (ret)
+		pr_err("UFS BLFS: image(%s) load failed\n", image_path);
+
+	return ret;
+}
+#endif /* CONFIG_SPL_UFS */
+#endif /* CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME */
 
 int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 {
@@ -542,6 +728,69 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 			free(part_esos);
 		if (part_uboot)
 			free(part_uboot);
+		break;
+	}
+#endif
+#ifdef CONFIG_SPL_UFS
+	case BOOT_DEVICE_UFS: {
+#if defined(CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME)
+		/* Try loading from bootloader filesystem partition (like MMC does) */
+		const char *uboot_itb_path, *esos_itb_path;
+		struct spl_image_info image;
+
+		/* Get environment variables for file paths */
+		esos_itb_path = env_get("esos_itb_path");
+		uboot_itb_path = env_get("uboot_itb_path");
+
+		/* Fallback to hardcoded paths if env_get fails */
+		if (!uboot_itb_path)
+			uboot_itb_path = "u-boot.itb";
+		if (!esos_itb_path || !strcmp(esos_itb_path, uboot_itb_path))
+			esos_itb_path = "esos.itb";
+
+		/* Load esos.itb first */
+		load_esos_res = load_image_from_ufs_blfs(&image, esos_itb_path);
+		if (!load_esos_res && image.fdt_addr)
+			spl_image->fdt_addr = image.fdt_addr;
+
+		/* Load u-boot.itb - this sets the entry point */
+		load_uboot_res = load_image_from_ufs_blfs(&image, uboot_itb_path);
+		if (!load_uboot_res) {
+			/* Copy DTB address if not already set */
+			if (image.fdt_addr)
+				spl_image->fdt_addr = image.fdt_addr;
+
+			/* Extract U-Boot entry point */
+			if (uboot_entry && image.entry_point)
+				*uboot_entry = image.entry_point;
+		}
+#else
+		/* Fallback: try raw partition loading */
+		const char *tmp;
+		char *part_esos = NULL, *part_uboot = NULL;
+
+		tmp = env_get("extra_esos_partition");
+		if (tmp)
+			part_esos = strdup(tmp);
+		else
+			part_esos = strdup("esos");
+
+		tmp = env_get("extra_uboot_partition");
+		if (tmp)
+			part_uboot = strdup(tmp);
+		else
+			part_uboot = strdup("uboot");
+
+		if (part_esos && *part_esos)
+			load_esos_res = load_fit_from_ufs(spl_image, part_esos, NULL);
+		if (part_uboot && *part_uboot)
+			load_uboot_res = load_fit_from_ufs(spl_image, part_uboot, uboot_entry);
+
+		if (part_esos)
+			free(part_esos);
+		if (part_uboot)
+			free(part_uboot);
+#endif /* CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME */
 		break;
 	}
 #endif
