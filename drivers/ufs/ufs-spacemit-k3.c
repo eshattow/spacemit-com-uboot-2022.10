@@ -7,6 +7,7 @@
 
 #include <clk.h>
 #include <dm.h>
+#include <reset.h>
 #include <ufs.h>
 #include <asm/io.h>
 #include <dm/device_compat.h>
@@ -20,6 +21,7 @@
 
 struct spacemit_k3_ufs_priv {
 	struct clk aclk;
+	struct reset_ctl reset;
 	u32 phy_mng_base;
 	u32 atop_base;
 };
@@ -127,21 +129,31 @@ static void spacemit_k3_ufs_clk_enable(struct spacemit_k3_ufs_priv *priv)
 {
 	int ret;
 
+	/* First deassert reset */
+	ret = reset_deassert(&priv->reset);
+	if (ret) {
+		pr_err("ufs: fail to deassert reset, ret=%d\n", ret);
+		return;
+	}
+
+	/* Then enable clock */
 	ret = clk_enable(&priv->aclk);
 	if (ret) {
 		pr_err("ufs: fail to enable ufs aclk, ret=%d\n", ret);
 		return;
 	}
 
-	/* HYNIX1 phone need delay*/
+	/* HYNIX1 phone need delay */
 	mdelay(5);
 }
 
 static void spacemit_k3_ufs_clk_disable(struct spacemit_k3_ufs_priv *priv)
 {
-	/*disable ufs aclk*/
+	/* Disable clock first */
 	clk_disable(&priv->aclk);
-	pr_info("ufs: clk disable ufs aclk\n");
+
+	/* Then assert reset */
+	reset_assert(&priv->reset);
 }
 
 static int __maybe_unused debug_print_desc(struct udevice *dev, enum desc_idn idn)
@@ -338,15 +350,15 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 	mdelay(1);
 
 	/* power up all */
-	ufshcd_writel(hba, 0x07f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
+	ufshcd_writel(hba, 0x87f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
 	mdelay(1);
 
 	/* asserted ana_rx_hb8_reset */
-	ufshcd_writel(hba, 0x37f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
+	ufshcd_writel(hba, 0xB7f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
 	mdelay(1);
 
 	/* deasserted ana_rx_hb8_reset */
-	ufshcd_writel(hba, 0x07f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
+	ufshcd_writel(hba, 0x87f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
 	mdelay(1);
 
 	/* deasserted ufs device reset & refer clk output enable */
@@ -373,7 +385,8 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 			pr_debug("ufs: MPHY Pll was locked\n");
 	}
 
-	/* force cdr_pi_on, always enable rx_pck20 */
+	/* force cdr_pi_on, always enable rx_pck20 - commented out per patch */
+#if 0
 	ufshcd_writel(hba, 0x1, priv->phy_mng_base + 0x08);
 	udelay(20);
 
@@ -382,6 +395,7 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 
 	ufshcd_writel(hba, 0x0, priv->phy_mng_base + 0x08);
 	udelay(20);
+#endif
 
 	/* HYNIX1 phone: extra settle time after MPHY tuning */
 	mdelay(5);
@@ -447,8 +461,8 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 		pr_err("Writing PA_TXMK2EXTENSION error \n");
 	}
 
-	/* PA_PEERSCRAMBLING */
-	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_PEERSCRAMBLING), 0x1);
+	/* PA_PEERSCRAMBLING - changed from 0x1 to 0x0 per patch */
+	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_PEERSCRAMBLING), 0x0);
 	if (err) {
 		pr_err("Writing PA_PEERSCRAMBLING error \n");
 	}
@@ -475,14 +489,14 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 		pr_err("Writing PA_PEER_TX_LCC_ENABLE error \n");
 	}
 
-	/* PA_SCRAMBLING */
+	/* PA_SCRAMBLING - keep 0x1 for silicon platform (only PA_PEERSCRAMBLING was changed to 0x0) */
 	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_SCRAMBLING), 0x1);
 	if (err) {
 		pr_err("Writing PA_SCRAMBLING error \n");
 	}
 
-	/* PA_GRANULARITY */
-	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_GRANULARITY), 0x1);
+	/* PA_GRANULARITY - changed from 0x1 to 0x6 per patch */
+	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_GRANULARITY), 0x6);
 	if (err) {
 		pr_err("Writing PA_GRANULARITY error \n");
 	}
@@ -598,8 +612,8 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 
 	pr_debug("ufs: ufs_spacemit_k3_uniprov1p6_init done.\n");
 
-	/* program controller timing registers for 409MHz SYS1CLK */
-	real_sysclk = UFS_SYS1CLK_1US_409MHZ;
+	/* program controller timing registers - changed from 409 to 499 per patch */
+	real_sysclk = 499;
 	ufshcd_writel(hba, real_sysclk, UFS_SYS1CLK_1US_REG);
 
 	reg_val = UFS_TX_SYMBOL_CLK_NS_US_409MHZ;
@@ -812,6 +826,12 @@ static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 	ret = clk_get_by_index(dev, 0, &priv->aclk);
 	if (ret) {
 		dev_err(dev, "ufs: failed to get aclk, ret=%d\n", ret);
+		return ret;
+	}
+
+	ret = reset_get_by_index(dev, 0, &priv->reset);
+	if (ret) {
+		dev_err(dev, "ufs: failed to get reset, ret=%d\n", ret);
 		return ret;
 	}
 
