@@ -56,8 +56,12 @@
 
 #define MAX_PRDT_ENTRY	262144
 
-/* maximum bytes per request */
-#define UFS_MAX_BYTES	(128 * 256 * 1024)
+/* maximum bytes per request - limited by bounce buffer for high addresses */
+#if defined(CONFIG_SPL_BUILD)
+#define UFS_MAX_BYTES	(4 * 1024)  /* 4KB for SPL to minimize memory */
+#else
+#define UFS_MAX_BYTES	(1024 * 1024)  /* 1MB for U-Boot proper */
+#endif
 
 static inline bool ufshcd_is_hba_active(struct ufs_hba *hba);
 static inline void ufshcd_hba_stop(struct ufs_hba *hba);
@@ -1494,7 +1498,7 @@ static void prepare_prdt_table(struct ufs_hba *hba, struct scsi_cmd *pccb)
 }
 
 /* Static bounce buffer for DMA - must be below 4GB */
-#define UFS_BOUNCE_BUF_SIZE	(64 * 1024)
+#define UFS_BOUNCE_BUF_SIZE	UFS_MAX_BYTES
 static u8 ufs_bounce_buf[UFS_BOUNCE_BUF_SIZE] __attribute__((aligned(4096), section(".data")));
 
 static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
@@ -1605,6 +1609,7 @@ static int ufshcd_read_device_desc(struct ufs_hba *hba, u8 *buf, u32 size)
 	return ufshcd_read_desc(hba, QUERY_DESC_IDN_DEVICE, 0, buf, size);
 }
 
+#if !defined(CONFIG_SPL_BUILD)
 /**
  * ufshcd_read_string_desc - read string descriptor
  *
@@ -1665,6 +1670,7 @@ int ufshcd_read_string_desc(struct ufs_hba *hba, int desc_index,
 out:
 	return err;
 }
+#endif /* !CONFIG_SPL_BUILD */
 
 static int ufs_get_device_desc(struct ufs_hba *hba,
 			       struct ufs_dev_desc *dev_desc)
@@ -1698,6 +1704,7 @@ static int ufs_get_device_desc(struct ufs_hba *hba,
 
 	model_index = desc_buf[DEVICE_DESC_PARAM_PRDCT_NAME];
 
+#if !defined(CONFIG_SPL_BUILD)
 	/* Zero-pad entire buffer for string termination. */
 	memset(desc_buf, 0, buff_len);
 
@@ -1716,6 +1723,11 @@ static int ufs_get_device_desc(struct ufs_hba *hba,
 
 	/* Null terminate the model string */
 	dev_desc->model[MAX_MODEL_LEN] = '\0';
+#else
+	/* Skip reading product name in SPL to save code size */
+	(void)model_index;
+	dev_desc->model[0] = '\0';
+#endif
 
 out:
 	kfree(desc_buf);
@@ -2158,12 +2170,19 @@ int ufs_probe(void)
 {
 	struct udevice *dev;
 	int ret, i;
+	int found = 0;
 
 	for (i = 0;; i++) {
 		ret = uclass_get_device(UCLASS_UFS, i, &dev);
 		if (ret == -ENODEV)
 			break;
+		if (ret)
+			return ret;
+		found++;
 	}
+
+	if (!found)
+		return -ENODEV;
 
 	return 0;
 }

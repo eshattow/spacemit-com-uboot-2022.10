@@ -1240,6 +1240,40 @@ config SPL_SATA_RAW_U_BOOT_SECTOR
 	  Sector on the SATA disk to load U-Boot from, when the SATA disk is being
 	  used in raw mode. Units: SATA disk sectors (1 sector = 512 bytes).
 
+config SPL_SCSI
+	bool "Support SCSI drivers in SPL"
+	depends on SCSI
+	help
+	  Enable support for SCSI (Small Computer System Interface) in SPL.
+	  This is required for storage devices that use SCSI protocol, such
+	  as UFS and SATA devices. This enables the SCSI subsystem and
+	  drivers in drivers/scsi as part of an SPL build.
+
+config SPL_UFS
+	bool "Support loading from UFS"
+	depends on SPL_SCSI && UFS
+	help
+	  Enable support for UFS (Universal Flash Storage) in SPL. This allows
+	  use of UFS devices for loading U-Boot. UFS is a high-performance
+	  flash storage interface commonly used in mobile and embedded systems.
+	  This enables the UFS drivers in drivers/ufs as part of an SPL build.
+
+config SPL_UFS_RAW_U_BOOT_USE_SECTOR
+	bool "UFS raw mode: by sector"
+	depends on SPL_UFS
+	default y
+	help
+	  Use sector number for specifying U-Boot location on UFS disk in
+	  raw mode.
+
+config SPL_UFS_RAW_U_BOOT_SECTOR
+	hex "Sector on the UFS disk to load U-Boot from"
+	depends on SPL_UFS_RAW_U_BOOT_USE_SECTOR
+	default 0x1000
+	help
+	  Sector on the UFS disk to load U-Boot from, when the UFS disk is being
+	  used in raw mode. Units: UFS disk sectors (1 sector = 4096 bytes typically).
+
 config SPL_SERIAL
 	bool "Support serial"
 	select SPL_PRINTF

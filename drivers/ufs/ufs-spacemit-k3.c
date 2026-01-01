@@ -198,16 +198,16 @@ static int __maybe_unused debug_print_desc(struct udevice *dev, enum desc_idn id
 			return ret;
 		}
 
-		pr_info("ufs: debug print descriptor for idn %d\n", idn);
+		debug("ufs: debug print descriptor for idn %d\n", idn);
 
 		for (int i = 0; i < hba->desc_size.conf_desc; i++) {
-			pr_info("[%x]:%x  ", i, desc_buf[i]);
+			debug("[%x]:%x  ", i, desc_buf[i]);
 			if ((i + 1) % 8 == 0) {
-				pr_info("\n");
+				debug("\n");
 			}
 		}
 	} else {
-		printf("ufs: debug print descriptor for idn %d\n", idn);
+		debug("ufs: debug print descriptor for idn %d\n", idn);
 		for (int i = 0; i < 8; i++) {
 			ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC, idn,
 							    i, 0, desc_buf, &desc_size);
@@ -217,11 +217,11 @@ static int __maybe_unused debug_print_desc(struct udevice *dev, enum desc_idn id
 				return ret;
 			}
 
-			pr_info("ufs: unit %d descriptor\n", i);
+			debug("ufs: unit %d descriptor\n", i);
 			for (int i = 0; i < hba->desc_size.conf_desc; i++) {
-				pr_info("[%x]:%x  ", i, desc_buf[i]);
+				debug("[%x]:%x  ", i, desc_buf[i]);
 				if ((i + 1) % 8 == 0) {
-					pr_info("\n");
+					debug("\n");
 				}
 			}
 		}
@@ -231,7 +231,7 @@ out:
 	return ret;
 }
 
-static int spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
+static __maybe_unused int spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 {
 	u8 *desc_buf;
 	uint64_t qTotalRawDeviceCapacity;
@@ -264,11 +264,10 @@ static int spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 			enabled_lun_count++;
 	}
 
-	pr_info("ufs: Current configuration has %d enabled LUN(s)\n", enabled_lun_count);
+	debug("ufs: Current configuration has %d enabled LUN(s)\n", enabled_lun_count);
 
 	/* If already single LUN, no need to reconfigure */
 	if (enabled_lun_count == 1) {
-		pr_info("ufs: Already configured as single LUN, skipping reconfiguration\n");
 		kfree(desc_buf);
 		return 0;
 	}
@@ -292,7 +291,7 @@ static int spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 	qTotalRawDeviceCapacity = get_unaligned_be64(&desc_buf[GEO_DESC_PARAM_TOTAL_RAW_DEV_CAP]);
 	dSegmentSize = get_unaligned_be32(&desc_buf[GEO_DESC_PARAM_SEG_SIZE]);
 	bAllocationUnitSize = desc_buf[GEO_DESC_PARAM_ALLOC_UNIT_SIZE];
-	pr_info("ufs: Total capacity: %llu sectors, Segment size: %u, Alloc unit size: %d\n",
+	debug("ufs: Total capacity: %llu sectors, Segment size: %u, Alloc unit size: %d\n",
 		qTotalRawDeviceCapacity, dSegmentSize, bAllocationUnitSize);
 	kfree(desc_buf);
 
@@ -340,7 +339,7 @@ static int spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE] = 0x3;
 	}
 
-	pr_info("ufs: Reconfiguring to single LUN with size: 0x%x allocation units\n", total_lun_size);
+	debug("ufs: Reconfiguring to single LUN with size: 0x%x allocation units\n", total_lun_size);
 
 	/* Write configuration descriptor back to device */
 	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_WRITE_DESC,
@@ -352,7 +351,7 @@ static int spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 		return ret;
 	}
 
-	pr_info("ufs: Single LUN configuration complete! Power cycle required for changes to take effect.\n");
+	dev_info(hba->dev, "Single LUN configuration complete! Power cycle required.\n");
 
 	kfree(desc_buf);
 	return 0;
@@ -793,8 +792,12 @@ static const struct ufs_hba_ops spacemit_k3_ufs_vops = {
 static int spacemit_k3_ufs_pltfm_bind(struct udevice *dev)
 {
 	struct udevice *scsi_dev;
-	pr_info("ufs: call spacemit_k3_ufs_pltfm_bind\n");
-	return ufs_scsi_bind(dev, &scsi_dev);
+	int ret;
+
+	ret = ufs_scsi_bind(dev, &scsi_dev);
+	if (ret)
+		pr_err("ufs: ufs_scsi_bind failed: %d\n", ret);
+	return ret;
 }
 
 static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
@@ -820,16 +823,19 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 		spacemit_k3_ufs_clk_disable(priv);
 		pr_err("ufs host probe failed:%d\n", ret);
 	} else {
-		/* Check and configure single LUN if needed */
+#if !defined(CONFIG_SPL_BUILD)
+		/* Check and configure single LUN if needed - skip in SPL */
 		spacemit_k3_ufs_check_and_config_single_lun(dev);
-
+#endif
 		/* Limit to single LUN - use only the main user data partition */
 		device_find_first_child(dev, &scsi_dev);
 		if (scsi_dev) {
 			scsi_plat = dev_get_uclass_plat(scsi_dev);
-			scsi_plat->max_lun = 1;
+			scsi_plat->max_id = 1;  /* UFS has single target */
+			scsi_plat->max_lun = 1; /* Use only main LUN */
+		} else {
+			pr_err("ufs: scsi_dev child not found!\n");
 		}
-		pr_info("ufs: ufs host probed (single LUN mode).\n");
 	}
 
 	return ret;
@@ -872,7 +878,6 @@ static int spacemit_k3_ufs_pltfm_remove(struct udevice *dev)
 {
 	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
 
-	pr_info("ufs: spacemit_k3_ufs_pltfm_remove\n");
 	spacemit_k3_ufs_clk_disable(priv);
 
 	return 0;
