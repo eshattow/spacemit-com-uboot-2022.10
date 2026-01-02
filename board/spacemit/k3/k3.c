@@ -347,8 +347,8 @@ int board_late_init(void)
 #ifdef CONFIG_ESPI
 	ret = uclass_probe_all(UCLASS_ESPI);
 	if (ret || !spacemit_espi_is_ready()) {
-		pr_warn("eSPI not ready, disabling kernel EC driver\n");
-		run_command("setenv bootargs ${bootargs} cros_ec_espi.disable=1", 0);
+		printf("eSPI not ready, disabling kernel EC driver\n");
+		env_set("espi_disabled", "1");
 	}
 #endif
 
