@@ -87,6 +87,10 @@
 	};
 };
 
+&ufs {
+	status = "okay";
+};
+
 &eth1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_gmac1>;
