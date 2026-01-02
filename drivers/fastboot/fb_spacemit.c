@@ -27,6 +27,8 @@
 #include <linux/io.h>
 #include <fb_mtd.h>
 #include <nvme.h>
+#include <scsi.h>
+#include <ufs.h>
 #include <tlv_eeprom.h>
 #include <misc.h>
 #include <search.h>
@@ -74,6 +76,7 @@ int _write_gpt_partition(struct flash_dev *fdev)
 #if CONFIG_IS_ENABLED(FASTBOOT_SUPPORT_BLOCK_DEV)
 	case BOOT_MODE_NOR:
 	case BOOT_MODE_NAND:
+	case BOOT_MODE_UFS:
 		char *blk_name;
 		int blk_index;
 
@@ -1347,6 +1350,27 @@ int detect_blk_dev_or_partition_exist(char *blk_name, int blk_index, const char 
 
 int _get_available_blk_or_part(char **blk_dev, int *index, const char *partition)
 {
+	u32 boot_mode = get_boot_pin_select();
+
+#ifdef CONFIG_UFS
+	/* For UFS boot mode, use SCSI block device */
+	if (boot_mode == BOOT_MODE_UFS) {
+		static bool ufs_scanned = false;
+		if (!ufs_scanned) {
+			/* Probe UFS and scan SCSI devices */
+			if (ufs_probe() == 0) {
+				scsi_scan(false);
+				ufs_scanned = true;
+			}
+		}
+		*blk_dev = "scsi";
+		*index = 0;
+		if (detect_blk_dev_or_partition_exist(*blk_dev, *index, partition) >= 0)
+			return 0;
+		return -1;
+	}
+#endif
+
 #ifdef CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
 	static bool scan_nvme = false;
 	/*nvme devices need scan at first*/
@@ -1375,14 +1399,13 @@ int _get_available_blk_or_part(char **blk_dev, int *index, const char *partition
 				return -1;
 		}
 	}else{
-		printf("not defind blk dev, check make config\n");
+		pr_err("block device not defined, check make config\n");
 		return -1;
 	}
 #else
-	printf("not defind blk dev, check make config\n");
+	pr_err("block device not defined, check make config\n");
 	return -1;
 #endif //CONFIG_FASTBOOT_SUPPORT_BLOCK_DEV_NAME
-	printf("detect available blk:%s\n", *blk_dev);
 	return 0;
 }
 

@@ -479,6 +479,12 @@ static void flash(char *cmd_parameter, char *response)
 					response);
 		return;
 #endif
+#if CONFIG_IS_ENABLED(FASTBOOT_SUPPORT_BLOCK_DEV)
+	case BOOT_MODE_UFS:
+		/* UFS uses block device interface */
+		fastboot_blk_flash_write(cmd_parameter, fastboot_buf_addr, image_size, response);
+		return;
+#endif
 	}
 
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_NAND)
@@ -518,6 +524,10 @@ static void erase(char *cmd_parameter, char *response)
 		}
 
 		/* erase blk dev */
+		fastboot_blk_erase(cmd_parameter, response);
+		return;
+	case BOOT_MODE_UFS:
+		/* UFS uses block device interface */
 		fastboot_blk_erase(cmd_parameter, response);
 		return;
 #endif
@@ -795,6 +805,10 @@ static void oem_read(char *cmd_parameter, char *response)
 		pr_info("read data from blk dev\n");
 		fastboot_bytes_expected = fastboot_blk_read(part, off, fastboot_buf_addr, response);
 
+		return;
+	case BOOT_MODE_UFS:
+		/* UFS uses block device interface */
+		fastboot_bytes_expected = fastboot_blk_read(part, off, fastboot_buf_addr, response);
 		return;
 #endif
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)

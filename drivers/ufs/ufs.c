@@ -56,8 +56,12 @@
 
 #define MAX_PRDT_ENTRY	262144
 
-/* maximum bytes per request */
-#define UFS_MAX_BYTES	(128 * 256 * 1024)
+/* maximum bytes per request - limited by bounce buffer for high addresses */
+#if defined(CONFIG_SPL_BUILD)
+#define UFS_MAX_BYTES	(4 * 1024)  /* 4KB for SPL to minimize memory */
+#else
+#define UFS_MAX_BYTES	(1024 * 1024)  /* 1MB for U-Boot proper */
+#endif
 
 static inline bool ufshcd_is_hba_active(struct ufs_hba *hba);
 static inline void ufshcd_hba_stop(struct ufs_hba *hba);
@@ -692,6 +696,21 @@ static inline u8 ufshcd_get_upmcrs(struct ufs_hba *hba)
 }
 
 /**
+ * ufshcd_cache_flush_and_invalidate - Flush and invalidate cache
+ *
+ * Flush and invalidate cache in aligned address..address+size range.
+ * The invalidation is in place to avoid stale data in cache.
+ */
+static void ufshcd_cache_flush_and_invalidate(void *addr, unsigned long size)
+{
+	uintptr_t aaddr = (uintptr_t)addr & ~(ARCH_DMA_MINALIGN - 1);
+	unsigned long asize = ALIGN(size, ARCH_DMA_MINALIGN);
+
+	flush_dcache_range(aaddr, aaddr + asize);
+	invalidate_dcache_range(aaddr, aaddr + asize);
+}
+
+/**
  * ufshcd_prepare_req_desc_hdr() - Fills the requests header
  * descriptor according to request
  */
@@ -733,6 +752,8 @@ static void ufshcd_prepare_req_desc_hdr(struct utp_transfer_req_desc *req_desc,
 	req_desc->header.dword_3 = 0;
 
 	req_desc->prd_table_length = 0;
+
+	ufshcd_cache_flush_and_invalidate(req_desc, sizeof(*req_desc));
 }
 
 static void ufshcd_prepare_utp_query_req_upiu(struct ufs_hba *hba,
@@ -761,10 +782,15 @@ static void ufshcd_prepare_utp_query_req_upiu(struct ufs_hba *hba,
 	memcpy(&ucd_req_ptr->qr, &query->request.upiu_req, QUERY_OSF_SIZE);
 
 	/* Copy the Descriptor */
-	if (query->request.upiu_req.opcode == UPIU_QUERY_OPCODE_WRITE_DESC)
+	if (query->request.upiu_req.opcode == UPIU_QUERY_OPCODE_WRITE_DESC) {
 		memcpy(ucd_req_ptr + 1, query->descriptor, len);
+		ufshcd_cache_flush_and_invalidate(ucd_req_ptr, 2 * sizeof(*ucd_req_ptr));
+	} else {
+		ufshcd_cache_flush_and_invalidate(ucd_req_ptr, sizeof(*ucd_req_ptr));
+	}
 
 	memset(hba->ucd_rsp_ptr, 0, sizeof(struct utp_upiu_rsp));
+	ufshcd_cache_flush_and_invalidate(hba->ucd_rsp_ptr, sizeof(*hba->ucd_rsp_ptr));
 }
 
 static inline void ufshcd_prepare_utp_nop_upiu(struct ufs_hba *hba)
@@ -781,6 +807,8 @@ static inline void ufshcd_prepare_utp_nop_upiu(struct ufs_hba *hba)
 	ucd_req_ptr->header.dword_2 = 0;
 
 	memset(hba->ucd_rsp_ptr, 0, sizeof(struct utp_upiu_rsp));
+	ufshcd_cache_flush_and_invalidate(ucd_req_ptr, sizeof(*ucd_req_ptr));
+	ufshcd_cache_flush_and_invalidate(hba->ucd_rsp_ptr, sizeof(*hba->ucd_rsp_ptr));
 }
 
 /**
@@ -857,6 +885,8 @@ static inline int ufshcd_get_req_rsp(struct utp_upiu_rsp *ucd_rsp_ptr)
  */
 static inline int ufshcd_get_tr_ocs(struct ufs_hba *hba)
 {
+	/* Invalidate cache before reading DMA response */
+	ufshcd_cache_flush_and_invalidate(hba->utrdl, sizeof(*hba->utrdl));
 	return le32_to_cpu(hba->utrdl->header.dword_2) & MASK_OCS;
 }
 
@@ -933,6 +963,9 @@ static int ufshcd_exec_dev_cmd(struct ufs_hba *hba, enum dev_cmd_type cmd_type,
 		dev_err(hba->dev, "Error in OCS:%d\n", err);
 		return -EINVAL;
 	}
+
+	/* Invalidate cache before reading response UPIU */
+	ufshcd_cache_flush_and_invalidate(hba->ucd_rsp_ptr, sizeof(*hba->ucd_rsp_ptr));
 
 	resp = ufshcd_get_req_rsp(hba->ucd_rsp_ptr);
 	switch (resp) {
@@ -1098,7 +1131,11 @@ static int __ufshcd_query_descriptor(struct ufs_hba *hba,
 		goto out;
 	}
 
-	err = ufshcd_exec_dev_cmd(hba, DEV_CMD_TYPE_QUERY, QUERY_REQ_TIMEOUT);
+	for (int count = 0; count < 3; count++) {
+		err = ufshcd_exec_dev_cmd(hba, DEV_CMD_TYPE_QUERY, QUERY_REQ_TIMEOUT);
+		if (!err)
+			break;
+	}
 
 	if (err) {
 		dev_err(hba->dev, "%s: opcode 0x%.2x for idn %d failed, index %d, err = %d\n",
@@ -1189,6 +1226,16 @@ static void ufshcd_init_desc_sizes(struct ufs_hba *hba)
 				      &hba->desc_size.conf_desc);
 	if (err)
 		hba->desc_size.conf_desc = QUERY_DESC_CONFIGURATION_DEF_SIZE;
+
+#ifdef CONFIG_SPACEMIT_K3_UFS
+	if (hba->desc_size.conf_desc == 0x90) {
+		hba->desc_size.conf_head_desc = 0x10;
+		hba->desc_size.conf_unit_desc = 0x10;
+	} else if (hba->desc_size.conf_desc == 0xE6) {
+		hba->desc_size.conf_head_desc = 0x16;
+		hba->desc_size.conf_unit_desc = 0x1A;
+	}
+#endif
 
 	err = ufshcd_read_desc_length(hba, QUERY_DESC_IDN_UNIT, 0,
 				      &hba->desc_size.unit_desc);
@@ -1406,6 +1453,8 @@ void ufshcd_prepare_utp_scsi_cmd_upiu(struct ufs_hba *hba,
 	memcpy(ucd_req_ptr->sc.cdb, pccb->cmd, cdb_len);
 
 	memset(hba->ucd_rsp_ptr, 0, sizeof(struct utp_upiu_rsp));
+	ufshcd_cache_flush_and_invalidate(ucd_req_ptr, sizeof(*ucd_req_ptr));
+	ufshcd_cache_flush_and_invalidate(hba->ucd_rsp_ptr, sizeof(*hba->ucd_rsp_ptr));
 }
 
 static inline void prepare_prdt_desc(struct ufshcd_sg_entry *entry,
@@ -1427,6 +1476,7 @@ static void prepare_prdt_table(struct ufs_hba *hba, struct scsi_cmd *pccb)
 
 	if (!datalen) {
 		req_desc->prd_table_length = 0;
+		ufshcd_cache_flush_and_invalidate(req_desc, sizeof(*req_desc));
 		return;
 	}
 
@@ -1443,7 +1493,13 @@ static void prepare_prdt_table(struct ufs_hba *hba, struct scsi_cmd *pccb)
 	prepare_prdt_desc(&prd_table[table_length - i - 1], buf, datalen - 1);
 
 	req_desc->prd_table_length = table_length;
+	ufshcd_cache_flush_and_invalidate(prd_table, sizeof(*prd_table) * table_length);
+	ufshcd_cache_flush_and_invalidate(req_desc, sizeof(*req_desc));
 }
+
+/* Static bounce buffer for DMA - must be below 4GB */
+#define UFS_BOUNCE_BUF_SIZE	UFS_MAX_BYTES
+static u8 ufs_bounce_buf[UFS_BOUNCE_BUF_SIZE] __attribute__((aligned(4096), section(".data")));
 
 static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 {
@@ -1452,14 +1508,59 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 	u32 upiu_flags;
 	int ocs, result = 0;
 	u8 scsi_status;
+	u8 *orig_pdata = NULL;
+	int use_bounce = 0;
+
+	/* Check if we need bounce buffer for high addresses */
+	if (pccb->datalen && pccb->pdata) {
+		unsigned long addr = (unsigned long)pccb->pdata;
+		if (addr >= 0x100000000UL) {
+			if (pccb->datalen > UFS_BOUNCE_BUF_SIZE) {
+				dev_err(hba->dev, "data too large for bounce buffer\n");
+				return -EINVAL;
+			}
+			orig_pdata = pccb->pdata;
+			pccb->pdata = ufs_bounce_buf;
+			use_bounce = 1;
+			/* For write operations, copy data to bounce buffer */
+			if (pccb->dma_dir == DMA_TO_DEVICE)
+				memcpy(ufs_bounce_buf, orig_pdata, pccb->datalen);
+		}
+	}
+
+	/* Flush data buffer cache before DMA transfer */
+	if (pccb->datalen && pccb->pdata)
+		ufshcd_cache_flush_and_invalidate(pccb->pdata, pccb->datalen);
 
 	ufshcd_prepare_req_desc_hdr(req_desc, &upiu_flags, pccb->dma_dir);
 	ufshcd_prepare_utp_scsi_cmd_upiu(hba, pccb, upiu_flags);
 	prepare_prdt_table(hba, pccb);
 
-	ufshcd_send_command(hba, TASK_TAG);
+	result = ufshcd_send_command(hba, TASK_TAG);
+	if (result) {
+		if (use_bounce)
+			pccb->pdata = orig_pdata;
+		return result;
+	}
+
+	/* Invalidate cache after DMA transfer for read operations */
+	if (pccb->datalen && pccb->pdata && pccb->dma_dir == DMA_FROM_DEVICE)
+		ufshcd_cache_flush_and_invalidate(pccb->pdata, pccb->datalen);
+
+	/* Copy data back from bounce buffer for read operations */
+	if (use_bounce && pccb->dma_dir == DMA_FROM_DEVICE) {
+		memcpy(orig_pdata, ufs_bounce_buf, pccb->datalen);
+	}
+
+	/* Restore original pdata pointer */
+	if (use_bounce)
+		pccb->pdata = orig_pdata;
 
 	ocs = ufshcd_get_tr_ocs(hba);
+
+	/* Invalidate response UPIU cache before reading */
+	ufshcd_cache_flush_and_invalidate(hba->ucd_rsp_ptr, sizeof(*hba->ucd_rsp_ptr));
+
 	switch (ocs) {
 	case OCS_SUCCESS:
 		result = ufshcd_get_req_rsp(hba->ucd_rsp_ptr);
@@ -1468,8 +1569,13 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 			result = ufshcd_get_rsp_upiu_result(hba->ucd_rsp_ptr);
 
 			scsi_status = result & MASK_SCSI_STATUS;
-			if (scsi_status)
+			/*
+			 * Don't fail on CHECK CONDITION (0x2) - let SCSI layer handle it.
+			 * Only fail on other non-zero status like BUSY, etc.
+			 */
+			if (scsi_status && scsi_status != 0x02) {
 				return -EINVAL;
+			}
 
 			break;
 		case UPIU_TRANSACTION_REJECT_UPIU:
@@ -1503,6 +1609,7 @@ static int ufshcd_read_device_desc(struct ufs_hba *hba, u8 *buf, u32 size)
 	return ufshcd_read_desc(hba, QUERY_DESC_IDN_DEVICE, 0, buf, size);
 }
 
+#if !defined(CONFIG_SPL_BUILD)
 /**
  * ufshcd_read_string_desc - read string descriptor
  *
@@ -1563,6 +1670,7 @@ int ufshcd_read_string_desc(struct ufs_hba *hba, int desc_index,
 out:
 	return err;
 }
+#endif /* !CONFIG_SPL_BUILD */
 
 static int ufs_get_device_desc(struct ufs_hba *hba,
 			       struct ufs_dev_desc *dev_desc)
@@ -1596,6 +1704,7 @@ static int ufs_get_device_desc(struct ufs_hba *hba,
 
 	model_index = desc_buf[DEVICE_DESC_PARAM_PRDCT_NAME];
 
+#if !defined(CONFIG_SPL_BUILD)
 	/* Zero-pad entire buffer for string termination. */
 	memset(desc_buf, 0, buff_len);
 
@@ -1614,6 +1723,11 @@ static int ufs_get_device_desc(struct ufs_hba *hba,
 
 	/* Null terminate the model string */
 	dev_desc->model[MAX_MODEL_LEN] = '\0';
+#else
+	/* Skip reading product name in SPL to save code size */
+	(void)model_index;
+	dev_desc->model[0] = '\0';
+#endif
 
 out:
 	kfree(desc_buf);
@@ -1623,16 +1737,17 @@ out:
 /**
  * ufshcd_get_max_pwr_mode - reads the max power mode negotiated with device
  */
-static int ufshcd_get_max_pwr_mode(struct ufs_hba *hba)
+static __maybe_unused  int ufshcd_get_max_pwr_mode(struct ufs_hba *hba)
 {
 	struct ufs_pa_layer_attr *pwr_info = &hba->max_pwr_info.info;
 
 	if (hba->max_pwr_info.is_valid)
 		return 0;
 
+	/* Use FAST_MODE instead of FASTAUTO_MODE for better compatibility */
 	pwr_info->pwr_tx = FAST_MODE;
 	pwr_info->pwr_rx = FAST_MODE;
-	pwr_info->hs_rate = PA_HS_MODE_B;
+	pwr_info->hs_rate = PA_HS_MODE_A;  /* Rate A */
 
 	/* Get the connected lane count */
 	ufshcd_dme_get(hba, UIC_ARG_MIB(PA_CONNECTEDRXDATALANES),
@@ -1652,6 +1767,7 @@ static int ufshcd_get_max_pwr_mode(struct ufs_hba *hba)
 	 * Then, get the maximum gears of PWM speed.
 	 */
 	ufshcd_dme_get(hba, UIC_ARG_MIB(PA_MAXRXHSGEAR), &pwr_info->gear_rx);
+
 	if (!pwr_info->gear_rx) {
 		ufshcd_dme_get(hba, UIC_ARG_MIB(PA_MAXRXPWMGEAR),
 			       &pwr_info->gear_rx);
@@ -1665,6 +1781,7 @@ static int ufshcd_get_max_pwr_mode(struct ufs_hba *hba)
 
 	ufshcd_dme_peer_get(hba, UIC_ARG_MIB(PA_MAXRXHSGEAR),
 			    &pwr_info->gear_tx);
+
 	if (!pwr_info->gear_tx) {
 		ufshcd_dme_peer_get(hba, UIC_ARG_MIB(PA_MAXRXPWMGEAR),
 				    &pwr_info->gear_tx);
@@ -1680,7 +1797,7 @@ static int ufshcd_get_max_pwr_mode(struct ufs_hba *hba)
 	return 0;
 }
 
-static int ufshcd_change_power_mode(struct ufs_hba *hba,
+static __maybe_unused  int ufshcd_change_power_mode(struct ufs_hba *hba,
 				    struct ufs_pa_layer_attr *pwr_mode)
 {
 	int ret;
@@ -1726,6 +1843,51 @@ static int ufshcd_change_power_mode(struct ufs_hba *hba,
 		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_HSSERIES),
 			       pwr_mode->hs_rate);
 
+#ifdef CONFIG_SPACEMIT_K3_UFS
+	/* Configure DL layer timeout values for HS mode */
+	if (pwr_mode->pwr_rx == FASTAUTO_MODE ||
+	    pwr_mode->pwr_tx == FASTAUTO_MODE ||
+	    pwr_mode->pwr_rx == FAST_MODE ||
+	    pwr_mode->pwr_tx == FAST_MODE) {
+		/*
+		 * Configure L2 AFC timeout values before power mode change
+		 * These must be set BEFORE PA_PWRMode to take effect
+		 */
+
+		/* DL_FC0ProtectionTimeOutVal (0x2041) */
+		ufshcd_dme_set(hba, UIC_ARG_MIB(0x2041), 0x1FFF);
+
+		/* DL_TC0ReplayTimeOutVal (0x2042) */
+		ufshcd_dme_set(hba, UIC_ARG_MIB(0x2042), 0x1FFF);
+
+		/* DL_AFC0ReqTimeOutVal (0x2043) */
+		ufshcd_dme_set(hba, UIC_ARG_MIB(0x2043), 0x1FFF);
+
+		/* DL_AFC0CreditThreshold (0x2044) */
+		ufshcd_dme_set(hba, UIC_ARG_MIB(0x2044), 0x0);
+
+		/* DL_TC0OutAckThreshold (0x2045) */
+		ufshcd_dme_set(hba, UIC_ARG_MIB(0x2045), 0x0);
+
+		/* DL_TC1ReplayTimeOutVal (0x2046) */
+		ufshcd_dme_set(hba, UIC_ARG_MIB(0x2046), 0x1FFF);
+
+		/* DL_AFC1ReqTimeOutVal (0x2047) */
+		ufshcd_dme_set(hba, UIC_ARG_MIB(0x2047), 0x1FFF);
+
+		/* Also configure peer device L2 timers */
+		ufshcd_dme_peer_set(hba, UIC_ARG_MIB(0x2041), 0x1FFF);
+		ufshcd_dme_peer_set(hba, UIC_ARG_MIB(0x2042), 0x1FFF);
+		ufshcd_dme_peer_set(hba, UIC_ARG_MIB(0x2043), 0x1FFF);
+
+		/* Increase PA_TActivate for more stable HS link setup */
+		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TACTIVATE), 0x7F);
+
+		/* Increase PA_Hibern8Time for better hibernate exit */
+		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_HIBERN8TIME), 0x7F);
+	}
+#endif
+
 	ret = ufshcd_uic_change_pwr_mode(hba, pwr_mode->pwr_rx << 4 |
 					 pwr_mode->pwr_tx);
 
@@ -1735,6 +1897,41 @@ static int ufshcd_change_power_mode(struct ufs_hba *hba,
 
 		return ret;
 	}
+
+	/* Add stabilization delay after power mode change */
+	mdelay(50);
+
+#ifdef CONFIG_SPACEMIT_K3_UFS
+	/* K3: Wait for MPHY PLL to re-lock after HS mode switch */
+	{
+		u32 reg_val;
+		u32 timeout = 100000;
+		u32 phy_mng_base = 0x1B00;  /* UFS_ARASAN_PHY_MNG_BASE */
+		u32 pll_lock_bit = BIT(31); /* UFS_MPHY_PU_PLL_LOCK */
+
+		do {
+			reg_val = ufshcd_readl(hba, phy_mng_base + 0x4);
+			if (reg_val & pll_lock_bit)
+				break;
+			udelay(10);
+		} while (--timeout);
+
+		if (!(reg_val & pll_lock_bit)) {
+			dev_err(hba->dev, "MPHY PLL lock timeout after power mode change\n");
+			return -ETIMEDOUT;
+		}
+
+		/*
+		 * NOTE: CDR force enable and extra PHY tuning removed per patch analysis.
+		 * The old driver (ufs-asr.c patch) commented out the CDR code in mphy_init,
+		 * indicating it should NOT be force-enabled after power mode change.
+		 * Re-applying PHY tuning after link is up can cause instability.
+		 */
+
+		/* Final stabilization delay - reduced since no extra tuning */
+		mdelay(20);
+	}
+#endif
 
 	/* Copy new Power Mode to power info */
 	memcpy(&hba->pwr_info, pwr_mode, sizeof(struct ufs_pa_layer_attr));
@@ -1842,11 +2039,25 @@ int ufs_start(struct ufs_hba *hba)
 		return ret;
 	}
 
+	/* DEBUG: Test HS mode with gear 1, lane 1 */
+#if 1
 	if (ufshcd_get_max_pwr_mode(hba)) {
 		dev_err(hba->dev,
 			"%s: Failed getting max supported power mode\n",
 			__func__);
 	} else {
+		/*
+		 * Match Linux kernel settings:
+		 * HS-G3, 2 Lane, Rate B (hs_rate=2)
+		 */
+		hba->max_pwr_info.info.gear_rx = 3;
+		hba->max_pwr_info.info.gear_tx = 3;
+		hba->max_pwr_info.info.lane_rx = 2;
+		hba->max_pwr_info.info.lane_tx = 2;
+		hba->max_pwr_info.info.pwr_rx = FAST_MODE;
+		hba->max_pwr_info.info.pwr_tx = FAST_MODE;
+		hba->max_pwr_info.info.hs_rate = PA_HS_MODE_B;
+
 		ret = ufshcd_change_power_mode(hba, &hba->max_pwr_info.info);
 		if (ret) {
 			dev_err(hba->dev, "%s: Failed setting power mode, err = %d\n",
@@ -1855,9 +2066,11 @@ int ufs_start(struct ufs_hba *hba)
 			return ret;
 		}
 
-		printf("Device at %s up at:", hba->dev->name);
 		ufshcd_print_pwr_info(hba);
 	}
+#else
+	ufshcd_print_pwr_info(hba);
+#endif
 
 	return 0;
 }
@@ -1957,12 +2170,19 @@ int ufs_probe(void)
 {
 	struct udevice *dev;
 	int ret, i;
+	int found = 0;
 
 	for (i = 0;; i++) {
 		ret = uclass_get_device(UCLASS_UFS, i, &dev);
 		if (ret == -ENODEV)
 			break;
+		if (ret)
+			return ret;
+		found++;
 	}
+
+	if (!found)
+		return -ENODEV;
 
 	return 0;
 }

@@ -976,13 +976,13 @@
 			pr-mem-base1 = <0xCAC8C000>;
 
 			/* Virtual-wire GPIO mapping configuration */
-			vw-gpio-mapping = <0 0x80>,
-							<1 0x81>,
-							<2 0x82>,
-							<3 0x83>;
+			/* vw-gpio-mapping = <0 0x80>,             */
+			/* 				<1 0x81>,                  */
+			/* 				<2 0x82>,                  */
+			/* 				<3 0x83>;                  */
 
 			/* eSPI Master configuration */
-			operating-frequency = <25>;   /* 25MHz (will negotiate with slave) */
+			operating-frequency = <20>;   /* 20MHz (will negotiate with slave) */
 			io-mode = "single";           /* "single", "dual", or "quad" */
 			alert-mode = "io1";           /* "pin" or "io1" */
 			alert-type = "open-drain";    /* "open-drain" or "push-pull" */
@@ -1003,11 +1003,13 @@
 			status = "disabled";
 		};
 
-		ufs: ufs@c0a80000 {
+		ufs: ufs@c0e00000 {
 			compatible = "spacemit,k3-ufshci";
-			reg = <0x0 0xc0a80000 0x0 0x30000>;
+			reg = <0x0 0xc0e00000 0x0 0x30000>;
 			clocks = <&ccu CLK_UFS_ACLK>;
 			clock-names = "aclk";
+			resets = <&reset RESET_UFS_ACLK>;
+			reset-names = "aclk_reset";
 			status = "disabled";
 		};
 

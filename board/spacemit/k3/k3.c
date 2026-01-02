@@ -347,8 +347,8 @@ int board_late_init(void)
 #ifdef CONFIG_ESPI
 	ret = uclass_probe_all(UCLASS_ESPI);
 	if (ret || !spacemit_espi_is_ready()) {
-		pr_warn("eSPI not ready, disabling kernel EC driver\n");
-		run_command("setenv bootargs ${bootargs} cros_ec_espi.disable=1", 0);
+		printf("eSPI not ready, disabling kernel EC driver\n");
+		env_set("espi_disabled", "1");
 	}
 #endif
 
@@ -548,6 +548,11 @@ void setenv_boot_mode(void)
 	case BOOT_MODE_SD:
 		env_set("boot_device", "mmc");
 		env_set("boot_devnum", simple_itoa(MMC_DEV_SD));
+		break;
+	case BOOT_MODE_UFS:
+		env_set("boot_device", "ufs");
+		env_set("boot_devnum", "0");
+		env_set("bootfs_devname", "scsi");
 		break;
 	case BOOT_MODE_USB:
 		// for fastboot image download and run test

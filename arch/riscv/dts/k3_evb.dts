@@ -206,6 +206,10 @@
 	};
 };
 
+&ufs {
+	status = "okay";
+};
+
 &pinctrl {
 	pinctrl-single,gpio-range = <
 		&range GPIO_86  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_DS4)

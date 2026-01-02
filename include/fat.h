@@ -182,6 +182,7 @@ typedef struct {
 	__u32	root_cluster;	/* First cluster of root dir for FAT32 */
 	u32	total_sect;	/* Number of sectors */
 	int	fats;		/* Number of FATs */
+	__u32	blksz;		/* Device block size in bytes */
 } fsdata;
 
 struct fat_itr;

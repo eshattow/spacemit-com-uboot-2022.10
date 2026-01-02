@@ -10,6 +10,7 @@
 #include <fb_mmc.h>
 #include <fb_nand.h>
 #include <fb_mtd.h>
+#include <fb_blk.h>
 #include <fs.h>
 #include <part.h>
 #include <version.h>
@@ -147,6 +148,18 @@ static int getvar_get_part_info(const char *part_name, char *response,
 						response);
 		if (r >= 0 && size)
 			*size = part_info.size * part_info.blksz;
+		break;
+#endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_SUPPORT_BLOCK_DEV)
+	case BOOT_MODE_UFS:
+		struct blk_desc *blk_dev_desc;
+		struct disk_partition blk_part_info;
+
+		r = fastboot_blk_get_part_info(part_name, &blk_dev_desc, &blk_part_info,
+						response);
+		if (r >= 0 && size)
+			*size = blk_part_info.size * blk_part_info.blksz;
 		break;
 #endif
 	default:
@@ -294,6 +307,7 @@ static void getvar_blk_size(char *var_parameter, char *response)
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
 	case BOOT_MODE_NOR:
+	case BOOT_MODE_UFS:
 		if (get_available_blk_dev(&blk_name, &blk_index)){
 			fastboot_fail("no block device", response);
 			return;

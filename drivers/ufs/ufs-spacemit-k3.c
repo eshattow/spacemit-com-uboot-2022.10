@@ -7,9 +7,12 @@
 
 #include <clk.h>
 #include <dm.h>
+#include <reset.h>
+#include <scsi.h>
 #include <ufs.h>
 #include <asm/io.h>
 #include <dm/device_compat.h>
+#include <dm/device-internal.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -20,6 +23,7 @@
 
 struct spacemit_k3_ufs_priv {
 	struct clk aclk;
+	struct reset_ctl reset;
 	u32 phy_mng_base;
 	u32 atop_base;
 };
@@ -127,21 +131,31 @@ static void spacemit_k3_ufs_clk_enable(struct spacemit_k3_ufs_priv *priv)
 {
 	int ret;
 
+	/* First deassert reset */
+	ret = reset_deassert(&priv->reset);
+	if (ret) {
+		pr_err("ufs: fail to deassert reset, ret=%d\n", ret);
+		return;
+	}
+
+	/* Then enable clock */
 	ret = clk_enable(&priv->aclk);
 	if (ret) {
 		pr_err("ufs: fail to enable ufs aclk, ret=%d\n", ret);
 		return;
 	}
 
-	/* HYNIX1 phone need delay*/
+	/* HYNIX1 phone need delay */
 	mdelay(5);
 }
 
 static void spacemit_k3_ufs_clk_disable(struct spacemit_k3_ufs_priv *priv)
 {
-	/*disable ufs aclk*/
+	/* Disable clock first */
 	clk_disable(&priv->aclk);
-	pr_info("ufs: clk disable ufs aclk\n");
+
+	/* Then assert reset */
+	reset_assert(&priv->reset);
 }
 
 static int __maybe_unused debug_print_desc(struct udevice *dev, enum desc_idn idn)
@@ -184,16 +198,16 @@ static int __maybe_unused debug_print_desc(struct udevice *dev, enum desc_idn id
 			return ret;
 		}
 
-		pr_info("ufs: debug print descriptor for idn %d\n", idn);
+		debug("ufs: debug print descriptor for idn %d\n", idn);
 
 		for (int i = 0; i < hba->desc_size.conf_desc; i++) {
-			pr_info("[%x]:%x  ", i, desc_buf[i]);
+			debug("[%x]:%x  ", i, desc_buf[i]);
 			if ((i + 1) % 8 == 0) {
-				pr_info("\n");
+				debug("\n");
 			}
 		}
 	} else {
-		printf("ufs: debug print descriptor for idn %d\n", idn);
+		debug("ufs: debug print descriptor for idn %d\n", idn);
 		for (int i = 0; i < 8; i++) {
 			ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC, idn,
 							    i, 0, desc_buf, &desc_size);
@@ -203,11 +217,11 @@ static int __maybe_unused debug_print_desc(struct udevice *dev, enum desc_idn id
 				return ret;
 			}
 
-			pr_info("ufs: unit %d descriptor\n", i);
+			debug("ufs: unit %d descriptor\n", i);
 			for (int i = 0; i < hba->desc_size.conf_desc; i++) {
-				pr_info("[%x]:%x  ", i, desc_buf[i]);
+				debug("[%x]:%x  ", i, desc_buf[i]);
 				if ((i + 1) % 8 == 0) {
-					pr_info("\n");
+					debug("\n");
 				}
 			}
 		}
@@ -217,114 +231,130 @@ out:
 	return ret;
 }
 
-static int __maybe_unused spacemit_k3_ufs_config_lun(struct udevice *dev)
+static __maybe_unused int spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 {
 	u8 *desc_buf;
 	uint64_t qTotalRawDeviceCapacity;
-	uint32_t dSegmentSize, boot_lun_size, user_lun_size;
-	uint8_t bAllocationUnitSize, bMaxNumberLU;
+	uint32_t dSegmentSize, total_lun_size;
+	uint8_t bAllocationUnitSize;
 	int ret;
 	uint32_t alloc_unit_bytes;
 	struct ufs_hba *hba = dev_get_uclass_priv(dev);
+	int enabled_lun_count = 0;
+	int i;
 
-	desc_buf = kmalloc(hba->desc_size.geom_desc, GFP_KERNEL);
-	if (!desc_buf) {
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	/*read ufs size info from greometry*/
-	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
-					    QUERY_DESC_IDN_GEOMETRY, 0, 0, desc_buf,
-					    &hba->desc_size.geom_desc);
-	qTotalRawDeviceCapacity = get_unaligned_be64(&desc_buf[GEO_DESC_PARAM_TOTAL_RAW_DEV_CAP]);
-	dSegmentSize = get_unaligned_be32(&desc_buf[GEO_DESC_PARAM_SEG_SIZE]);
-	bAllocationUnitSize = desc_buf[GEO_DESC_PARAM_ALLOC_UNIT_SIZE];
-	bMaxNumberLU = desc_buf[GEO_DESC_PARAM_MAX_NUM_LUN];
-	pr_info("ufs: qTotalRawDeviceCapacity: %llu \ndSegmentSize:%u\n bAllocationUnitSize:%d\n "
-		"bMaxNumberLU%x\n",
-		qTotalRawDeviceCapacity, dSegmentSize, bAllocationUnitSize, bMaxNumberLU);
-	kfree(desc_buf);
-
-	/*
-	 * 1.set lu0, lu1, lu2 enable
-	 * 2.set lu0-lu7 logicblocksize = 4k, bdataliability = 0x1, bprovisiontype = 0x3
-	 */
+	/* First read configuration descriptor to check current LUN configuration */
 	desc_buf = kmalloc(hba->desc_size.conf_desc, GFP_KERNEL);
-	if (!desc_buf) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (!desc_buf)
+		return -ENOMEM;
 
 	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
 					    QUERY_DESC_IDN_CONFIGURATION, 0, 0, desc_buf,
 					    &hba->desc_size.conf_desc);
 	if (ret) {
-		dev_err(hba->dev, "%s:FAILed read descriptor%d\n", __func__, ret);
-
+		dev_err(hba->dev, "%s: Failed to read config descriptor: %d\n", __func__, ret);
+		kfree(desc_buf);
 		return ret;
 	}
 
-	desc_buf[CONFIG_DESC_HEADER_PARAM_BOOT_EN] = 0x0;
-	for (int i = 0; i < 8; i++) {
-		if (i < 3)
-			desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i +
-				 CONFIG_DESC_UNIT_PARAM_LU_EN] = 0x1;
-		else
-			desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i +
-				 CONFIG_DESC_UNIT_PARAM_LU_EN] = 0x0;
-		desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i +
-			 CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID] = 0x0;
-		desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i +
-			 CONFIG_DESC_UNIT_PARAM_LU_WRI_PRO] = 0x0;
-		desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i +
-			 CONFIG_DESC_UNIT_PARAM_MEM_TYPE] = 0x0;
-		memset(&desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i +
-				 CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT],
-		       0x0, 4);
-		desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i +
-			 CONFIG_DESC_UNIT_PARAM_DATA_RELY] = 0x1;
-		desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i +
-			 CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE] = 0xC;
-		desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i +
-			 CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE] = 0x3;
+	/* Count enabled LUNs */
+	for (i = 0; i < 8; i++) {
+		int offset = hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i;
+		if (desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] == 0x1)
+			enabled_lun_count++;
 	}
 
-	/*
-	 * 3.set lun0:32M, lu1:32M, lu2:total_cap-64M
-	 */
-	alloc_unit_bytes = dSegmentSize * bAllocationUnitSize * UFS_LOGICAL_BLOCK_SIZE;
-	boot_lun_size =
-		((UFS_BOOT_LU_SIZE * 1024 * 1024) / alloc_unit_bytes);
-	user_lun_size = (((qTotalRawDeviceCapacity * UFS_LOGICAL_BLOCK_SIZE) -
-			 (UFS_BOOT_LU_SIZE * 2 * 1024 * 1024)) /
-			alloc_unit_bytes);
+	debug("ufs: Current configuration has %d enabled LUN(s)\n", enabled_lun_count);
 
-	put_unaligned_be32(
-		boot_lun_size,
-		&desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * 0 +
-			  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
-	put_unaligned_be32(
-		boot_lun_size,
-		&desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * 1 +
-			  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
-	put_unaligned_be32(
-		user_lun_size,
-		&desc_buf[hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * 2 +
-			  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
-
-	pr_info("ufs: boot_lun_size:0x%x, user_lun_size:0x%x\n", boot_lun_size, user_lun_size);
-
-	if (ret) {
-		dev_err(hba->dev, "%s:!!!FAILed write descriptor%d\n", __func__, ret);
-
-		return ret;
+	/* If already single LUN, no need to reconfigure */
+	if (enabled_lun_count == 1) {
+		kfree(desc_buf);
+		return 0;
 	}
-	pr_info("ufs: ufs_config_lun done\n");
 
-out:
 	kfree(desc_buf);
-	return ret;
+
+	/* Need to reconfigure - read geometry descriptor for capacity info */
+	desc_buf = kmalloc(hba->desc_size.geom_desc, GFP_KERNEL);
+	if (!desc_buf)
+		return -ENOMEM;
+
+	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
+					    QUERY_DESC_IDN_GEOMETRY, 0, 0, desc_buf,
+					    &hba->desc_size.geom_desc);
+	if (ret) {
+		dev_err(hba->dev, "%s: Failed to read geometry descriptor: %d\n", __func__, ret);
+		kfree(desc_buf);
+		return ret;
+	}
+
+	qTotalRawDeviceCapacity = get_unaligned_be64(&desc_buf[GEO_DESC_PARAM_TOTAL_RAW_DEV_CAP]);
+	dSegmentSize = get_unaligned_be32(&desc_buf[GEO_DESC_PARAM_SEG_SIZE]);
+	bAllocationUnitSize = desc_buf[GEO_DESC_PARAM_ALLOC_UNIT_SIZE];
+	debug("ufs: Total capacity: %llu sectors, Segment size: %u, Alloc unit size: %d\n",
+		qTotalRawDeviceCapacity, dSegmentSize, bAllocationUnitSize);
+	kfree(desc_buf);
+
+	/* Read and modify configuration descriptor */
+	desc_buf = kmalloc(hba->desc_size.conf_desc, GFP_KERNEL);
+	if (!desc_buf)
+		return -ENOMEM;
+
+	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
+					    QUERY_DESC_IDN_CONFIGURATION, 0, 0, desc_buf,
+					    &hba->desc_size.conf_desc);
+	if (ret) {
+		dev_err(hba->dev, "%s: Failed to read config descriptor: %d\n", __func__, ret);
+		kfree(desc_buf);
+		return ret;
+	}
+
+	/* Disable boot LUN */
+	desc_buf[CONFIG_DESC_HEADER_PARAM_BOOT_EN] = 0x0;
+
+	/* Calculate total capacity in allocation units */
+	alloc_unit_bytes = dSegmentSize * bAllocationUnitSize * UFS_LOGICAL_BLOCK_SIZE;
+	total_lun_size = (qTotalRawDeviceCapacity * UFS_LOGICAL_BLOCK_SIZE) / alloc_unit_bytes;
+
+	/* Configure all 8 LUN slots */
+	for (i = 0; i < 8; i++) {
+		int offset = hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i;
+
+		if (i == 0) {
+			/* LU0: Enable with full capacity */
+			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] = 0x1;
+			put_unaligned_be32(total_lun_size,
+					   &desc_buf[offset + CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+		} else {
+			/* LU1-LU7: Disable */
+			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] = 0x0;
+			put_unaligned_be32(0, &desc_buf[offset + CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+		}
+
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID] = 0x0;
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_WRI_PRO] = 0x0;
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_MEM_TYPE] = 0x0;
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_DATA_RELY] = 0x1;
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE] = 0x0C; /* 4KB */
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE] = 0x3;
+	}
+
+	debug("ufs: Reconfiguring to single LUN with size: 0x%x allocation units\n", total_lun_size);
+
+	/* Write configuration descriptor back to device */
+	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_WRITE_DESC,
+					    QUERY_DESC_IDN_CONFIGURATION, 0, 0, desc_buf,
+					    &hba->desc_size.conf_desc);
+	if (ret) {
+		dev_err(hba->dev, "%s: Failed to write config descriptor: %d\n", __func__, ret);
+		kfree(desc_buf);
+		return ret;
+	}
+
+	dev_info(hba->dev, "Single LUN configuration complete! Power cycle required.\n");
+
+	kfree(desc_buf);
+	return 0;
 }
 
 static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
@@ -338,15 +368,15 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 	mdelay(1);
 
 	/* power up all */
-	ufshcd_writel(hba, 0x07f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
+	ufshcd_writel(hba, 0x87f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
 	mdelay(1);
 
 	/* asserted ana_rx_hb8_reset */
-	ufshcd_writel(hba, 0x37f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
+	ufshcd_writel(hba, 0xB7f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
 	mdelay(1);
 
 	/* deasserted ana_rx_hb8_reset */
-	ufshcd_writel(hba, 0x07f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
+	ufshcd_writel(hba, 0x87f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
 	mdelay(1);
 
 	/* deasserted ufs device reset & refer clk output enable */
@@ -373,7 +403,8 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 			pr_debug("ufs: MPHY Pll was locked\n");
 	}
 
-	/* force cdr_pi_on, always enable rx_pck20 */
+	/* force cdr_pi_on, always enable rx_pck20 - commented out per patch */
+#if 0
 	ufshcd_writel(hba, 0x1, priv->phy_mng_base + 0x08);
 	udelay(20);
 
@@ -382,6 +413,7 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 
 	ufshcd_writel(hba, 0x0, priv->phy_mng_base + 0x08);
 	udelay(20);
+#endif
 
 	/* HYNIX1 phone: extra settle time after MPHY tuning */
 	mdelay(5);
@@ -447,8 +479,8 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 		pr_err("Writing PA_TXMK2EXTENSION error \n");
 	}
 
-	/* PA_PEERSCRAMBLING */
-	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_PEERSCRAMBLING), 0x1);
+	/* PA_PEERSCRAMBLING - changed from 0x1 to 0x0 per patch */
+	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_PEERSCRAMBLING), 0x0);
 	if (err) {
 		pr_err("Writing PA_PEERSCRAMBLING error \n");
 	}
@@ -475,14 +507,14 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 		pr_err("Writing PA_PEER_TX_LCC_ENABLE error \n");
 	}
 
-	/* PA_SCRAMBLING */
+	/* PA_SCRAMBLING - keep 0x1 for silicon platform (only PA_PEERSCRAMBLING was changed to 0x0) */
 	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_SCRAMBLING), 0x1);
 	if (err) {
 		pr_err("Writing PA_SCRAMBLING error \n");
 	}
 
-	/* PA_GRANULARITY */
-	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_GRANULARITY), 0x1);
+	/* PA_GRANULARITY - changed from 0x1 to 0x6 per patch */
+	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_GRANULARITY), 0x6);
 	if (err) {
 		pr_err("Writing PA_GRANULARITY error \n");
 	}
@@ -598,8 +630,8 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 
 	pr_debug("ufs: ufs_spacemit_k3_uniprov1p6_init done.\n");
 
-	/* program controller timing registers for 409MHz SYS1CLK */
-	real_sysclk = UFS_SYS1CLK_1US_409MHZ;
+	/* program controller timing registers - changed from 409 to 499 per patch */
+	real_sysclk = 499;
 	ufshcd_writel(hba, real_sysclk, UFS_SYS1CLK_1US_REG);
 
 	reg_val = UFS_TX_SYMBOL_CLK_NS_US_409MHZ;
@@ -760,8 +792,12 @@ static const struct ufs_hba_ops spacemit_k3_ufs_vops = {
 static int spacemit_k3_ufs_pltfm_bind(struct udevice *dev)
 {
 	struct udevice *scsi_dev;
-	pr_info("ufs: call spacemit_k3_ufs_pltfm_bind\n");
-	return ufs_scsi_bind(dev, &scsi_dev);
+	int ret;
+
+	ret = ufs_scsi_bind(dev, &scsi_dev);
+	if (ret)
+		pr_err("ufs: ufs_scsi_bind failed: %d\n", ret);
+	return ret;
 }
 
 static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
@@ -769,6 +805,8 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
 	struct ufs_hba *hba = dev_get_uclass_priv(dev);
 	struct ufs_hba_ops *hba_ops = (struct ufs_hba_ops *) dev->driver_data;
+	struct udevice *scsi_dev;
+	struct scsi_plat *scsi_plat;
 	int ret;
 	int retries;
 
@@ -785,7 +823,19 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 		spacemit_k3_ufs_clk_disable(priv);
 		pr_err("ufs host probe failed:%d\n", ret);
 	} else {
-		pr_info("ufs: ufs host probed.\n");
+#if !defined(CONFIG_SPL_BUILD)
+		/* Check and configure single LUN if needed - skip in SPL */
+		spacemit_k3_ufs_check_and_config_single_lun(dev);
+#endif
+		/* Limit to single LUN - use only the main user data partition */
+		device_find_first_child(dev, &scsi_dev);
+		if (scsi_dev) {
+			scsi_plat = dev_get_uclass_plat(scsi_dev);
+			scsi_plat->max_id = 1;  /* UFS has single target */
+			scsi_plat->max_lun = 1; /* Use only main LUN */
+		} else {
+			pr_err("ufs: scsi_dev child not found!\n");
+		}
 	}
 
 	return ret;
@@ -815,6 +865,12 @@ static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 		return ret;
 	}
 
+	ret = reset_get_by_index(dev, 0, &priv->reset);
+	if (ret) {
+		dev_err(dev, "ufs: failed to get reset, ret=%d\n", ret);
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -822,7 +878,6 @@ static int spacemit_k3_ufs_pltfm_remove(struct udevice *dev)
 {
 	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
 
-	pr_info("ufs: spacemit_k3_ufs_pltfm_remove\n");
 	spacemit_k3_ufs_clk_disable(priv);
 
 	return 0;

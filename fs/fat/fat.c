@@ -39,6 +39,14 @@ static void downcase(char *str, size_t len)
 static struct blk_desc *cur_dev;
 static struct disk_partition cur_part_info;
 
+/*
+ * FAT sector size tracking for sector-to-block translation.
+ * When FAT sector size (e.g., 512B) is smaller than device block size
+ * (e.g., 4096B for UFS), we need to translate FAT sector numbers to
+ * device block numbers.
+ */
+static __u16 fat_sect_size;
+
 #define DOS_BOOT_MAGIC_OFFSET	0x1fe
 #define DOS_FS_TYPE_OFFSET	0x36
 #define DOS_FS32_TYPE_OFFSET	0x52
@@ -46,16 +54,92 @@ static struct disk_partition cur_part_info;
 static int disk_read(__u32 block, __u32 nr_blocks, void *buf)
 {
 	ulong ret;
+	__u32 blksz;
 
 	if (!cur_dev)
 		return -1;
 
-	ret = blk_dread(cur_dev, cur_part_info.start + block, nr_blocks, buf);
+	blksz = cur_part_info.blksz;
 
-	if (ret != nr_blocks)
-		return -1;
+	/*
+	 * If FAT sector size is not set yet (during initial boot sector read)
+	 * or matches device block size, read directly without translation.
+	 */
+	if (fat_sect_size == 0 || fat_sect_size == blksz) {
+		ret = blk_dread(cur_dev, cur_part_info.start + block,
+				nr_blocks, buf);
+		if (ret != nr_blocks)
+			return -1;
+		return ret;
+	}
 
-	return ret;
+	/*
+	 * FAT sector size is smaller than device block size.
+	 * Translate FAT sector numbers to device blocks and read in chunks
+	 * to avoid huge memory allocation for large files.
+	 */
+	{
+		__u32 byte_offset = block * fat_sect_size;
+		__u32 byte_len = nr_blocks * fat_sect_size;
+		__u32 dev_block_start = byte_offset / blksz;
+
+		/* Optimization: if aligned, read directly to output buffer */
+		if ((byte_offset % blksz == 0) && (byte_len % blksz == 0)) {
+			__u32 dev_nr_blocks = byte_len / blksz;
+
+			ret = blk_dread(cur_dev, cur_part_info.start + dev_block_start,
+					dev_nr_blocks, buf);
+			if (ret != dev_nr_blocks)
+				return -1;
+			return nr_blocks;
+		}
+
+		/*
+		 * Unaligned case: read in chunks using a temporary buffer.
+		 * Use 64KB chunks to balance memory usage and performance.
+		 */
+		{
+			#define CHUNK_SIZE	(64 * 1024)
+			__u32 chunk_blocks = CHUNK_SIZE / blksz;
+			__u8 *tmpbuf = malloc_cache_aligned(CHUNK_SIZE);
+
+			if (!tmpbuf)
+				return -1;
+
+			while (byte_len > 0) {
+				__u32 cur_dev_block = byte_offset / blksz;
+				__u32 offset_in_block = byte_offset % blksz;
+				__u32 dev_blocks_to_read;
+				__u32 bytes_to_copy;
+
+				dev_blocks_to_read = (offset_in_block + byte_len + blksz - 1) / blksz;
+				if (dev_blocks_to_read > chunk_blocks)
+					dev_blocks_to_read = chunk_blocks;
+
+				ret = blk_dread(cur_dev, cur_part_info.start + cur_dev_block,
+						dev_blocks_to_read, tmpbuf);
+				if (ret != dev_blocks_to_read) {
+					free(tmpbuf);
+					return -1;
+				}
+
+				bytes_to_copy = dev_blocks_to_read * blksz - offset_in_block;
+				if (bytes_to_copy > byte_len)
+					bytes_to_copy = byte_len;
+
+				memcpy(buf, tmpbuf + offset_in_block, bytes_to_copy);
+
+				buf = (__u8 *)buf + bytes_to_copy;
+				byte_offset += bytes_to_copy;
+				byte_len -= bytes_to_copy;
+			}
+
+			free(tmpbuf);
+			#undef CHUNK_SIZE
+		}
+
+		return nr_blocks;
+	}
 }
 
 int fat_set_blk_dev(struct blk_desc *dev_desc, struct disk_partition *info)
@@ -64,6 +148,9 @@ int fat_set_blk_dev(struct blk_desc *dev_desc, struct disk_partition *info)
 
 	cur_dev = dev_desc;
 	cur_part_info = *info;
+
+	/* Reset FAT sector size - will be set in get_fs_info() */
+	fat_sect_size = 0;
 
 	/* Make sure it has a valid FAT header */
 	if (disk_read(0, 1, buffer) != 1) {
@@ -90,12 +177,14 @@ int fat_set_blk_dev(struct blk_desc *dev_desc, struct disk_partition *info)
 int fat_register_device(struct blk_desc *dev_desc, int part_no)
 {
 	struct disk_partition info;
+	int ret;
 
 	/* First close any currently found FAT filesystem */
 	cur_dev = NULL;
 
 	/* Read the partition table, if present */
-	if (part_get_info(dev_desc, part_no, &info)) {
+	ret = part_get_info(dev_desc, part_no, &info);
+	if (ret) {
 		if (part_no != 0) {
 			printf("** Partition %d not valid on device %d **\n",
 					part_no, dev_desc->devnum);
@@ -585,9 +674,32 @@ static int get_fs_info(fsdata *mydata)
 
 	mydata->sect_size = (bs.sector_size[1] << 8) + bs.sector_size[0];
 	mydata->clust_size = bs.cluster_size;
-	if (mydata->sect_size != cur_part_info.blksz) {
-		printf("Error: FAT sector size mismatch (fs=%hu, dev=%lu)\n",
-				mydata->sect_size, cur_part_info.blksz);
+	mydata->blksz = cur_part_info.blksz;
+
+	/*
+	 * Set global FAT sector size for sector-to-block translation in disk_read().
+	 * This enables reading FAT filesystems with 512-byte sectors from devices
+	 * with larger block sizes (e.g., 4096-byte UFS blocks).
+	 */
+	fat_sect_size = mydata->sect_size;
+
+	/*
+	 * Allow FAT sector size to be smaller than or equal to device block size.
+	 * This supports reading FAT with 512-byte sectors from UFS with 4096-byte blocks.
+	 * Only reject if FAT sector size is larger than device block size or invalid.
+	 */
+	if (mydata->sect_size > cur_part_info.blksz) {
+		printf("Error: FAT sector size (%u) larger than device block size (%lu)\n",
+			mydata->sect_size, cur_part_info.blksz);
+		return -1;
+	}
+	if (mydata->sect_size == 0 || (mydata->sect_size & (mydata->sect_size - 1))) {
+		printf("Error: Invalid FAT sector size: %u\n", mydata->sect_size);
+		return -1;
+	}
+	if (cur_part_info.blksz % mydata->sect_size != 0) {
+		printf("Error: Device block size (%lu) not a multiple of FAT sector size (%u)\n",
+			cur_part_info.blksz, mydata->sect_size);
 		return -1;
 	}
 	if (mydata->clust_size == 0) {

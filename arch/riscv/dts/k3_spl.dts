@@ -287,6 +287,17 @@
 			};
 		};
 
+		ufs: ufs@c0e00000 {
+			compatible = "spacemit,k3-ufshci";
+			reg = <0x0 0xc0e00000 0x0 0x30000>;
+			clocks = <&ccu CLK_UFS_ACLK>;
+			clock-names = "aclk";
+			resets = <&reset RESET_UFS_ACLK>;
+			reset-names = "aclk_reset";
+			status = "okay";
+			u-boot,dm-spl;
+		};
+
 		efuse: fuse@f0702800 {
 			u-boot,dm-spl;
 			compatible = "spacemit,k3-efuse";

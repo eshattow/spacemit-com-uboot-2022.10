@@ -45,9 +45,22 @@ static int do_get_part_info(struct blk_desc **dev_desc, const char *name,
 		ret = part_get_info_by_name(*dev_desc, name, info);
 		if (ret >= 0)
 			return ret;
+
+		/*
+		 * Partition not found. If part_type is already valid (non-zero),
+		 * just list partitions for debug. Only force re-init if part_type is 0.
+		 */
+		if ((*dev_desc)->part_type == 0) {
+			/* part_type is unknown, try to detect it */
+			part_init(*dev_desc);
+
+			ret = part_get_info_by_name(*dev_desc, name, info);
+			if (ret >= 0)
+				return ret;
+		}
 	}
 
-	printf("has not define block device name \n");
+	pr_err("partition '%s' not found on %s\n", name, blk_dev);
 	return ret;
 }
 
