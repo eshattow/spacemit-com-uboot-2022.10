@@ -435,20 +435,28 @@ static int spacemit_espi_negotiate_config(struct spacemit_espi_priv *priv)
 	u32 status;
 	u32 slave_gen_caps = 0;
 	u32 negotiated_config = 0;
+	int retry;
+	int ret;
 
 	debug("Starting eSPI configuration negotiation\n");
-	/* Step 1: Get slave general capabilities */
-	espi_get_config(ESPI_SLAVE_GEN_CFG);
-	if (espi_poll_status(&status, ESPI_POLL_DNCMD) == 0) {
-		if (status & ESPI_DNCMD_INT) {
+	/* Step 1: Get slave general capabilities with retry */
+	for (retry = 0; retry < 5; retry++) {
+		espi_get_config(ESPI_SLAVE_GEN_CFG);
+		ret = espi_poll_status(&status, ESPI_POLL_DNCMD);
+		if (ret == 0 && (status & ESPI_DNCMD_INT)) {
 			u8 header[4];
 			espi_hw_get_config_rsp(ESPI_CMD_GET_CONFIGURATION, 4, header, 0, NULL);
 			slave_gen_caps = MAKELONG(MAKEWORD(header[0], header[1]),
 						  MAKEWORD(header[2], header[3]));
 			pr_info("Slave general capabilities: 0x%08x\n", slave_gen_caps);
+			break;
 		}
-	} else {
-		debug("Failed to get slave general capabilities\n");
+		debug("Retry %d: Failed to get slave capabilities, waiting...\n", retry + 1);
+		mdelay(10);  /* Brief delay before retry - poll already has 50ms timeout */
+	}
+
+	if (retry >= 5) {
+		debug("Failed to get slave general capabilities after retries\n");
 		return -ETIMEDOUT;
 	}
 
@@ -484,6 +492,8 @@ static int espi_basic_hw_init(struct spacemit_espi_priv *priv)
 	espi_master_init(priv->cfg_base);
 	/* Send initial reset to prepare for negotiation */
 	espi_inband_reset();
+	/* Brief delay for reset signal to propagate */
+	udelay(1000);
 	return 0;
 }
 
