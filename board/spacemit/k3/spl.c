@@ -296,6 +296,11 @@ static void spl_load_env(void)
 		loc = ENVL_MTD;
 		break;
 #endif
+#ifdef CONFIG_ENV_IS_IN_UFS
+	case BOOT_MODE_UFS:
+		loc = ENVL_UFS;
+		break;
+#endif
 	default:
 		return;
 	}

@@ -242,6 +242,31 @@ config ENV_IS_IN_MMC
 	  This value is also in units of bytes, but must also be aligned to
 	  an MMC sector boundary.
 
+config ENV_IS_IN_UFS
+	bool "Environment in a UFS device"
+	depends on !CHAIN_OF_TRUST
+	depends on SCSI
+	help
+	  Define this if you have a UFS device which you want to use for the
+	  environment.
+
+	  CONFIG_SYS_UFS_ENV_DEV:
+
+	  Specifies which UFS device the environment is stored in.
+
+	  CONFIG_ENV_OFFSET:
+	  CONFIG_ENV_SIZE:
+
+	  These two #defines specify the offset and size of the environment
+	  area within the specified UFS device.
+
+config SYS_UFS_ENV_DEV
+	int "UFS device number"
+	depends on ENV_IS_IN_UFS
+	default 0
+	help
+	  UFS device number on the platform where the environment is stored.
+
 config ENV_IS_IN_NAND
 	bool "Environment in a NAND device"
 	depends on !CHAIN_OF_TRUST && !ENV_IS_IN_SPI_FLASH && !ENV_IS_IN_MTD
@@ -583,7 +608,7 @@ config ENV_ADDR_REDUND
 config ENV_OFFSET
 	hex "Environment offset"
 	depends on ENV_IS_IN_EEPROM || ENV_IS_IN_MMC || ENV_IS_IN_NAND || \
-		    ENV_IS_IN_SPI_FLASH || ENV_IS_IN_MTD
+		    ENV_IS_IN_SPI_FLASH || ENV_IS_IN_MTD || ENV_IS_IN_UFS
 	default 0x80000 if ENV_IS_IN_MTD
 	default 0x3f8000 if ARCH_ROCKCHIP && ENV_IS_IN_MMC
 	default 0x140000 if ARCH_ROCKCHIP && ENV_IS_IN_SPI_FLASH
@@ -601,7 +626,7 @@ config ENV_OFFSET
 config ENV_OFFSET_REDUND
 	hex "Redundant environment offset"
 	depends on (ENV_IS_IN_EEPROM || ENV_IS_IN_MMC || ENV_IS_IN_NAND || \
-		    ENV_IS_IN_SPI_FLASH || ENV_IS_IN_MTD) && SYS_REDUNDAND_ENVIRONMENT
+		    ENV_IS_IN_SPI_FLASH || ENV_IS_IN_MTD || ENV_IS_IN_UFS) && SYS_REDUNDAND_ENVIRONMENT
 	default 0
 	help
 	  Offset from the start of the device (or partition) of the redundant

@@ -27,6 +27,7 @@
 #include <dm.h>
 #include <fb_spacemit.h>
 #include <watchdog.h>
+#include <scsi.h>
 #include "nfs_env.h"
 
 #define NFS_LOAD_ADDR  CONFIG_FASTBOOT_BUF_ADDR
@@ -77,10 +78,9 @@ static int get_mac_address(uint8_t *mac_addr)
 
 static int read_mac_from_eeprom(uint8_t *mac_addr)
 {
-	struct tlvinfo_tlv *mac_base_tlv = NULL;
-	read_from_eeprom(&mac_base_tlv, TLV_CODE_MAC_BASE);
-	if (mac_base_tlv && mac_base_tlv->length == 6) {
-		memcpy(mac_addr, mac_base_tlv->value, 6);
+	extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
+
+	if (get_tlvinfo(TLV_CODE_MAC_BASE, mac_addr, 6) == 6) {
 		pr_info("Successfully read MAC address from EEPROM: %02x:%02x:%02x:%02x:%02x:%02x\n",
 				mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
 		return 0;
@@ -306,6 +306,32 @@ static int check_mmc_bootfs(int dev)
 	return -1;
 }
 
+#ifdef CONFIG_SCSI
+static int check_ufs_bootfs(void)
+{
+	struct blk_desc *desc;
+	struct disk_partition info;
+	int part;
+
+	scsi_scan(false);
+	desc = blk_get_dev("scsi", 0);
+	if (!desc) {
+		return -1;
+	}
+
+	for (part = 1; part <= MAX_SEARCH_PARTITIONS; part++) {
+		if (part_get_info(desc, part, &info) != 0) {
+			continue;
+		}
+		if (strcmp(info.name, BOOTFS_NAME) == 0) {
+			return 0;
+		}
+	}
+
+	return -1;
+}
+#endif
+
 int check_bootfs_exists(void)
 {
 	int ret;
@@ -324,6 +350,11 @@ int check_bootfs_exists(void)
 	case BOOT_MODE_SD:
 		ret = check_mmc_bootfs(MMC_DEV_SD);
 		break;
+#ifdef CONFIG_SCSI
+	case BOOT_MODE_UFS:
+		ret = check_ufs_bootfs();
+		break;
+#endif
 	default:
 		pr_info("Unsupported boot mode for checking bootfs\n");
 		return -1;
