@@ -40,12 +40,13 @@ static struct blk_desc *cur_dev;
 static struct disk_partition cur_part_info;
 
 /*
- * FAT sector size tracking for sector-to-block translation.
- * When FAT sector size (e.g., 512B) is smaller than device block size
- * (e.g., 4096B for UFS), we need to translate FAT sector numbers to
- * device block numbers.
+ * FAT sector size and device block size tracking for sector-to-block translation.
+ * Supports two cases:
+ * 1. FAT sector < device block (e.g., 512B FAT on 4K UFS)
+ * 2. FAT sector > device block (e.g., 4K FAT on 512B SSD/NVMe)
  */
 static __u16 fat_sect_size;
+static __u16 fat_blk_per_sect = 1;  /* device blocks per FAT sector (when sect > blk) */
 
 #define DOS_BOOT_MAGIC_OFFSET	0x1fe
 #define DOS_FS_TYPE_OFFSET	0x36
@@ -74,7 +75,22 @@ static int disk_read(__u32 block, __u32 nr_blocks, void *buf)
 	}
 
 	/*
-	 * FAT sector size is smaller than device block size.
+	 * FAT sector size > device block size (e.g., 4K FAT on 512B device).
+	 * Convert FAT sector numbers to device block numbers.
+	 */
+	if (fat_sect_size > blksz) {
+		__u32 dev_block = block * fat_blk_per_sect;
+		__u32 dev_nr_blocks = nr_blocks * fat_blk_per_sect;
+
+		ret = blk_dread(cur_dev, cur_part_info.start + dev_block,
+				dev_nr_blocks, buf);
+		if (ret != dev_nr_blocks)
+			return -1;
+		return nr_blocks;
+	}
+
+	/*
+	 * FAT sector size < device block size (e.g., 512B FAT on 4K UFS).
 	 * Translate FAT sector numbers to device blocks and read in chunks
 	 * to avoid huge memory allocation for large files.
 	 */
@@ -149,8 +165,9 @@ int fat_set_blk_dev(struct blk_desc *dev_desc, struct disk_partition *info)
 	cur_dev = dev_desc;
 	cur_part_info = *info;
 
-	/* Reset FAT sector size - will be set in get_fs_info() */
+	/* Reset FAT sector size and conversion factor - will be set in get_fs_info() */
 	fat_sect_size = 0;
+	fat_blk_per_sect = 1;
 
 	/* Make sure it has a valid FAT header */
 	if (disk_read(0, 1, buffer) != 1) {
@@ -649,6 +666,15 @@ static int get_fs_info(fsdata *mydata)
 	volume_info volinfo;
 	int ret;
 
+	/*
+	 * Reset sector size before reading boot sector.
+	 * This is needed because get_fs_info may be called multiple times
+	 * (e.g., for different partitions), and fat_sect_size from a previous
+	 * call would cause read_bootsectandvi to read too many blocks.
+	 */
+	fat_sect_size = 0;
+	fat_blk_per_sect = 1;
+
 	ret = read_bootsectandvi(&bs, &volinfo, &mydata->fatsize);
 	if (ret) {
 		debug("Error: reading boot sector\n");
@@ -684,23 +710,36 @@ static int get_fs_info(fsdata *mydata)
 	fat_sect_size = mydata->sect_size;
 
 	/*
-	 * Allow FAT sector size to be smaller than or equal to device block size.
-	 * This supports reading FAT with 512-byte sectors from UFS with 4096-byte blocks.
-	 * Only reject if FAT sector size is larger than device block size or invalid.
+	 * Handle sector size mismatch between FAT filesystem and device.
+	 * Two cases are supported:
+	 * 1. FAT sector > device block (e.g., 4K FAT on 512B SSD/NVMe)
+	 * 2. FAT sector < device block (e.g., 512B FAT on 4K UFS)
 	 */
-	if (mydata->sect_size > cur_part_info.blksz) {
-		printf("Error: FAT sector size (%u) larger than device block size (%lu)\n",
-			mydata->sect_size, cur_part_info.blksz);
-		return -1;
-	}
 	if (mydata->sect_size == 0 || (mydata->sect_size & (mydata->sect_size - 1))) {
 		printf("Error: Invalid FAT sector size: %u\n", mydata->sect_size);
 		return -1;
 	}
-	if (cur_part_info.blksz % mydata->sect_size != 0) {
-		printf("Error: Device block size (%lu) not a multiple of FAT sector size (%u)\n",
-			cur_part_info.blksz, mydata->sect_size);
-		return -1;
+
+	if (mydata->sect_size > cur_part_info.blksz) {
+		/* FAT sector > device block: set conversion factor */
+		if (mydata->sect_size % cur_part_info.blksz != 0) {
+			printf("Error: FAT sector size (%u) not a multiple of device block size (%lu)\n",
+			       mydata->sect_size, cur_part_info.blksz);
+			return -1;
+		}
+		fat_blk_per_sect = mydata->sect_size / cur_part_info.blksz;
+		debug("FAT: sector size %u > device block size %lu, using %u blocks per sector\n",
+		      mydata->sect_size, cur_part_info.blksz, fat_blk_per_sect);
+	} else if (mydata->sect_size < cur_part_info.blksz) {
+		/* FAT sector < device block: check alignment */
+		if (cur_part_info.blksz % mydata->sect_size != 0) {
+			printf("Error: Device block size (%lu) not a multiple of FAT sector size (%u)\n",
+			       cur_part_info.blksz, mydata->sect_size);
+			return -1;
+		}
+		fat_blk_per_sect = 1;  /* Will use byte-level translation in disk_read */
+	} else {
+		fat_blk_per_sect = 1;  /* sector == block, no translation needed */
 	}
 	if (mydata->clust_size == 0) {
 		printf("Error: FAT cluster size not set\n");
