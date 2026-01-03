@@ -24,6 +24,7 @@
 #include <net.h>
 #include <tlv_eeprom.h>
 #include <clk.h>
+#include <scsi.h>
 #include "nfs_env.h"
 
 #ifdef CONFIG_ESPI
@@ -760,6 +761,16 @@ void import_env_from_bootfs(void)
 		}
 
 		_load_env_from_blk(mmc_get_blk_desc(mmc), "mmc", dev);
+		break;
+#endif
+	case BOOT_MODE_UFS:
+#ifdef CONFIG_SCSI
+		struct blk_desc *ufs_dev_desc;
+
+		scsi_scan(false);
+		ufs_dev_desc = blk_get_dev("scsi", 0);
+		if (ufs_dev_desc)
+			_load_env_from_blk(ufs_dev_desc, "scsi", 0);
 		break;
 #endif
 	default:
