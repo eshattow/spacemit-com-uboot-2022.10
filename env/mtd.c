@@ -19,34 +19,45 @@
 #include <u-boot/crc.h>
 #include <config.h>
 
-static struct udevice *env_mtd_dev = NULL;
+static struct mtd_info *env_mtd = NULL;
 
 static int env_mtd_init(void) {
-	if (!env_mtd_dev) {
-		if (uclass_get_device(UCLASS_MTD, 0, &env_mtd_dev)) {
+	if (!env_mtd) {
+		/* Probe MTD devices first */
+		mtd_probe_devices();
+
+		/* Try to get MTD device by name first (for SPI flash registered via add_mtd_device) */
+		env_mtd = get_mtd_device_nm("spi-flash");
+		if (IS_ERR_OR_NULL(env_mtd)) {
+			env_mtd = get_mtd_device_nm("nor0");
+		}
+		if (IS_ERR_OR_NULL(env_mtd)) {
+			env_mtd = get_mtd_device(NULL, 0);
+		}
+		if (IS_ERR_OR_NULL(env_mtd)) {
+			env_mtd = NULL;
 			return -ENODEV;
 		}
 	}
 	return 0;
 }
 
-static struct udevice *find_mtd_device(void) {
-	struct udevice *dev;
-	if (uclass_get_device(UCLASS_MTD, 0, &dev)) {
-		printf("Cannot find any MTD device\n");
-		return NULL;
+static struct mtd_info *find_mtd_device(void) {
+	if (!env_mtd) {
+		if (env_mtd_init()) {
+			printf("Cannot find any MTD device\n");
+			return NULL;
+		}
 	}
-	return dev;
+	return env_mtd;
 }
 
 static int env_mtd_erase(void) {
-	struct udevice *dev = find_mtd_device();
-	if (!dev) {
+	struct mtd_info *mtd = find_mtd_device();
+	if (!mtd) {
 		printf("Failed to initialize MTD device\n");
 		return -ENODEV;
 	}
-
-	struct mtd_info *mtd = dev_get_uclass_priv(dev);
 
 #ifdef CONFIG_ENV_OFFSET_REDUND
 	loff_t offset = (gd->env_valid == ENV_VALID) ? CONFIG_ENV_OFFSET_REDUND : CONFIG_ENV_OFFSET;
@@ -67,13 +78,12 @@ static int env_mtd_erase(void) {
 #if defined(CONFIG_ENV_OFFSET_REDUND)
 
 static int env_mtd_load(void) {
-	struct udevice *dev = find_mtd_device();
-	if (!dev) {
+	struct mtd_info *mtd = find_mtd_device();
+	if (!mtd) {
 		printf("MTD device not initialized\n");
 		return -ENODEV;
 	}
 
-	struct mtd_info *mtd = dev_get_uclass_priv(dev);
 	size_t retlen;
 	char *buf1 = malloc(CONFIG_ENV_SIZE);
 	char *buf2 = malloc(CONFIG_ENV_SIZE);
@@ -89,7 +99,7 @@ static int env_mtd_load(void) {
 	int ret = env_import_redund(buf1, read1_fail, buf2, read2_fail, H_EXTERNAL);
 	if (ret == 0) {
 		gd->env_valid = (read1_fail == 0) ? ENV_VALID : ENV_REDUND;
-		printf("Loaded environment from %s MTD location\n", 
+		printf("Loaded environment from %s MTD location\n",
 			   (gd->env_valid == ENV_VALID) ? "primary" : "redundant");
 	} else {
 		printf("Failed to load environment from MTD device\n");
@@ -102,13 +112,12 @@ static int env_mtd_load(void) {
 }
 
 static int env_mtd_save(void) {
-	struct udevice *dev = find_mtd_device();
-	if (!dev) {
+	struct mtd_info *mtd = find_mtd_device();
+	if (!mtd) {
 		printf("MTD device not initialized\n");
 		return -ENODEV;
 	}
 
-	struct mtd_info *mtd = dev_get_uclass_priv(dev);
 	env_t env_new;
 	char *buf = env_new.data;
 
@@ -156,13 +165,12 @@ static int env_mtd_save(void) {
 #else
 
 static int env_mtd_load(void) {
-	struct udevice *dev = find_mtd_device();
-	if (!dev) {
+	struct mtd_info *mtd = find_mtd_device();
+	if (!mtd) {
 		printf("MTD device not initialized\n");
 		return -ENODEV;
 	}
 
-	struct mtd_info *mtd = dev_get_uclass_priv(dev);
 	size_t retlen;
 	char *buf = malloc(CONFIG_ENV_SIZE);
 	if (!buf) {
@@ -182,13 +190,12 @@ static int env_mtd_load(void) {
 }
 
 static int env_mtd_save(void) {
-	struct udevice *dev = find_mtd_device();
-	if (!dev) {
+	struct mtd_info *mtd = find_mtd_device();
+	if (!mtd) {
 		printf("MTD device not initialized\n");
 		return -ENODEV;
 	}
 
-	struct mtd_info *mtd = dev_get_uclass_priv(dev);
 	env_t env_new;
 	char *buf = env_new.data;
 

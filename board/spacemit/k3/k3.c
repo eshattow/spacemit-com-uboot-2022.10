@@ -7,6 +7,7 @@
 #include <dm.h>
 #include <dm/ofnode.h>
 #include <env.h>
+#include <env_internal.h>
 #include <fdtdec.h>
 #include <g_dnl.h>
 #include <image.h>
@@ -578,6 +579,36 @@ int mmc_get_env_dev(void)
 		return MMC_DEV_EMMC;
 	else
 		return MMC_DEV_SD;
+}
+
+enum env_location env_get_location(enum env_operation op, int prio)
+{
+	if (prio >= 1)
+		return ENVL_UNKNOWN;
+
+	u32 boot_mode = get_boot_mode();
+	switch (boot_mode) {
+#ifdef CONFIG_ENV_IS_IN_MTD
+	case BOOT_MODE_NAND:
+	case BOOT_MODE_NOR:
+		return ENVL_MTD;
+#endif
+#ifdef CONFIG_ENV_IS_IN_MMC
+	case BOOT_MODE_EMMC:
+	case BOOT_MODE_SD:
+		return ENVL_MMC;
+#endif
+#ifdef CONFIG_ENV_IS_IN_UFS
+	case BOOT_MODE_UFS:
+		return ENVL_UFS;
+#endif
+	default:
+#ifdef CONFIG_ENV_IS_NOWHERE
+		return ENVL_NOWHERE;
+#else
+		return ENVL_UNKNOWN;
+#endif
+	}
 }
 
 void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev)
