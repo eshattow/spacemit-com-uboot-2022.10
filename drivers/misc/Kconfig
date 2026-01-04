@@ -681,4 +681,14 @@ config SPL_SPACEMIT_SHUTDOWN_CHARGE
 	depends on MISC
 	help
 	  This enable the charge battery in system shutdown mode, on Spacemit K1x SoCs, in spl.
+
+config HWMON_SENSORS_CTF2301
+	bool "Sensylink CTF2301"
+	depends on DM_I2C
+	help
+	  If you say yes here you get support for Sensylink CTF2301
+	  sensor chip.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called ctf2301.
 endmenu

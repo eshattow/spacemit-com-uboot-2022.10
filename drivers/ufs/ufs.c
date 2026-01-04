@@ -16,6 +16,7 @@
 #include <dm/devres.h>
 #include <dm/lists.h>
 #include <dm/device-internal.h>
+#include <env.h>
 #include <malloc.h>
 #include <hexdump.h>
 #include <scsi.h>
@@ -56,12 +57,29 @@
 
 #define MAX_PRDT_ENTRY	262144
 
+/* UFS controller DMA is limited to 32-bit addressing (below 4GB) */
+#define UFS_DMA_ADDR_LIMIT	(1ULL << 32)
+
+static bool ufshcd_force_bounce_enabled(void)
+{
+#if !defined(CONFIG_SPL_BUILD)
+	return env_get_yesno("ufs_force_bounce") == 1;
+#else
+	return false;
+#endif
+}
+
 /* maximum bytes per request - limited by bounce buffer for high addresses */
 #if defined(CONFIG_SPL_BUILD)
 #define UFS_MAX_BYTES	(4 * 1024)  /* 4KB for SPL to minimize memory */
 #else
 #define UFS_MAX_BYTES	(1024 * 1024)  /* 1MB for U-Boot proper */
 #endif
+
+/* Fallback bounce buffer for platforms with no DMA32 allocator */
+#define UFS_BOUNCE_BUF_SIZE	UFS_MAX_BYTES
+static u8 ufs_bounce_buf[UFS_BOUNCE_BUF_SIZE]
+	__attribute__((aligned(4096), section(".data")));
 
 static inline bool ufshcd_is_hba_active(struct ufs_hba *hba);
 static inline void ufshcd_hba_stop(struct ufs_hba *hba);
@@ -1497,10 +1515,6 @@ static void prepare_prdt_table(struct ufs_hba *hba, struct scsi_cmd *pccb)
 	ufshcd_cache_flush_and_invalidate(req_desc, sizeof(*req_desc));
 }
 
-/* Static bounce buffer for DMA - must be below 4GB */
-#define UFS_BOUNCE_BUF_SIZE	UFS_MAX_BYTES
-static u8 ufs_bounce_buf[UFS_BOUNCE_BUF_SIZE] __attribute__((aligned(4096), section(".data")));
-
 static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 {
 	struct ufs_hba *hba = dev_get_uclass_priv(scsi_dev->parent);
@@ -1509,22 +1523,36 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 	int ocs, result = 0;
 	u8 scsi_status;
 	u8 *orig_pdata = NULL;
+	u8 *bounce_buf = NULL;
+	bool bounce_buf_malloced = false;
 	int use_bounce = 0;
 
 	/* Check if we need bounce buffer for high addresses */
 	if (pccb->datalen && pccb->pdata) {
-		unsigned long addr = (unsigned long)pccb->pdata;
-		if (addr >= 0x100000000UL) {
-			if (pccb->datalen > UFS_BOUNCE_BUF_SIZE) {
-				dev_err(hba->dev, "data too large for bounce buffer\n");
-				return -EINVAL;
+		u64 addr = (uintptr_t)pccb->pdata;
+		if (addr >= UFS_DMA_ADDR_LIMIT &&
+		    (!(hba->capabilities & MASK_64_ADDRESSING_SUPPORT) ||
+		     ufshcd_force_bounce_enabled())) {
+			bounce_buf = memalign(4096, pccb->datalen);
+			if (bounce_buf &&
+			    (u64)(uintptr_t)bounce_buf < UFS_DMA_ADDR_LIMIT) {
+				bounce_buf_malloced = true;
+			} else {
+				if (bounce_buf)
+					free(bounce_buf);
+				if (pccb->datalen > UFS_BOUNCE_BUF_SIZE) {
+					dev_err(hba->dev,
+						"data too large for bounce buffer\n");
+					return -EINVAL;
+				}
+				bounce_buf = ufs_bounce_buf;
 			}
 			orig_pdata = pccb->pdata;
-			pccb->pdata = ufs_bounce_buf;
+			pccb->pdata = bounce_buf;
 			use_bounce = 1;
 			/* For write operations, copy data to bounce buffer */
 			if (pccb->dma_dir == DMA_TO_DEVICE)
-				memcpy(ufs_bounce_buf, orig_pdata, pccb->datalen);
+				memcpy(bounce_buf, orig_pdata, pccb->datalen);
 		}
 	}
 
@@ -1538,9 +1566,7 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 
 	result = ufshcd_send_command(hba, TASK_TAG);
 	if (result) {
-		if (use_bounce)
-			pccb->pdata = orig_pdata;
-		return result;
+		goto out;
 	}
 
 	/* Invalidate cache after DMA transfer for read operations */
@@ -1549,12 +1575,16 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 
 	/* Copy data back from bounce buffer for read operations */
 	if (use_bounce && pccb->dma_dir == DMA_FROM_DEVICE) {
-		memcpy(orig_pdata, ufs_bounce_buf, pccb->datalen);
+		memcpy(orig_pdata, bounce_buf, pccb->datalen);
 	}
 
+out:
 	/* Restore original pdata pointer */
-	if (use_bounce)
+	if (use_bounce) {
 		pccb->pdata = orig_pdata;
+		if (bounce_buf_malloced)
+			free(bounce_buf);
+	}
 
 	ocs = ufshcd_get_tr_ocs(hba);
 
