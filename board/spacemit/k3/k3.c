@@ -342,6 +342,9 @@ void try_flash_image_from_card(void)
 
 int board_late_init(void)
 {
+#if CONFIG_IS_ENABLED(HWMON_SENSORS_CTF2301)
+	struct udevice *dev;
+#endif
 	ulong kernel_start;
 	ofnode chosen_node;
 	int ret;
@@ -352,6 +355,13 @@ int board_late_init(void)
 		printf("eSPI not ready, disabling kernel EC driver\n");
 		env_set("espi_disabled", "1");
 	}
+#endif
+
+#if CONFIG_IS_ENABLED(HWMON_SENSORS_CTF2301)
+	ret = uclass_get_device_by_driver(UCLASS_MISC,
+					  DM_DRIVER_GET(ctf2301), &dev);
+	if (ret)
+		printf("Warn: Failed to force init ctf2301 fan (err=%d)\n", ret);
 #endif
 
 	set_env_ethaddr();

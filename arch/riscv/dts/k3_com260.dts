@@ -154,6 +154,18 @@
        status = "okay";
 };
 
+&i2c6 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c6_0>;
+	status = "okay";
+
+	ctf2301: ctf2301@4c {
+		compatible = "sensylink,ctf2301";
+		reg = <0x4c>;
+		#cooling-cells = <2>;
+	};
+};
+
 &i2c8 {
 	clock-frequency = <100000>;
 	u-boot,dm-spl;
