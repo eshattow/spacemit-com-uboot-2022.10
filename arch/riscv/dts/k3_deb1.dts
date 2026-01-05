@@ -150,12 +150,20 @@
 		/* eSPI VW GPIO interrupt configuration */
 		espi-vw-gpio-wire = <0>;       /* Wire 0 within the group */
 		espi-vw-gpio-index = <0x82>;   /* VM index 0x82 (Group 2/130) */
+
 		i2c_tunnel: i2c-tunnel {
 			compatible = "google,cros-ec-i2c-tunnel";
 			#address-cells = <1>;
 			#size-cells = <0>;
 			google,remote-bus = <1>;
 
+			rt7451: retimer@13 {
+				compatible = "retimer,rt7451";
+				reg = <0x13>;
+				primary-addr = <0x13>;
+				secondary-addr = <0x29>;
+				status = "okay";
+			};
 		};
 	};
 };
