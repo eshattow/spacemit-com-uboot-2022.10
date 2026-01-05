@@ -94,3 +94,4 @@ obj-$(CONFIG_SL28CPLD) += sl28cpld.o
 obj-$(CONFIG_MCP4725) += mcp4725.o
 obj-$(CONFIG_$(SPL_)SPACEMIT_K1X_EFUSE) += spacemit_k1x_efuse.o
 obj-$(CONFIG_$(SPL_)SPACEMIT_SHUTDOWN_CHARGE) += spacemit_shutdown_charging.o
+obj-$(CONFIG_RT7451_RETIMER) += rt7451.o

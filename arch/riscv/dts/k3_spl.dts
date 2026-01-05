@@ -169,7 +169,7 @@
 			mem_heap_start = <0x1 0xB04000>;
 			mem_heap_size = <0x200000>;
 			fw_boot_entry = <0x1 0x804000>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		ddr@3000000 {
