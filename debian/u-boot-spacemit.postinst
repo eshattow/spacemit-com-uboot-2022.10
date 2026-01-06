@@ -4,10 +4,10 @@ set -e
 case "$1" in
 configure)
     target=""
-    if grep -q '^spacemit' /sys/firmware/devicetree/base/model || grep -q '^spacemit' /sys/devices/soc0/family; then
+    if grep -q 'Spacemit(R) X100' /proc/cpuinfo; then
         target="spacemit"
     else
-        echo "Neither /sys/firmware/devicetree/base/model nor /sys/devices/soc0/family starts with 'spacemit'."
+        echo "no 'Spacemit(R) X100' found in /proc/cpuinfo."
         echo "This may indicate that you are installing this package in a chroot environment."
         exit 0
     fi
@@ -27,61 +27,72 @@ configure)
     if [ -n $ROOT ]; then
         case $ROOT in
         "/dev/mmcblk0"*)
-            BOOTINFO_FILE=bootinfo_sd.bin
+            BOOTINFO_FILE=bootinfo_block.bin
             BOOTINFO=/dev/mmcblk0
-            FSBL=/dev/mmcblk0p1
-            FSBL_SEEK=0
-            ENV=/dev/mmcblk0p2
-            ENV_SEEK=0
-            UBOOT=/dev/mmcblk0p4
-            UBOOT_SEEK=0
+            BOOTINFO_SEEK=$((1024 * 1024))
+            FSBL=/dev/mmcblk0
+            FSBL_SEEK=$((1536 * 1024))
+            ENV=/dev/mmcblk0
+            ENV_SEEK=$((640 * 1024))
+            UBOOT_MOUNT="/dev/mmcblk0p1"
+            UBOOT_COPY_MODE=1
             ;;
         "/dev/mmcblk2"*)
-            BOOTINFO_FILE=bootinfo_emmc.bin
-            BOOTINFO=/dev/mmcblk2boot0
-            FSBL=/dev/mmcblk2boot0
-            FSBL_SEEK=512
-            ENV=/dev/mmcblk2p2
-            ENV_SEEK=0
-            UBOOT=/dev/mmcblk2p4
-            UBOOT_SEEK=0
-            if [ -e $BOOTINFO ]; then
-                echo 0 | tee /sys/block/mmcblk2boot0/force_ro
-            fi
+            BOOTINFO_FILE=bootinfo_block.bin
+            BOOTINFO=/dev/mmcblk2
+            BOOTINFO_SEEK=$((1024 * 1024))
+            FSBL=/dev/mmcblk2
+            FSBL_SEEK=$((1536 * 1024))
+            ENV=/dev/mmcblk2
+            ENV_SEEK=$((640 * 1024))
+            UBOOT_MOUNT="/dev/mmcblk2p1"
+            UBOOT_COPY_MODE=1
+            ;;
+        "/dev/sda"*)
+            BOOTINFO_FILE=bootinfo_block.bin
+            BOOTINFO=/dev/sda
+            BOOTINFO_SEEK=$((1024 * 1024))
+            FSBL=/dev/sda
+            FSBL_SEEK=$((1536 * 1024))
+            ENV=/dev/sda
+            ENV_SEEK=$((640 * 1024))
+            UBOOT_MOUNT="/dev/sda1"
+            UBOOT_COPY_MODE=1
             ;;
         "/dev/nvme0n1"*)
-            if [ -e "/dev/mtdblock5" ]; then
+            if [ -e "/dev/mtdblock6" ]; then
                 BOOTINFO_FILE=bootinfo_spinor.bin
-                BOOTINFO=/dev/mtdblock0
+                BOOTINFO=/dev/mtdblock1
                 FSBL=/dev/mtdblock2
                 FSBL_SEEK=0
                 ENV=/dev/mtdblock3
                 ENV_SEEK=0
-                UBOOT=/dev/mtdblock5
+                UBOOT=/dev/mtdblock6
                 # 以KB为单位
                 UBOOT_SEEK=0
             elif [ -e "/dev/mtdblock0" ]; then
                 BOOTINFO_FILE=bootinfo_spinor.bin
                 BOOTINFO=/dev/mtdblock0
+                BOOTINFO_SEEK=0
                 FSBL=/dev/mtdblock0
                 FSBL_SEEK=$((128 * 1024))
                 ENV=/dev/mtdblock0
-                ENV_SEEK=$((384 * 1024))
+                ENV_SEEK=$((640 * 1024))
                 UBOOT=/dev/mtdblock0
                 # 以KB为单位
-                UBOOT_SEEK=640
+                UBOOT_SEEK=2112
             else
-                BOOTINFO_FILE=bootinfo_emmc.bin
-                BOOTINFO=/dev/mmcblk2boot0
-                FSBL=/dev/mmcblk2boot0
-                FSBL_SEEK=512
-                ENV=/dev/mmcblk2p2
-                ENV_SEEK=0
-                UBOOT=/dev/mmcblk2p4
-                UBOOT_SEEK=0
-                if [ -e $BOOTINFO ]; then
-                    echo 0 | tee /sys/block/mmcblk2boot0/force_ro
-                fi
+                # emmc + ssd
+                BOOTINFO_FILE=bootinfo_block.bin
+                BOOTINFO=/dev/mmcblk2
+                BOOTINFO_SEEK=$((1024 * 1024))
+                FSBL=/dev/mmcblk2
+                FSBL_SEEK=$((1536 * 1024))
+                ENV=/dev/mmcblk2
+                ENV_SEEK=$((640 * 1024))
+                UBOOT=/dev/mmcblk2
+                # 以KB为单位
+                UBOOT_SEEK=2112
             fi
             ;;
         *)
@@ -95,8 +106,13 @@ configure)
     fi
 
     BIN_DIR="/usr/lib/u-boot/$target"
-    # 待检查文件/分区列表
-    files="${BIN_DIR}/${BOOTINFO_FILE} ${BIN_DIR}/FSBL.bin ${BIN_DIR}/env.bin ${BIN_DIR}/u-boot.itb $BOOTINFO $FSBL $ENV $UBOOT"
+    # 待检查文件列表
+    files="${BIN_DIR}/${BOOTINFO_FILE} ${BIN_DIR}/FSBL.bin ${BIN_DIR}/env.bin ${BIN_DIR}/u-boot.itb $BOOTINFO $FSBL $ENV"
+    if [ -z "$UBOOT_COPY_MODE" ]; then
+        files="$files $UBOOT"
+    else
+        files="$files $UBOOT_MOUNT"
+    fi
     for file in $files; do
         if [ ! -e "$file" ]; then
             # 任意不存在则退出
@@ -107,10 +123,26 @@ configure)
 
     # 此前已经做了所有检查
     set -x
-    dd if=/usr/lib/u-boot/$target/$BOOTINFO_FILE of=$BOOTINFO && sync
+    if [ -n "$BOOTINFO_SEEK" ]; then
+        dd if=/usr/lib/u-boot/$target/$BOOTINFO_FILE of=$BOOTINFO seek=$BOOTINFO_SEEK bs=1 && sync
+    else
+        dd if=/usr/lib/u-boot/$target/$BOOTINFO_FILE of=$BOOTINFO && sync
+    fi
     dd if=/usr/lib/u-boot/$target/FSBL.bin of=$FSBL seek=$FSBL_SEEK bs=1 && sync
     dd if=/usr/lib/u-boot/$target/env.bin of=$ENV seek=$ENV_SEEK bs=1 && sync
-    dd if=/usr/lib/u-boot/$target/u-boot.itb of=$UBOOT seek=$UBOOT_SEEK bs=1K && sync
+    
+    if [ -n "$UBOOT_COPY_MODE" ]; then
+        # SD卡模式：挂载分区并复制文件
+        mkdir -p /mnt/uboot-install
+        mount $UBOOT_MOUNT /mnt/uboot-install
+        cp /usr/lib/u-boot/$target/u-boot.itb /mnt/uboot-install/
+        sync
+        umount /mnt/uboot-install
+        rmdir /mnt/uboot-install
+    else
+        # 直接写入模式
+        dd if=/usr/lib/u-boot/$target/u-boot.itb of=$UBOOT seek=$UBOOT_SEEK bs=1K && sync
+    fi
     set +x
     ;;
 esac
