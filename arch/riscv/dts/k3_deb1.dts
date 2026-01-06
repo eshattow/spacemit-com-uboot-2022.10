@@ -20,8 +20,13 @@
 		 <&ccu CLK_CPU_C0_CORE>,
 		 <&ccu CLK_CPU_C1_CORE>,
 		 <&ccu CLK_CPU_C2_CORE>,
-		 <&ccu CLK_CPU_C3_CORE>;
-	clock-names = "topd", "axi", "cci", "cluster0", "cluster1", "cluster2", "cluster3";
+		 <&ccu CLK_CPU_C3_CORE>,
+		 <&ccu CLK_PLL3>,
+		 <&ccu CLK_PLL4>,
+		 <&ccu CLK_PLL5>,
+		 <&ccu CLK_PLL8>;
+	clock-names = "topd", "axi", "cci", "cluster0", "cluster1", "cluster2", "cluster3",
+		       "pll3", "pll4", "pll5", "pll8";
 	topd_frequency = <800000000>;
 	axi_frequency =  <307000000>;
 	cci_frequency =  <1000000000>;
