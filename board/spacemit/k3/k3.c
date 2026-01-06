@@ -177,6 +177,8 @@ void update_usb_serial_number(void)
 #endif
 }
 
+#define TURBO0_FREQUENCY		(1000000000)
+
 static int cpu_frequency_set(void)
 {
 	int ret;
@@ -187,7 +189,7 @@ static int cpu_frequency_set(void)
 	unsigned int topd_frequency;
 	unsigned int axi_frequency;
 	unsigned int cci_frequency;
-	struct clk top_dclk, axi_clk, cci_clk, cluster0_clk, cluster1_clk, cluster2_clk, cluster3_clk;
+	struct clk top_dclk, axi_clk, cci_clk, cluster0_clk, cluster1_clk, cluster2_clk, cluster3_clk, clk_pll3, clk_pll4, clk_pll5, clk_pll8;
 	ofnode cpu_node;
 
 	cpu_node = ofnode_path("/cpus");
@@ -203,6 +205,10 @@ static int cpu_frequency_set(void)
 	ret |= clk_get_by_name_nodev(cpu_node, "topd", &top_dclk);
 	ret |= clk_get_by_name_nodev(cpu_node, "axi", &axi_clk);
 	ret |= clk_get_by_name_nodev(cpu_node, "cci", &cci_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll3", &clk_pll3);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll4", &clk_pll4);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll5", &clk_pll5);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll8", &clk_pll8);
 	if (ret) {
 		pr_err("Get cluster clk error\n");
 		return -1;
@@ -257,6 +263,12 @@ static int cpu_frequency_set(void)
 		return -1;
 	}
 
+	if ((cluster0_frequency != cluster1_frequency) ||
+			(cluster2_frequency != cluster3_frequency)) {
+		printk("Cluster0/2 should be same as Cluster1/3")	;
+		return -1;
+	}
+
 	clk_enable(&cluster0_clk);
 	clk_enable(&cluster1_clk);
 	clk_enable(&cluster2_clk);
@@ -264,11 +276,27 @@ static int cpu_frequency_set(void)
 	clk_enable(&top_dclk);
 	clk_enable(&axi_clk);
 	clk_enable(&cci_clk);
+	clk_enable(&clk_pll3);
+	clk_enable(&clk_pll4);
+	clk_enable(&clk_pll5);
+	clk_enable(&clk_pll8);
 
 	clk_set_rate(&top_dclk, topd_frequency);
 	clk_set_rate(&axi_clk, axi_frequency);
+
+	if (cluster0_frequency > TURBO0_FREQUENCY) {
+		clk_set_rate(&clk_pll3, cluster0_frequency);
+		clk_set_rate(&clk_pll4, cluster0_frequency);
+	}
+
 	clk_set_rate(&cluster0_clk, cluster0_frequency);
 	clk_set_rate(&cluster1_clk, cluster1_frequency);
+
+	if (cluster2_frequency > TURBO0_FREQUENCY) {
+		clk_set_rate(&clk_pll5, cluster2_frequency);
+		clk_set_rate(&clk_pll8, cluster2_frequency);
+	}
+
 	clk_set_rate(&cluster2_clk, cluster2_frequency);
 	clk_set_rate(&cluster3_clk, cluster3_frequency);
 	clk_set_rate(&cci_clk, cci_frequency);
