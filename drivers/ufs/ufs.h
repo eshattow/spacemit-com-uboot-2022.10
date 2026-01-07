@@ -837,6 +837,7 @@ struct ufs_hba {
 #define UFSHCD_QUIRK_HS_GEAR_1 BIT(4)
 #else
 #define UFSHCD_QUIRK_BROKEN_LCC 0x1
+#define UFSHCD_QUIRK_BROKEN_64BIT_ADDRESS 0
 #endif
 	/* Virtual memory reference */
 	struct utp_transfer_cmd_desc *ucdl;

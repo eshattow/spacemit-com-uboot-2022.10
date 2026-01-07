@@ -57,7 +57,7 @@
 
 #define MAX_PRDT_ENTRY	262144
 
-/* UFS controller DMA is limited to 32-bit addressing (below 4GB) */
+/* DMA address boundary for controllers without 64-bit addressing support */
 #define UFS_DMA_ADDR_LIMIT	(1ULL << 32)
 
 static bool ufshcd_force_bounce_enabled(void)
@@ -69,17 +69,8 @@ static bool ufshcd_force_bounce_enabled(void)
 #endif
 }
 
-/* maximum bytes per request - limited by bounce buffer for high addresses */
-#if defined(CONFIG_SPL_BUILD)
-#define UFS_MAX_BYTES	(4 * 1024)  /* 4KB for SPL to minimize memory */
-#else
-#define UFS_MAX_BYTES	(1024 * 1024)  /* 1MB for U-Boot proper */
-#endif
-
-/* Fallback bounce buffer for platforms with no DMA32 allocator */
-#define UFS_BOUNCE_BUF_SIZE	UFS_MAX_BYTES
-static u8 ufs_bounce_buf[UFS_BOUNCE_BUF_SIZE]
-	__attribute__((aligned(4096), section(".data")));
+/* maximum bytes per request (SCSI uclass) */
+#define UFS_MAX_BYTES	(1024 * 1024)  /* 1MB */
 
 static inline bool ufshcd_is_hba_active(struct ufs_hba *hba);
 static inline void ufshcd_hba_stop(struct ufs_hba *hba);
@@ -1524,29 +1515,40 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 	u8 scsi_status;
 	u8 *orig_pdata = NULL;
 	u8 *bounce_buf = NULL;
-	bool bounce_buf_malloced = false;
 	int use_bounce = 0;
 
 	/* Check if we need bounce buffer for high addresses */
 	if (pccb->datalen && pccb->pdata) {
 		u64 addr = (uintptr_t)pccb->pdata;
+		bool supports_64bit = hba->capabilities &
+				      MASK_64_ADDRESSING_SUPPORT;
+		bool broken_64bit = hba->quirks &
+				    UFSHCD_QUIRK_BROKEN_64BIT_ADDRESS;
+
 		if (addr >= UFS_DMA_ADDR_LIMIT &&
-		    (!(hba->capabilities & MASK_64_ADDRESSING_SUPPORT) ||
+		    ((!supports_64bit || broken_64bit) ||
 		     ufshcd_force_bounce_enabled())) {
-			bounce_buf = memalign(4096, pccb->datalen);
-			if (bounce_buf &&
-			    (u64)(uintptr_t)bounce_buf < UFS_DMA_ADDR_LIMIT) {
-				bounce_buf_malloced = true;
-			} else {
-				if (bounce_buf)
-					free(bounce_buf);
-				if (pccb->datalen > UFS_BOUNCE_BUF_SIZE) {
-					dev_err(hba->dev,
-						"data too large for bounce buffer\n");
-					return -EINVAL;
-				}
-				bounce_buf = ufs_bounce_buf;
+			if (pccb->datalen > UFS_MAX_BYTES) {
+				dev_err(hba->dev,
+					"data too large for bounce buffer\n");
+				return -EINVAL;
 			}
+
+			bounce_buf = memalign(4096, pccb->datalen);
+			if (!bounce_buf) {
+				dev_err(hba->dev,
+					"failed to allocate bounce buffer\n");
+				return -ENOMEM;
+			}
+
+			if ((!supports_64bit || broken_64bit) &&
+			    (u64)(uintptr_t)bounce_buf >= UFS_DMA_ADDR_LIMIT) {
+				dev_err(hba->dev,
+					"no DMA32 memory for bounce buffer\n");
+				free(bounce_buf);
+				return -ENOMEM;
+			}
+
 			orig_pdata = pccb->pdata;
 			pccb->pdata = bounce_buf;
 			use_bounce = 1;
@@ -1582,8 +1584,7 @@ out:
 	/* Restore original pdata pointer */
 	if (use_bounce) {
 		pccb->pdata = orig_pdata;
-		if (bounce_buf_malloced)
-			free(bounce_buf);
+		free(bounce_buf);
 	}
 
 	ocs = ufshcd_get_tr_ocs(hba);
