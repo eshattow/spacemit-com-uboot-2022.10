@@ -19,7 +19,7 @@
 #if (DDR_SIZE_GB == 8)
 // only support 1066MT/s @8GB
 #define CONFIG_DDR_DATARATE	(1066)
-#elif (DDR_SIZE_GB == 16)
+#elif (DDR_SIZE_GB == 16) || (DDR_SIZE_GB == 4)
 // support 4266MT/s, 5120MT/s, 5500MT/s, 6000MT/s, 6400MT/s @16GB
 #define CONFIG_DDR_DATARATE	(6400)
 #else
