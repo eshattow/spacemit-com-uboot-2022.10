@@ -11,19 +11,22 @@
 #define DDR_CTRL_REG_BASE	(0xCB000000)
 #define DDR_CTRL1_REG_BASE	(0xCC000000)
 
-// current only support 8GB or 16GB
+// current only support 4GB, 8GB or 16GB
+// default is 8GB
 #define DDR_SIZE_GB		(8)
+// support 4266MT/s, 5500MT/s, 6000MT/s, 6400MT/s
+#define CONFIG_DDR_DATARATE	(6400)
+
 // 2D training configuration
 #define DISABLE_DDR_2D_TRAINING	(0)
 
-#if (DDR_SIZE_GB == 8)
-// only support 1066MT/s @8GB
-#define CONFIG_DDR_DATARATE	(1066)
-#elif (DDR_SIZE_GB == 16) || (DDR_SIZE_GB == 4)
-// support 4266MT/s, 5120MT/s, 5500MT/s, 6000MT/s, 6400MT/s @16GB
-#define CONFIG_DDR_DATARATE	(6400)
-#else
+#if (DDR_SIZE_GB != 4) && (DDR_SIZE_GB != 8) && (DDR_SIZE_GB != 16)
 #error "Unsupported DDR size"
+#endif
+
+#if (CONFIG_DDR_DATARATE != 6400) && (CONFIG_DDR_DATARATE != 6000) \
+	&& (CONFIG_DDR_DATARATE != 5500) && (CONFIG_DDR_DATARATE != 4266)
+#error "Unsupported DDR datarate"
 #endif
 
 #ifndef REG32
