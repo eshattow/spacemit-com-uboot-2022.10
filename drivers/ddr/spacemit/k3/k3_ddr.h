@@ -16,14 +16,6 @@
 // 2D training configuration
 #define DISABLE_DDR_2D_TRAINING	(0)
 
-#if (DISABLE_DDR_2D_TRAINING == 0)
-#define AC_VREFDAC		(0x2F)
-#define DQ_VREFDAC		(0x2F)
-#else
-#define AC_VREFDAC		(0x35)
-#define DQ_VREFDAC		(0x35)
-#endif
-
 #if (DDR_SIZE_GB == 8)
 // only support 1066MT/s @8GB
 #define CONFIG_DDR_DATARATE	(1066)
