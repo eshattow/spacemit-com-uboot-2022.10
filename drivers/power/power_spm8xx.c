@@ -37,7 +37,8 @@ static const char *global_compatible[] = {
 #endif
 };
 
-#define NRESET_BIT 1 << 6
+#define NRESET_BIT	(1 << 6)
+#define INT_STA_EN_BIT	(1 << 2)
 
 void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck_desc,
 		const struct pm8xx_buck_desc **ldo_desc, int *num_buck, int *num_ldo)
@@ -279,6 +280,11 @@ static int __board_pmic_init(const char *name)
 		/* enable p1 wdt reset */
 		i2c_read(saddr, 0x7c, 1, &regval, 1);
 		regval |= NRESET_BIT;
+		i2c_write(saddr, 0x7c, 1, &regval, 1);
+
+		/* Disable the INT trigger power-on function */
+		i2c_read(saddr, 0x7c, 1, &regval, 1);
+		regval &= ~INT_STA_EN_BIT;
 		i2c_write(saddr, 0x7c, 1, &regval, 1);
 	}
 #endif
