@@ -6,7 +6,7 @@
 #include "k3_ddr.h"
 
 #if (CONFIG_DDR_DATARATE == 1066)
-static const phy_init_config training_table_0 = {
+static const phy_init_config training_8g_table_0 = {
 	0x00090000, 8, false,
 	{
 		{{0x08f0, 0x0011}}, {{0x08f1, 0x0031}}, {{0x08f2, 0x0000}}, {{0x08f3, 0x0040}},
@@ -14,7 +14,7 @@ static const phy_init_config training_table_0 = {
 	}
 };
 
-static const phy_init_config training_table_1 = {
+static const phy_init_config training_8g_table_1 = {
 	0x00040000, 176, false,
 	{
 		{{0x1008, 0xc9d8}}, {{0x1009, 0x0000}}, {{0x100a, 0x0000}}, {{0x100b, 0x0000}},
@@ -64,42 +64,42 @@ static const phy_init_config training_table_1 = {
 	}
 };
 
-static const phy_init_config training_table_2 = {
+static const phy_init_config training_8g_table_2 = {
 	0x00020000, 1, false,
 	{
 		{{0x0015, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_3 = {
+static const phy_init_config training_8g_table_3 = {
 	0x00030000, 4, false,
 	{
 		{{0x004a, 0x0000}}, {{0x004b, 0x0000}}, {{0x104a, 0x0000}}, {{0x104b, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_4 = {
+static const phy_init_config training_8g_table_4 = {
 	0x00020000, 3, false,
 	{
 		{{0x004c, 0x0827}}, {{0x004d, 0x0000}}, {{0x0041, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_5 = {
+static const phy_init_config training_8g_table_5 = {
 	0x00090000, 1, false,
 	{
 		{{0x0802, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_6 = {
+static const phy_init_config training_8g_table_6 = {
 	0x00020000, 1, false,
 	{
 		{{0x0045, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_7 = {
+static const phy_init_config training_8g_table_7 = {
 	0x00010000, 8, false,
 	{
 		{{0x0057, 0x0000}}, {{0x1057, 0x0000}}, {{0x2057, 0x0000}}, {{0x3057, 0x0000}},
@@ -107,7 +107,7 @@ static const phy_init_config training_table_7 = {
 	}
 };
 
-static const phy_init_config training_table_8 = {
+static const phy_init_config training_8g_table_8 = {
 	0x00090000, 7, false,
 	{
 		{{0x0803, 0x0004}}, {{0x0804, 0x0082}}, {{0x0805, 0x0001}}, {{0x0903, 0x0001}},
@@ -115,42 +115,42 @@ static const phy_init_config training_table_8 = {
 	}
 };
 
-static const phy_init_config training_table_9 = {
+static const phy_init_config training_8g_table_9 = {
 	0x00020000, 1, false,
 	{
 		{{0x0072, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_10 = {
+static const phy_init_config training_8g_table_10 = {
 	0x00090000, 1, false,
 	{
 		{{0x080e, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_11 = {
+static const phy_init_config training_8g_table_11 = {
 	0x00020000, 1, false,
 	{
 		{{0x0073, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_12 = {
+static const phy_init_config training_8g_table_12 = {
 	0x00090000, 1, false,
 	{
 		{{0x080f, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_13 = {
+static const phy_init_config training_8g_table_13 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0000, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_14 = {
+static const phy_init_config training_8g_table_14 = {
 	0x00040000, 2264, false,
 	{
 		{{0x1000, 0x0000}}, {{0x1001, 0x0000}}, {{0x1002, 0x0000}}, {{0x1003, 0x0000}},
@@ -722,7 +722,7 @@ static const phy_init_config training_table_14 = {
 	}
 };
 
-static const phy_init_config training_table_15 = {
+static const phy_init_config training_8g_table_15 = {
 	0x0009002e, 1293, true,
 	{
 		{{0x0010, 0x0400}}, {{0x080e, 0x000b}}, {{0x0480, 0x0809}}, {{0x0009, 0x0308}},
@@ -890,14 +890,14 @@ static const phy_init_config training_table_15 = {
 	}
 };
 
-static const phy_init_config training_table_16 = {
+static const phy_init_config training_8g_table_16 = {
 	0x000d0000, 1, false,
 	{
 		{{0x00e7, 0x0600}},
 	}
 };
 
-static const phy_init_config training_table_17 = {
+static const phy_init_config training_8g_table_17 = {
 	0x00090000, 15, false,
 	{
 		{{0x001c, 0x0000}}, {{0x0020, 0x0077}}, {{0x0024, 0x0082}}, {{0x0025, 0x002b}},
@@ -907,7 +907,7 @@ static const phy_init_config training_table_17 = {
 	}
 };
 
-static const phy_init_config training_table_18 = {
+static const phy_init_config training_8g_table_18 = {
 	0x00020000, 161, false,
 	{
 		{{0x018a, 0x0000}}, {{0x0124, 0x0001}}, {{0x018b, 0x0016}}, {{0x0125, 0x0039}},
@@ -954,7 +954,7 @@ static const phy_init_config training_table_18 = {
 	}
 };
 
-static const phy_init_config training_table_19 = {
+static const phy_init_config training_8g_table_19 = {
 	0x00040000, 208, false,
 	{
 		{{0x1613, 0x0b00}}, {{0x1617, 0x0000}}, {{0x163b, 0x0b00}}, {{0x163f, 0x0000}},
@@ -1012,7 +1012,7 @@ static const phy_init_config training_table_19 = {
 	}
 };
 
-static const phy_init_config training_table_20 = {
+static const phy_init_config training_8g_table_20 = {
 	0x000c0000, 6, false,
 	{
 		{{0x0001, 0x5061}}, {{0x0002, 0x7098}}, {{0x0003, 0x0000}}, {{0x0000, 0xbedc}},
@@ -1020,7 +1020,7 @@ static const phy_init_config training_table_20 = {
 	}
 };
 
-static const phy_init_config training_table_21 = {
+static const phy_init_config training_8g_table_21 = {
 	0x00090000, 36, false,
 	{
 		{{0x070c, 0x0000}}, {{0x070d, 0x07ff}}, {{0x070e, 0x0668}}, {{0x070f, 0x7910}},
@@ -1035,14 +1035,14 @@ static const phy_init_config training_table_21 = {
 	}
 };
 
-static const phy_init_config training_table_22 = {
+static const phy_init_config training_8g_table_22 = {
 	0x00020000, 3, false,
 	{
 		{{0x00f0, 0x27f7}}, {{0x00f1, 0x2108}}, {{0x00f2, 0x2108}},
 	}
 };
 
-static const phy_init_config training_table_23 = {
+static const phy_init_config training_8g_table_23 = {
 	0x00010000, 20, false,
 	{
 		{{0x00b9, 0x0001}}, {{0x00b1, 0x0180}}, {{0x00ba, 0x0001}}, {{0x00a2, 0x0000}},
@@ -1053,7 +1053,7 @@ static const phy_init_config training_table_23 = {
 	}
 };
 
-static const phy_init_config training_table_24 = {
+static const phy_init_config training_8g_table_24 = {
 	0x00070000, 74, false,
 	{
 		{{0x0024, 0x5a3c}}, {{0x0025, 0x5a3c}}, {{0x0026, 0x5a3c}}, {{0x0027, 0x5a3c}},
@@ -1078,35 +1078,35 @@ static const phy_init_config training_table_24 = {
 	}
 };
 
-static const phy_init_config training_table_25 = {
+static const phy_init_config training_8g_table_25 = {
 	0x00020000, 2, false,
 	{
 		{{0x007e, 0x0033}}, {{0x00ef, 0xffff}},
 	}
 };
 
-static const phy_init_config training_table_26 = {
+static const phy_init_config training_8g_table_26 = {
 	0x00090000, 1, false,
 	{
 		{{0x0910, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_27 = {
+static const phy_init_config training_8g_table_27 = {
 	0x00020000, 2, false,
 	{
 		{{0x0310, 0x0001}}, {{0x0311, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_28 = {
+static const phy_init_config training_8g_table_28 = {
 	0x000c0000, 1, false,
 	{
 		{{0x0080, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_29 = {
+static const phy_init_config training_8g_table_29 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0003, 0x0000}},
@@ -1114,42 +1114,42 @@ static const phy_init_config training_table_29 = {
 };
 
 const phy_init_config* lp5_train_table[] = {
-	&training_table_0,
-	&training_table_1,
-	&training_table_2,
-	&training_table_3,
-	&training_table_4,
-	&training_table_5,
-	&training_table_6,
-	&training_table_7,
-	&training_table_8,
-	&training_table_9,
-	&training_table_10,
-	&training_table_11,
-	&training_table_12,
-	&training_table_13,
-	&training_table_14,
-	&training_table_15,
-	&training_table_16,
-	&training_table_17,
-	&training_table_18,
-	&training_table_19,
-	&training_table_20,
-	&training_table_21,
-	&training_table_22,
-	&training_table_23,
-	&training_table_24,
-	&training_table_25,
-	&training_table_26,
-	&training_table_27,
-	&training_table_28,
-	&training_table_29,
+	&training_8g_table_0,
+	&training_8g_table_1,
+	&training_8g_table_2,
+	&training_8g_table_3,
+	&training_8g_table_4,
+	&training_8g_table_5,
+	&training_8g_table_6,
+	&training_8g_table_7,
+	&training_8g_table_8,
+	&training_8g_table_9,
+	&training_8g_table_10,
+	&training_8g_table_11,
+	&training_8g_table_12,
+	&training_8g_table_13,
+	&training_8g_table_14,
+	&training_8g_table_15,
+	&training_8g_table_16,
+	&training_8g_table_17,
+	&training_8g_table_18,
+	&training_8g_table_19,
+	&training_8g_table_20,
+	&training_8g_table_21,
+	&training_8g_table_22,
+	&training_8g_table_23,
+	&training_8g_table_24,
+	&training_8g_table_25,
+	&training_8g_table_26,
+	&training_8g_table_27,
+	&training_8g_table_28,
+	&training_8g_table_29,
 	NULL
 };
 
 #elif (CONFIG_DDR_DATARATE == 4266)
 
-static const phy_init_config training_table_0 = {
+static const phy_init_config training_16g_table_0 = {
 	0x00090000, 8, false,
 	{
 		{{0x08f0, 0x0043}}, {{0x08f1, 0x00c7}}, {{0x08f2, 0x0000}}, {{0x08f3, 0x0058}},
@@ -1157,7 +1157,7 @@ static const phy_init_config training_table_0 = {
 	}
 };
 
-static const phy_init_config training_table_1 = {
+static const phy_init_config training_16g_table_1 = {
 	0x00040000, 176, false,
 	{
 		{{0x1008, 0xc9d8}}, {{0x1009, 0x0000}}, {{0x100a, 0x0000}}, {{0x100b, 0x0000}},
@@ -1207,42 +1207,42 @@ static const phy_init_config training_table_1 = {
 	}
 };
 
-static const phy_init_config training_table_2 = {
+static const phy_init_config training_16g_table_2 = {
 	0x00020000, 1, false,
 	{
 		{{0x0015, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_3 = {
+static const phy_init_config training_16g_table_3 = {
 	0x00030000, 4, false,
 	{
 		{{0x004a, 0x0000}}, {{0x004b, 0x0000}}, {{0x104a, 0x0000}}, {{0x104b, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_4 = {
+static const phy_init_config training_16g_table_4 = {
 	0x00020000, 3, false,
 	{
 		{{0x004c, 0x080f}}, {{0x004d, 0x0000}}, {{0x0041, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_5 = {
+static const phy_init_config training_16g_table_5 = {
 	0x00090000, 1, false,
 	{
 		{{0x0802, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_6 = {
+static const phy_init_config training_16g_table_6 = {
 	0x00020000, 1, false,
 	{
 		{{0x0045, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_7 = {
+static const phy_init_config training_16g_table_7 = {
 	0x00010000, 8, false,
 	{
 		{{0x0057, 0x0000}}, {{0x1057, 0x0000}}, {{0x2057, 0x0000}}, {{0x3057, 0x0000}},
@@ -1250,7 +1250,7 @@ static const phy_init_config training_table_7 = {
 	}
 };
 
-static const phy_init_config training_table_8 = {
+static const phy_init_config training_16g_table_8 = {
 	0x00090000, 7, false,
 	{
 		{{0x0803, 0x0004}}, {{0x0804, 0x0082}}, {{0x0805, 0x0001}}, {{0x0903, 0x0001}},
@@ -1258,42 +1258,42 @@ static const phy_init_config training_table_8 = {
 	}
 };
 
-static const phy_init_config training_table_9 = {
+static const phy_init_config training_16g_table_9 = {
 	0x00020000, 1, false,
 	{
 		{{0x0072, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_10 = {
+static const phy_init_config training_16g_table_10 = {
 	0x00090000, 1, false,
 	{
 		{{0x080e, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_11 = {
+static const phy_init_config training_16g_table_11 = {
 	0x00020000, 1, false,
 	{
 		{{0x0073, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_12 = {
+static const phy_init_config training_16g_table_12 = {
 	0x00090000, 1, false,
 	{
 		{{0x080f, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_13 = {
+static const phy_init_config training_16g_table_13 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0000, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_14 = {
+static const phy_init_config training_16g_table_14 = {
 	0x00040000, 2264, false,
 	{
 		{{0x1000, 0x0000}}, {{0x1001, 0x0000}}, {{0x1002, 0x0000}}, {{0x1003, 0x0000}},
@@ -1865,7 +1865,7 @@ static const phy_init_config training_table_14 = {
 	}
 };
 
-static const phy_init_config training_table_15 = {
+static const phy_init_config training_16g_table_15 = {
 	0x0009002e, 1293, true,
 	{
 		{{0x0010, 0x0400}}, {{0x080e, 0x000b}}, {{0x0480, 0x0809}}, {{0x0009, 0x0308}},
@@ -2033,14 +2033,14 @@ static const phy_init_config training_table_15 = {
 	}
 };
 
-static const phy_init_config training_table_16 = {
+static const phy_init_config training_16g_table_16 = {
 	0x000d0000, 1, false,
 	{
 		{{0x00e7, 0x0600}},
 	}
 };
 
-static const phy_init_config training_table_17 = {
+static const phy_init_config training_16g_table_17 = {
 	0x00090000, 15, false,
 	{
 		{{0x001c, 0x0000}}, {{0x0020, 0x0077}}, {{0x0024, 0x0082}}, {{0x0025, 0x002b}},
@@ -2050,7 +2050,7 @@ static const phy_init_config training_table_17 = {
 	}
 };
 
-static const phy_init_config training_table_18 = {
+static const phy_init_config training_16g_table_18 = {
 	0x00020000, 161, false,
 	{
 		{{0x018a, 0x0000}}, {{0x0124, 0x0001}}, {{0x018b, 0x0016}}, {{0x0125, 0x0039}},
@@ -2097,7 +2097,7 @@ static const phy_init_config training_table_18 = {
 	}
 };
 
-static const phy_init_config training_table_19 = {
+static const phy_init_config training_16g_table_19 = {
 	0x00040000, 208, false,
 	{
 		{{0x1613, 0x0b00}}, {{0x1617, 0x0000}}, {{0x163b, 0x0b00}}, {{0x163f, 0x0000}},
@@ -2155,7 +2155,7 @@ static const phy_init_config training_table_19 = {
 	}
 };
 
-static const phy_init_config training_table_20 = {
+static const phy_init_config training_16g_table_20 = {
 	0x000c0000, 6, false,
 	{
 		{{0x0001, 0x5061}}, {{0x0002, 0x7098}}, {{0x0003, 0x0000}}, {{0x0000, 0xbedc}},
@@ -2163,7 +2163,7 @@ static const phy_init_config training_table_20 = {
 	}
 };
 
-static const phy_init_config training_table_21 = {
+static const phy_init_config training_16g_table_21 = {
 	0x00090000, 36, false,
 	{
 		{{0x070c, 0x0000}}, {{0x070d, 0x07ff}}, {{0x070e, 0x0668}}, {{0x070f, 0x7910}},
@@ -2178,14 +2178,14 @@ static const phy_init_config training_table_21 = {
 	}
 };
 
-static const phy_init_config training_table_22 = {
+static const phy_init_config training_16g_table_22 = {
 	0x00020000, 3, false,
 	{
 		{{0x00f0, 0x27f7}}, {{0x00f1, 0x2108}}, {{0x00f2, 0x2108}},
 	}
 };
 
-static const phy_init_config training_table_23 = {
+static const phy_init_config training_16g_table_23 = {
 	0x00010000, 20, false,
 	{
 		{{0x00b9, 0x0001}}, {{0x00b1, 0x0180}}, {{0x00ba, 0x0001}}, {{0x00a2, 0x0000}},
@@ -2196,7 +2196,7 @@ static const phy_init_config training_table_23 = {
 	}
 };
 
-static const phy_init_config training_table_24 = {
+static const phy_init_config training_16g_table_24 = {
 	0x00070000, 74, false,
 	{
 		{{0x0024, 0x5a3c}}, {{0x0025, 0x5a3c}}, {{0x0026, 0x5a3c}}, {{0x0027, 0x5a3c}},
@@ -2221,35 +2221,35 @@ static const phy_init_config training_table_24 = {
 	}
 };
 
-static const phy_init_config training_table_25 = {
+static const phy_init_config training_16g_table_25 = {
 	0x00020000, 2, false,
 	{
 		{{0x007e, 0x0033}}, {{0x00ef, 0xffff}},
 	}
 };
 
-static const phy_init_config training_table_26 = {
+static const phy_init_config training_16g_table_26 = {
 	0x00090000, 1, false,
 	{
 		{{0x0910, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_27 = {
+static const phy_init_config training_16g_table_27 = {
 	0x00020000, 2, false,
 	{
 		{{0x0310, 0x0001}}, {{0x0311, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_28 = {
+static const phy_init_config training_16g_table_28 = {
 	0x000c0000, 1, false,
 	{
 		{{0x0080, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_29 = {
+static const phy_init_config training_16g_table_29 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0003, 0x0000}},
@@ -2257,43 +2257,42 @@ static const phy_init_config training_table_29 = {
 };
 
 const phy_init_config* lp5_train_table[] = {
-	&training_table_0,
-	&training_table_1,
-	&training_table_2,
-	&training_table_3,
-	&training_table_4,
-	&training_table_5,
-	&training_table_6,
-	&training_table_7,
-	&training_table_8,
-	&training_table_9,
-	&training_table_10,
-	&training_table_11,
-	&training_table_12,
-	&training_table_13,
-	&training_table_14,
-	&training_table_15,
-	&training_table_16,
-	&training_table_17,
-	&training_table_18,
-	&training_table_19,
-	&training_table_20,
-	&training_table_21,
-	&training_table_22,
-	&training_table_23,
-	&training_table_24,
-	&training_table_25,
-	&training_table_26,
-	&training_table_27,
-	&training_table_28,
-	&training_table_29,
+	&training_16g_table_0,
+	&training_16g_table_1,
+	&training_16g_table_2,
+	&training_16g_table_3,
+	&training_16g_table_4,
+	&training_16g_table_5,
+	&training_16g_table_6,
+	&training_16g_table_7,
+	&training_16g_table_8,
+	&training_16g_table_9,
+	&training_16g_table_10,
+	&training_16g_table_11,
+	&training_16g_table_12,
+	&training_16g_table_13,
+	&training_16g_table_14,
+	&training_16g_table_15,
+	&training_16g_table_16,
+	&training_16g_table_17,
+	&training_16g_table_18,
+	&training_16g_table_19,
+	&training_16g_table_20,
+	&training_16g_table_21,
+	&training_16g_table_22,
+	&training_16g_table_23,
+	&training_16g_table_24,
+	&training_16g_table_25,
+	&training_16g_table_26,
+	&training_16g_table_27,
+	&training_16g_table_28,
+	&training_16g_table_29,
 	NULL,
 };
 
 #else
 
-#if (DDR_SIZE_GB == 4)
-static const phy_init_config training_table_0 = {
+static const phy_init_config training_4g_table_0 = {
 	0x00090000, 8, false,
 	{
 		{{0x08f0, 0x0065}}, {{0x08f1, 0x012c}}, {{0x08f2, 0x0000}}, {{0x08f3, 0x0058}},
@@ -2301,7 +2300,7 @@ static const phy_init_config training_table_0 = {
 	}
 };
 
-static const phy_init_config training_table_1 = {
+static const phy_init_config training_4g_table_1 = {
 	0x00040000, 176, false,
 	{
 		{{0x1008, 0x49d8}}, {{0x1009, 0x0000}}, {{0x100a, 0x0000}}, {{0x100b, 0x0000}},
@@ -2351,42 +2350,42 @@ static const phy_init_config training_table_1 = {
 	}
 };
 
-static const phy_init_config training_table_2 = {
+static const phy_init_config training_4g_table_2 = {
 	0x00020000, 1, false,
 	{
 		{{0x0015, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_3 = {
+static const phy_init_config training_4g_table_3 = {
 	0x00030000, 4, false,
 	{
 		{{0x004a, 0x0000}}, {{0x004b, 0x0000}}, {{0x104a, 0x0000}}, {{0x104b, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_4 = {
+static const phy_init_config training_4g_table_4 = {
 	0x00020000, 3, false,
 	{
 		{{0x004c, 0x2c0f}}, {{0x004d, 0x0000}}, {{0x0041, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_5 = {
+static const phy_init_config training_4g_table_5 = {
 	0x00090000, 1, false,
 	{
 		{{0x0802, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_6 = {
+static const phy_init_config training_4g_table_6 = {
 	0x00020000, 1, false,
 	{
 		{{0x0045, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_7 = {
+static const phy_init_config training_4g_table_7 = {
 	0x00010000, 8, false,
 	{
 		{{0x0057, 0x0001}}, {{0x1057, 0x0001}}, {{0x2057, 0x0001}}, {{0x3057, 0x0001}},
@@ -2394,7 +2393,7 @@ static const phy_init_config training_table_7 = {
 	}
 };
 
-static const phy_init_config training_table_8 = {
+static const phy_init_config training_4g_table_8 = {
 	0x00090000, 7, false,
 	{
 		{{0x0803, 0x0004}}, {{0x0804, 0x0082}}, {{0x0805, 0x0001}}, {{0x0903, 0x0001}},
@@ -2402,42 +2401,42 @@ static const phy_init_config training_table_8 = {
 	}
 };
 
-static const phy_init_config training_table_9 = {
+static const phy_init_config training_4g_table_9 = {
 	0x00020000, 1, false,
 	{
 		{{0x0072, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_10 = {
+static const phy_init_config training_4g_table_10 = {
 	0x00090000, 1, false,
 	{
 		{{0x080e, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_11 = {
+static const phy_init_config training_4g_table_11 = {
 	0x00020000, 1, false,
 	{
 		{{0x0073, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_12 = {
+static const phy_init_config training_4g_table_12 = {
 	0x00090000, 1, false,
 	{
 		{{0x080f, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_13 = {
+static const phy_init_config training_4g_table_13 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0000, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_14 = {
+static const phy_init_config training_4g_table_14 = {
 	0x00040000, 1856, false,
 	{
 		{{0x1000, 0x0000}}, {{0x1001, 0x0000}}, {{0x1002, 0x0000}}, {{0x1003, 0x0000}},
@@ -2907,7 +2906,7 @@ static const phy_init_config training_table_14 = {
 	}
 };
 
-static const phy_init_config training_table_15 = {
+static const phy_init_config training_4g_table_15 = {
 	0x0009002e, 1269, true,
 	{
 		{{0x0010, 0x0400}}, {{0x080e, 0x000b}}, {{0x0480, 0x0809}}, {{0x0009, 0x0308}},
@@ -3072,14 +3071,14 @@ static const phy_init_config training_table_15 = {
 	}
 };
 
-static const phy_init_config training_table_16 = {
+static const phy_init_config training_4g_table_16 = {
 	0x000d0000, 1, false,
 	{
 		{{0x00e7, 0x0600}},
 	}
 };
 
-static const phy_init_config training_table_17 = {
+static const phy_init_config training_4g_table_17 = {
 	0x00090000, 15, false,
 	{
 		{{0x001c, 0x0000}}, {{0x0020, 0x0077}}, {{0x0024, 0x0082}}, {{0x0025, 0x002b}},
@@ -3089,7 +3088,7 @@ static const phy_init_config training_table_17 = {
 	}
 };
 
-static const phy_init_config training_table_18 = {
+static const phy_init_config training_4g_table_18 = {
 	0x00020000, 161, false,
 	{
 		{{0x018a, 0x0000}}, {{0x0124, 0x0001}}, {{0x018b, 0x0016}}, {{0x0125, 0x0039}},
@@ -3136,7 +3135,7 @@ static const phy_init_config training_table_18 = {
 	}
 };
 
-static const phy_init_config training_table_19 = {
+static const phy_init_config training_4g_table_19 = {
 	0x00040000, 208, false,
 	{
 		{{0x153b, 0x0b00}}, {{0x153f, 0x0000}}, {{0x1563, 0x0b00}}, {{0x1567, 0x0000}},
@@ -3194,7 +3193,7 @@ static const phy_init_config training_table_19 = {
 	}
 };
 
-static const phy_init_config training_table_20 = {
+static const phy_init_config training_4g_table_20 = {
 	0x000c0000, 6, false,
 	{
 		{{0x0001, 0x5061}}, {{0x0002, 0x7098}}, {{0x0003, 0x0000}}, {{0x0000, 0xbedc}},
@@ -3202,7 +3201,7 @@ static const phy_init_config training_table_20 = {
 	}
 };
 
-static const phy_init_config training_table_21 = {
+static const phy_init_config training_4g_table_21 = {
 	0x00090000, 36, false,
 	{
 		{{0x070c, 0x0000}}, {{0x070d, 0x07ff}}, {{0x070e, 0x0668}}, {{0x070f, 0x7910}},
@@ -3217,14 +3216,14 @@ static const phy_init_config training_table_21 = {
 	}
 };
 
-static const phy_init_config training_table_22 = {
+static const phy_init_config training_4g_table_22 = {
 	0x00020000, 3, false,
 	{
 		{{0x00f0, 0x27f7}}, {{0x00f1, 0x2108}}, {{0x00f2, 0x2108}},
 	}
 };
 
-static const phy_init_config training_table_23 = {
+static const phy_init_config training_4g_table_23 = {
 	0x00010000, 20, false,
 	{
 		{{0x00b9, 0x0001}}, {{0x00b1, 0x0180}}, {{0x00ba, 0x0001}}, {{0x00a2, 0x0000}},
@@ -3235,7 +3234,7 @@ static const phy_init_config training_table_23 = {
 	}
 };
 
-static const phy_init_config training_table_24 = {
+static const phy_init_config training_4g_table_24 = {
 	0x00070000, 74, false,
 	{
 		{{0x0024, 0x5a3c}}, {{0x0025, 0x5a3c}}, {{0x0026, 0x5a3c}}, {{0x0027, 0x5a3c}},
@@ -3260,78 +3259,76 @@ static const phy_init_config training_table_24 = {
 	}
 };
 
-static const phy_init_config training_table_25 = {
+static const phy_init_config training_4g_table_25 = {
 	0x00020000, 2, false,
 	{
 		{{0x007e, 0x0011}}, {{0x00ef, 0xffff}},
 	}
 };
 
-static const phy_init_config training_table_26 = {
+static const phy_init_config training_4g_table_26 = {
 	0x00090000, 1, false,
 	{
 		{{0x0910, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_27 = {
+static const phy_init_config training_4g_table_27 = {
 	0x00020000, 2, false,
 	{
 		{{0x0310, 0x0001}}, {{0x0311, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_28 = {
+static const phy_init_config training_4g_table_28 = {
 	0x000c0000, 1, false,
 	{
 		{{0x0080, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_29 = {
+static const phy_init_config training_4g_table_29 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0003, 0x0000}},
 	}
 };
 
-const phy_init_config* lp5_train_table[] = {
-	&training_table_0,
-	&training_table_1,
-	&training_table_2,
-	&training_table_3,
-	&training_table_4,
-	&training_table_5,
-	&training_table_6,
-	&training_table_7,
-	&training_table_8,
-	&training_table_9,
-	&training_table_10,
-	&training_table_11,
-	&training_table_12,
-	&training_table_13,
-	&training_table_14,
-	&training_table_15,
-	&training_table_16,
-	&training_table_17,
-	&training_table_18,
-	&training_table_19,
-	&training_table_20,
-	&training_table_21,
-	&training_table_22,
-	&training_table_23,
-	&training_table_24,
-	&training_table_25,
-	&training_table_26,
-	&training_table_27,
-	&training_table_28,
-	&training_table_29,
+const phy_init_config* lp5_4g_train_table[] = {
+	&training_4g_table_0,
+	&training_4g_table_1,
+	&training_4g_table_2,
+	&training_4g_table_3,
+	&training_4g_table_4,
+	&training_4g_table_5,
+	&training_4g_table_6,
+	&training_4g_table_7,
+	&training_4g_table_8,
+	&training_4g_table_9,
+	&training_4g_table_10,
+	&training_4g_table_11,
+	&training_4g_table_12,
+	&training_4g_table_13,
+	&training_4g_table_14,
+	&training_4g_table_15,
+	&training_4g_table_16,
+	&training_4g_table_17,
+	&training_4g_table_18,
+	&training_4g_table_19,
+	&training_4g_table_20,
+	&training_4g_table_21,
+	&training_4g_table_22,
+	&training_4g_table_23,
+	&training_4g_table_24,
+	&training_4g_table_25,
+	&training_4g_table_26,
+	&training_4g_table_27,
+	&training_4g_table_28,
+	&training_4g_table_29,
 	NULL,
 };
 
-#elif (DDR_SIZE_GB == 8)
-
-static const phy_init_config training_table_0 = {
+static const phy_init_config training_8g_table_0 = {
 	0x00090000, 8, false,
 	{
 		{{0x08f0, 0x0065}}, {{0x08f1, 0x012c}}, {{0x08f2, 0x0000}}, {{0x08f3, 0x0058}},
@@ -3339,7 +3336,7 @@ static const phy_init_config training_table_0 = {
 	}
 };
 
-static const phy_init_config training_table_1 = {
+static const phy_init_config training_8g_table_1 = {
 	0x00040000, 176, false,
 	{
 		{{0x1008, 0xc9d8}}, {{0x1009, 0x0000}}, {{0x100a, 0x0000}}, {{0x100b, 0x0000}},
@@ -3389,42 +3386,42 @@ static const phy_init_config training_table_1 = {
 	}
 };
 
-static const phy_init_config training_table_2 = {
+static const phy_init_config training_8g_table_2 = {
 	0x00020000, 1, false,
 	{
 		{{0x0015, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_3 = {
+static const phy_init_config training_8g_table_3 = {
 	0x00030000, 4, false,
 	{
 		{{0x004a, 0x0000}}, {{0x004b, 0x0000}}, {{0x104a, 0x0000}}, {{0x104b, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_4 = {
+static const phy_init_config training_8g_table_4 = {
 	0x00020000, 3, false,
 	{
 		{{0x004c, 0x2c0f}}, {{0x004d, 0x0000}}, {{0x0041, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_5 = {
+static const phy_init_config training_8g_table_5 = {
 	0x00090000, 1, false,
 	{
 		{{0x0802, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_6 = {
+static const phy_init_config training_8g_table_6 = {
 	0x00020000, 1, false,
 	{
 		{{0x0045, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_7 = {
+static const phy_init_config training_8g_table_7 = {
 	0x00010000, 8, false,
 	{
 		{{0x0057, 0x0001}}, {{0x1057, 0x0001}}, {{0x2057, 0x0001}}, {{0x3057, 0x0001}},
@@ -3432,7 +3429,7 @@ static const phy_init_config training_table_7 = {
 	}
 };
 
-static const phy_init_config training_table_8 = {
+static const phy_init_config training_8g_table_8 = {
 	0x00090000, 7, false,
 	{
 		{{0x0803, 0x0004}}, {{0x0804, 0x0082}}, {{0x0805, 0x0001}}, {{0x0903, 0x0001}},
@@ -3440,42 +3437,42 @@ static const phy_init_config training_table_8 = {
 	}
 };
 
-static const phy_init_config training_table_9 = {
+static const phy_init_config training_8g_table_9 = {
 	0x00020000, 1, false,
 	{
 		{{0x0072, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_10 = {
+static const phy_init_config training_8g_table_10 = {
 	0x00090000, 1, false,
 	{
 		{{0x080e, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_11 = {
+static const phy_init_config training_8g_table_11 = {
 	0x00020000, 1, false,
 	{
 		{{0x0073, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_12 = {
+static const phy_init_config training_8g_table_12 = {
 	0x00090000, 1, false,
 	{
 		{{0x080f, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_13 = {
+static const phy_init_config training_8g_table_13 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0000, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_14 = {
+static const phy_init_config training_8g_table_14 = {
 	0x00040000, 2264, false,
 	{
 		{{0x1000, 0x0000}}, {{0x1001, 0x0000}}, {{0x1002, 0x0000}}, {{0x1003, 0x0000}},
@@ -4047,7 +4044,7 @@ static const phy_init_config training_table_14 = {
 	}
 };
 
-static const phy_init_config training_table_15 = {
+static const phy_init_config training_8g_table_15 = {
 	0x0009002e, 1293, true,
 	{
 		{{0x0010, 0x0400}}, {{0x080e, 0x000b}}, {{0x0480, 0x0809}}, {{0x0009, 0x0308}},
@@ -4215,14 +4212,14 @@ static const phy_init_config training_table_15 = {
 	}
 };
 
-static const phy_init_config training_table_16 = {
+static const phy_init_config training_8g_table_16 = {
 	0x000d0000, 1, false,
 	{
 		{{0x00e7, 0x0600}},
 	}
 };
 
-static const phy_init_config training_table_17 = {
+static const phy_init_config training_8g_table_17 = {
 	0x00090000, 15, false,
 	{
 		{{0x001c, 0x0000}}, {{0x0020, 0x0077}}, {{0x0024, 0x0082}}, {{0x0025, 0x002b}},
@@ -4232,7 +4229,7 @@ static const phy_init_config training_table_17 = {
 	}
 };
 
-static const phy_init_config training_table_18 = {
+static const phy_init_config training_8g_table_18 = {
 	0x00020000, 161, false,
 	{
 		{{0x018a, 0x0000}}, {{0x0124, 0x0001}}, {{0x018b, 0x0016}}, {{0x0125, 0x0039}},
@@ -4279,7 +4276,7 @@ static const phy_init_config training_table_18 = {
 	}
 };
 
-static const phy_init_config training_table_19 = {
+static const phy_init_config training_8g_table_19 = {
 	0x00040000, 208, false,
 	{
 		{{0x1613, 0x0b00}}, {{0x1617, 0x0000}}, {{0x163b, 0x0b00}}, {{0x163f, 0x0000}},
@@ -4337,7 +4334,7 @@ static const phy_init_config training_table_19 = {
 	}
 };
 
-static const phy_init_config training_table_20 = {
+static const phy_init_config training_8g_table_20 = {
 	0x000c0000, 6, false,
 	{
 		{{0x0001, 0x5061}}, {{0x0002, 0x7098}}, {{0x0003, 0x0000}}, {{0x0000, 0xbedc}},
@@ -4345,7 +4342,7 @@ static const phy_init_config training_table_20 = {
 	}
 };
 
-static const phy_init_config training_table_21 = {
+static const phy_init_config training_8g_table_21 = {
 	0x00090000, 36, false,
 	{
 		{{0x070c, 0x0000}}, {{0x070d, 0x07ff}}, {{0x070e, 0x0668}}, {{0x070f, 0x7910}},
@@ -4360,14 +4357,14 @@ static const phy_init_config training_table_21 = {
 	}
 };
 
-static const phy_init_config training_table_22 = {
+static const phy_init_config training_8g_table_22 = {
 	0x00020000, 3, false,
 	{
 		{{0x00f0, 0x27f7}}, {{0x00f1, 0x2108}}, {{0x00f2, 0x2108}},
 	}
 };
 
-static const phy_init_config training_table_23 = {
+static const phy_init_config training_8g_table_23 = {
 	0x00010000, 20, false,
 	{
 		{{0x00b9, 0x0001}}, {{0x00b1, 0x0180}}, {{0x00ba, 0x0001}}, {{0x00a2, 0x0000}},
@@ -4378,7 +4375,7 @@ static const phy_init_config training_table_23 = {
 	}
 };
 
-static const phy_init_config training_table_24 = {
+static const phy_init_config training_8g_table_24 = {
 	0x00070000, 74, false,
 	{
 		{{0x0024, 0x5a3c}}, {{0x0025, 0x5a3c}}, {{0x0026, 0x5a3c}}, {{0x0027, 0x5a3c}},
@@ -4403,78 +4400,76 @@ static const phy_init_config training_table_24 = {
 	}
 };
 
-static const phy_init_config training_table_25 = {
+static const phy_init_config training_8g_table_25 = {
 	0x00020000, 2, false,
 	{
 		{{0x007e, 0x0033}}, {{0x00ef, 0xffff}},
 	}
 };
 
-static const phy_init_config training_table_26 = {
+static const phy_init_config training_8g_table_26 = {
 	0x00090000, 1, false,
 	{
 		{{0x0910, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_27 = {
+static const phy_init_config training_8g_table_27 = {
 	0x00020000, 2, false,
 	{
 		{{0x0310, 0x0001}}, {{0x0311, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_28 = {
+static const phy_init_config training_8g_table_28 = {
 	0x000c0000, 1, false,
 	{
 		{{0x0080, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_29 = {
+static const phy_init_config training_8g_table_29 = {
 	0x000d0000, 2, false,
 	{
 		{{0x0003, 0x0000}}, {{0x0000, 0x0001}},
 	}
 };
 
-const phy_init_config* lp5_train_table[] = {
-	&training_table_0,
-	&training_table_1,
-	&training_table_2,
-	&training_table_3,
-	&training_table_4,
-	&training_table_5,
-	&training_table_6,
-	&training_table_7,
-	&training_table_8,
-	&training_table_9,
-	&training_table_10,
-	&training_table_11,
-	&training_table_12,
-	&training_table_13,
-	&training_table_14,
-	&training_table_15,
-	&training_table_16,
-	&training_table_17,
-	&training_table_18,
-	&training_table_19,
-	&training_table_20,
-	&training_table_21,
-	&training_table_22,
-	&training_table_23,
-	&training_table_24,
-	&training_table_25,
-	&training_table_26,
-	&training_table_27,
-	&training_table_28,
-	&training_table_29,
+const phy_init_config* lp5_8g_train_table[] = {
+	&training_8g_table_0,
+	&training_8g_table_1,
+	&training_8g_table_2,
+	&training_8g_table_3,
+	&training_8g_table_4,
+	&training_8g_table_5,
+	&training_8g_table_6,
+	&training_8g_table_7,
+	&training_8g_table_8,
+	&training_8g_table_9,
+	&training_8g_table_10,
+	&training_8g_table_11,
+	&training_8g_table_12,
+	&training_8g_table_13,
+	&training_8g_table_14,
+	&training_8g_table_15,
+	&training_8g_table_16,
+	&training_8g_table_17,
+	&training_8g_table_18,
+	&training_8g_table_19,
+	&training_8g_table_20,
+	&training_8g_table_21,
+	&training_8g_table_22,
+	&training_8g_table_23,
+	&training_8g_table_24,
+	&training_8g_table_25,
+	&training_8g_table_26,
+	&training_8g_table_27,
+	&training_8g_table_28,
+	&training_8g_table_29,
 	NULL,
 };
 
-#else
-
-static const phy_init_config training_table_0 = {
+static const phy_init_config training_16g_table_0 = {
 	0x00090000, 8, false,
 	{
 		{{0x08f0, 0x0065}}, {{0x08f1, 0x012c}}, {{0x08f2, 0x0000}}, {{0x08f3, 0x0058}},
@@ -4482,7 +4477,7 @@ static const phy_init_config training_table_0 = {
 	}
 };
 
-static const phy_init_config training_table_1 = {
+static const phy_init_config training_16g_table_1 = {
 	0x00040000, 176, false,
 	{
 		{{0x1008, 0xc9d8}}, {{0x1009, 0x0000}}, {{0x100a, 0x0000}}, {{0x100b, 0x0000}},
@@ -4532,42 +4527,42 @@ static const phy_init_config training_table_1 = {
 	}
 };
 
-static const phy_init_config training_table_2 = {
+static const phy_init_config training_16g_table_2 = {
 	0x00020000, 1, false,
 	{
 		{{0x0015, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_3 = {
+static const phy_init_config training_16g_table_3 = {
 	0x00030000, 4, false,
 	{
 		{{0x004a, 0x0000}}, {{0x004b, 0x0000}}, {{0x104a, 0x0000}}, {{0x104b, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_4 = {
+static const phy_init_config training_16g_table_4 = {
 	0x00020000, 3, false,
 	{
 		{{0x004c, 0x2c0f}}, {{0x004d, 0x0000}}, {{0x0041, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_5 = {
+static const phy_init_config training_16g_table_5 = {
 	0x00090000, 1, false,
 	{
 		{{0x0802, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_6 = {
+static const phy_init_config training_16g_table_6 = {
 	0x00020000, 1, false,
 	{
 		{{0x0045, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_7 = {
+static const phy_init_config training_16g_table_7 = {
 	0x00010000, 8, false,
 	{
 		{{0x0057, 0x0001}}, {{0x1057, 0x0001}}, {{0x2057, 0x0001}}, {{0x3057, 0x0001}},
@@ -4575,7 +4570,7 @@ static const phy_init_config training_table_7 = {
 	}
 };
 
-static const phy_init_config training_table_8 = {
+static const phy_init_config training_16g_table_8 = {
 	0x00090000, 7, false,
 	{
 		{{0x0803, 0x0004}}, {{0x0804, 0x0082}}, {{0x0805, 0x0001}}, {{0x0903, 0x0001}},
@@ -4583,42 +4578,42 @@ static const phy_init_config training_table_8 = {
 	}
 };
 
-static const phy_init_config training_table_9 = {
+static const phy_init_config training_16g_table_9 = {
 	0x00020000, 1, false,
 	{
 		{{0x0072, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_10 = {
+static const phy_init_config training_16g_table_10 = {
 	0x00090000, 1, false,
 	{
 		{{0x080e, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_11 = {
+static const phy_init_config training_16g_table_11 = {
 	0x00020000, 1, false,
 	{
 		{{0x0073, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_12 = {
+static const phy_init_config training_16g_table_12 = {
 	0x00090000, 1, false,
 	{
 		{{0x080f, 0x0003}},
 	}
 };
 
-static const phy_init_config training_table_13 = {
+static const phy_init_config training_16g_table_13 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0000, 0x0000}},
 	}
 };
 
-static const phy_init_config training_table_14 = {
+static const phy_init_config training_16g_table_14 = {
 	0x00040000, 2264, false,
 	{
 		{{0x1000, 0x0000}}, {{0x1001, 0x0000}}, {{0x1002, 0x0000}}, {{0x1003, 0x0000}},
@@ -5190,7 +5185,7 @@ static const phy_init_config training_table_14 = {
 	}
 };
 
-static const phy_init_config training_table_15 = {
+static const phy_init_config training_16g_table_15 = {
 	0x0009002e, 1293, true,
 	{
 		{{0x0010, 0x0400}}, {{0x080e, 0x000b}}, {{0x0480, 0x0809}}, {{0x0009, 0x0308}},
@@ -5358,14 +5353,14 @@ static const phy_init_config training_table_15 = {
 	}
 };
 
-static const phy_init_config training_table_16 = {
+static const phy_init_config training_16g_table_16 = {
 	0x000d0000, 1, false,
 	{
 		{{0x00e7, 0x0600}},
 	}
 };
 
-static const phy_init_config training_table_17 = {
+static const phy_init_config training_16g_table_17 = {
 	0x00090000, 15, false,
 	{
 		{{0x001c, 0x0000}}, {{0x0020, 0x0077}}, {{0x0024, 0x0082}}, {{0x0025, 0x002b}},
@@ -5375,7 +5370,7 @@ static const phy_init_config training_table_17 = {
 	}
 };
 
-static const phy_init_config training_table_18 = {
+static const phy_init_config training_16g_table_18 = {
 	0x00020000, 161, false,
 	{
 		{{0x018a, 0x0000}}, {{0x0124, 0x0001}}, {{0x018b, 0x0016}}, {{0x0125, 0x0039}},
@@ -5422,7 +5417,7 @@ static const phy_init_config training_table_18 = {
 	}
 };
 
-static const phy_init_config training_table_19 = {
+static const phy_init_config training_16g_table_19 = {
 	0x00040000, 208, false,
 	{
 		{{0x1613, 0x0b00}}, {{0x1617, 0x0000}}, {{0x163b, 0x0b00}}, {{0x163f, 0x0000}},
@@ -5480,7 +5475,7 @@ static const phy_init_config training_table_19 = {
 	}
 };
 
-static const phy_init_config training_table_20 = {
+static const phy_init_config training_16g_table_20 = {
 	0x000c0000, 6, false,
 	{
 		{{0x0001, 0x5061}}, {{0x0002, 0x7098}}, {{0x0003, 0x0000}}, {{0x0000, 0xbedc}},
@@ -5488,7 +5483,7 @@ static const phy_init_config training_table_20 = {
 	}
 };
 
-static const phy_init_config training_table_21 = {
+static const phy_init_config training_16g_table_21 = {
 	0x00090000, 36, false,
 	{
 		{{0x070c, 0x0000}}, {{0x070d, 0x07ff}}, {{0x070e, 0x0668}}, {{0x070f, 0x7910}},
@@ -5503,14 +5498,14 @@ static const phy_init_config training_table_21 = {
 	}
 };
 
-static const phy_init_config training_table_22 = {
+static const phy_init_config training_16g_table_22 = {
 	0x00020000, 3, false,
 	{
 		{{0x00f0, 0x27f7}}, {{0x00f1, 0x2108}}, {{0x00f2, 0x2108}},
 	}
 };
 
-static const phy_init_config training_table_23 = {
+static const phy_init_config training_16g_table_23 = {
 	0x00010000, 20, false,
 	{
 		{{0x00b9, 0x0001}}, {{0x00b1, 0x0180}}, {{0x00ba, 0x0001}}, {{0x00a2, 0x0000}},
@@ -5521,7 +5516,7 @@ static const phy_init_config training_table_23 = {
 	}
 };
 
-static const phy_init_config training_table_24 = {
+static const phy_init_config training_16g_table_24 = {
 	0x00070000, 73, false,
 	{
 		{{0x0024, 0x5a3c}}, {{0x0025, 0x5a3c}}, {{0x0026, 0x5a3c}}, {{0x0027, 0x5a3c}},
@@ -5546,73 +5541,72 @@ static const phy_init_config training_table_24 = {
 	}
 };
 
-static const phy_init_config training_table_25 = {
+static const phy_init_config training_16g_table_25 = {
 	0x00020000, 2, false,
 	{
 		{{0x007e, 0x0033}}, {{0x00ef, 0xffff}},
 	}
 };
 
-static const phy_init_config training_table_26 = {
+static const phy_init_config training_16g_table_26 = {
 	0x00090000, 1, false,
 	{
 		{{0x0910, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_27 = {
+static const phy_init_config training_16g_table_27 = {
 	0x00020000, 2, false,
 	{
 		{{0x0310, 0x0001}}, {{0x0311, 0x0001}},
 	}
 };
 
-static const phy_init_config training_table_28 = {
+static const phy_init_config training_16g_table_28 = {
 	0x000c0000, 1, false,
 	{
 		{{0x0080, 0x0002}},
 	}
 };
 
-static const phy_init_config training_table_29 = {
+static const phy_init_config training_16g_table_29 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0003, 0x0000}},
 	}
 };
 
-const phy_init_config* lp5_train_table[] = {
-	&training_table_0,
-	&training_table_1,
-	&training_table_2,
-	&training_table_3,
-	&training_table_4,
-	&training_table_5,
-	&training_table_6,
-	&training_table_7,
-	&training_table_8,
-	&training_table_9,
-	&training_table_10,
-	&training_table_11,
-	&training_table_12,
-	&training_table_13,
-	&training_table_14,
-	&training_table_15,
-	&training_table_16,
-	&training_table_17,
-	&training_table_18,
-	&training_table_19,
-	&training_table_20,
-	&training_table_21,
-	&training_table_22,
-	&training_table_23,
-	&training_table_24,
-	&training_table_25,
-	&training_table_26,
-	&training_table_27,
-	&training_table_28,
-	&training_table_29,
+const phy_init_config* lp5_16g_train_table[] = {
+	&training_16g_table_0,
+	&training_16g_table_1,
+	&training_16g_table_2,
+	&training_16g_table_3,
+	&training_16g_table_4,
+	&training_16g_table_5,
+	&training_16g_table_6,
+	&training_16g_table_7,
+	&training_16g_table_8,
+	&training_16g_table_9,
+	&training_16g_table_10,
+	&training_16g_table_11,
+	&training_16g_table_12,
+	&training_16g_table_13,
+	&training_16g_table_14,
+	&training_16g_table_15,
+	&training_16g_table_16,
+	&training_16g_table_17,
+	&training_16g_table_18,
+	&training_16g_table_19,
+	&training_16g_table_20,
+	&training_16g_table_21,
+	&training_16g_table_22,
+	&training_16g_table_23,
+	&training_16g_table_24,
+	&training_16g_table_25,
+	&training_16g_table_26,
+	&training_16g_table_27,
+	&training_16g_table_28,
+	&training_16g_table_29,
 	NULL,
 };
-#endif
 #endif

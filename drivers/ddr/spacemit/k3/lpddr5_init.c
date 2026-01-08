@@ -39,20 +39,20 @@ static void lp5_training_table_init(unsigned int ddrc_base, const phy_init_confi
 	}
 }
 
-static void phyinit_lp5_pre_training(unsigned int ddrc_base)
+static void phyinit_lp5_pre_training(unsigned int ddrc_base, const phy_init_config* pre_train_table[])
 {
 	unsigned int offset = 0;
 	unsigned long DPHY_BASE = ddrc_base + 0x800000;
 
-	lp5_training_table_init(ddrc_base, lp5_pre_train_table);
+	lp5_training_table_init(ddrc_base, pre_train_table);
 
 	for (offset = 0x584d2; offset < 0x60000; offset++)
 		REG32(DPHY_BASE + offset * 4) = 0x0;
 }
 
-static void phyinit_lp5_training(unsigned int ddrc_base)
+static void phyinit_lp5_training(unsigned int ddrc_base, const phy_init_config* train_table[])
 {
-	lp5_training_table_init(ddrc_base, lp5_train_table);
+	lp5_training_table_init(ddrc_base, train_table);
 }
 
 #if TRAINING_DEBUG
@@ -149,53 +149,14 @@ void major_message_all(unsigned int dphy_base)
 	accept_message(dphy_base);
 }
 
-void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
+#if (CONFIG_DDR_DATARATE == 1066)
+static void init_snps_lp45_ddrc_1066(unsigned DDRC_BASE, unsigned int rst_code)
 {
 	unsigned int read_data;
 	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
 	unsigned int DPHY_BASE = DDRC_BASE + 0x800000;
 	unsigned int count = 0x100;
 
-#if (CONFIG_DDR_DATARATE == 5500)
-	/* DPLL 2750MHz*/
-	REG32(CFG_BASE + 0x8) = 0x0b3912aa;
-	REG32(CFG_BASE + 0x10) = 0xa0558b8b;
-	REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0xab << 8);
-#elif (CONFIG_DDR_DATARATE == 6000)
-	/* DPLL 3000MHz*/
-	REG32(CFG_BASE + 0x8) = 0x0b3e2000;
-	REG32(CFG_BASE + 0x10) = 0xa0558c8c;
-	REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0x00 << 8);
-#else
-	REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff);
-#endif
-	read_data = REG32(CFG_BASE + 0x1c);
-	while ((read_data & 0x00000001) != 0x1) {
-		read_data = REG32(CFG_BASE + 0x1c);
-	}
-	REG32(CFG_BASE + 0x18) &= ~(0x3f << 16); // div 0
-#if (CONFIG_DDR_DATARATE == 1066)
-	REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x7 << 16); // sel 2, div 8
-#elif (CONFIG_DDR_DATARATE == 4266)
-	REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x1 << 16); // sel 2, div 2
-	// REG32(CFG_BASE + 0x18) |= (0x2 << 19) | (0x1 << 16); // sel 2, div 2 3200mbps
-#elif (CONFIG_DDR_DATARATE == 5120)
-	REG32(CFG_BASE + 0x18) |= (0x7 << 19) | (0x0 << 16); // sel 3, div 1 5120mbps
-#else
-	REG32(CFG_BASE + 0x18) |= (0x2 << 19) | (0x0 << 16); // sel 3, div 1 6400mbps
-	// REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x1 << 16); // sel 3, div 1
-#endif
-	REG32(CFG_BASE + 0x18) |= (1 << 25); // fc
-	LogMsg(0, "read 6400 reg 0x%08X 0x%08X\n", CFG_BASE + 0x18, REG32(CFG_BASE + 0x18));
-	REG32(0xD4282CE8) = REG32(CFG_BASE + 0x18);
-	LogMsg(0, "check setting reg 0x%08X 0x%08X\n", 0xD4282CE8, REG32(0xD4282CE8));
-	read_data = REG32(CFG_BASE + 0x18);
-	while ((read_data & 0x2000000) != 0x0) {
-		read_data = REG32(CFG_BASE + 0x18);
-	}
-	REG32(CFG_BASE + 0x18) |= 0x1;
-
-#if (CONFIG_DDR_DATARATE == 1066)
 	REG32(DDRC_BASE + 0x00010b84) = 0x00000001;
 	REG32(DDRC_BASE + 0x00010000) = 0x03080008;
 	REG32(DDRC_BASE + 0x00010010) = 0x00000101;
@@ -389,7 +350,7 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
 
 	LogMsg(0, "read ddr phy 0x%08X\n", REG32(DPHY_BASE + 0x200c9 * 4));
-	phyinit_lp5_pre_training(DDRC_BASE);
+	phyinit_lp5_pre_training(DDRC_BASE, lp5_pre_train_table);
 
 	REG32(DDRC_BASE + 0x00010180) |= (0x1 << 11);
 
@@ -404,7 +365,7 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 		count--;
 	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
 
-	phyinit_lp5_training(DDRC_BASE);
+	phyinit_lp5_training(DDRC_BASE, lp5_train_table);
 
 	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
 	REG32(DDRC_BASE + 0x00010510) = 0x00010034;
@@ -452,7 +413,17 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 	REG32(DDRC_BASE + 0x00010180) = 0x00020000;
 	REG32(DDRC_BASE + 0x00010184) = 0x00000002;
 	REG32(DDRC_BASE + 0x00010100) = 0x00000005;
+}
+
 #elif (CONFIG_DDR_DATARATE == 4266)
+
+static void init_snps_lp45_ddrc_4266(unsigned DDRC_BASE, unsigned int rst_code)
+{
+	unsigned int read_data;
+	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
+	unsigned int DPHY_BASE = DDRC_BASE + 0x800000;
+	unsigned int count = 0x100;
+
 	REG32(DDRC_BASE + 0x00010b84) = 0x00000001;
 	REG32(DDRC_BASE + 0x00010000) = 0x03080008;
 	REG32(DDRC_BASE + 0x00010010) = 0x00000101;
@@ -626,7 +597,7 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 	}
 	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
 
-	phyinit_lp5_pre_training(DDRC_BASE);
+	phyinit_lp5_pre_training(DDRC_BASE, lp5_pre_train_table);
 
 	REG32(DDRC_BASE + 0x00010180) |= (0x1 << 11);
 
@@ -640,7 +611,7 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 		;
 	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
 
-	phyinit_lp5_training(DDRC_BASE);
+	phyinit_lp5_training(DDRC_BASE, lp5_train_table);
 
 	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
 	REG32(DDRC_BASE + 0x00010510) = 0x00010034;
@@ -686,8 +657,16 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 	REG32(DDRC_BASE + 0x00010180) = 0x00020000;
 	REG32(DDRC_BASE + 0x00010184) = 0x00000000;
 	REG32(DDRC_BASE + 0x00010100) = 0x00000005;
+}
+
 #else
-#if (DDR_SIZE_GB == 4)
+
+static void init_snps_lp45_4g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_code)
+{
+	unsigned int read_data;
+	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
+	unsigned int DPHY_BASE = DDRC_BASE + 0x800000;
+	unsigned int count = 0x100;
 	REG32(DDRC_BASE + 0x00010b84) = 0x00000001;
 	REG32(DDRC_BASE + 0x00010000) = 0x01080008;
 	REG32(DDRC_BASE + 0x00010010) = 0x00000101;
@@ -865,7 +844,7 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 	}
 	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
 
-	phyinit_lp5_pre_training(DDRC_BASE);
+	phyinit_lp5_pre_training(DDRC_BASE, lp5_4g_pre_train_table);
 
 	REG32(DDRC_BASE + 0x00010180) |= (0x1 << 11);
 
@@ -879,7 +858,7 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 		;
 	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
 
-	phyinit_lp5_training(DDRC_BASE);
+	phyinit_lp5_training(DDRC_BASE, lp5_4g_train_table);
 
 	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
 	REG32(DDRC_BASE + 0x00010510) = 0x00010034;
@@ -924,7 +903,15 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 	REG32(DDRC_BASE + 0x00010180) = 0x00020010;
 	REG32(DDRC_BASE + 0x00010180) = 0x00020000;
 	REG32(DDRC_BASE + 0x00010184) = 0x00000000;
-#elif (DDR_SIZE_GB == 8)
+}
+
+static void init_snps_lp45_8g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_code)
+{
+	unsigned int read_data;
+	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
+	unsigned int DPHY_BASE = DDRC_BASE + 0x800000;
+	unsigned int count = 0x100;
+
 	REG32(DDRC_BASE + 0x00010b84) = 0x00000001;
 	REG32(DDRC_BASE + 0x00010000) = 0x03080008;
 	REG32(DDRC_BASE + 0x00010010) = 0x00000111;
@@ -1102,7 +1089,7 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 	}
 	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
 
-	phyinit_lp5_pre_training(DDRC_BASE);
+	phyinit_lp5_pre_training(DDRC_BASE, lp5_8g_pre_train_table);
 
 	REG32(DDRC_BASE + 0x00010180) |= (0x1 << 11);
 
@@ -1116,7 +1103,7 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 		;
 	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
 
-	phyinit_lp5_training(DDRC_BASE);
+	phyinit_lp5_training(DDRC_BASE, lp5_8g_train_table);
 
 	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
 	REG32(DDRC_BASE + 0x00010510) = 0x00010034;
@@ -1167,7 +1154,15 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 	REG32(DDRC_BASE + 0x00010180) = 0x00020000;
 	REG32(DDRC_BASE + 0x00010184) = 0x00000002;
 	REG32(DDRC_BASE + 0x00010100) = 0x00000005;
-#else
+}
+
+static void init_snps_lp45_16g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_code)
+{
+	unsigned int read_data;
+	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
+	unsigned int DPHY_BASE = DDRC_BASE + 0x800000;
+	unsigned int count = 0x100;
+
 	REG32(DDRC_BASE + 0x00010b84) = 0x00000001;
 	REG32(DDRC_BASE + 0x00010000) = 0x03080008;
 	REG32(DDRC_BASE + 0x00010010) = 0x00000101;
@@ -1340,7 +1335,7 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 	}
 	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
 
-	phyinit_lp5_pre_training(DDRC_BASE);
+	phyinit_lp5_pre_training(DDRC_BASE, lp5_16g_pre_train_table);
 
 	REG32(DDRC_BASE + 0x00010180) |= (0x1 << 11);
 
@@ -1354,7 +1349,7 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 		;
 	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
 
-	phyinit_lp5_training(DDRC_BASE);
+	phyinit_lp5_training(DDRC_BASE, lp5_16g_train_table);
 
 	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
 	REG32(DDRC_BASE + 0x00010510) = 0x00010034;
@@ -1399,13 +1394,75 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 	REG32(DDRC_BASE + 0x00010180) = 0x00020010;
 	REG32(DDRC_BASE + 0x00010180) = 0x00020000;
 	REG32(DDRC_BASE + 0x00010184) = 0x00000000;
+}
 #endif
+
+void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info)
+{
+	unsigned int rst_code, read_data;
+	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
+
+	rst_code = 22;
+
+#if (CONFIG_DDR_DATARATE == 5500)
+	/* DPLL 2750MHz*/
+	REG32(CFG_BASE + 0x8) = 0x0b3912aa;
+	REG32(CFG_BASE + 0x10) = 0xa0558b8b;
+	REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0xab << 8);
+#elif (CONFIG_DDR_DATARATE == 6000)
+	/* DPLL 3000MHz*/
+	REG32(CFG_BASE + 0x8) = 0x0b3e2000;
+	REG32(CFG_BASE + 0x10) = 0xa0558c8c;
+	REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0x00 << 8);
+#else
+	REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff);
+#endif
+	read_data = REG32(CFG_BASE + 0x1c);
+	while ((read_data & 0x00000001) != 0x1) {
+		read_data = REG32(CFG_BASE + 0x1c);
+	}
+	REG32(CFG_BASE + 0x18) &= ~(0x3f << 16); // div 0
+#if (CONFIG_DDR_DATARATE == 1066)
+	REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x7 << 16); // sel 2, div 8
+#elif (CONFIG_DDR_DATARATE == 4266)
+	REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x1 << 16); // sel 2, div 2
+	// REG32(CFG_BASE + 0x18) |= (0x2 << 19) | (0x1 << 16); // sel 2, div 2 3200mbps
+#elif (CONFIG_DDR_DATARATE == 5120)
+	REG32(CFG_BASE + 0x18) |= (0x7 << 19) | (0x0 << 16); // sel 3, div 1 5120mbps
+#else
+	REG32(CFG_BASE + 0x18) |= (0x2 << 19) | (0x0 << 16); // sel 3, div 1 6400mbps
+	// REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x1 << 16); // sel 3, div 1
+#endif
+	REG32(CFG_BASE + 0x18) |= (1 << 25); // fc
+	LogMsg(0, "read 6400 reg 0x%08X 0x%08X\n", CFG_BASE + 0x18, REG32(CFG_BASE + 0x18));
+	REG32(0xD4282CE8) = REG32(CFG_BASE + 0x18);
+	LogMsg(0, "check setting reg 0x%08X 0x%08X\n", 0xD4282CE8, REG32(0xD4282CE8));
+	read_data = REG32(CFG_BASE + 0x18);
+	while ((read_data & 0x2000000) != 0x0) {
+		read_data = REG32(CFG_BASE + 0x18);
+	}
+	REG32(CFG_BASE + 0x18) |= 0x1;
+
+#if (CONFIG_DDR_DATARATE == 1066)
+	init_snps_lp45_ddrc_1066(DDRC_BASE, rst_code);
+#elif (CONFIG_DDR_DATARATE == 4266)
+	init_snps_lp45_ddrc_4266(DDRC_BASE, rst_code);
+#else
+	if (4096 == part_info->size_mb) {
+		init_snps_lp45_4g_ddrc_6400(DDRC_BASE, rst_code);
+	} else if (8192 == part_info->size_mb) {
+		init_snps_lp45_8g_ddrc_6400(DDRC_BASE, rst_code);
+	} else if (16384 == part_info->size_mb) {
+		init_snps_lp45_16g_ddrc_6400(DDRC_BASE, rst_code);
+	} else {
+		LogMsg(0, "Unsupported DDR size %d MB\n", part_info->size_mb);
+	}
 #endif
 }
 
-void lpddr5_silicon_init(uint64_t ddrc_reg_base, uint32_t data_rate)
+void lpddr5_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info)
 {
 	LogMsg(0, "=== start init_lpddr() ===\n");
-	init_snps_lp45(ddrc_reg_base, 22);
+	init_snps_lp45(ddrc_reg_base, part_info);
 	LogMsg(0, "=== finish init_lpddr() ===\n");
 }
