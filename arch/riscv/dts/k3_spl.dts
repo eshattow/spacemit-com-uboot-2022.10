@@ -172,10 +172,12 @@
 			status = "okay";
 		};
 
-		ddr@3000000 {
+		ddr@cb000000 {
 			u-boot,dm-spl;
 			compatible = "spacemit,snps-lp45";
-			reg = <0x00000000 0xc0000000 0x00000000 0x00400000>;
+			reg = <0x00000000 0xcb000000 0x00000000 0x00400000>,
+			      <0x00000000 0xcc000000 0x00000000 0x00400000>;
+			reg-names = "ddrc0", "ddrc1";
 			status = "okay";
 		};
 

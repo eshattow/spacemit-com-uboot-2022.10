@@ -8,9 +8,6 @@
 
 #include <stdio.h>
 
-#define DDR_CTRL_REG_BASE	(0xCB000000)
-#define DDR_CTRL1_REG_BASE	(0xCC000000)
-
 // current only support 4GB, 8GB or 16GB
 // default is 8GB
 #define DDR_SIZE_GB		(8)
@@ -66,4 +63,6 @@ typedef struct {
 extern const phy_init_config* lp5_pre_train_table[];
 extern const phy_init_config* lp5_train_table[];
 
+extern void fpga_ddr_init(void);
+extern void lpddr5_silicon_init(uint64_t ddrc_reg_base, uint32_t data_rate);
 #endif /* _K3_DDR_H_ */

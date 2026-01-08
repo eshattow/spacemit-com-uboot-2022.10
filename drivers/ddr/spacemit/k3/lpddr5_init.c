@@ -1403,15 +1403,9 @@ void init_snps_lp45(unsigned DDRC_BASE, unsigned rst_code)
 #endif
 }
 
-void lpddr5_silicon_init(void)
+void lpddr5_silicon_init(uint64_t ddrc_reg_base, uint32_t data_rate)
 {
-	printf("Init LPDDR5 with %dMT/s\n", CONFIG_DDR_DATARATE);
-
 	LogMsg(0, "=== start init_lpddr() ===\n");
-	init_snps_lp45(DDR_CTRL_REG_BASE, 22);
+	init_snps_lp45(ddrc_reg_base, 22);
 	LogMsg(0, "=== finish init_lpddr() ===\n");
-
-	LogMsg(0, "=== start init_lpddr1() ===\n");
-	init_snps_lp45(DDR_CTRL1_REG_BASE, 22);
-	LogMsg(0, "=== finish init_lpddr1() ===\n");
 }

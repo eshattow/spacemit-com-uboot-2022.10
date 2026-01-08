@@ -8,13 +8,11 @@
 #include <fdtdec.h>
 #include <asm/io.h>
 #include <dm/device_compat.h>
+#include "k3_ddr.h"
 
 #define DDR_CHECK_SIZE			(0x4000)
 #define DDR_CHECK_STEP			(0x2000)
 #define DDR_CHECK_CNT			(0x1000)
-
-void fpga_ddr_init(void);
-void lpddr5_silicon_init(void);
 
 static int test_pattern(fdt_addr_t base, fdt_size_t size)
 {
@@ -99,7 +97,18 @@ static int spacemit_ddr_probe(struct udevice *dev)
 #ifdef CONFIG_K3_BOARD_FPGA
 	fpga_ddr_init();
 #else
-	lpddr5_silicon_init();
+	uint64_t ddrc0, ddrc1;
+
+	ddrc0 = dev_read_addr_index(dev, 0);
+	ddrc1 = dev_read_addr_index(dev, 1);
+	if ((FDT_ADDR_T_NONE == ddrc0) || (FDT_ADDR_T_NONE == ddrc1)) {
+		pr_err("failed to get register address of DDRC\n");
+		return 1;
+	}
+
+	printf("Init LPDDR5 with %dMT/s\n", CONFIG_DDR_DATARATE);
+	lpddr5_silicon_init(ddrc0, CONFIG_DDR_DATARATE);
+	lpddr5_silicon_init(ddrc1, CONFIG_DDR_DATARATE);
 #endif
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
 	if (ret < 0) {
