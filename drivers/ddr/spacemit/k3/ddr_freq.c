@@ -127,12 +127,13 @@ u32 ddr_get_mr8(void)
 	return (mr8&0xff);
 }
 
+#ifdef CONFIG_SPL_BUILD
 u32 ddr_get_density(void)
 {
-	u32 ddr_size_mb = DDR_SIZE_GB * 1024 * 2;
-	pr_info("DDR size fixed to be %d MB\n", ddr_size_mb);
-	return ddr_size_mb;
+	// there are two ddr parts
+	return part_info->size_mb * 2;
 }
+#endif
 
 uint32_t get_manufacture_id(void)
 {

@@ -10,7 +10,7 @@
 
 // current only support 4GB, 8GB or 16GB
 // default is 8GB
-#define DDR_SIZE_GB		(8)
+#define DDR_SIZE_GB		(4)
 // support 4266MT/s, 5500MT/s, 6000MT/s, 6400MT/s
 #define CONFIG_DDR_DATARATE	(6400)
 
@@ -39,6 +39,12 @@
 			printf(format, ##args);	\
 	} while (0)
 
+typedef enum {
+	DDR_TYPE_LPDDR4X = 0,
+	DDR_TYPE_LPDDR5,
+	DDR_TYPE_UNKNOWN
+} ddr_part_type;
+
 typedef struct {
 	uint16_t offset;
 	uint16_t value;
@@ -60,9 +66,21 @@ typedef struct {
 	} sequence[];
 } phy_init_config;
 
-extern const phy_init_config* lp5_pre_train_table[];
-extern const phy_init_config* lp5_train_table[];
+typedef struct {
+	const char *part_number;
+	uint32_t crc32_value;
+	uint32_t type;
+	uint32_t size_mb;
+	uint32_t data_rate_mtps;
+} ddr_part_info;
+
+extern ddr_part_info* part_info;
+extern const phy_init_config *lp5_pre_train_table[];
+extern const phy_init_config *lp5_train_table[];
+extern const phy_init_config *lp5_4g_pre_train_table[], *lp5_8g_pre_train_table[], *lp5_16g_pre_train_table[];
+extern const phy_init_config *lp5_4g_train_table[], *lp5_8g_train_table[], *lp5_16g_train_table[];
 
 extern void fpga_ddr_init(void);
-extern void lpddr5_silicon_init(uint64_t ddrc_reg_base, uint32_t data_rate);
+extern void lpddr5_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info);
+extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 #endif /* _K3_DDR_H_ */

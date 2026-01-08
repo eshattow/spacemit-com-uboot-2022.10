@@ -8,11 +8,15 @@
 #include <fdtdec.h>
 #include <asm/io.h>
 #include <dm/device_compat.h>
+#include <u-boot/crc.h>
 #include "k3_ddr.h"
 
 #define DDR_CHECK_SIZE			(0x4000)
 #define DDR_CHECK_STEP			(0x2000)
 #define DDR_CHECK_CNT			(0x1000)
+
+// place part_info in .data section to avoid it being cleared during bss clear
+__section(".data") ddr_part_info* part_info;
 
 static int test_pattern(fdt_addr_t base, fdt_size_t size)
 {
@@ -91,12 +95,37 @@ ERR_HANDLE:
 	return err;
 }
 
+const ddr_part_info ddr_parts_info[] = {
+	{ "MT62F1G32D2DS", 0x0FD38DD9, DDR_TYPE_LPDDR5, 4096, CONFIG_DDR_DATARATE },
+	{ "MT62F2G32D4DS", 0x85D1F688, DDR_TYPE_LPDDR5, 8192, CONFIG_DDR_DATARATE },
+	{ "MT62F4G32D8DV", 0x3ACEF2E4, DDR_TYPE_LPDDR5, 16384, CONFIG_DDR_DATARATE }
+};
+
+static ddr_part_info* find_ddr_info(const char *part_number)
+{
+	int i;
+	uint32_t crc_code = crc32(0, (const uint8_t*)part_number, strlen(part_number));
+
+	for (i = 0; i < ARRAY_SIZE(ddr_parts_info); i++) {
+		// use crc32 code to speed up the comparison
+		if ((crc_code == ddr_parts_info[i].crc32_value) &&
+		(0 == strcmp(ddr_parts_info[i].part_number, part_number))) {
+			return (ddr_part_info*)&ddr_parts_info[i];
+		}
+	}
+
+	// use first element as default
+	return (ddr_part_info*)&ddr_parts_info[0];
+}
+
 static int spacemit_ddr_probe(struct udevice *dev)
 {
 	int ret;
 #ifdef CONFIG_K3_BOARD_FPGA
 	fpga_ddr_init();
 #else
+	char ddr_part_number[32];
+	const char *temp;
 	uint64_t ddrc0, ddrc1;
 
 	ddrc0 = dev_read_addr_index(dev, 0);
@@ -106,9 +135,28 @@ static int spacemit_ddr_probe(struct udevice *dev)
 		return 1;
 	}
 
-	printf("Init LPDDR5 with %dMT/s\n", CONFIG_DDR_DATARATE);
-	lpddr5_silicon_init(ddrc0, CONFIG_DDR_DATARATE);
-	lpddr5_silicon_init(ddrc1, CONFIG_DDR_DATARATE);
+	ret = get_tlvinfo(TLV_CODE_DDR_PARTNUMBER, ddr_part_number, sizeof(ddr_part_number) - 1);
+	if (ret <= 0) {
+		temp = dev_read_string(dev, "part-number");
+		if (NULL == temp) {
+			pr_err("failed to get ddr part number from dts\n");
+			return 1;
+		}
+		strlcpy(ddr_part_number, temp, sizeof(ddr_part_number));
+		ret = strlen(ddr_part_number);
+	}
+	ddr_part_number[ret] = '\0';
+
+	part_info = find_ddr_info((const char*)ddr_part_number);
+	printf("DDR Part Number: %s, Size: %dMB, Data Rate: %dMT/s\n",
+		part_info->part_number, part_info->size_mb, part_info->data_rate_mtps);
+	if (DDR_TYPE_LPDDR5 != part_info->type) {
+		pr_err("unsupported ddr type %d\n", part_info->type);
+		return 1;
+	}
+
+	lpddr5_silicon_init(ddrc0, part_info);
+	lpddr5_silicon_init(ddrc1, part_info);
 #endif
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
 	if (ret < 0) {
