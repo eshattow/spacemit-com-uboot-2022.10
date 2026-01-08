@@ -190,7 +190,11 @@
 };
 
 &pcie0_rc{
-	status = "disabled";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie0_1>;
+
+	num-lanes = <2>;
+	status = "okay";
 };
 
 &usb3_porta_u2phy {
