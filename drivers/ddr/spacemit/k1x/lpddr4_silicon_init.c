@@ -30,7 +30,7 @@ extern u32 ddr_cs_num;
 extern u32 ddr_get_mr8(void);
 extern uint32_t get_manufacture_id(void);
 extern uint32_t get_ddr_rev_id(void);
-static uint32_t byte_mode_tag = 0, ddr_mid;
+static uint32_t byte_mode_tag, ddr_mid;
 struct addrmap_info {
 	u32 io_width_per_channel;
 	u32 density_per_channel;
@@ -1401,6 +1401,7 @@ uint32_t lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 	u32 size_mb, mr8_value, cs_num, tx_odt_ohm;
 	struct ddr_training_info_t *info;
 
+	byte_mode_tag = 0;
 	cs_num = ddr_cs_num;
 	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
 	ddr_mid = DDR_MID_SAMSUNG;
