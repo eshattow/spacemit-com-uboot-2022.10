@@ -178,8 +178,6 @@ int spl_board_init_f(void)
 void spl_board_init(void)
 {
 	spl_load_env();
-
-	update_usb_serial_number();
 }
 
 #if CONFIG_IS_ENABLED(FIT_IMAGE_POST_PROCESS)
@@ -329,6 +327,7 @@ void board_boot_order(u32* spl_boot_list)
 	u32 boot_mode = get_boot_mode();
 	pr_debug("boot_mode:0x%x\n", boot_mode);
 	if (boot_mode == BOOT_MODE_USB) {
+		update_usb_serial_number();
 		spl_boot_list[0] = BOOT_DEVICE_BOARD;
 	} else {
 		switch (boot_mode) {
