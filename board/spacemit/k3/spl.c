@@ -117,6 +117,11 @@ int spl_board_init_f(void)
 	int ret;
 	struct udevice *dev;
 
+#if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
+	/* init i2c */
+	i2c_init_board();
+#endif
+
 	/* DDR init */
 	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
 	if (ret) {
@@ -144,11 +149,6 @@ int spl_board_init_f(void)
 	while(read_data != 0xa55a)
 		read_data = readl((void*)0xc0800000);
 	printf("get new image\n");
-#endif
-
-#if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
-	/* init i2c */
-	i2c_init_board();
 #endif
 
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)

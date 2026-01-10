@@ -42,6 +42,7 @@ void setenv_boot_mode(void);
 void set_env_ethaddr(void);
 void refresh_config_info(void);
 
+extern u32 ddr_get_density(void);
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 extern int set_tlvinfo(int tcode, char* val);
 extern int flush_tlvinfo(void);
@@ -439,24 +440,69 @@ int misc_init_r(void)
 {
 	return 0;
 }
-extern u32 ddr_get_density(void);
+
+u64 read_memory_size_from_dtb(void)
+{
+	ofnode node, subnode;
+	u64 dram_size = 6UL * 1024 * 1024 * 1024; /* default 6GB */
+	fdt_size_t size;
+	const void *fdt = gd->fdt_blob;
+	const char *prop;
+
+	if (fdt_check_header(fdt)) {
+		pr_err("Invalid uboot DTB\n");
+		return 0;
+	}
+
+	node = ofnode_path("/");
+	ofnode_for_each_subnode(subnode, node) {
+		pr_debug("subnode name: %s\n", ofnode_get_name(subnode));
+		prop = ofnode_get_property(subnode, "device_type", NULL);
+		if (prop && !strcmp(prop, "memory")) {
+			size = ofnode_get_size(subnode);
+			if (FDT_SIZE_T_NONE != size) {
+				dram_size = size;
+				pr_debug("Found memory node, size: 0x%llx\n", dram_size);
+				break;
+			}
+		}
+	}
+
+	pr_debug("Get memory size 0x%llx from dtb\n", dram_size);
+	return dram_size;
+}
 
 int dram_init(void)
 {
+	u64 dram_size;
+
 #if CONFIG_K3_BOARD_FPGA
-	u64 dram_size = SZ_2GB;
+	dram_size = SZ_2GB;
+	gd->ram_base = CONFIG_SYS_SDRAM_BASE;
+	gd->ram_size = dram_size - SEC_IMG_SIZE;
 #else
-	u64 dram_size = (u64)ddr_get_density() * SZ_1MB;
-#endif
+#ifdef CONFIG_SPL_BUILD
+	// report real ddr size during spl stage
+	dram_size = (u64)ddr_get_density() * SZ_1MB;
+	gd->ram_base = CONFIG_SYS_SDRAM_BASE - SEC_IMG_SIZE;
+	gd->ram_size = dram_size;
+#else
+	// memory info would be update to dtb by spl_perform_fixups
+	dram_size = read_memory_size_from_dtb();
 	// initial 32MB of memory is invisible, reserved for openSBI and esos.
 	gd->ram_base = CONFIG_SYS_SDRAM_BASE;
 	gd->ram_size = dram_size - SEC_IMG_SIZE;
+#endif
+#endif
 
 	return 0;
 }
 
 int dram_init_banksize(void)
 {
+	if (0 == gd->ram_size)
+		dram_init();
+
 	memset(gd->bd->bi_dram, 0, sizeof(gd->bd->bi_dram));
 	gd->bd->bi_dram[0].start = gd->ram_base;
 	gd->bd->bi_dram[0].size = gd->ram_size;
