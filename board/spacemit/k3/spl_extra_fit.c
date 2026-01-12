@@ -801,6 +801,7 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 
 	if (!load_uboot_res || !load_esos_res) {
 		pr_info("load result: uboot=%d esos=%d\n", load_uboot_res, load_esos_res);
+		spl_perform_fixups(spl_image);
 		return 0;
 	} else {
 		pr_err("load failed: uboot=%d esos=%d\n", load_uboot_res, load_esos_res);
