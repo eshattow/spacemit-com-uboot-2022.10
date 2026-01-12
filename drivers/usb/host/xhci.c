@@ -1018,6 +1018,11 @@ static int xhci_submit_root(struct usb_device *udev, unsigned long pipe,
 		case USB_DT_HUB:
 		case USB_DT_SS_HUB:
 			debug("USB_DT_HUB config\n");
+			/* XHCI only have one global descriptor, If we have multiple
+			 * runnint controller with different configuration, make sure
+			 * usb_hub get the right value of specific Controller */
+			reg = xhci_readl(&hccr->cr_hcsparams1);
+			descriptor.hub.bNbrPorts = HCS_MAX_PORTS(reg);
 			srcptr = &descriptor.hub;
 			srclen = 0x8;
 			break;

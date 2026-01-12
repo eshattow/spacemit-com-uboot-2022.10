@@ -197,7 +197,19 @@
 	status = "okay";
 };
 
+&usb2_host_u2phy {
+	status = "okay";
+};
+
+&usb2_host {
+	status = "okay";
+};
+
 &usb3_porta_u2phy {
+	status = "okay";
+};
+
+&usb3_porta_u3phy {
 	status = "okay";
 };
 
@@ -206,12 +218,6 @@
 	u-boot,dm-spl;
 	dwc3@cad00000 {
 		dr_mode = "peripheral";
-		maximum-speed = "high-speed";
-		phy_type = "utmi";
-		snps,dis_enblslpm_quirk;
-		snps,dis_u2_susphy_quirk;
-		snps,dis_u3_susphy_quirk;
-		u-boot,dm-spl;
 	};
 };
 

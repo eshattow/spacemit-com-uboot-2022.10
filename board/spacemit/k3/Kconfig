@@ -53,4 +53,11 @@ config K3_BOARD_ASIC
 
 endchoice
 
+config BOOT_FROM_USB_DISK
+	default n
+	bool "boot using usb disk"
+	help
+		use USB disk to boot
+
+
 endif

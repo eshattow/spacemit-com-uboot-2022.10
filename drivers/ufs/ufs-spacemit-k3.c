@@ -50,6 +50,13 @@ struct spacemit_k3_ufs_priv {
 #define PLAT_UFS_ACLK_DIV_SHIFT 5
 #define PLAT_UFS_ACLK_FC_SHIFT 8
 
+#define PLAT_UFS_ACLK_SEL_WIDTH 3
+#define PLAT_UFS_ACLK_DIV_WIDTH 3
+
+/* ufs_aclk parents in `uboot-2022.10/drivers/clk/spacemit/ccu-k3.c` */
+#define PLAT_UFS_ACLK_SEL_PLL1_D5_491P52 0
+#define PLAT_UFS_ACLK_SEL_PLL1_D6_409P6  1
+
 #define UFS_CLK_SEL 0
 #define UFS_CLK_DIV 1
 
@@ -127,6 +134,30 @@ extern int ufshcd_query_descriptor_retry(struct ufs_hba *hba, enum query_opcode 
 					 enum desc_idn idn, u8 index, u8 selector, u8 *desc_buf,
 					 int *buf_len);
 
+static void spacemit_k3_ufs_set_aclk_low_freq(void)
+{
+	void __iomem *ufs_clk_res_ctrl =
+		(void __iomem *)(ulong)(APMU_BASE + PMU_UFS_CLK_RES_CTRL_REG);
+	u32 reg_val;
+
+	/*
+	 * Select pll1_d6_409p6 (index 1) as ufs_aclk parent, matching the
+	 * "ufs-low-aclk-freq" init change from the other environment.
+	 */
+	reg_val = readl(ufs_clk_res_ctrl);
+	reg_val &= ~GENMASK(PLAT_UFS_ACLK_SEL_SHIFT + PLAT_UFS_ACLK_SEL_WIDTH - 1,
+			    PLAT_UFS_ACLK_SEL_SHIFT);
+	reg_val |= (PLAT_UFS_ACLK_SEL_PLL1_D6_409P6 << PLAT_UFS_ACLK_SEL_SHIFT);
+
+	/* aclk = clk_src / (div field + 1) */
+	reg_val &= ~GENMASK(PLAT_UFS_ACLK_DIV_SHIFT + PLAT_UFS_ACLK_DIV_WIDTH - 1,
+			    PLAT_UFS_ACLK_DIV_SHIFT);
+	reg_val |= (0 << PLAT_UFS_ACLK_DIV_SHIFT);
+
+	writel(reg_val, ufs_clk_res_ctrl);
+	pr_debug("ufs: APMU_UFS_CLK_RES_CTRL=0x%x\n", readl(ufs_clk_res_ctrl));
+}
+
 static void spacemit_k3_ufs_clk_enable(struct spacemit_k3_ufs_priv *priv)
 {
 	int ret;
@@ -137,6 +168,8 @@ static void spacemit_k3_ufs_clk_enable(struct spacemit_k3_ufs_priv *priv)
 		pr_err("ufs: fail to deassert reset, ret=%d\n", ret);
 		return;
 	}
+
+	spacemit_k3_ufs_set_aclk_low_freq();
 
 	/* Then enable clock */
 	ret = clk_enable(&priv->aclk);
@@ -630,8 +663,8 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 
 	pr_debug("ufs: ufs_spacemit_k3_uniprov1p6_init done.\n");
 
-	/* program controller timing registers - changed from 409 to 499 per patch */
-	real_sysclk = 499;
+	/* program controller timing registers for 409MHz SYS1CLK */
+	real_sysclk = UFS_SYS1CLK_1US_409MHZ;
 	ufshcd_writel(hba, real_sysclk, UFS_SYS1CLK_1US_REG);
 
 	reg_val = UFS_TX_SYMBOL_CLK_NS_US_409MHZ;

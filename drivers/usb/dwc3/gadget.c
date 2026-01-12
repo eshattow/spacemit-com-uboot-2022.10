@@ -399,7 +399,13 @@ static int dwc3_gadget_set_ep_config(struct dwc3 *dwc, struct dwc3_ep *dep,
 		| DWC3_DEPCFG_MAX_PACKET_SIZE(usb_endpoint_maxp(desc));
 
 	/* Burst size is only needed in SuperSpeed mode */
-	if (dwc->gadget.speed == USB_SPEED_SUPER) {
+	if (dwc->gadget.speed == USB_SPEED_SUPER &&
+	    usb_endpoint_xfer_bulk(desc) && comp_desc) {
+		u32 burst = max(comp_desc->bMaxBurst - 1, 1);
+
+		params.param0 |= DWC3_DEPCFG_BURST_SIZE(burst);
+	}
+	else if (dwc->gadget.speed == USB_SPEED_SUPER) {
 		u32 burst = dep->endpoint.maxburst - 1;
 
 		params.param0 |= DWC3_DEPCFG_BURST_SIZE(burst);
@@ -1128,7 +1134,7 @@ static int dwc3_gadget_ep_dequeue(struct usb_ep *ep,
 			dwc3_stop_active_transfer(dwc, dep->number, true);
 			goto out1;
 		}
-		dev_err(dwc->dev, "request %p was not queued to %s\n",
+		dev_dbg(dwc->dev, "request %p was not queued to %s\n",
 				request, ep->name);
 		ret = -EINVAL;
 		goto out0;
@@ -1416,6 +1422,8 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 	is_on = !!is_on;
 
 	spin_lock_irqsave(&dwc->lock, flags);
+	if (!dwc->gadget_driver && is_on)
+		return 0;
 	ret = dwc3_gadget_run_stop(dwc, is_on, false);
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
@@ -2672,15 +2680,7 @@ void dwc3_gadget_uboot_handle_interrupt(struct dwc3 *dwc)
 	int ret = dwc3_interrupt(0, dwc);
 
 	if (ret == IRQ_WAKE_THREAD) {
-		int i;
-		struct dwc3_event_buffer *evt;
-
 		dwc3_thread_interrupt(0, dwc);
-
-		/* Clean + Invalidate the buffers after touching them */
-		for (i = 0; i < dwc->num_event_buffers; i++) {
-			evt = dwc->ev_buffs[i];
-			dwc3_flush_cache((uintptr_t)evt->buf, evt->length);
-		}
+		/* Buffers ared invalidated in dwc3_process_event_buf() */
 	}
 }

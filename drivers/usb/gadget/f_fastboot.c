@@ -31,7 +31,11 @@
 #define RX_ENDPOINT_MAXIMUM_PACKET_SIZE_1_1  (0x0040)
 #define TX_ENDPOINT_MAXIMUM_PACKET_SIZE      (0x0040)
 
+#if defined(CONFIG_K3_BOARD_ASIC)
+#define EP_BUFFER_SIZE			512 * 1024
+#else
 #define EP_BUFFER_SIZE			4096
+#endif
 /*
  * EP_BUFFER_SIZE must always be an integral multiple of maxpacket size
  * (64 or 512 or 1024), else we break on certain controllers like DWC3
@@ -149,6 +153,7 @@ static struct usb_endpoint_descriptor ss_ep_out = {
 static struct usb_ss_ep_comp_descriptor fb_ss_bulk_comp_desc = {
 	.bLength =		sizeof(fb_ss_bulk_comp_desc),
 	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
+	.bMaxBurst = 15,
 };
 
 static struct usb_descriptor_header *fb_ss_function[] = {
@@ -259,6 +264,8 @@ static int fastboot_bind(struct usb_configuration *c, struct usb_function *f)
 		ss_ep_in.bEndpointAddress = fs_ep_in.bEndpointAddress;
 		ss_ep_out.bEndpointAddress = fs_ep_out.bEndpointAddress;
 		f->ss_descriptors = fb_ss_function;
+		f_fb->in_ep->comp_desc = &fb_ss_bulk_comp_desc;
+		f_fb->out_ep->comp_desc = &fb_ss_bulk_comp_desc;
 	}
 
 	s = env_get("serial#");

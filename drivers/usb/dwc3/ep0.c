@@ -733,6 +733,25 @@ static int dwc3_ep0_std_request(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 	return ret;
 }
 
+#ifdef CONFIG_TARGET_SPACEMIT_K3
+static const char *reqname(unsigned r)
+{
+	switch (r) {
+	case USB_REQ_GET_STATUS: return "GET_STATUS";
+	case USB_REQ_CLEAR_FEATURE: return "CLEAR_FEATURE";
+	case USB_REQ_SET_FEATURE: return "SET_FEATURE";
+	case USB_REQ_SET_ADDRESS: return "SET_ADDRESS";
+	case USB_REQ_GET_DESCRIPTOR: return "GET_DESCRIPTOR";
+	case USB_REQ_SET_DESCRIPTOR: return "SET_DESCRIPTOR";
+	case USB_REQ_GET_CONFIGURATION: return "GET_CONFIGURATION";
+	case USB_REQ_SET_CONFIGURATION: return "SET_CONFIGURATION";
+	case USB_REQ_GET_INTERFACE: return "GET_INTERFACE";
+	case USB_REQ_SET_INTERFACE: return "SET_INTERFACE";
+	default: return "*UNKNOWN*";
+	}
+}
+#endif
+
 static void dwc3_ep0_inspect_setup(struct dwc3 *dwc,
 		const struct dwc3_event_depevt *event)
 {
@@ -755,6 +774,12 @@ static void dwc3_ep0_inspect_setup(struct dwc3 *dwc,
 		dwc->ep0_expect_in = !!(ctrl->bRequestType & USB_DIR_IN);
 		dwc->ep0_next_event = DWC3_EP0_NRDY_DATA;
 	}
+
+#ifdef CONFIG_TARGET_SPACEMIT_K3
+	pr_info("handle setup %s, 0x%x, 0x%x index 0x%x value 0x%x length 0x%x\n",
+		reqname(ctrl->bRequest), ctrl->bRequestType, ctrl->bRequest, ctrl->wIndex,
+		ctrl->wValue, ctrl->wLength);
+#endif
 
 	if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_STANDARD)
 		ret = dwc3_ep0_std_request(dwc, ctrl);
