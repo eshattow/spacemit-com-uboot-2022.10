@@ -359,6 +359,8 @@ void board_boot_order(u32* spl_boot_list)
 
 void spl_perform_fixups(struct spl_image_info *spl_image)
 {
-	dram_init_banksize();
-	spl_fixup_fdt(spl_image->fdt_addr);
+	if ((NULL != spl_image) && (NULL != spl_image->fdt_addr)) {
+		dram_init_banksize();
+		spl_fixup_fdt(spl_image->fdt_addr);
+	}
 }
