@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config TYPEC_TCPM
+	tristate "USB Type-C Port Controller Manager"
+	depends on DM
+	help
+	  The Type-C Port Controller Manager provides a USB PD and USB Type-C
+	  state machine for use with Type-C Port Controllers.
+
+config TYPEC_FUSB301
+	tristate "Fairchild FUSB301 Type-C chip driver"
+	depends on DM && DM_I2C && TYPEC_TCPM
+	help
+	  The Fairchild FUSB301 Type-C chip driver that works with
+	  Type-C Port Controller Manager to provide USB Type-C functionalities.
