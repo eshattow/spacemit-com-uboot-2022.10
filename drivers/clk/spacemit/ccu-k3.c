@@ -1483,8 +1483,8 @@ static SPACEMIT_CCU_DIV2_FC_MUX_GATE(lcd_dsc_clk, "lcd_dsc_clk", lcddsc_parent_n
 	0);
 
 static const char * const lcdpx_parent_names[] = {
-	"pll1_d4_614p4", "pll1_d5_491p52", "pll1_d10_245p76", "pll7_d5", "pll2_d7",
-	"pll2_d4", "pll1_d48_51p2_ap", "pll2_d8"
+	"pll1_d4_614p4", "pll1_d5_491p52", "pll7_d5", "pll6_d6",
+	"pll2_d7", "pll2_d4", "pll1_d48_51p2_ap", "pll2_d8"
 };
 static SPACEMIT_CCU_DIV2_FC_MUX_GATE(lcd_pxclk, "lcd_pxclk", lcdpx_parent_names,
 	BASE_TYPE_APMU, APMU_LCD_CLK_RES_CTRL1, APMU_LCD_CLK_RES_CTRL2,
