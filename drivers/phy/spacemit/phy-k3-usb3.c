@@ -23,6 +23,8 @@
 #include <linux/bitfield.h>
 #include <linux/iopoll.h>
 #include <usb.h>
+#include <usb/tcpm.h>
+#include <usb/typec_switch.h>
 
 #define MAX_NUM_PHY 2
 
@@ -63,6 +65,7 @@
 #define TYPEC_ORIENT_FLIP BIT(2)
 #define TYPEC_ORIENT_OVRD_EN BIT(3)
 #define TYPEC_ORIENT_OVRD BIT(4)
+#define TYPEC_ORIENT_OVRD_MASK (TYPEC_ORIENT_OVRD_EN | TYPEC_ORIENT_OVRD)
 
 /* PHY rcal init requires APB_SPARE regmap access */
 #define SYSCON_APB_SPARE "spacemit,syscon-apb-spare"
@@ -156,7 +159,10 @@ struct k3_usb3phy {
 	void __iomem *pmu;
 	void __iomem *apb_spare;
 
+	/* For USB only */
 	bool nop;
+	bool orientation_flip;
+	struct udevice *sw;
 };
 
 /* We need these helpers so that kernel codes could be used directly */
@@ -185,6 +191,7 @@ static inline int k3_update_bits(void __iomem *base, unsigned int reg, u32 mask,
 				 u32 val)
 {
 	u32 temp;
+
 	temp = readl(base + reg);
 	temp &= ~(mask);
 	temp |= mask & val;
@@ -192,8 +199,66 @@ static inline int k3_update_bits(void __iomem *base, unsigned int reg, u32 mask,
 	return 0;
 }
 
+#if CONFIG_IS_ENABLED(TYPEC_SWITCH)
+static int k3_switch_set(struct udevice *dev,
+			 enum typec_orientation orientation)
+{
+	struct k3_usb3phy *k3_phy = dev_get_priv(dev->parent);
+	void __iomem *pmu = k3_phy->pmu;
+	bool val;
+
+	val = orientation == TYPEC_ORIENTATION_REVERSE;
+	if (k3_phy->orientation_flip)
+		val = !val;
+
+	if (k3_test_bits(pmu, PMUA_TYPEC_CTRL, TYPEC_ORIENT_OVRD_MASK) != val)
+		k3_update_bits(pmu, PMUA_TYPEC_CTRL,
+			       TYPEC_ORIENT_OVRD_MASK,
+			       val ? TYPEC_ORIENT_OVRD_MASK : 0);
+
+	dev_info(k3_phy->dev, "Override orientation with %d\n", val);
+	return 0;
+}
+
+static struct dm_typec_switch_ops k3_switch_ops = {
+	.set = k3_switch_set,
+};
+
+static int k3_switch_regsiter(struct k3_usb3phy *k3_phy)
+{
+	struct udevice *dev = k3_phy->dev;
+	int ret;
+
+	if (device_is_compatible(dev, "spacemit,k3-typec-switch") &&
+	    dev_read_bool(dev, "orientation-switch")) {
+		ret = device_bind_driver_to_node(dev, "k3_usb3_switch",
+						 "k3_usb3_switch",
+						 dev_ofnode(dev), &k3_phy->sw);
+		if (ret) {
+			dev_err(dev, "cannot get bind switch driver\n");
+			return ret;
+		}
+		k3_phy->orientation_flip = dev_read_bool(dev, "orientation-flip");
+	}
+
+	return ret;
+}
+
+U_BOOT_DRIVER(k3_usb3_switch) = {
+	.name = "k3_usb3_switch",
+	.id = UCLASS_TYPEC_SWITCH,
+	.ops = &k3_switch_ops,
+};
+#else
+static int k3_switch_regsiter(struct k3_usb3phy *k3_phy)
+{
+	return 0;
+}
+#endif
+
 static void k3_usb3phy_combo_set_usb(struct k3_usb3phy *k3_phy, bool usb)
 {
+	void __iomem *pmu = k3_phy->pmu;
 	u32 combo_mode_mask = BIT(k3_phy->combo_sel_bit);
 	u32 combo_mode_val = usb << k3_phy->combo_sel_bit;
 
@@ -201,10 +266,9 @@ static void k3_usb3phy_combo_set_usb(struct k3_usb3phy *k3_phy, bool usb)
 	combo_mode_val |= usb ? PU_MATRIX_CONF_X8_DISABLE : 0;
 
 	if (k3_phy->is_combo &&
-	    !k3_test_bits(k3_phy->pmu, PMUA_PCIE_SUBSYS_MGMT,
-			      combo_mode_val) == usb) {
-		k3_update_bits(k3_phy->pmu, PMUA_PCIE_SUBSYS_MGMT,
-				   combo_mode_mask, combo_mode_val);
+	    !k3_test_bits(pmu, PMUA_PCIE_SUBSYS_MGMT, combo_mode_val) == usb) {
+		k3_update_bits(pmu, PMUA_PCIE_SUBSYS_MGMT, combo_mode_mask,
+			       combo_mode_val);
 		dev_info(k3_phy->dev, "Update Combo Mode %d to %s Mode\n",
 			 combo_mode_val, usb ? "USB" : "PCIE");
 	}
@@ -219,9 +283,8 @@ static void k3_usb3phy_update_status(struct k3_usb3phy *k3_phy)
 		base = k3_phy->bases[i];
 		if (!base)
 			break;
-		ret = k3_update_bits(base, PHY_PU_SEL,
-					CFG_STATUS | OVRD_STATUS,
-					OVRD_STATUS);
+		ret = k3_update_bits(base, PHY_PU_SEL, CFG_STATUS | OVRD_STATUS,
+				     OVRD_STATUS);
 		if (ret != 0) {
 			pr_err("regmap update PHY_PU_SEL failed, ret=%d\n", ret);
 			return;
@@ -240,68 +303,59 @@ static int k3_usb3phy_init_single(struct k3_usb3phy *k3_phy, void __iomem *base)
 	if (ret)
 		return ret;
 
-	k3_update_bits(apb_spare, APB_SPARE_PU_CAL, PU_CAL,
-			   PU_CAL);
+	k3_update_bits(apb_spare, APB_SPARE_PU_CAL, PU_CAL, PU_CAL);
 
 	k3_update_bits(apb_spare, APB_SPARE_RCAL_HSIO,
-			   R_CAL_OVRD_NTRIM_EN | R_CAL_OVRD_PTRIM_EN,
-			   R_CAL_OVRD_NTRIM_EN | R_CAL_OVRD_PTRIM_EN);
+		       R_CAL_OVRD_NTRIM_EN | R_CAL_OVRD_PTRIM_EN,
+		       R_CAL_OVRD_NTRIM_EN | R_CAL_OVRD_PTRIM_EN);
 
 	k3_update_bits(apb_spare, APB_SPARE_RCAL_HSIO,
-			   R_CAL_OVRD_NTRIM_MASK | R_CAL_OVRD_PTRIM_MASK,
-			   R_CAL_OVRD_NTRIM_VAL(NTRIM_DEFAULT) |
-				   R_CAL_OVRD_PTRIM_VAL(PTRIM_DEFAULT));
+		       R_CAL_OVRD_NTRIM_MASK | R_CAL_OVRD_PTRIM_MASK,
+		       R_CAL_OVRD_NTRIM_VAL(NTRIM_DEFAULT) |
+		       R_CAL_OVRD_PTRIM_VAL(PTRIM_DEFAULT));
 
 	mdelay(100);
 
 	/* Do not wait CDR lock before sampling data */
-	k3_update_bits(base, PHY_RESET_CFG, EN_SAMPLE_DATA_AFTER_LOCK,
-			   0);
+	k3_update_bits(base, PHY_RESET_CFG, EN_SAMPLE_DATA_AFTER_LOCK, 0);
 
 	/* Power down 100MHz refclk buffer */
 	k3_update_bits(base, PHY_PU_CK_REG, PU_REFCLK_100, 0);
 
 	/* Program PLL REG1 configure the SSC */
 	k3_write(base, PHY_PLL_REG1,
-		     FIELD_PREP(SSC_MODE, SSC_DOWN_SPREAD1) |
-			     FIELD_PREP(SSC_DEP_SEL, SSC_5000PPM) |
-			     FIELD_PREP(FREF_SEL, FREF_24M));
+		 FIELD_PREP(SSC_MODE, SSC_DOWN_SPREAD1) |
+		 FIELD_PREP(SSC_DEP_SEL, SSC_5000PPM) |
+		 FIELD_PREP(FREF_SEL, FREF_24M));
 
 	/* Un-select 100MHz PLL reference */
 	k3_update_bits(base, PHY_PLL_REG2, SEL_REF100, 0);
 
 	/* USB LFPS period configuration */
 	k3_update_bits(base, PHY_MODE_CFG, CFG_LFPS_TPERIOD,
-			   FIELD_PREP(CFG_LFPS_TPERIOD,
-				      LFPS_TPERIOD_USB));
+		       FIELD_PREP(CFG_LFPS_TPERIOD, LFPS_TPERIOD_USB));
 
 	/* Force AFE adaptation reset */
-	k3_update_bits(
-		base, PHY_ADPT_CFG0,
-		AFE_ADPT_RST_OVRD_EN | AFE_ADPT_RST_OVRD_VAL,
-		AFE_ADPT_RST_OVRD_EN | AFE_ADPT_RST_OVRD_VAL);
+	k3_update_bits(base, PHY_ADPT_CFG0,
+		       AFE_ADPT_RST_OVRD_EN | AFE_ADPT_RST_OVRD_VAL,
+		       AFE_ADPT_RST_OVRD_EN | AFE_ADPT_RST_OVRD_VAL);
 	/*
 	 * Optional but commonly required for USB bring-up:
 	 * bypass RX adaptation loop
 	 */
-	k3_update_bits(base, PHY_RX_REG2, RX_BYPASS_ADPT,
-			   RX_BYPASS_ADPT);
+	k3_update_bits(base, PHY_RX_REG2, RX_BYPASS_ADPT, RX_BYPASS_ADPT);
 
 	/*
 	 * Inform PHY that all PLL-related configuration is done.
 	 * PLL will not start locking until CFG_SW_INIT_DONE is set.
 	 */
 	k3_write(base, PHY_CLK_CFG,
-		     CFG_SW_INIT_DONE |
-			     FIELD_PREP(CFG_REFCLK_FREQ, REFCLK_24M) |
-			     CFG_RXCLK_EN | CFG_PCLK_EN |
-			     CFG_PIPE_PCLK_EN | CFG_TXCLK_EN |
-			     CFG_TXCLK_INV);
-
+		 CFG_SW_INIT_DONE | FIELD_PREP(CFG_REFCLK_FREQ, REFCLK_24M) |
+		 CFG_RXCLK_EN | CFG_PCLK_EN | CFG_PIPE_PCLK_EN |
+		 CFG_TXCLK_EN | CFG_TXCLK_INV);
 
 	ret = readl_poll_timeout(base + PHY_CLK_CFG, reg,
-				 (reg & PLL_READY) == PLL_READY,
-				 PLL_TIMEOUT);
+				 (reg & PLL_READY) == PLL_READY, PLL_TIMEOUT);
 	if (ret)
 		return -ETIMEDOUT;
 
@@ -326,9 +380,8 @@ static int k3_usb3phy_init(struct phy *phy)
 	ret = k3_usb3phy_init_single(k3_phy, k3_phy->bases[0]);
 	if (ret)
 		return ret;
-	if (k3_phy->bases[1]) {
+	if (k3_phy->bases[1])
 		ret = k3_usb3phy_init_single(k3_phy, k3_phy->bases[1]);
-	}
 
 	return ret;
 }
@@ -387,7 +440,7 @@ static int k3_usb3phy_probe(struct udevice *dev)
 		}
 	}
 
-	return 0;
+	return k3_switch_regsiter(k3_phy);
 }
 
 static const struct udevice_id k3_usb3phy_ids[] = {
