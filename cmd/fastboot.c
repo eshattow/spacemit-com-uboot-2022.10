@@ -15,6 +15,7 @@
 #include <usb.h>
 #include <watchdog.h>
 #include <linux/stringify.h>
+#include <usb/tcpm.h>
 
 static int do_fastboot_udp(int argc, char *const argv[],
 			   uintptr_t buf_addr, size_t buf_size)
@@ -42,6 +43,7 @@ static int do_fastboot_usb(int argc, char *const argv[],
 	char *usb_controller;
 	char *endp;
 	int ret;
+	struct udevice *tcpm_dev;
 
 	if (argc < 2)
 		return CMD_RET_USAGE;
@@ -52,6 +54,13 @@ static int do_fastboot_usb(int argc, char *const argv[],
 		pr_err("Error: Wrong USB controller index format\n");
 		return CMD_RET_FAILURE;
 	}
+#if defined(CONFIG_K3_BOARD_ASIC)
+	ret = tcpm_get(0, &tcpm_dev);
+	if (ret && ret != -ENODEV) {
+		pr_err("TCPM init failed: %d\n", ret);
+		return CMD_RET_FAILURE;
+	}
+#endif
 
 	ret = usb_gadget_initialize(controller_index);
 	if (ret) {

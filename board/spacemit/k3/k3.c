@@ -156,29 +156,64 @@ int get_chipinfo_from_efuse(uint32_t *product_id, uint32_t *wafer_tid)
 }
 #endif
 
-void update_usb_serial_number(void)
+uint32_t get_serial_number(char *sn, uint32_t max_size)
 {
-	uint64_t chipid;
+	uint64_t chipid = 0;
 	uint32_t i, seed;
 	int ret = -1;
-	char temp[20];
+	char temp[32], *serial;
 
+	memset(temp, 0, sizeof(temp));
+	memset(sn, 0, max_size);
+
+	serial = env_get("serial#");
+	if (NULL != serial) {
+		strlcpy(temp, serial, sizeof(temp));
+	}
+	else if (get_tlvinfo(TLV_CODE_SERIAL_NUMBER, temp, sizeof(temp)) <= 0) {
 #if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
-	ret = get_chipid_from_efuse(&chipid);
+		// use chipid in efuse as serial number
+		ret = get_chipid_from_efuse(&chipid);
 #endif
-
-	if (0 != ret) {
-		seed = get_ticks();
-		for (i = 0; i < sizeof(chipid); i++) {
-			((uint8_t*)&chipid)[i] = rand_r(&seed);
+		// check if chipid is valid
+		if ((0 != ret) || (0 == chipid)) {
+			seed = get_ticks();
+			for (i = 0; i < sizeof(chipid); i++) {
+				((uint8_t*)&chipid)[i] = rand_r(&seed);
+			}
 		}
+		snprintf(temp, sizeof(temp), "%016llx", chipid);
 	}
 
-	snprintf(temp, sizeof(temp), "%016llx", chipid);
+	i = min(max_size, (uint32_t)strlen(temp));
+	memcpy(sn, temp, i);
+	return i;
+}
 
+void update_usb_serial_number(void)
+{
 #ifdef CONFIG_USB_SET_SERIAL_NUMBER
-	g_dnl_set_serialnumber(temp);
+	char temp[32];
+
+	if (0 != get_serial_number(temp, sizeof(temp))) {
+		g_dnl_set_serialnumber(temp);
+	}
 #endif
+}
+
+void set_dev_serial_no(void)
+{
+	char serial[32], temp[32];
+
+	if (0 != get_serial_number(serial, sizeof(serial))) {
+		memset(temp, 0, sizeof(temp));
+		// save serial number to TLV when it is NOT in TLV
+		if ((get_tlvinfo(TLV_CODE_SERIAL_NUMBER, temp, sizeof(temp)) <= 0)
+			|| (0 != strcmp(serial, temp))) {
+			set_tlvinfo(TLV_CODE_SERIAL_NUMBER, serial);
+			flush_tlvinfo();
+		}
+	}
 }
 
 #define TURBO0_FREQUENCY		(1000000000)
@@ -458,6 +493,7 @@ int board_late_init(void)
 #endif
 
 	set_env_ethaddr();
+	set_dev_serial_no();
 	refresh_config_info();
 
 	run_fastboot_command();
