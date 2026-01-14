@@ -42,6 +42,9 @@
 /* Query request timeout */
 #define QUERY_REQ_TIMEOUT 1500 /* 1.5 seconds */
 
+/* Polling time to wait for fDeviceInit */
+#define FDEVICEINIT_COMPL_TIMEOUT 3000 /* millisecs */
+
 /* maximum timeout in ms for a general UIC command */
 #define UFS_UIC_CMD_TIMEOUT	1000
 /* NOP OUT retries waiting for NOP IN response */
@@ -651,6 +654,7 @@ static int ufshcd_memory_alloc(struct ufs_hba *hba)
 		dev_err(hba->dev, "Transfer Descriptor memory allocation failed\n");
 		return -ENOMEM;
 	}
+	memset(hba->utrdl, 0, sizeof(struct utp_transfer_req_desc));
 
 	/* Allocate one Command Descriptor
 	 * Should be aligned to 1k boundary.
@@ -658,8 +662,29 @@ static int ufshcd_memory_alloc(struct ufs_hba *hba)
 	hba->ucdl = memalign(1024, sizeof(struct utp_transfer_cmd_desc));
 	if (!hba->ucdl) {
 		dev_err(hba->dev, "Command descriptor memory allocation failed\n");
+		free(hba->utrdl);
+		hba->utrdl = NULL;
 		return -ENOMEM;
 	}
+	memset(hba->ucdl, 0, sizeof(struct utp_transfer_cmd_desc));
+
+	/*
+	 * Allocate one Task Management Request Descriptor.
+	 *
+	 * Some controllers require UTMRL base to be valid even if task
+	 * management isn't used actively; leaving it uninitialized can lead to
+	 * unpredictable controller behavior for UTP transfers.
+	 */
+	hba->utmrdl = memalign(1024, sizeof(struct utp_task_req_desc));
+	if (!hba->utmrdl) {
+		dev_err(hba->dev, "Task Management Descriptor memory allocation failed\n");
+		free(hba->ucdl);
+		hba->ucdl = NULL;
+		free(hba->utrdl);
+		hba->utrdl = NULL;
+		return -ENOMEM;
+	}
+	memset(hba->utmrdl, 0, sizeof(struct utp_task_req_desc));
 
 	return 0;
 }
@@ -1999,9 +2024,9 @@ static int ufshcd_verify_dev_init(struct ufs_hba *hba)
  */
 static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 {
-	int i;
 	int err;
 	bool flag_res = 1;
+	unsigned long start;
 
 	err = ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_SET_FLAG,
 				      QUERY_FLAG_IDN_FDEVICEINIT, NULL);
@@ -2012,11 +2037,18 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 		goto out;
 	}
 
-	/* poll for max. 1000 iterations for fDeviceInit flag to clear */
-	for (i = 0; i < 1000 && !err && flag_res; i++)
+	/*
+	 * Poll for fDeviceInit flag to clear, bounded by
+	 * FDEVICEINIT_COMPL_TIMEOUT.
+	 */
+	start = get_timer(0);
+	while (!err && flag_res && get_timer(start) <= FDEVICEINIT_COMPL_TIMEOUT) {
 		err = ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_READ_FLAG,
 					      QUERY_FLAG_IDN_FDEVICEINIT,
 					      &flag_res);
+		if (flag_res)
+			udelay(1000);
+	}
 
 	if (err)
 		dev_err(hba->dev,
