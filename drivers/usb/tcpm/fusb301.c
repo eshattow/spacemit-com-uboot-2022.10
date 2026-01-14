@@ -699,7 +699,7 @@ static int fusb301_init(struct udevice *dev)
 	ret = fusb301_reset_device(chip);
 	if (ret) {
 		dev_err(dev, "failed to reset device, ret: %d\n", ret);
-		return ret;
+		// return ret;
 	}
 
 	return 0;
