@@ -374,6 +374,10 @@ void run_fastboot_command(void)
 
 		update_usb_serial_number();
 
+#if !defined(CONFIG_SPL_BUILD) && CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_SPEED)
+		g_dnl_set_max_speed(spacemit_k3_fastboot_requested_speed());
+#endif
+
 		char *cmd_para = "fastboot 0";
 		run_command(cmd_para, 0);
 
