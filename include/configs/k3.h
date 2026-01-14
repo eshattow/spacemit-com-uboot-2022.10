@@ -3,8 +3,8 @@
  * Copyright (C) 2025, Kevin.z.m <zhangmeng.kevin@spacemit.com>
  */
 
- #ifndef __SPACEMIT_K3_CONFIG_H
- #define __SPACEMIT_K3_CONFIG_H
+#ifndef __SPACEMIT_K3_CONFIG_H
+#define __SPACEMIT_K3_CONFIG_H
 
 #include <linux/sizes.h>
 
@@ -92,6 +92,11 @@
 #endif
 #define MMC_DEV_SD			(0)
 
+#define K3_NOR_USB_DEVNUM_DEFAULT	(0)
+#define K3_NOR_SSD_DEVNUM_DEFAULT	(0)
+#define K3_NOR_UFS_DEVNUM_DEFAULT	(0)
+#define K3_NOR_EMMC_DEVNUM_DEFAULT	(MMC_DEV_EMMC)
+
 #define DEFAULT_PRODUCT_NAME		"k3_evb"
 #define BOOTFS_NAME			("bootfs")
 
@@ -111,6 +116,22 @@ enum board_boot_mode {
 	BOOT_MODE_SD	= 0xb10,
 	BOOT_MODE_BOOTSTRAP,
 };
+
+enum k3_nor_boot_target_type {
+	K3_NOR_BOOT_TARGET_UDISK = 0,
+	K3_NOR_BOOT_TARGET_NVME,
+	K3_NOR_BOOT_TARGET_SCSI,
+	K3_NOR_BOOT_TARGET_MMC,
+};
+
+struct k3_nor_boot_target {
+	enum k3_nor_boot_target_type type;
+	const char *blk_name;
+	const char *devnum_env;
+	unsigned int devnum_default;
+};
+
+const struct k3_nor_boot_target *k3_nor_get_boot_prio(unsigned int *count);
 #endif
 
 /* ****************************************************************************************
