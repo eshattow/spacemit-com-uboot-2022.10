@@ -2234,8 +2234,10 @@ static void tcpm_poll_event(struct udevice *dev)
 	const struct dm_tcpm_ops *drvops = dev_get_driver_ops(dev);
 	struct tcpm_port *port = dev_get_uclass_plat(dev);
 
+#ifndef CONFIG_TARGET_SPACEMIT_K3
 	if (!drvops->get_vbus(dev))
 		return;
+#endif
 
 	while (port->poll_event_cnt < TCPM_POLL_EVENT_TIME_OUT) {
 		if (!port->wait_dr_swap_message &&
