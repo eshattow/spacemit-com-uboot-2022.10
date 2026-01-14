@@ -55,6 +55,11 @@
 /* boot mode configs */
 /* System boot control register */
 #define BOOT_DEV_FLAG_REG		(0xD4282D10)
+/* CIU debug registers (scratch) */
+#define BOOT_CIU_REG			(0xD4282C00)
+#define BOOT_CIU_DEBUG_REG0		(BOOT_CIU_REG + 0x0390)
+#define BOOT_CIU_DEBUG_REG1		(BOOT_CIU_REG + 0x0394)
+#define BOOT_CIU_DEBUG_REG2		(BOOT_CIU_REG + 0x0398)
 /* Boot flag dummy register */
 #define BOOT_PIN_SELECT			(0xD4282c20)
 #define BOOT_STRAP_BIT_OFFSET		(9)

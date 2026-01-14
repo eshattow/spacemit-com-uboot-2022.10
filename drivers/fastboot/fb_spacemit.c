@@ -33,8 +33,45 @@
 #include <misc.h>
 #include <search.h>
 #include <env_internal.h>
+#include <linux/bitops.h>
+#include <usb.h>
 
 #define EMMC_MAX_BLK_WRITE 16384
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_SPEED)
+/*
+ * K3: pass fastboot speed selection from SPL to U-Boot via CIU debug scratch
+ * register.
+ *
+ * NOTE: Do not reuse this on platforms that treat BOOT_DEV_FLAG_REG as an
+ * exact boot-mode value (e.g. some K1-X flows), since extra bits would break
+ * boot-mode comparisons.
+ */
+#define SPACEMIT_FASTBOOT_SPEED_SUPER_BIT	BIT(0)
+
+u32 spacemit_k3_fastboot_speed_flags(void)
+{
+	return readl((void *)BOOT_CIU_DEBUG_REG0);
+}
+
+enum usb_device_speed spacemit_k3_fastboot_requested_speed(void)
+{
+	return (spacemit_k3_fastboot_speed_flags() & SPACEMIT_FASTBOOT_SPEED_SUPER_BIT) ?
+	       USB_SPEED_SUPER : USB_SPEED_HIGH;
+}
+
+void spacemit_k3_fastboot_set_superspeed_flag(bool enable)
+{
+	u32 val = readl((void *)BOOT_CIU_DEBUG_REG0);
+
+	if (enable)
+		val |= SPACEMIT_FASTBOOT_SPEED_SUPER_BIT;
+	else
+		val &= ~SPACEMIT_FASTBOOT_SPEED_SUPER_BIT;
+
+	writel(val, (void *)BOOT_CIU_DEBUG_REG0);
+}
+#endif
 
 #if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
 int _write_gpt_partition(struct flash_dev *fdev)

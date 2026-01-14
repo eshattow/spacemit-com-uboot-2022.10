@@ -222,6 +222,12 @@ enum board_boot_mode get_boot_mode(void);
  */
 enum board_boot_mode get_boot_pin_select(void);
 
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_SPEED)
+u32 spacemit_k3_fastboot_speed_flags(void);
+enum usb_device_speed spacemit_k3_fastboot_requested_speed(void);
+void spacemit_k3_fastboot_set_superspeed_flag(bool enable);
+#endif
+
 /**
  * fastboot_oem_flash_gpt() - parse flash config and write gpt table.
  *
