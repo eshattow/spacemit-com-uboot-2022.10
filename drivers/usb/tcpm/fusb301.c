@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * fusb301 typec controller
- *
  */
 
 #include <common.h>
@@ -12,6 +11,7 @@
 #include <linux/delay.h>
 #include <i2c.h>
 #include <usb/tcpm.h>
+#include <usb/typec_switch.h>
 
 /* Register Map */
 #define FUSB301_REG_DEVICEID			0x01
@@ -94,6 +94,7 @@
 
 struct fusb301_chip {
 	struct udevice *dev;
+	struct udevice *sw;
 	u8 dev_id;
 	u8 mode;
 	u8 pwr_mode;
@@ -667,6 +668,24 @@ static int fusb301_set_cc(struct udevice *dev, enum typec_cc_status cc)
 	return ret;
 }
 
+static int fusb301_set_polarity(struct udevice *dev,
+				enum typec_cc_polarity polarity)
+{
+	struct fusb301_chip *chip = dev_get_priv(dev);
+	struct udevice *sw_dev = chip->sw;
+	enum typec_orientation orientation;
+
+	if (!sw_dev)
+		return -ENODEV;
+
+	if (polarity == TYPEC_POLARITY_CC1)
+		orientation = TYPEC_ORIENTATION_NORMAL;
+	else
+		orientation = TYPEC_ORIENTATION_REVERSE;
+
+	return typec_switch_set(sw_dev, orientation);
+}
+
 static int fusb301_get_vbus(struct udevice *dev)
 {
 	u8 status;
@@ -702,6 +721,10 @@ static int fusb301_init(struct udevice *dev)
 		// return ret;
 	}
 
+	ret = typec_switch_get(dev, &chip->sw);
+	if (ret)
+		dev_err(dev, "failed to get typec switch\n");
+
 	return 0;
 }
 
@@ -722,6 +745,7 @@ static struct dm_tcpm_ops fusb301_ops = {
 	.get_vbus = fusb301_get_vbus,
 	.set_cc = fusb301_set_cc,
 	.get_cc = fusb301_get_cc,
+	.set_polarity = fusb301_set_polarity,
 	.set_vconn = fusb301_set_vconn,
 	.set_vbus = fusb301_set_vbus,
 	.set_pd_rx = fusb301_set_pd_rx,
