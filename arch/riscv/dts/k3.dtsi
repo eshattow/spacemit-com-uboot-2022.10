@@ -444,6 +444,79 @@
 			status = "disabled";
 		};
 
+		pcie_phy0: pcie-phy0@81d00000 {
+			compatible = "spacemit,k3-pcie-phy";
+			reg = <0x0 0x81d00000 0x0 0x1000>,
+			      <0x0 0xd4090178 0x0 0x4>;
+			reg-names = "phy", "apb_spare";
+
+			spacemit,phy-id = <0>;
+			spacemit,num-lanes = <2>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		pcie_phy1: pcie-phy1@81e00000 {
+			compatible = "spacemit,k3-pcie-phy";
+			reg = <0x0 0x81e00000 0x0 0x1000>,
+			      <0x0 0xd4090178 0x0 0x4>;
+			reg-names = "phy", "apb_spare";
+
+			spacemit,phy-id = <1>;
+			spacemit,num-lanes = <2>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		pcie_phy2: pcie-phy2@81f00000 {
+			compatible = "spacemit,k3-pcie-phy";
+			reg = <0x0 0x81f00000 0x0 0x400>,
+			      <0x0 0xd4090178 0x0 0x4>;
+			reg-names = "phy", "apb_spare";
+
+			spacemit,phy-id = <2>;
+			spacemit,num-lanes = <1>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		pcie_phy3: pcie-phy3@82000000 {
+			compatible = "spacemit,k3-pcie-phy";
+			reg = <0x0 0x82000000 0x0 0x400>,
+			      <0x0 0xd4090178 0x0 0x4>;
+			reg-names = "phy", "apb_spare";
+
+			spacemit,phy-id = <3>;
+			spacemit,num-lanes = <1>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		pcie_phy4: pcie-phy4@82100000 {
+			compatible = "spacemit,k3-pcie-phy";
+			reg = <0x0 0x82100000 0x0 0x400>,
+			      <0x0 0xd4090178 0x0 0x4>;
+			reg-names = "phy", "apb_spare";
+
+			spacemit,phy-id = <4>;
+			spacemit,num-lanes = <1>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		pcie_phy5: pcie-phy5@82200000 {
+			compatible = "spacemit,k3-pcie-phy";
+			reg = <0x0 0x82200000 0x0 0x400>,
+			      <0x0 0xd42829f0 0x0 0x8>,
+			      <0x0 0xd4090178 0x0 0x4>;
+			reg-names = "phy", "app", "apb_spare";
+
+			spacemit,phy-id = <5>;
+			spacemit,num-lanes = <1>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
 		pcie0_rc: pcie@80000000 {
 			compatible = "spacemit,k3-pcie";
 			reg = <0x0 0x80000000 0x0 0x00001000>, /* dbi */
