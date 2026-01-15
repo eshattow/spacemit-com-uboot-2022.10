@@ -46,4 +46,26 @@ enum dw_pcie_device_mode {
 
 #define GEN3_EQ_CONTROL_OFF				0x8a8
 
+#define PHY_NUMS	6
+
+/* Port A Modes */
+#define PORTA_MODE_MASK		(BIT(4) | BIT(3))
+#define PORTA_MODE_X8		(0)				/* [4:3] = 00b */
+#define PORTA_MODE_X4		(BIT(4))			/* [4:3] = 10b */
+#define PORTA_MODE_X2_PORTB_X2	(BIT(4) | BIT(3))		/* [4:3] = 11b */
+
+/* Port C Modes */
+#define PORTC_LANE_MASK		(BIT(4) | BIT(2) | BIT(1))
+#define PORTC_MODE_X2		(BIT(4) | (0))			/* [4:1] = 1x00b */
+#define PORTC_MODE_X1_PHY2	(BIT(4) | BIT(1))		/* [4:1] = 1x01b */
+#define PORTC_MODE_X1_PHY3	(BIT(4) | BIT(2))		/* [4:1] = 1x10b */
+
+/* Port D Modes */
+#define PORTD_LANE_MASK		(BIT(4) | BIT(0))
+#define PORTD_MODE_PCIE		(BIT(4) | (0))			/* [4:0] = 1xxx0b */
+
+/* Port E Modes */
+#define PORTE_LANE_MASK		(BIT(4))
+#define PORTE_MODE_PCIE		(BIT(4))			/* [4:0] = 1xxxxb */
+
 #endif
