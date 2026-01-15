@@ -33,8 +33,45 @@
 #include <misc.h>
 #include <search.h>
 #include <env_internal.h>
+#include <linux/bitops.h>
+#include <usb.h>
 
 #define EMMC_MAX_BLK_WRITE 16384
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_SPEED)
+/*
+ * K3: pass fastboot speed selection from SPL to U-Boot via CIU debug scratch
+ * register.
+ *
+ * NOTE: Do not reuse this on platforms that treat BOOT_DEV_FLAG_REG as an
+ * exact boot-mode value (e.g. some K1-X flows), since extra bits would break
+ * boot-mode comparisons.
+ */
+#define SPACEMIT_FASTBOOT_SPEED_SUPER_BIT	BIT(0)
+
+u32 spacemit_k3_fastboot_speed_flags(void)
+{
+	return readl((void *)BOOT_CIU_DEBUG_REG0);
+}
+
+enum usb_device_speed spacemit_k3_fastboot_requested_speed(void)
+{
+	return (spacemit_k3_fastboot_speed_flags() & SPACEMIT_FASTBOOT_SPEED_SUPER_BIT) ?
+	       USB_SPEED_SUPER : USB_SPEED_HIGH;
+}
+
+void spacemit_k3_fastboot_set_superspeed_flag(bool enable)
+{
+	u32 val = readl((void *)BOOT_CIU_DEBUG_REG0);
+
+	if (enable)
+		val |= SPACEMIT_FASTBOOT_SPEED_SUPER_BIT;
+	else
+		val &= ~SPACEMIT_FASTBOOT_SPEED_SUPER_BIT;
+
+	writel(val, (void *)BOOT_CIU_DEBUG_REG0);
+}
+#endif
 
 #if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
 int _write_gpt_partition(struct flash_dev *fdev)
@@ -1142,6 +1179,28 @@ void fastboot_env_access(char *operation, char *env, char *response)
 		write_oem_env(env, response);
 	else
 		fastboot_fail("NOT support", response);
+}
+#endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_SPEED)
+void fastboot_set_speed(char *operation, char *response)
+{
+	if (!operation || !*operation) {
+		fastboot_fail("missing parameter", response);
+		return;
+	}
+
+	if (0 == strcmp(operation, "super-speed")) {
+		pr_info("fastboot: set maximum-speed to super-speed\n");
+		spacemit_k3_fastboot_set_superspeed_flag(true);
+		fastboot_okay(NULL, response);
+	} else if (0 == strcmp(operation, "high-speed")) {
+		pr_info("fastboot: set maximum-speed to high-speed\n");
+		spacemit_k3_fastboot_set_superspeed_flag(false);
+		fastboot_okay(NULL, response);
+	} else {
+		fastboot_fail("NOT support", response);
+	}
 }
 #endif
 

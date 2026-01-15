@@ -19,6 +19,7 @@
 #include <watchdog.h>
 #include <linux/stringify.h>
 #include <vsprintf.h>
+#include <fb_spacemit.h>
 
 static ulong spl_fastboot_load_read(struct spl_load_info *load, ulong sector,
 			       ulong count, void *buf)
@@ -50,6 +51,8 @@ static int run_fastboot_usb(void)
 		pr_err("USB init failed: %d\n", ret);
 		return -1;
 	}
+
+	spacemit_k3_fastboot_set_superspeed_flag(false);
 
 	g_dnl_clear_detach();
 	ret = g_dnl_register("usb_dnl_fastboot");

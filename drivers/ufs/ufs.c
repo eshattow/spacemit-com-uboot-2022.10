@@ -43,7 +43,7 @@
 #define QUERY_REQ_TIMEOUT 1500 /* 1.5 seconds */
 
 /* Polling time to wait for fDeviceInit */
-#define FDEVICEINIT_COMPL_TIMEOUT 3000 /* millisecs */
+#define FDEVICEINIT_COMPL_TIMEOUT 10000 /* millisecs */
 
 /* maximum timeout in ms for a general UIC command */
 #define UFS_UIC_CMD_TIMEOUT	1000
