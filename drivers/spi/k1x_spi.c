@@ -233,7 +233,8 @@ int k1x_spi_pio_xfer(struct k1x_spi *priv, int len, void *din, unsigned long fla
 			k1x_stop_ssp(priv);
 			break;
 		}
-	} while (priv->write(priv));
+		priv->write(priv);
+	} while (1);
 
 	if (flags & SPI_XFER_END) {
 		k1x_gpio_set_value(priv->cs_gpio, 1);
