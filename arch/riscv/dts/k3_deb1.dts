@@ -206,7 +206,6 @@
 	status = "okay";
 	u-boot,dm-spl;
 	dwc3@cad00000 {
-		maximum-speed = "high-speed";
 		dr_mode = "peripheral";
 		u-boot,dm-spl;
 	};
