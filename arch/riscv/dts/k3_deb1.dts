@@ -38,6 +38,10 @@
 };
 
 &pinctrl {
+	pinctrl-single,gpio-range = <
+		&range GPIO_89  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_DS4)
+	>;
+
 	gmac0_grp {
 		power-source = <1800>;
 	};
@@ -51,6 +55,14 @@
 		power-source = <1800>;
 	};
 
+	pcie1_1_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_88, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS4)) /* PCIeB_perstn */
+			K3_PADCONF(GPIO_90, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS4)) /* PCIeB_clkreqn */
+		>;
+		power-source = <1800>;
+	};
+
 	espi0_grp {
 		power-source = <1800>;
 	};
@@ -61,6 +73,12 @@
 		>;
 		power-source = <1800>;
 	};
+};
+
+&gpio{
+	gpio-ranges = <
+		&pinctrl 89 GPIO_89 1
+	>;
 };
 
 &uart0 {
@@ -133,12 +151,32 @@
 	};
 };
 
-&pcie0_rc {
-       pinctrl-names = "default";
-       pinctrl-0 = <&pinctrl_pcie0_1>;
-       num-lanes = <4>;
+&pcie_phy0 {
+	status = "okay";
+};
 
-       status = "okay";
+&pcie_phy1 {
+	status = "okay";
+};
+
+&pcie0_rc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie0_1>;
+	num-lanes = <4>;
+	phys = <&pcie_phy0>, <&pcie_phy1>;
+	phy-names = "pcie-phy0", "pcie-phy1";
+	spacemit,device-detect = <&gpio 89 0>;
+
+	status = "okay";
+};
+
+&pcie1_rc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie1_1>;
+
+	phys = <&pcie_phy1>;
+	phy-names = "pcie-phy0";
+	status = "okay";
 };
 
 &usb2_host_u2phy {
