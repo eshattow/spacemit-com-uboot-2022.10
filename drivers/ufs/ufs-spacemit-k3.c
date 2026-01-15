@@ -129,6 +129,7 @@ struct spacemit_k3_ufs_priv {
 #define UFS_SYS1CLK_1US_409MHZ		409		/* 1us worth of SYS1CLK cycles at ~409MHz */
 #define UFS_TX_SYMBOL_CLK_NS_US_409MHZ	0x800	/* TX symbol clock ns/us ratio for 409MHz */
 #define UFS_PA_LINK_STARTUP_TIMER_MAX	0xffffffff	/* Max PA link startup timer */
+#define UFS_DL_AFC0REQTIMEOUTVAL_MAX	0xFFFF
 
 extern int ufshcd_query_descriptor_retry(struct ufs_hba *hba, enum query_opcode opcode,
 					 enum desc_idn idn, u8 index, u8 selector, u8 *desc_buf,
@@ -512,7 +513,7 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 		pr_err("Writing PA_TXMK2EXTENSION error \n");
 	}
 
-	/* PA_PEERSCRAMBLING - changed from 0x1 to 0x0 per patch */
+	/* PA_PEERSCRAMBLING */
 	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_PEERSCRAMBLING), 0x0);
 	if (err) {
 		pr_err("Writing PA_PEERSCRAMBLING error \n");
@@ -546,7 +547,7 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 		pr_err("Writing PA_SCRAMBLING error \n");
 	}
 
-	/* PA_GRANULARITY - changed from 0x1 to 0x6 per patch */
+	/* PA_GRANULARITY */
 	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_GRANULARITY), 0x6);
 	if (err) {
 		pr_err("Writing PA_GRANULARITY error \n");
@@ -661,6 +662,11 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 			0x9F);
 	}
 
+	/* bypass B0 reduce phy power ECO */
+	err = ufshcd_dme_set(hba, UIC_ARG_MIB(0xfc), 0xfc);
+	if (err)
+		pr_err("Writing 0xfc error \n");
+
 	pr_debug("ufs: ufs_spacemit_k3_uniprov1p6_init done.\n");
 
 	/* program controller timing registers for 409MHz SYS1CLK */
@@ -706,7 +712,7 @@ static int spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 
 	pr_debug("ufs: spacemit_k3_ufs_link_startup_notify, status:%d\n", status);
 	if (status == PRE_CHANGE) {
-		/*do nothing*/
+		/* init is done in hce_enable_notify(POST_CHANGE) */
 		return 0;
 	}
 
@@ -743,6 +749,10 @@ static int spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)), 0xd7);
 		mdelay(1);
 		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)), 0x17);
+
+		/* DL_AFC0REQTIMEOUTVAL_MAX */
+		ufshcd_dme_set(hba, UIC_ARG_MIB(DL_AFC0REQTIMEOUTVAL),
+			       UFS_DL_AFC0REQTIMEOUTVAL_MAX);
 
 		/*LCC_DISABLE*/
 		mdelay(5);
@@ -799,6 +809,9 @@ static int spacemit_k3_ufs_hce_enable_notify(struct ufs_hba *hba,
 	if (status == POST_CHANGE) {
 		spacemit_k3_ufs_mphy_init(hba);
 		spacemit_k3_ufs_unipro_init(hba);
+
+		/* Disable auto-hibern8 during bringup */
+		ufshcd_writel(hba, 0, REG_AUTO_HIBERNATE_IDLE_TIMER);
 	}
 
 	return 0;
@@ -806,11 +819,8 @@ static int spacemit_k3_ufs_hce_enable_notify(struct ufs_hba *hba,
 
 static int spacemit_k3_ufs_init(struct ufs_hba *hba)
 {
-	struct udevice *dev = hba->dev;
-	struct spacemit_k3_ufs_priv *priv;
-	priv = dev_get_priv(dev);
-
-	spacemit_k3_ufs_clk_enable(priv);
+	/* Mirror Linux behavior: disable LCC for controller stability */
+	hba->quirks |= UFSHCD_QUIRK_BROKEN_LCC;
 
 	return 0;
 }
@@ -842,6 +852,9 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 	struct scsi_plat *scsi_plat;
 	int ret;
 	int retries;
+
+	/* Bring clocks/reset up as early as possible */
+	spacemit_k3_ufs_clk_enable(priv);
 
 	for (retries = 3; retries > 0; retries--) {
 		ret = ufshcd_probe(dev, hba_ops);
