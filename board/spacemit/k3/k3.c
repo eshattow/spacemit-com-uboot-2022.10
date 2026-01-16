@@ -467,8 +467,12 @@ int board_late_init(void)
 
 #ifdef CONFIG_ESPI
 	ret = uclass_probe_all(UCLASS_ESPI);
-	if (ret || !spacemit_espi_is_ready()) {
-		printf("eSPI not ready, disabling kernel EC driver\n");
+	if (ret) {
+		if (ret != -ENODEV)
+			printf("Warn: Failed to probe eSPI (err=%d), skipping EC\n", ret);
+		env_set("espi_disabled", "1");
+	} else if (!spacemit_espi_is_ready()) {
+		printf("eSPI not ready, skipping EC probe\n");
 		env_set("espi_disabled", "1");
 	} else {
 		/* Probe CrosEC and its children (I2C tunnel devices) */
@@ -481,14 +485,14 @@ int board_late_init(void)
 #if CONFIG_IS_ENABLED(HWMON_SENSORS_CTF2301)
 	ret = uclass_get_device_by_driver(UCLASS_MISC,
 					  DM_DRIVER_GET(ctf2301), &dev);
-	if (ret)
+	if (ret && ret != -ENODEV)
 		printf("Warn: Failed to force init ctf2301 fan (err=%d)\n", ret);
 #endif
 
 #if CONFIG_IS_ENABLED(RT7451_RETIMER)
 	ret = uclass_get_device_by_driver(UCLASS_MISC,
 					  DM_DRIVER_GET(rt7451), &dev);
-	if (ret)
+	if (ret && ret != -ENODEV)
 		printf("Warn: Failed to init RT7451 retimer (err=%d)\n", ret);
 #endif
 

@@ -1478,8 +1478,8 @@ static const char * const lcddsc_parent_names[] = {
 };
 static SPACEMIT_CCU_DIV2_FC_MUX_GATE(lcd_dsc_clk, "lcd_dsc_clk", lcddsc_parent_names,
 	BASE_TYPE_APMU, APMU_LCD_CLK_RES_CTRL1, APMU_LCD_CLK_RES_CTRL2,
-	17, 4, BIT(30),
-	21, 3, BIT(16), BIT(16), 0x0,
+	25, 3, BIT(26),
+	29, 3, BIT(14), BIT(14), 0x0,
 	0);
 
 static const char * const lcdpx_parent_names[] = {
@@ -1488,7 +1488,7 @@ static const char * const lcdpx_parent_names[] = {
 };
 static SPACEMIT_CCU_DIV2_FC_MUX_GATE(lcd_pxclk, "lcd_pxclk", lcdpx_parent_names,
 	BASE_TYPE_APMU, APMU_LCD_CLK_RES_CTRL1, APMU_LCD_CLK_RES_CTRL2,
-	17, 4, BIT(30),
+	17, 3, BIT(30),
 	21, 3, BIT(16), BIT(16), 0x0,
 	0);
 

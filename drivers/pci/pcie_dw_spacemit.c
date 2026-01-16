@@ -15,6 +15,7 @@
 #include <syscon.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
+#include <linux/io.h>
 #include <asm-generic/gpio.h>
 #include <dm/device_compat.h>
 #include <linux/bitops.h>
@@ -38,15 +39,16 @@ struct spacemit_pcie {
 
 	void __iomem *app_base; /* DT app */
 	void __iomem *phy_ahb; /* DT phy_ahb */
+	void __iomem *mgmt;    /* DT phy mgmt */
 
 	/* reset, clock resources */
 	struct clk clock;
 	struct reset_ctl reset;
 
+	int port_id;
 	int num_lanes;
+	struct phy_bulk phys;
 };
-
-extern void init_phy(void);
 
 static inline u32 spacemit_pcie_readl(struct spacemit_pcie *pcie, u32 offset)
 {
@@ -76,6 +78,126 @@ static void pcie_eq_preset(struct spacemit_pcie *pci)
 	val &= ~(0xffff<<8);
 	val |= ((0x1<<4)<<8);
 	writel(val, pci->dw.dbi_base + GEN3_EQ_CONTROL_OFF);
+}
+
+static int k3_pcie_phy_map_lanes(struct spacemit_pcie *pcie)
+{
+	u32 tmp = 0, mask = 0, val = 0;
+	struct gpio_desc  portb_det_gpio;
+	u32 gpio_active_level = 1;
+	static int porta_four_lane = 0;
+	int phy_id = 0;
+	struct phy *port2_phy;
+	ofnode phy_node;
+	int ret;
+
+	/* Check if there is a device inserted in port B. If so, port A can only be 2 lanes. */
+	if (pcie->port_id == 0) {
+		ret = gpio_request_by_name(pcie->dw.dev,"spacemit,device-detect", 0,
+			&portb_det_gpio, GPIOD_IS_IN);
+		if (ret)
+			dev_info(pcie->dw.dev, "Port0 has no device detect gpio\n");
+		else {
+			ret = dev_read_u32(pcie->dw.dev, "spacemit,device-detect-active-level",
+				&gpio_active_level);
+			if (ret || (gpio_active_level != 0 && gpio_active_level != 1))
+				gpio_active_level = 1; /* default to high active */
+
+			if (dm_gpio_get_value(&portb_det_gpio) == gpio_active_level) {
+				dev_info(pcie->dw.dev, "Port1 device detected, force to x2 mode\n");
+				pcie->num_lanes = 2;
+				pcie->phys.count = 1;
+			}
+			dm_gpio_free(pcie->dw.dev, &portb_det_gpio);
+		}
+	}
+
+	/* When port 2 has only 1 lane, it is necessary to determine
+	 * whether port 2 is connected to PHY2 or PHY3.*/
+	if (pcie->port_id == 2 && pcie->num_lanes == 1) {
+		if (pcie->phys.count != 1)
+			return -EINVAL;
+		port2_phy = &(pcie->phys.phys[0]);
+		phy_node = dev_ofnode(port2_phy->dev);
+		if (!ofnode_valid(phy_node)) {
+			dev_err(pcie->dw.dev, "Failed to get phy node\n");
+			return -ENODEV;
+		}
+
+		ret = ofnode_read_u32(phy_node, "spacemit,phy-id", &phy_id);
+		if (ret || phy_id != 2 || phy_id != 3) {
+			dev_info(pcie->dw.dev, "It is no phy-id: %d, use default 2 for pcie port 2\n", ret);
+			phy_id = 2; /* default to phy2 */
+		}
+	}
+
+	switch (pcie->port_id) {
+	case 0:
+		mask = PORTA_MODE_MASK;
+		if (pcie->num_lanes == 8) {
+			val = PORTA_MODE_X8;
+			porta_four_lane = 2;
+		}
+		else if (pcie->num_lanes == 4) {
+			val = PORTA_MODE_X4;
+			porta_four_lane = 1;
+		}
+		else if (pcie->num_lanes == 2)
+			val = PORTA_MODE_X2_PORTB_X2;
+		else
+			return -EINVAL;
+	break;
+
+	case 1:
+		if (porta_four_lane >= 1) {
+			pcie->phys.count = 0;
+			return -EINVAL;
+		}
+		mask = PORTA_MODE_MASK;
+		if (pcie->num_lanes == 2)
+			val = PORTA_MODE_X2_PORTB_X2;
+		else
+			return -EINVAL;
+	break;
+
+	case 2:
+		mask = PORTC_LANE_MASK;
+		if (pcie->num_lanes == 2)
+			 val = PORTC_MODE_X2;
+		else if (pcie->num_lanes == 1) {
+			if (phy_id == 2)
+				val = PORTC_MODE_X1_PHY2;
+			else
+				val = PORTC_MODE_X1_PHY3;
+		} else
+			return -EINVAL;
+	break;
+
+	case 3:
+		mask = PORTD_LANE_MASK;
+		if (pcie->num_lanes == 1)
+			val = PORTD_MODE_PCIE;
+		else
+			return -EINVAL;
+	break;
+
+	case 4:
+		mask = PORTE_LANE_MASK;
+		if (pcie->num_lanes == 1)
+			val = PORTE_MODE_PCIE;
+		else
+			return -EINVAL;
+	break;
+
+	default:
+		return -EINVAL;
+	}
+
+	tmp = readl(pcie->mgmt);
+	tmp &= ~mask;
+	tmp |= val;
+	writel(tmp, pcie->mgmt);
+        return 0;
 }
 
 /*
@@ -310,6 +432,41 @@ static int spacemit_pcie_host_init(struct spacemit_pcie *pcie)
 	return 0;
 }
 
+static int spacemit_pcie_phy_init(struct spacemit_pcie *pcie)
+{
+	int i, ret;
+	u32 reg;
+	struct udevice *dev = pcie->dw.dev;
+
+	reg = spacemit_pcie_readl(pcie, PCIECTRL_SPACEMIT_CONF_DEVICE_CMD);
+	reg &= ~APP_HOLD_PHY_RST;
+	spacemit_pcie_writel(pcie, PCIECTRL_SPACEMIT_CONF_DEVICE_CMD, reg);
+
+	ret = k3_pcie_phy_map_lanes(pcie);
+	if (ret) {
+		dev_err(dev, "failed to map lanes: %d\n", ret);
+		return ret;
+	}
+
+	for(i = 0; i < pcie->phys.count; i++) {
+		struct phy *phy = &(pcie->phys.phys[i]);
+
+		ret = generic_phy_init(phy);
+		if (ret) {
+			dev_err(dev, "failed to init phy %d: %d\n", i, ret);
+			return ret;
+		}
+
+		ret = generic_phy_power_on(phy);
+		if (ret) {
+			dev_err(dev, "failed to power on phy: %d\n", ret);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
 /**
  * spacemit_pcie_probe() - Probe the PCIe bus for active link
  *
@@ -325,7 +482,6 @@ static int spacemit_pcie_probe(struct udevice *dev)
 	struct spacemit_pcie *pcie = dev_get_priv(dev);
 	struct udevice *ctlr = pci_get_controller(dev);
 	struct pci_controller *hose = dev_get_uclass_priv(ctlr);
-	struct phy phy0, phy1;
 	int ret;
 	u32 reg;
 
@@ -347,31 +503,16 @@ static int spacemit_pcie_probe(struct udevice *dev)
 	reg &= ~PCIE_PERSTN_OUT;
 	spacemit_pcie_writel(pcie, PCIE_CTRL_LOGIC, reg);
 
-	ret = generic_phy_get_by_name(dev, "pcie-phy0", &phy0);
-	if (ret) {
-		dev_info(dev, "Unable to get phy0\n");
-	} else {
-		generic_phy_reset(&phy0);
-		generic_phy_init(&phy0);
-		generic_phy_power_on(&phy0);
-	}
-
-	ret = generic_phy_get_by_name(dev, "pcie-phy1", &phy1);
-	if (ret) {
-		dev_info(dev, "Unable to get phy1\n");
-	} else {
-		generic_phy_reset(&phy1);
-		generic_phy_init(&phy1);
-		generic_phy_power_on(&phy1);
-	}
-
 	pcie->dw.first_busno = dev_seq(dev);
 	pcie->dw.dev = dev;
 
 	pcie_set_mode(pcie, DW_PCIE_RC_TYPE);
-
 	spacemit_pcie_host_init(pcie);
-	init_phy();
+	ret = spacemit_pcie_phy_init(pcie);
+	if (ret) {
+		dev_err(dev, "failed to init phy: %d\n", ret);
+		return ret;
+	}
 	pcie_eq_preset(pcie);
 	pcie_dw_setup_host(&pcie->dw);
 	pcie_dw_init_id(pcie);
@@ -406,6 +547,7 @@ static int spacemit_pcie_probe(struct udevice *dev)
 static int spacemit_pcie_of_to_plat(struct udevice *dev)
 {
 	int ret = 0;
+	u32 mgmt = 0;
 	struct spacemit_pcie *pcie = dev_get_priv(dev);
 
 	/* Get the controller base address */
@@ -433,6 +575,17 @@ static int spacemit_pcie_of_to_plat(struct udevice *dev)
 	if ((fdt_addr_t)pcie->app_base == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
+	ret = dev_read_u32(dev, "spacemit,pcie-mgmt", &mgmt);
+	if (ret) {
+		dev_err(dev, "failed to get pcie-mgmt: %d\n", ret);
+		return ret;
+	}
+	pcie->mgmt = (void __iomem *)ioremap(mgmt, 4);
+	if (!pcie->mgmt) {
+		dev_err(dev, "failed to map mgmt\n");
+		return -EINVAL;
+	}
+
 	ret = clk_get_by_index(dev, 0, &pcie->clock);
 	if (ret) {
 		dev_err(dev, "failed to get clk: %d\n", ret);
@@ -445,11 +598,22 @@ static int spacemit_pcie_of_to_plat(struct udevice *dev)
 		return -EINVAL;
 	}
 
+	pcie->port_id = dev_read_u32_default(dev, "spacemit,pcie-port", 0);
+	if (pcie->port_id < 0 || pcie->port_id > 4) {
+		dev_err(dev, "port-id %d: invalid value\n", pcie->port_id);
+		return -EINVAL;
+	}
+
 	pcie->num_lanes = dev_read_u32_default(dev, "num-lanes", 1);
-	dev_info(dev, "num-lanes: %u\n", pcie->num_lanes);
 	if (!pcie->num_lanes || pcie->num_lanes > 8) {
 		dev_err(dev, "num-lanes %u: invalid value\n", pcie->num_lanes);
 		return -EINVAL;
+	}
+
+	ret = generic_phy_get_bulk(dev, &pcie->phys);
+	if (ret) {
+		dev_err(dev, "failed to get phys: %d\n", ret);
+		return ret;
 	}
 
 	return 0;

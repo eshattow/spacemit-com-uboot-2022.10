@@ -150,6 +150,7 @@ config PCIE_DW_K1X
 config PCIE_DW_SPACEMIT
 	bool "Enable Spacemit PCIe"
 	select PCIE_DW_COMMON
+	select PHY_SPACEMIT_PCIE
 	help
 	  Say Y here if you want to enable PCIe controller support on
 	  Spacemit SoCs.

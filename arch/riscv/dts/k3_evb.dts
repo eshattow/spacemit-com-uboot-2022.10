@@ -189,11 +189,73 @@
 	};
 };
 
+&pcie_phy0 {
+	status = "okay";
+};
+
+&pcie_phy1 {
+	status = "okay";
+};
+
+&pcie_phy2 {
+	status = "okay";
+};
+
+&pcie_phy3 {
+	status = "okay";
+};
+
+&pcie_phy4 {
+	status = "okay";
+};
+
+&pcie_phy5 {
+	status = "okay";
+};
+
 &pcie0_rc{
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pcie0_1>;
+	phys = <&pcie_phy0>;
+	phy-names = "pcie-phy0";
 
 	num-lanes = <2>;
+	status = "okay";
+};
+
+&pcie1_rc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie1_1>;
+	phys = <&pcie_phy1>;
+	phy-names = "pcie-phy0";
+
+	status = "okay";
+};
+
+&pcie2_rc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie2_2>;
+	phys = <&pcie_phy2>, <&pcie_phy3>;
+	phy-names = "pcie-phy0", "pcie-phy1";
+
+	status = "okay";
+};
+
+&pcie3_rc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie3_1>;
+	phys = <&pcie_phy4>;
+	phy-names = "pcie-phy0";
+
+	status = "okay";
+};
+
+&pcie4_rc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie4_1>;
+	phys = <&pcie_phy5>;
+	phy-names = "pcie-phy0";
+
 	status = "okay";
 };
 
@@ -229,6 +291,31 @@
 	pinctrl-single,gpio-range = <
 		&range GPIO_86  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_DS4)
 	>;
+
+	pcie1_1_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_88, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeB_perstn */
+			K3_PADCONF(GPIO_89, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeB_waken */
+			K3_PADCONF(GPIO_90, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeB_clkreqn */
+		>;
+	};
+
+	pcie3_1_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_105, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeD_perstn */
+			K3_PADCONF(GPIO_106, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeD_waken */
+			K3_PADCONF(GPIO_107, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeD_clkreqn */
+		>;
+		power-source = <1800>;
+	};
+
+	pcie4_1_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_76, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeE_perstn */
+			K3_PADCONF(GPIO_77, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeE_waken */
+			K3_PADCONF(GPIO_78, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeE_clkreqn */
+		>;
+	};
 };
 
 &gpio{
