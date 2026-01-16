@@ -510,7 +510,7 @@ static int load_fit_from_mtd(struct spl_image_info *caller_spl_image, const char
 #if defined(CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME)
 /**
  * Load firmware from bootloader file system partition
- * Loads u-boot-opensbi.itb or esos.itb FIT images, same as legacy mode
+ * Loads fw_dynamic.itb and esos.itb FIT images, same as legacy mode
  *
  * @image:      SPL image info structure
  * @image_path: Image path and name.
