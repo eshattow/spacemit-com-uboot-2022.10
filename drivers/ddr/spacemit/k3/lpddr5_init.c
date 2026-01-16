@@ -1404,36 +1404,44 @@ void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info)
 
 	rst_code = 22;
 
-#if (CONFIG_DDR_DATARATE == 5500)
-	/* DPLL 2750MHz*/
-	REG32(CFG_BASE + 0x8) = 0x0b3912aa;
-	REG32(CFG_BASE + 0x10) = 0xa0558b8b;
-	REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0xab << 8);
-#elif (CONFIG_DDR_DATARATE == 6000)
-	/* DPLL 3000MHz*/
-	REG32(CFG_BASE + 0x8) = 0x0b3e2000;
-	REG32(CFG_BASE + 0x10) = 0xa0558c8c;
-	REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0x00 << 8);
-#else
-	REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff);
-#endif
+	if (5500 == part_info->data_rate_mtps) {
+		/* DPLL 2750MHz*/
+		REG32(CFG_BASE + 0x8) = 0x0b3912aa;
+		REG32(CFG_BASE + 0x10) = 0xa0558b8b;
+		REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0xab << 8);
+	}
+	else if (6000 == part_info->data_rate_mtps) {
+		/* DPLL 3000MHz*/
+		REG32(CFG_BASE + 0x8) = 0x0b3e2000;
+		REG32(CFG_BASE + 0x10) = 0xa0558c8c;
+		REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0x00 << 8);
+	}
+	else {
+		/* DPLL 3200MHz*/
+		REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff);
+	}
+
 	read_data = REG32(CFG_BASE + 0x1c);
 	while ((read_data & 0x00000001) != 0x1) {
 		read_data = REG32(CFG_BASE + 0x1c);
 	}
-	REG32(CFG_BASE + 0x18) &= ~(0x3f << 16); // div 0
-#if (CONFIG_DDR_DATARATE == 1066)
-	REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x7 << 16); // sel 2, div 8
-#elif (CONFIG_DDR_DATARATE == 4266)
-	REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x1 << 16); // sel 2, div 2
-	// REG32(CFG_BASE + 0x18) |= (0x2 << 19) | (0x1 << 16); // sel 2, div 2 3200mbps
-#elif (CONFIG_DDR_DATARATE == 5120)
-	REG32(CFG_BASE + 0x18) |= (0x7 << 19) | (0x0 << 16); // sel 3, div 1 5120mbps
-#else
-	REG32(CFG_BASE + 0x18) |= (0x2 << 19) | (0x0 << 16); // sel 3, div 1 6400mbps
-	// REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x1 << 16); // sel 3, div 1
-#endif
-	REG32(CFG_BASE + 0x18) |= (1 << 25); // fc
+	// clear frequency divider
+	REG32(CFG_BASE + 0x18) &= ~(0x3f << 16);
+
+	if (1066 == part_info->data_rate_mtps) {
+		REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x7 << 16); // sel 2, div 8
+	} else if (4266 == part_info->data_rate_mtps) {
+		REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x1 << 16); // sel 2, div 2
+		// REG32(CFG_BASE + 0x18) |= (0x2 << 19) | (0x1 << 16); // sel 2, div 2 3200mbps
+	} else if (5120 == part_info->data_rate_mtps) {
+		REG32(CFG_BASE + 0x18) |= (0x7 << 19) | (0x0 << 16); // sel 3, div 1 5120mbps
+	} else {
+		REG32(CFG_BASE + 0x18) |= (0x2 << 19) | (0x0 << 16); // sel 3, div 1 6400mbps
+		// REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x1 << 16); // sel 3, div 1
+	}
+
+	// initial frequency change
+	REG32(CFG_BASE + 0x18) |= (1 << 25);
 	LogMsg(0, "read 6400 reg 0x%08X 0x%08X\n", CFG_BASE + 0x18, REG32(CFG_BASE + 0x18));
 	REG32(0xD4282CE8) = REG32(CFG_BASE + 0x18);
 	LogMsg(0, "check setting reg 0x%08X 0x%08X\n", 0xD4282CE8, REG32(0xD4282CE8));
