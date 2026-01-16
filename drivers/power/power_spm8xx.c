@@ -325,11 +325,6 @@ static int __board_pmic_init(const char *name)
 					regvals[1] = 0x2;
 					i2c_write(saddr, 0x29, 1, regvals, 2);
 
-					/* second: set 0xd1 */
-					i2c_read(saddr, 0xd1, 1, &regval, 1);
-					regval = 0x7c;
-					i2c_write(saddr, 0xd1, 1, &regval, 1);
-
 					/* then: set 0x21 */
 					if (sel >= 0) {
 						sel <<= ffs(buck_desc[0].vsel_msk) - 1;
