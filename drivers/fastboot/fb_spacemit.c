@@ -315,8 +315,9 @@ int _clear_env_part(void *download_buffer, u32 download_bytes,
 			int ret;
 			ret = fb_mtd_lookup("env", &mtd, &part);
 			if (ret) {
-				pr_err("invalid mtd device\n");
-				return -1;
+				/* No 'env' partition defined: skip ENV clear gracefully */
+				pr_info("no env partition found, skip clearing env\n");
+				break;
 			}
 			ret = _fb_mtd_erase(mtd, CONFIG_ENV_SIZE);
 			if (ret)
@@ -949,6 +950,90 @@ int compare_blk_image_val(struct blk_desc *dev_desc, u64 compare_val, lbaint_t p
 	return (calculate == compare_val) ? 0 : -1;
 }
 
+/**
+ * compare_ubi_image_val() - Verify UBI volume data using UBI commands
+ * @partition: UBI partition name
+ * @volume_name: UBI volume name
+ * @compare_value: Expected checksum value
+ * @image_size: Size of data to verify
+ *
+ * Returns 0 on success, non-zero on failure
+ */
+int compare_ubi_image_val(const char *partition, const char *volume_name, 
+                                u64 compare_value, u64 image_size)
+{
+	char cmd_buf[256];
+	void *read_addr = (void *)map_sysmem(RECOVERY_LOAD_IMG_ADDR + RECOVERY_LOAD_IMG_SIZE, 0);
+	u64 calculated_checksum = 0;
+	u64 bytes_to_verify = image_size;
+	u64 read_offset = 0;
+	u64 chunk_size;
+	int ret;
+
+	printf("Starting UBI data verification for volume %s in partition %s\n", 
+	       volume_name, partition);
+
+	/* Attach to UBI partition */
+	snprintf(cmd_buf, sizeof(cmd_buf), "ubi part %s", partition);
+	if (run_command(cmd_buf, 0)) {
+		printf("Failed to attach UBI partition %s for verification\n", partition);
+		return -1;
+	}
+
+	/* Check if volume exists */
+	snprintf(cmd_buf, sizeof(cmd_buf), "ubi check %s", volume_name);
+	if (run_command(cmd_buf, 0)) {
+		printf("UBI volume %s does not exist for verification\n", volume_name);
+		run_command("ubi detach", 0);
+		return -1;
+	}
+
+	/* Read and verify data in chunks */
+	while (bytes_to_verify > 0) {
+		chunk_size = bytes_to_verify > RECOVERY_LOAD_IMG_SIZE ? 
+		             RECOVERY_LOAD_IMG_SIZE : bytes_to_verify;
+
+		printf("Verifying chunk: offset=0x%llx, size=0x%llx\n", read_offset, chunk_size);
+
+		/* Read data from UBI volume */
+		if (read_offset == 0) {
+			/* First chunk - no offset parameter */
+			snprintf(cmd_buf, sizeof(cmd_buf), "ubi read %p %s 0x%llx", 
+			         read_addr, volume_name, chunk_size);
+		} else {
+			/* Subsequent chunks - with offset parameter */
+			snprintf(cmd_buf, sizeof(cmd_buf), "ubi read %p %s 0x%llx 0x%llx", 
+			         read_addr, volume_name, chunk_size, read_offset);
+		}
+
+		ret = run_command(cmd_buf, 0);
+		if (ret) {
+			printf("Failed to read from UBI volume %s at offset 0x%llx\n", 
+			       volume_name, read_offset);
+			run_command("ubi detach", 0);
+			return -1;
+		}
+
+		/* Calculate checksum for this chunk */
+		calculated_checksum += checksum64(read_addr, chunk_size);
+
+		read_offset += chunk_size;
+		bytes_to_verify -= chunk_size;
+	}
+
+	/* Detach from UBI partition */
+	run_command("ubi detach", 0);
+
+	/* Compare checksums */
+	if (calculated_checksum != compare_value) {
+		printf("UBI verification failed: expected=0x%llx, calculated=0x%llx\n", 
+		       compare_value, calculated_checksum);
+		return -1;
+	}
+
+	printf("UBI verification successful: checksum=0x%llx\n", calculated_checksum);
+	return 0;
+}
 
 int compare_mtd_image_val(struct mtd_info *mtd, u64 compare_val, uint64_t image_size)
 {

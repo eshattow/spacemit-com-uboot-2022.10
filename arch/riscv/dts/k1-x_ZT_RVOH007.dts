@@ -284,7 +284,7 @@
 };
 
 &panel {
-	force-attached = "hxdm101";
+	force-attached = "lcd_hxdm101_mipi";
 	dcp-gpios = <&gpio 34 0>;
 	dcn-gpios = <&gpio 42 0>;
 	backlight = <&backlight>;

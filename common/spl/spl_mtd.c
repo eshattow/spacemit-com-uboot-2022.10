@@ -12,6 +12,25 @@
 #include <linux/err.h>
 #include <env.h>
 #include <mapmem.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
+
+#define MAX_IDR_ID	16
+
+struct idr_layer {
+	int	used;
+	void	*ptr;
+};
+
+struct idr {
+	struct idr_layer id[MAX_IDR_ID];
+	bool updated;
+};
+
+/* IDR function declarations */
+void *idr_find(struct idr *idp, int id);
+void idr_remove(struct idr *idp, int id);
+int idr_alloc(struct idr *idp, void *ptr, int start, int end, gfp_t gfp_mask);
 
 static uint mtd_len_to_pages(struct mtd_info *mtd, u64 len)
 {
@@ -150,15 +169,115 @@ static int mtd_load_image(struct spl_image_info *spl_image,
 	return err;
 }
 
+static void compact_mtd_device_list(void)
+{
+	struct mtd_info *devices[MAX_IDR_ID];
+	int device_count = 0;
+	int i, new_index = 0;
+
+	extern struct idr mtd_idr;
+
+	/* Collect all valid MTD devices */
+	for (i = 0; i < MAX_IDR_ID; i++) {
+		struct mtd_info *mtd = idr_find(&mtd_idr, i);
+		if (mtd && device_count < MAX_IDR_ID) {
+			devices[device_count] = mtd;
+			device_count++;
+		}
+	}
+
+	if (device_count == 0) {
+		return;
+	}
+
+	/* Clear the IDR table */
+	for (i = 0; i < MAX_IDR_ID; i++) {
+		if (idr_find(&mtd_idr, i)) {
+			idr_remove(&mtd_idr, i);
+		}
+	}
+
+	/* Re-add devices with consecutive indices */
+	for (i = 0; i < device_count; i++) {
+		int ret = idr_alloc(&mtd_idr, devices[i], new_index, new_index + 1, GFP_KERNEL);
+		if (ret >= 0) {
+			devices[i]->index = new_index;
+			new_index++;
+		}
+	}
+
+	/* Mark IDR as updated */
+	mtd_idr.updated = true;
+}
+
+
+static void remove_nor_partitions(void)
+{
+	struct mtd_info *mtd;
+	struct mtd_info *nor_devices[2];
+	int nor_count = 0;
+
+	mtd_for_each_device(mtd) {
+		if (mtd->parent == NULL &&
+			(mtd->type == MTD_NORFLASH || mtd->type == MTD_DATAFLASH ||
+				mtd->type == MTD_ROM)) {
+			if (nor_count < 10) {
+				nor_devices[nor_count++] = mtd;
+			}
+		} else {
+			pr_info("Skipping non-NOR device: %s (type=%d)\n",
+					mtd->name, mtd->type);
+		}
+	}
+
+	for (int i = 0; i < nor_count; i++) {
+		mtd = nor_devices[i];
+		struct mtd_info *slave, *tmp;
+		int partition_count = 0;
+		int ret;
+
+		list_for_each_entry_safe(slave, tmp, &mtd->partitions, node) {
+			pr_info("  Removing NOR partition: %s (offset: 0x%llx, size: 0x%llx)\n",
+					slave->name, slave->offset, slave->size);
+			ret = del_mtd_device(slave);
+			if (ret) {
+				pr_info("  Failed to remove partition %s (ret=%d)\n", slave->name, ret);
+			} else {
+				partition_count++;
+			}
+		}
+	}
+
+	compact_mtd_device_list();
+}
+
 
 static int spl_spi_load_image(struct spl_image_info *spl_image,
 			      struct spl_boot_device *bootdev)
 {
 	struct mtd_info *mtd;
 	int err = 0;
+	bool has_nand = false;
+	struct mtd_info *check_mtd;
 	__maybe_unused int load_others_res = -1;
 
 	mtd_probe_devices();
+	mtd_for_each_device(check_mtd) {
+		if (mtd_type_is_nand(check_mtd)) {
+			has_nand = true;
+			pr_info("Found NAND device: %s\n", check_mtd->name);
+			break;
+		}
+	}
+
+	if (has_nand) {
+		/* NAND and NOR Flash devices may share identical partition names,
+		   Spl may erroneously boot from NOR rather than the intended NAND Flash
+		   partitions
+		*/
+		pr_info("NAND device detected, removing NOR and partitions...\n");
+		remove_nor_partitions();
+	}
 
 #ifdef CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION_NAME
 	mtd = get_mtd_device_nm(CONFIG_SYS_LOAD_IMAGE_SEC_PARTITION_NAME);

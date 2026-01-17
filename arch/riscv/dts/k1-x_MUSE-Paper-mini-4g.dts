@@ -289,7 +289,7 @@
 };
 
 &panel {
-	force-attached = "jd9365dah3";
+	force-attached = "lcd_jd9365dah3_mipi";
 	dcp-gpios = <&gpio 34 0>;
 	dcn-gpios = <&gpio 42 0>;
 	avee-gpios = <&gpio 35 0>;

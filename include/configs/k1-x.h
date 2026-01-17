@@ -28,6 +28,8 @@
 #define DEFAULT_PRODUCT_NAME	"k1-x_deb1"
 
 #define DDR_TRAINING_DATA_BASE	(0xc0832000)
+#define AUDIO_BUFFER_ADDRESS	(0xC08D0000)
+#define AUDIO_BUFFER_SIZE	(0x4000)
 
 #if defined(CONFIG_SPL_BOOTING_NON_AI_CORE_SUPPORT) && defined(CONFIG_SPL_BUILD)
 
@@ -135,7 +137,9 @@ struct ddr_training_info_t {
 	uint64_t mac_addr;
 	uint32_t version;
 	uint32_t cs_num;
-	uint8_t reserved[32];
+	uint32_t ddr_datarate;
+	char ddr_type[16];
+	uint8_t reserved[12];
 	uint8_t para[1024];
 	uint8_t reserved2[448];
 };
@@ -152,6 +156,46 @@ enum private_part_offset {
 	DDR_TRAINING_INFO_OFFSET = 0x10000,
 	TLV_DATA_OFFSET = 0x10000 + 0x1000,
 };
+
+/* pin mux */
+#define MUX_MODE0       0
+#define MUX_MODE1       1
+#define MUX_MODE2       2
+#define MUX_MODE3       3
+#define MUX_MODE4       4
+#define MUX_MODE5       5
+#define MUX_MODE6       6
+#define MUX_MODE7       7
+
+/* edge detect */
+#define EDGE_NONE       (1 << 6)
+#define EDGE_RISE       (1 << 4)
+#define EDGE_FALL       (1 << 5)
+#define EDGE_BOTH       (3 << 4)
+
+/* driver strength*/
+#define PAD_1V8_DS0     (0 << 11)
+#define PAD_1V8_DS1     (1 << 11)
+#define PAD_1V8_DS2     (2 << 11)
+#define PAD_1V8_DS3     (3 << 11)
+
+/*
+ * notice: !!!
+ * ds2 ---> bit10, ds1 ----> bit12, ds0 ----> bit11
+*/
+#define PAD_3V_DS0      (0 << 10)     /* bit[12:10] 000 */
+#define PAD_3V_DS1      (2 << 10)     /* bit[12:10] 010 */
+#define PAD_3V_DS2      (4 << 10)     /* bit[12:10] 100 */
+#define PAD_3V_DS3      (6 << 10)     /* bit[12:10] 110 */
+#define PAD_3V_DS4      (1 << 10)     /* bit[12:10] 001 */
+#define PAD_3V_DS5      (3 << 10)     /* bit[12:10] 011 */
+#define PAD_3V_DS6      (5 << 10)     /* bit[12:10] 101 */
+#define PAD_3V_DS7      (7 << 10)     /* bit[12:10] 111 */
+
+/* pull up/down */
+#define PULL_DIS        (0 << 13)     /* bit[15:13] 000 */
+#define PULL_UP         (6 << 13)     /* bit[15:13] 110 */
+#define PULL_DOWN       (5 << 13)     /* bit[15:13] 101 */
 
 /* LED GPIO definition for environment */
 #define STATUS_LED_GPIO0    96

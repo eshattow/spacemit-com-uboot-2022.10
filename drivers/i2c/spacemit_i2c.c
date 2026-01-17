@@ -213,8 +213,7 @@ static int __i2c_read(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen,
 {
 	struct spacemit_i2c_msg msg;
 
-	debug("i2c_read(chip=0x%02x, addr=0x%02x, alen=0x%02x, "
-	      "len=0x%02x)\n", chip, *addr, alen, len);
+	debug("i2c_read(chip=0x%02x, len=0x%02x)\n", chip, len);
 
 	if (len == 0) {
 		pr_err("reading zero byte is invalid\n");
@@ -289,8 +288,7 @@ static int __i2c_write(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen
 {
 	struct spacemit_i2c_msg msg;
 
-	debug("i2c_write(chip=0x%02x, addr=0x%02x, alen=0x%02x, "
-	      "len=0x%02x)\n", chip, *addr, alen, len);
+	debug("i2c_write(chip=0x%02x, len=0x%02x)\n", chip, len);
 
 	i2c_reset(base);
 

@@ -121,9 +121,17 @@ struct lcd_mipi_panel_info {
 	unsigned int pxclk_div;
 };
 
+enum spacemit_dpu_work_mode {
+	SPACEMIT_DPU_MODE_VIDEO,
+	SPACEMIT_DPU_MODE_CMD,
+	SPACEMIT_DPU_MODE_MAX
+};
+
 struct video_tx_device {
 	const struct video_tx_driver *driver;
 	enum panel_type panel_type;
+	char *lcd_name;
+	enum spacemit_dpu_work_mode work_mode;
 	void *private;
 };
 
@@ -174,6 +182,12 @@ extern int lcd_id;
 extern int lcd_width;
 extern int lcd_height;
 extern char *lcd_name;
+
+struct panel_config {
+	const char *panel_name;
+	enum panel_type panel_type;
+	int (*panel_init)(void);
+};
 
 /* Host functions */
 struct video_tx_device *find_video_tx(void);

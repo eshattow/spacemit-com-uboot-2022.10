@@ -98,7 +98,7 @@ static struct spacemit_dsi_cmd_desc tc358762xbg_dpi_800x480_sleep_in_cmds[] = {
 };
 
 struct lcd_mipi_panel_info lcd_tc358762xbg_dpi_800x480 = {
-	.lcd_name = "lcd_tc358762xbg_dpi",
+	.lcd_name = "lcd_tc358762xbg_dpi_800x480",
 	.lcd_id = 0x00,
 	.panel_id0 = 0x00,
 	.power_value = 0x00,

@@ -293,8 +293,8 @@ static struct spacemit_dsi_cmd_desc ft8201sinx101_sleep_in_cmds[] = {
 };
 
 
-struct lcd_mipi_panel_info lcd_ft8201sinx101 = {
-	.lcd_name = "ft8201sinx101",
+struct lcd_mipi_panel_info lcd_ft8201sinx101_mipi = {
+	.lcd_name = "lcd_ft8201sinx101_mipi",
 	.lcd_id = 0x0611,
 	.panel_id0 = 0x06,
 	.power_value = 0x1c,
@@ -325,10 +325,10 @@ struct lcd_mipi_panel_info lcd_ft8201sinx101 = {
 	.pxclk_div = 6,
 };
 
-int lcd_ft8201sinx101_init(void)
+int lcd_ft8201sinx101_mipi_init(void)
 {
 	int ret;
 
-	ret = lcd_mipi_register_panel(&lcd_ft8201sinx101);
+	ret = lcd_mipi_register_panel(&lcd_ft8201sinx101_mipi);
 	return ret;
 }

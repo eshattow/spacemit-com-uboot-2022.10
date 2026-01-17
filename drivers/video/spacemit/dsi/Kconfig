@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	bool "Support Multiple MIPI DSI Panels"
+	depends on DISPLAY_SPACEMIT_MIPI
+	help
+	  This enables multiple different MIPI DSI panels support.
+
+config LCD_LT8911_EDP_1920X1080
+	bool "Add lcd lt8911 edp 1920x1080 panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_lt8911_edp_1920x1080 panel
+
+config LCD_TC358762XBG_DPI_800X480
+	bool "Add lcd tc358762xbg dpi 800x480 panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_tc358762xbg_dpi_800x480 panel
+
+config LCD_ICNL9951R_MIPI
+	bool "Add lcd icnl9951r mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_icnl9951r_mipi panel
+
+config LCD_ICNL9911C_MIPI
+	bool "Add lcd icnl9911c mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_icnl9911c_mipi panel
+
+config LCD_JD9365DAH3_MIPI
+	bool "Add lcd jd9365dah3 mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_jd9365dah3_mipi panel
+
+config LCD_JD9366TC_MIPI
+	bool "Add lcd jd9366tc mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_jd9366tc_mipi panel
+
+config LCD_FT8201SINX101_MIPI
+	bool "Add lcd ft8201sinx101 mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_ft8201sinx101_mipi panel
+
+config LCD_HXDM101_MIPI
+	bool "Add lcd hxdm101 mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_hxdm101_mipi panel
+
+config LCD_CO5300_MIPI
+	bool "Add lcd co5300 mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_co5300_mipi panel
+
+config LCD_GX09INX101_MIPI
+	bool "Add lcd gx09inx101 mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_gx09inx101_mipi panel
+
+config LCD_JD9366TCYH1095_MIPI
+	bool "Add lcd jd9366tcyh1095 mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_jd9366tcyh1095_mipi panel

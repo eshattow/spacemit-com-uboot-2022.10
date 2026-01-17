@@ -19,6 +19,7 @@
 #include <linux/libfdt.h>
 #include <cpu_func.h>
 #include <linux/kernel.h>
+#include <linux/lzo.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -342,6 +343,12 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 			return -EIO;
 		}
 		length = size;
+	} else if (IS_ENABLED(CONFIG_SPL_LZO) && image_comp == IH_COMP_LZO) {
+		length = CONFIG_SYS_BOOTM_LEN;
+		if (lzop_decompress(src, size, load_ptr, &length)) {
+			pr_err("LZO Uncompressing error\n");
+			return -EIO;
+		}
 	} else {
 		memcpy(load_ptr, src, length);
 	}

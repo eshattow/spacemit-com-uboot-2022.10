@@ -262,6 +262,18 @@ int compare_blk_image_val(struct blk_desc *dev_desc, u64 crc_compare, lbaint_t p
 						ulong blksz, uint64_t image_size);
 
 /**
+ * @brief check image crc at ubi dev. if crc is same it would return RESULT_OK(0).
+ *
+ * @param partition ubi partition name.
+ * @param volume_name ubi volume name.
+ * @param compare_value need to be compare crc.
+ * @param image_size
+ * @return int
+ */
+int compare_ubi_image_val(const char *partition, const char *volume_name, 
+                                u64 compare_value, u64 image_size);
+
+/**
  * @brief check image crc at mtd dev. if crc is same it would return RESULT_OK(0).
  *
  * @param mtd mtd dev.

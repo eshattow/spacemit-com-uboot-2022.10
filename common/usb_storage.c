@@ -148,8 +148,16 @@ int usb_stor_info(void)
 	     dev;
 	     blk_next_device(&dev)) {
 		struct blk_desc *desc = dev_get_uclass_plat(dev);
+#if CONFIG_IS_ENABLED(DM_USB)
+		struct usb_device *udev = dev_get_parent_priv(dev_get_parent(dev));
+
+		printf("  Device %d: Bus: %s Spd: %s ", desc->devnum,
+		       udev->controller_dev->name,
+		       usb_speed_string(udev->speed));
+#else
 
 		printf("  Device %d: ", desc->devnum);
+#endif
 		dev_print(desc);
 		count++;
 	}

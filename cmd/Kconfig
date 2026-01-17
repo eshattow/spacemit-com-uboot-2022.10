@@ -1005,6 +1005,12 @@ config CMD_DM
 	  can be useful to see the state of driver model for debugging or
 	  interest.
 
+config CMD_DRV
+	bool "drv - Driver management tools"
+	default y
+	help
+	  Driver management tools.Used to remove,unbind and probe devices.
+
 config CMD_FASTBOOT
 	bool "fastboot - Android fastboot support"
 	depends on FASTBOOT

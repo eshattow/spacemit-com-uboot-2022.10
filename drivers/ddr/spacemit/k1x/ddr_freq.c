@@ -101,9 +101,9 @@ enum DCLK_BYPASS_sel {
 #define KHZ			1000
 #define FREQ_MAX		~(0U)
 
-u32 ddr_cs_num = DDR_CS_NUM;
-__section(".data") u32 ddr_size;
-const char *ddr_type;
+__section(".data") u32 ddr_cs_num = DDR_CS_NUM;
+__section(".data") u32 ddr_size, ddr_datarate;
+__section(".data") const char *ddr_type;
 
 static u32 mode_register_read(u32 MR, u32 CH, u32 CS)
 {
@@ -268,7 +268,7 @@ int ddr_freq_max(void)
 	return 0;
 }
 
-static struct dfc_level_config freq_levels[MAX_FREQ_LV] =
+static struct dfc_level_config lp4_freq_levels[MAX_FREQ_LV] =
 {
 /*	freq_lv, timing, pll, pll_div, data_rate, high_freq, vol_lv */
 /*	fp 0 == fp 1 just fill in the blanks */
@@ -280,6 +280,20 @@ static struct dfc_level_config freq_levels[MAX_FREQ_LV] =
 	{5, 1, DPLL_PLL2, DPLL_DIV2, DPLL_DIV1, 1600, 0, 2},
 	{6, 2, DPLL_PLL1, DPLL_DIV1, DPLL_DIV1, 2400, 1, 3},
 	{7, 2, DPLL_PLL1, DPLL_DIV1, DPLL_DIV1, 2666, 1, 3},
+};
+
+static struct dfc_level_config lp3_freq_levels[MAX_FREQ_LV] =
+{
+/*	freq_lv, timing, pll, pll_div, data_rate, high_freq, vol_lv */
+/*	fp 0 == fp 1 just fill in the blanks */
+	{0, 0, DPLL_PLL1, DPLL_DIV4, DPLL_DIV1, 666, 0, 0},
+	{1, 0, DPLL_PLL1, DPLL_DIV4, DPLL_DIV1, 666, 0, 0},
+	{2, 0, DPLL_PLL1, DPLL_DIV3, DPLL_DIV1, 888, 0, 0},
+	{3, 1, DPLL_PLL2, DPLL_DIV3, DPLL_DIV1, 1066, 0, 0},
+	{4, 2, DPLL_PLL1, DPLL_DIV2, DPLL_DIV1, 1333, 0, 1},
+	{5, 2, DPLL_PLL2, DPLL_DIV2, DPLL_DIV1, 1600, 0, 2},
+	{6, 2, DPLL_PLL2, DPLL_DIV2, DPLL_DIV1, 1600, 0, 2},
+	{7, 2, DPLL_PLL2, DPLL_DIV2, DPLL_DIV1, 1600, 0, 2},
 };
 
 #define KHZ			1000
@@ -297,10 +311,10 @@ static int get_cur_freq_level(void)
 	return level;
 }
 
-static int get_datarate_freq_level(uint32_t data_rate)
+static int get_datarate_freq_level(struct dfc_level_config *freq_levels, uint32_t data_rate)
 {
 	int i;
-	for (i = ARRAY_SIZE(freq_levels) - 1; i >= 0; i--) {
+	for (i = MAX_FREQ_LV - 1; i >= 0; i--) {
 		if (data_rate >= freq_levels[i].data_rate)
 			return freq_levels[i].freq_lv;
 	}
@@ -387,7 +401,7 @@ static int dfc_level_cfg(struct dfc_level_config *cfg)
 	return 0;
 }
 
-static int ddr_vftbl_cfg(void)
+static int ddr_vftbl_cfg(struct dfc_level_config *freq_levels)
 {
 	int i, ret;
 
@@ -402,7 +416,7 @@ static int ddr_vftbl_cfg(void)
 	return 0;
 }
 
-static void set_vol_level(void)
+static void set_vol_level(struct dfc_level_config *freq_levels)
 {
 	int freq_lv, vmin_lv, cur_vol_lv = 0;
 	u32 rate;
@@ -522,7 +536,7 @@ static int wait_freq_change_done(void)
 	return 0;
 }
 
-static int ddr_freq_init(void)
+static int ddr_freq_init(struct dfc_level_config *freq_levels)
 {
 	int ret;
 	static bool ddr_freq_init_flag = false;
@@ -532,8 +546,8 @@ static int ddr_freq_init(void)
 	}
 
 #ifdef CONFIG_K1_X_BOARD_ASIC
-	set_vol_level();
-	ret = ddr_vftbl_cfg();
+	set_vol_level(freq_levels);
+	ret = ddr_vftbl_cfg(freq_levels);
 	if (ret < 0) {
 		pr_err("%s failed!\n", __func__);
 		return ret;
@@ -545,18 +559,26 @@ static int ddr_freq_init(void)
 	return 0;
 }
 
-int ddr_freq_change(u32 data_rate)
+int ddr_freq_change(const char *ddr_type, u32 data_rate)
 {
 	int ret, freq_curr, freq_level;
+	struct dfc_level_config *freq_levels;
 
-	ret = ddr_freq_init();
+	if ((NULL != ddr_type) && 0 == strcasecmp(ddr_type, "LPDDR3")) {
+		freq_levels = lp3_freq_levels;
+	}
+	else {
+		freq_levels = lp4_freq_levels;
+	}
+
+	ret = ddr_freq_init(freq_levels);
 	if (ret < 0) {
 		pr_err("ddr_freq_init failed: %d\n", -ret);
 		return ret;
 	}
 
 	freq_curr = get_cur_freq_level();
-	freq_level = get_datarate_freq_level(data_rate);
+	freq_level = get_datarate_freq_level(freq_levels, data_rate);
 
 	if(freq_curr == freq_level) {
 		/* dram frequency is same as the target already */
@@ -593,16 +615,24 @@ int do_ddr_freq(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
 	u32 datarate;
 	int i;
+	struct dfc_level_config *freq_levels;
 
 	if (argc <= 1 || argc > 2) {
 		/* invalid parameter, report error */
 		return CMD_RET_USAGE;
 	}
 
+	if ((NULL != ddr_type) && 0 == strcasecmp(ddr_type, "LPDDR3")) {
+		freq_levels = lp3_freq_levels;
+	}
+	else {
+		freq_levels = lp4_freq_levels;
+	}
+
 	if (0 == strcmp(argv[1], "list")) {
 		/* show valid frequency list */
 		pr_info("support frequency list as shown below:\n");
-		for (i = 0; i < ARRAY_SIZE(freq_levels); i++) {
+		for (i = 0; i < MAX_FREQ_LV; i++) {
 			pr_info("Frequency level: %d, data rate: %dMT/s\n",
 				freq_levels[i].freq_lv, freq_levels[i].data_rate);
 		}
@@ -617,7 +647,7 @@ int do_ddr_freq(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 		return CMD_RET_USAGE;
 	}
 
-	ddr_freq_change(datarate);
+	ddr_freq_change(ddr_type, datarate);
 
 	return CMD_RET_SUCCESS;
 }

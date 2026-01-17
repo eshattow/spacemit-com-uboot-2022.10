@@ -24,22 +24,7 @@
 #include "ddr_freq.h"
 #include <linux/delay.h>
 
-#define BOOT_PP		0
-#define PMUA_REG_BASE	0xd4282800
-#define PMUA_MCK_CTRL	(PMUA_REG_BASE + 0xe8)
-#define PMUA_MC_HW_SLP_TYPE	(PMUA_REG_BASE + 0xb0)
-#define REG32(x)	(*((volatile uint32_t *)((uintptr_t)(x))))
-
-#define LOGLEVEL 0
-#if (LOGLEVEL > 0)
-#define LogMsg(level, format, args...) \
-	do { \
-		if (level < LOGLEVEL) \
-			printf(format, ##args); \
-	} while (0)
-#else
-#define LogMsg(level, format, args...)
-#endif
+#include "k1_ddr.h"
 
 extern u32 ddr_cs_num;
 extern u32 ddr_get_mr8(void);
@@ -89,9 +74,9 @@ struct io_para_info {
 };
 
 const struct io_para_info ddr_io_para_table[] = {
-	{SK_HYNIX, LPDDR4X, 0x9D, R_40, R_40, R_80, 0x19, R_60, VOH_0P6, R_60, R_60, 0x55},
-	{SK_HYNIX, LPDDR4, 0xB2, R_40, R_40, R_120, 0xA7, R_60, VOH_0P6, R_80, R_80, 0x33},
-	// {SK_HYNIX, LPDDR4, 0xB2, R_40, R_40, R_60, 0xA7, R_48, VOH_0P6, R_48, R_48, 0x00},
+	{DDR_MID_SK_HYNIX, LPDDR4X, 0x9D, R_40, R_40, R_80, 0x19, R_60, VOH_0P6, R_60, R_60, 0x55},
+	{DDR_MID_SK_HYNIX, LPDDR4, 0xB2, R_40, R_40, R_120, 0xA7, R_60, VOH_0P6, R_80, R_80, 0x33},
+	// {DDR_MID_SK_HYNIX, LPDDR4, 0xB2, R_40, R_40, R_60, 0xA7, R_48, VOH_0P6, R_48, R_48, 0x00},
 };
 
 const struct io_para_info *io_para_update;
@@ -1130,7 +1115,7 @@ void top_DDR_phy_init(unsigned DDRC_BASE, unsigned int cs_num, unsigned fp)
 	top_DDR_rx_ds_odt_vref(DPHY0_BASE, 2);
 
 	// only enable and set CLK/CA ODT for hynix H9HCNNNFAMMLXR-NEE(8GB,x8,2CS)
-	if ((0 != byte_mode_tag) && (2 == cs_num)&& (SK_HYNIX == ddr_mid)
+	if ((0 != byte_mode_tag) && (2 == cs_num)&& (DDR_MID_SK_HYNIX == ddr_mid)
 		&& (LPDDR4X == io_para_update->devicetype))
 		top_DDR_ca_ds_odt_vref(DPHY0_BASE, cs_num, 1);
 
@@ -1395,7 +1380,6 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp, void *inp
 	u64 to_traning_param[10];
 	int (*func)(const char*, ...) = printf;
 	void (*training)(void* param);
-	unsigned long flush_lenth;
 
 	#if !(LOGLEVEL > 0)
 	func = printf_no_output;
@@ -1406,9 +1390,6 @@ static void top_training_fp_all(u32 ddr_base, u32 cs_num, u32 boot_pp, void *inp
 	to_traning_param[2] = boot_pp;
 	to_traning_param[3] = (u64)func;
 	to_traning_param[4] = (u64)input;
-	memcpy((void*)DDR_TRAINING_DATA_BASE, lpddr4_training_img, sizeof(lpddr4_training_img));
-	flush_lenth = round_up(sizeof(lpddr4_training_img), CONFIG_RISCV_CBOM_BLOCK_SIZE);
-	flush_dcache_range(DDR_TRAINING_DATA_BASE, DDR_TRAINING_DATA_BASE + flush_lenth);
 
 	training = (void (*)(void * param))DDR_TRAINING_DATA_BASE;
 	training(to_traning_param);
@@ -1422,7 +1403,7 @@ uint32_t lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 
 	cs_num = ddr_cs_num;
 	info = (struct ddr_training_info_t*)map_sysmem(DDR_TRAINING_INFO_BUFF, 0);
-	ddr_mid = SAMSUNG;
+	ddr_mid = DDR_MID_SAMSUNG;
 	top_Common_config(data_rate);
 
 	if (0 == strcasecmp(ddr_type, "LPDDR4"))
