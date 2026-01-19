@@ -1636,5 +1636,65 @@
 			K3_PADCONF(PRI_TDO, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS4)) /* pri_tdo */
 		>;
 	};
+
+	pinctrl_dp0_0: dp0_0_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_09, MUX_MODE6, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* dp0_hpd */
+		>;
+	};
+
+	pinctrl_dp0_1: dp0_1_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_23, MUX_MODE6, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* dp0_hpd */
+		>;
+	};
+
+	pinctrl_dp0_2: dp0_2_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_97, MUX_MODE5, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* dp0_hpd */
+		>;
+	};
+
+	pinctrl_dp0_3: dp0_3_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_124, MUX_MODE4, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* dp0_hpd */
+		>;
+	};
+
+	pinctrl_dp1_0: dp1_0_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_10, MUX_MODE6, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* dp1_hpd */
+		>;
+	};
+
+	pinctrl_dp1_1: dp1_1_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_24, MUX_MODE6, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* dp1_hpd */
+		>;
+	};
+
+	pinctrl_dp1_2: dp1_2_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_69, MUX_MODE4, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* dp1_hpd */
+		>;
+	};
+
+	pinctrl_dp1_3: dp1_3_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_72, MUX_MODE4, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* dp1_hpd */
+		>;
+	};
+
+	pinctrl_dp1_4: dp1_4_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_98, MUX_MODE5, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* dp1_hpd */
+		>;
+	};
+
+	pinctrl_dp1_5: dp1_5_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_125, MUX_MODE4, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* dp1_hpd */
+		>;
+	};
 };
 
