@@ -2038,7 +2038,7 @@ uint32_t lpddr3_silicon_init(uint32_t ddrc_base, const char *ddr_type, uint32_t 
 	lp3_info.cs_num = 0x2; // pre inic cs_num=2
 	lp3_info.vendor = 0x1; // samsung
 	lp3_info.density_cs0 = 0x16; // samsung 3G byte
-	lp3_info.wds_odt = 1; // 40+60ohm
+	lp3_info.wds_odt = 2; // 40+60ohm
 	lp3_info.rds_odt = 2; // 40+60ohm
 	lp3_info.ca_ds_odt = 2;
 
