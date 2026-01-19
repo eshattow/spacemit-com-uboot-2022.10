@@ -33,8 +33,8 @@
 	cci_frequency =  <1000000000>;
 	cluster0_frequency = <2200000000>;
 	cluster1_frequency = <2200000000>;
-	cluster2_frequency = <1200000000>;
-	cluster3_frequency = <1200000000>;
+	cluster2_frequency = <1800000000>;
+	cluster3_frequency = <1800000000>;
 };
 
 &pinctrl {
