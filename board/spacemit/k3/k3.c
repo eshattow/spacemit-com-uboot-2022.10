@@ -228,7 +228,7 @@ static int cpu_frequency_set(void)
 	unsigned int topd_frequency;
 	unsigned int axi_frequency;
 	unsigned int cci_frequency;
-	struct clk top_dclk, axi_clk, cci_clk, cluster0_clk, cluster1_clk, cluster2_clk, cluster3_clk, clk_pll3, clk_pll4, clk_pll5, clk_pll8;
+	struct clk top_dclk, axi_clk, cci_clk, cluster0_clk, cluster1_clk, cluster2_clk, cluster3_clk, clk_pll3, clk_pll4, clk_pll5, clk_pll8, pll_src3, clt1_pll_src, pll_src5, clt3_pll_src;
 	ofnode cpu_node;
 
 	cpu_node = ofnode_path("/cpus");
@@ -248,6 +248,10 @@ static int cpu_frequency_set(void)
 	ret |= clk_get_by_name_nodev(cpu_node, "pll4", &clk_pll4);
 	ret |= clk_get_by_name_nodev(cpu_node, "pll5", &clk_pll5);
 	ret |= clk_get_by_name_nodev(cpu_node, "pll8", &clk_pll8);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll_src3", &pll_src3);
+	ret |= clk_get_by_name_nodev(cpu_node, "clt1_pll_src", &clt1_pll_src);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll_src5", &pll_src5);
+	ret |= clk_get_by_name_nodev(cpu_node, "clt3_pll_src", &clt3_pll_src);
 	if (ret) {
 		pr_err("Get cluster clk error\n");
 		return -1;
@@ -329,6 +333,9 @@ static int cpu_frequency_set(void)
 	}
 
 	clk_set_rate(&cluster0_clk, cluster0_frequency);
+
+	clk_set_parent(&clt1_pll_src, &pll_src3);
+
 	clk_set_rate(&cluster1_clk, cluster1_frequency);
 
 	if (cluster2_frequency > TURBO0_FREQUENCY) {
@@ -337,6 +344,7 @@ static int cpu_frequency_set(void)
 	}
 
 	clk_set_rate(&cluster2_clk, cluster2_frequency);
+	clk_set_parent(&clt3_pll_src, &pll_src5);
 	clk_set_rate(&cluster3_clk, cluster3_frequency);
 	clk_set_rate(&cci_clk, cci_frequency);
 
