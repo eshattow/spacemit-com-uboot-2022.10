@@ -198,7 +198,7 @@ static int spacemit_ddr_probe(struct udevice *dev)
 		data_rate = lpddr4_silicon_init(ddrc_base, ddr_type, ddr_datarate);
 	}
 	start = get_timer(start);
-	printf("lpddr3_silicon_init consume %lldms\n", start);
+	printf("lpddr silicon init consume %lldms\n", start);
 #endif
 	ddr_freq_change(ddr_type, data_rate);
 

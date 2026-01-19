@@ -104,6 +104,7 @@ enum DCLK_BYPASS_sel {
 __section(".data") u32 ddr_cs_num = DDR_CS_NUM;
 __section(".data") u32 ddr_size, ddr_datarate;
 __section(".data") const char *ddr_type;
+__section(".data") static bool ddr_freq_init_flag = false;
 
 static u32 mode_register_read(u32 MR, u32 CH, u32 CS)
 {
@@ -539,7 +540,6 @@ static int wait_freq_change_done(void)
 static int ddr_freq_init(struct dfc_level_config *freq_levels)
 {
 	int ret;
-	static bool ddr_freq_init_flag = false;
 
 	if(ddr_freq_init_flag == true) {
 		return 0;
