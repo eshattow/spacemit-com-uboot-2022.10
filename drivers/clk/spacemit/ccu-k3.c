@@ -1370,9 +1370,17 @@ static SPACEMIT_CCU_DIV_FC_MUX(cpu_c0_core_clk, "cpu_c0_core_clk", cpu_c0_parent
 	3, 3, BIT(12),
 	0, 3,
 	0);
+
+static const char * const cpu_c1_pll_src_parent_names[] = {
+	"pll4_d1", "pll3_d1"
+};
+static SPACEMIT_CCU_MUX(cpu_c1_pll_src, "cpu_c1_pll_src", cpu_c1_pll_src_parent_names,
+	BASE_TYPE_APMU, APMU_CPU_C1_CLK_CTRL,
+	13, 1, 0);
+
 static const char * const cpu_c1_parent_names[] = {
 	"pll1_d3_819p2", "pll1_d5_491p52", "pll1_d4_614p4", "pll2_d3", "clk_dummy",
-	"pll1_d2_1228p8", "pll2_d2", "pll4_d1"
+	"pll1_d2_1228p8", "pll2_d2", "cpu_c1_pll_src"
 };
 static SPACEMIT_CCU_DIV_FC_MUX(cpu_c1_core_clk, "cpu_c1_core_clk", cpu_c1_parent_names,
 	BASE_TYPE_APMU, APMU_CPU_C1_CLK_CTRL,
@@ -1388,9 +1396,17 @@ static SPACEMIT_CCU_DIV_FC_MUX(cpu_c2_core_clk, "cpu_c2_core_clk", cpu_c2_parent
 	3, 3, BIT(12),
 	0, 3,
 	0);
+
+static const char * const cpu_c3_pll_src_parent_names[] = {
+	"pll8_d1", "pll5_d1"
+};
+static SPACEMIT_CCU_MUX(cpu_c3_pll_src, "cpu_c3_pll_src", cpu_c3_pll_src_parent_names,
+	BASE_TYPE_APMU, APMU_CPU_C3_CLK_CTRL,
+	13, 1, 0);
+
 static const char * const cpu_c3_parent_names[] = {
 	"pll1_d3_819p2", "pll1_d5_491p52", "pll1_d4_614p4", "pll2_d3", "clk_dummy",
-	"pll1_d2_1228p8", "pll2_d2", "pll8_d1"
+	"pll1_d2_1228p8", "pll2_d2", "cpu_c3_pll_src"
 };
 static SPACEMIT_CCU_DIV_FC_MUX(cpu_c3_core_clk, "cpu_c3_core_clk", cpu_c3_parent_names,
 	BASE_TYPE_APMU, APMU_CPU_C3_CLK_CTRL,
@@ -2125,6 +2141,8 @@ static struct spacemit_clk_table spacemit_k3_clks = {
 		//APMU
 		[CLK_AXICLK]		= &axi_clk.common.clk,
 		[CLK_CCI550]		= &cci550_clk.common.clk,
+		[CLK_CPU_C1_PLL_SRC]	= &cpu_c1_pll_src.common.clk,
+		[CLK_CPU_C3_PLL_SRC]	= &cpu_c3_pll_src.common.clk,
 		[CLK_CPU_C0_CORE]	= &cpu_c0_core_clk.common.clk,
 		[CLK_CPU_C1_CORE]	= &cpu_c1_core_clk.common.clk,
 		[CLK_CPU_C2_CORE]	= &cpu_c2_core_clk.common.clk,
