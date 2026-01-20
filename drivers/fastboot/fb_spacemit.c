@@ -38,6 +38,152 @@
 
 #define EMMC_MAX_BLK_WRITE 16384
 
+static u32 env_get_u32_default(const char *name, u32 default_value)
+{
+	const char *val = env_get(name);
+	char *endp;
+	ulong parsed;
+
+	if (!val || !*val)
+		return default_value;
+
+	parsed = simple_strtoul(val, &endp, 10);
+	if (endp == val)
+		return default_value;
+
+	return (u32)parsed;
+}
+
+static int k3_detect_blk_or_part_quiet(const char *blk_name, int blk_index,
+				      const char *partition)
+{
+	struct blk_desc *dev_desc;
+	struct disk_partition info;
+	u32 part;
+	int err;
+
+	dev_desc = blk_get_dev(blk_name, blk_index);
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN)
+		return -1;
+
+	if (!partition)
+		return 0;
+
+	for (part = 1; part <= MAX_SEARCH_PARTITIONS; part++) {
+		err = part_get_info(dev_desc, part, &info);
+		if (err)
+			continue;
+
+		if (!strcmp(partition, info.name))
+			return part;
+	}
+
+	return -1;
+}
+
+#if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
+static int k3_nor_probe_usb(u32 devnum, const char *partition)
+{
+	static bool usb_scanned;
+
+	if (!usb_scanned) {
+		usb_init();
+		usb_stor_scan(1);
+		usb_scanned = true;
+	}
+
+	return k3_detect_blk_or_part_quiet("usb", devnum, partition);
+}
+#endif
+
+#ifdef CONFIG_NVME
+static int k3_nor_probe_nvme(u32 devnum, const char *partition)
+{
+	static bool nvme_scanned;
+
+	if (!nvme_scanned) {
+		run_command("nvme scan", 0);
+		nvme_scanned = true;
+	}
+
+	return k3_detect_blk_or_part_quiet("nvme", devnum, partition);
+}
+#endif
+
+#ifdef CONFIG_SCSI
+static int k3_nor_probe_scsi(u32 devnum, const char *partition)
+{
+	static bool scsi_scanned;
+
+	if (!scsi_scanned) {
+		scsi_scan(false);
+		scsi_scanned = true;
+	}
+
+	return k3_detect_blk_or_part_quiet("scsi", devnum, partition);
+}
+#endif
+
+#ifdef CONFIG_MMC
+static int k3_nor_probe_mmc(u32 devnum, const char *partition)
+{
+	struct mmc *mmc = find_mmc_device(devnum);
+
+	if (!mmc || mmc_init(mmc))
+		return -1;
+
+	return k3_detect_blk_or_part_quiet("mmc", devnum, partition);
+}
+#endif
+
+static int k3_nor_probe_by_target(const struct k3_nor_boot_target *target,
+				  u32 devnum, const char *partition)
+{
+	switch (target->type) {
+#ifdef CONFIG_NVME
+	case K3_NOR_BOOT_TARGET_NVME:
+		return k3_nor_probe_nvme(devnum, partition);
+#endif
+#ifdef CONFIG_SCSI
+	case K3_NOR_BOOT_TARGET_SCSI:
+		return k3_nor_probe_scsi(devnum, partition);
+#endif
+#ifdef CONFIG_MMC
+	case K3_NOR_BOOT_TARGET_MMC:
+		return k3_nor_probe_mmc(devnum, partition);
+#endif
+#if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
+	case K3_NOR_BOOT_TARGET_UDISK:
+		return k3_nor_probe_usb(devnum, partition);
+#endif
+	default:
+		return -1;
+	}
+}
+
+static int k3_get_nor_blk_or_part(char **blk_dev, int *index, const char *partition)
+{
+	const struct k3_nor_boot_target *boot_prio;
+	unsigned int prio_count;
+	u32 i;
+
+	boot_prio = k3_nor_get_boot_prio(&prio_count);
+	for (i = 0; i < prio_count; i++) {
+		u32 devnum = env_get_u32_default(boot_prio[i].devnum_env,
+						 boot_prio[i].devnum_default);
+		int part;
+
+		part = k3_nor_probe_by_target(&boot_prio[i], devnum, partition);
+		if (part >= 0) {
+			*blk_dev = (char *)boot_prio[i].blk_name;
+			*index = devnum;
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_SPEED)
 /*
  * K3: pass fastboot speed selection from SPL to U-Boot via CIU debug scratch
@@ -1410,6 +1556,15 @@ int detect_blk_dev_or_partition_exist(char *blk_name, int blk_index, const char 
 int _get_available_blk_or_part(char **blk_dev, int *index, const char *partition)
 {
 	u32 boot_mode = get_boot_pin_select();
+
+#ifdef CONFIG_TARGET_SPACEMIT_K3
+	/* K3 NOR-boot boards: prefer USB -> SSD(NVMe) -> UFS(SCSI) -> eMMC(MMC). */
+	if (boot_mode == BOOT_MODE_NOR) {
+		if (!k3_get_nor_blk_or_part(blk_dev, index, partition))
+			return 0;
+		return -1;
+	}
+#endif
 
 #ifdef CONFIG_UFS
 	/* For UFS boot mode, use SCSI block device */

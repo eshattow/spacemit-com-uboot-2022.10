@@ -28,6 +28,9 @@
 #include <mtd.h>
 #include <fb_mtd.h>
 #include <nvme.h>
+#ifdef CONFIG_SCSI
+#include <scsi.h>
+#endif
 #include <watchdog.h>
 
 static int dev_emmc_num = -1;
@@ -35,6 +38,123 @@ static int dev_sdio_num = -1;
 static u32 bootfs_part_index = 0;
 
 void recovery_show_result(struct flash_dev *fdev, int ret);
+static int init_mmc_device(int dev_num);
+
+#ifdef CONFIG_TARGET_SPACEMIT_K3
+static u32 env_get_u32_default(const char *name, u32 default_value)
+{
+	const char *val = env_get(name);
+	char *endp;
+	ulong parsed;
+
+	if (!val || !*val)
+		return default_value;
+
+	parsed = simple_strtoul(val, &endp, 10);
+	if (endp == val)
+		return default_value;
+
+	return (u32)parsed;
+}
+
+#if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
+static void k3_nor_usb_scan_once(void)
+{
+	static bool usb_scanned;
+
+	if (!usb_scanned) {
+		usb_init();
+		usb_stor_scan(1);
+		usb_scanned = true;
+	}
+}
+
+static struct blk_desc *k3_nor_get_usb_desc(u32 devnum)
+{
+	k3_nor_usb_scan_once();
+	return blk_get_dev("usb", devnum);
+}
+#endif
+
+#ifdef CONFIG_NVME
+static struct blk_desc *k3_nor_get_nvme_desc(u32 devnum)
+{
+	static bool nvme_scanned;
+
+	if (!nvme_scanned) {
+		run_command("nvme scan", 0);
+		nvme_scanned = true;
+	}
+
+	return blk_get_dev("nvme", devnum);
+}
+#endif
+
+#ifdef CONFIG_SCSI
+static struct blk_desc *k3_nor_get_scsi_desc(u32 devnum)
+{
+	static bool scsi_scanned;
+
+	if (!scsi_scanned) {
+		scsi_scan(false);
+		scsi_scanned = true;
+	}
+
+	return blk_get_dev("scsi", devnum);
+}
+#endif
+
+static struct blk_desc *k3_nor_get_desc_by_target(const struct k3_nor_boot_target *target,
+						  u32 devnum)
+{
+	switch (target->type) {
+#if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
+	case K3_NOR_BOOT_TARGET_UDISK:
+		return k3_nor_get_usb_desc(devnum);
+#endif
+#ifdef CONFIG_NVME
+	case K3_NOR_BOOT_TARGET_NVME:
+		return k3_nor_get_nvme_desc(devnum);
+#endif
+#ifdef CONFIG_SCSI
+	case K3_NOR_BOOT_TARGET_SCSI:
+		return k3_nor_get_scsi_desc(devnum);
+#endif
+#ifdef CONFIG_MMC
+	case K3_NOR_BOOT_TARGET_MMC:
+		if (init_mmc_device(devnum) != RESULT_OK)
+			return NULL;
+		return blk_get_dev("mmc", devnum);
+#endif
+	default:
+		return NULL;
+	}
+}
+
+static int k3_select_nor_flash_blk_dev(char **blk_dev, int *index)
+{
+	const struct k3_nor_boot_target *boot_prio;
+	unsigned int prio_count;
+	struct blk_desc *desc = NULL;
+	u32 i;
+
+	boot_prio = k3_nor_get_boot_prio(&prio_count);
+	for (i = 0; i < prio_count; i++) {
+		u32 devnum = env_get_u32_default(boot_prio[i].devnum_env,
+						 boot_prio[i].devnum_default);
+
+		desc = k3_nor_get_desc_by_target(&boot_prio[i], devnum);
+
+		if (desc && desc->type != DEV_TYPE_UNKNOWN) {
+			*blk_dev = (char *)boot_prio[i].blk_name;
+			*index = devnum;
+			return 0;
+		}
+	}
+
+	return -1;
+}
+#endif
 
 static void free_flash_dev(struct flash_dev *fdev)
 {
@@ -923,10 +1043,17 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
 	case BOOT_MODE_NOR:
-		if (get_available_blk_dev(&blk_dev, &blk_index)){
+#ifdef CONFIG_TARGET_SPACEMIT_K3
+		if (k3_select_nor_flash_blk_dev(&blk_dev, &blk_index)) {
+			printf("no available NOR flash target blk dev (usb/nvme/ufs/emmc)\n");
+			return -1;
+		}
+#else
+		if (get_available_blk_dev(&blk_dev, &blk_index)) {
 			printf("can not get availabel blk dev\n");
 			return -1;
 		}
+#endif
 
 		fdev->dev_desc = blk_get_dev(blk_dev, blk_index);
 		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
@@ -1018,10 +1145,17 @@ void get_blk_partition_file(char *file_name)
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
 	case BOOT_MODE_NOR:
-		if (get_available_blk_dev(&blk_name, &blk_index)){
+#ifdef CONFIG_TARGET_SPACEMIT_K3
+		if (k3_select_nor_flash_blk_dev(&blk_name, &blk_index)) {
+			printf("no available NOR flash target blk dev (usb/nvme/ufs/emmc)\n");
+			return;
+		}
+#else
+		if (get_available_blk_dev(&blk_name, &blk_index)) {
 			printf("can not get availabel blk dev\n");
 			return;
 		}
+#endif
 
 		dev_desc = blk_get_devnum_by_typename(blk_name, blk_index);
 		if (dev_desc != NULL)

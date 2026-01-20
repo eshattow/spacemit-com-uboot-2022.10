@@ -246,35 +246,37 @@ static int check_nand_bootfs(void)
 	return 0;
 }
 
+static int check_mmc_bootfs(int dev);
+
 static int check_nor_bootfs(void)
 {
-	int part, blk_index;
-	char *blk_name;
-	char devpart_str[16];
+	int part;
 
-	if (get_available_boot_blk_dev(&blk_name, &blk_index)) {
-		pr_err("Cannot get available block device\n");
-		return -1;
+	/* NOR-boot boards: local bootfs priority is SSD(NVMe) -> UFS -> eMMC */
+#ifdef CONFIG_NVME
+	run_command("nvme scan", 0);
+	part = detect_blk_dev_or_partition_exist("nvme", 0, BOOTFS_NAME);
+	if (part >= 0) {
+		pr_info("Found bootfs partition on NVMe device %d:%d\n", 0, part);
+		return 0;
+	}
+#endif
+
+#ifdef CONFIG_SCSI
+	scsi_scan(false);
+	part = detect_blk_dev_or_partition_exist("scsi", 0, BOOTFS_NAME);
+	if (part >= 0) {
+		pr_info("Found bootfs partition on UFS device %d:%d\n", 0, part);
+		return 0;
+	}
+#endif
+
+	if (check_mmc_bootfs(MMC_DEV_EMMC) == 0) {
+		pr_info("Found bootfs partition on eMMC device %d\n", MMC_DEV_EMMC);
+		return 0;
 	}
 
-	part = detect_blk_dev_or_partition_exist(blk_name, blk_index, BOOTFS_NAME);
-	if (part < 0) {
-		pr_err("Failed to detect partition %s on %s:%d\n", BOOTFS_NAME, blk_name, blk_index);
-		return -1;
-	}
-
-	snprintf(devpart_str, sizeof(devpart_str), "%d:%d", blk_index, part);
-
-	if (!strcmp("mmc", blk_name)) {
-		pr_info("Found bootfs partition on eMMC device %s\n", devpart_str);
-	} else if (!strcmp("nvme", blk_name)) {
-		pr_info("Found bootfs partition on NVMe device %s\n", devpart_str);
-	} else {
-		pr_info("Not found bootfs partition on %s\n", blk_name);
-		return -1;
-	}
-
-	return 0;
+	return -1;
 }
 
 static int check_mmc_bootfs(int dev)

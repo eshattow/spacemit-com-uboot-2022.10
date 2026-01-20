@@ -29,6 +29,7 @@
 #include <fs.h>
 #include <usb.h>
 #include <part.h>
+#include <mmc.h>
 #include "nfs_env.h"
 
 #ifdef CONFIG_ESPI
@@ -40,10 +41,149 @@ static char found_partition[64] = {0};
 
 DECLARE_GLOBAL_DATA_PTR;
 
+static const struct k3_nor_boot_target k3_nor_boot_prio[] = {
+#ifdef CONFIG_NVME
+	{ K3_NOR_BOOT_TARGET_NVME, "nvme", "ssd_devnum",
+	  K3_NOR_SSD_DEVNUM_DEFAULT },
+#endif
+#ifdef CONFIG_SCSI
+	{ K3_NOR_BOOT_TARGET_SCSI, "scsi", "ufs_devnum",
+	  K3_NOR_UFS_DEVNUM_DEFAULT },
+#endif
+#ifdef CONFIG_MMC
+	{ K3_NOR_BOOT_TARGET_MMC, "mmc", "emmc_devnum",
+	  K3_NOR_EMMC_DEVNUM_DEFAULT },
+#endif
+#if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
+	{ K3_NOR_BOOT_TARGET_UDISK, "usb", "usb_devnum",
+	  K3_NOR_USB_DEVNUM_DEFAULT },
+#endif
+};
+
+const struct k3_nor_boot_target *k3_nor_get_boot_prio(unsigned int *count)
+{
+	if (count)
+		*count = ARRAY_SIZE(k3_nor_boot_prio);
+
+	return k3_nor_boot_prio;
+}
+
 void import_env_from_bootfs(void);
 void setenv_boot_mode(void);
 void set_env_ethaddr(void);
 void refresh_config_info(void);
+
+static u32 env_get_u32_default(const char *name, u32 default_value)
+{
+	const char *val = env_get(name);
+	char *endp;
+	ulong parsed;
+
+	if (!val || !*val)
+		return default_value;
+
+	parsed = simple_strtoul(val, &endp, 10);
+	if (endp == val)
+		return default_value;
+
+	return (u32)parsed;
+}
+
+#if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
+static int k3_nor_usb_scan_once(void)
+{
+	static bool usb_scanned;
+
+	if (!usb_scanned) {
+		usb_init();
+		usb_stor_scan(1);
+		usb_scanned = true;
+	}
+
+	return 0;
+}
+
+static struct blk_desc *k3_nor_get_usb_desc(u32 devnum)
+{
+	k3_nor_usb_scan_once();
+	return blk_get_dev("usb", devnum);
+}
+#endif
+
+#ifdef CONFIG_NVME
+static struct blk_desc *k3_nor_get_nvme_desc(u32 devnum)
+{
+	static bool nvme_scanned;
+
+	if (!nvme_scanned) {
+		run_command("nvme scan", 0);
+		nvme_scanned = true;
+	}
+
+	return blk_get_dev("nvme", devnum);
+}
+#endif
+
+#ifdef CONFIG_SCSI
+static struct blk_desc *k3_nor_get_scsi_desc(u32 devnum)
+{
+	static bool scsi_scanned;
+
+	if (!scsi_scanned) {
+		scsi_scan(false);
+		scsi_scanned = true;
+	}
+
+	return blk_get_dev("scsi", devnum);
+}
+#endif
+
+#ifdef CONFIG_MMC
+static struct blk_desc *k3_nor_get_mmc_desc(u32 devnum)
+{
+	struct mmc *mmc = find_mmc_device(devnum);
+
+	if (!mmc || mmc_init(mmc))
+		return NULL;
+
+	return mmc_get_blk_desc(mmc);
+}
+#endif
+
+static struct blk_desc *k3_nor_get_desc_by_target(const struct k3_nor_boot_target *target,
+						  u32 devnum)
+{
+	switch (target->type) {
+#if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
+	case K3_NOR_BOOT_TARGET_UDISK:
+		return k3_nor_get_usb_desc(devnum);
+#endif
+#ifdef CONFIG_NVME
+	case K3_NOR_BOOT_TARGET_NVME:
+		return k3_nor_get_nvme_desc(devnum);
+#endif
+#ifdef CONFIG_SCSI
+	case K3_NOR_BOOT_TARGET_SCSI:
+		return k3_nor_get_scsi_desc(devnum);
+#endif
+#ifdef CONFIG_MMC
+	case K3_NOR_BOOT_TARGET_MMC:
+		return k3_nor_get_mmc_desc(devnum);
+#endif
+	default:
+		return NULL;
+	}
+}
+
+static bool k3_nor_has_bootfs(struct blk_desc *desc)
+{
+	struct disk_partition info;
+
+	if (!desc)
+		return false;
+
+	return part_get_info_by_name(desc, BOOTFS_NAME, &info) >= 0;
+}
 
 extern u32 ddr_get_density(void);
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
@@ -461,6 +601,8 @@ static void try_boot_from_udisk(void)
 
 	printf("found %s! setting environment value...\n", "env_k3.txt");
 
+	/* Ask setenv_boot_mode() to keep USB boot despite strap boot mode. */
+	env_set("boot_override", "udisk");
 	env_set("boot_device", "udisk");
 	env_set("boot_devname", "usb");
 	env_set("bootfs_devname", "usb");
@@ -525,6 +667,16 @@ int board_late_init(void)
 	import_env_from_bootfs();
 
 	setenv_boot_mode();
+
+	/* Defaults for NOR boot fallback scripting */
+	if (!env_get("usb_devnum"))
+		env_set("usb_devnum", simple_itoa(K3_NOR_USB_DEVNUM_DEFAULT));
+	if (!env_get("ssd_devnum"))
+		env_set("ssd_devnum", simple_itoa(K3_NOR_SSD_DEVNUM_DEFAULT));
+	if (!env_get("ufs_devnum"))
+		env_set("ufs_devnum", simple_itoa(K3_NOR_UFS_DEVNUM_DEFAULT));
+	if (!env_get("emmc_devnum"))
+		env_set("emmc_devnum", simple_itoa(K3_NOR_EMMC_DEVNUM_DEFAULT));
 
 	chosen_node = ofnode_path("/chosen");
 	if (!ofnode_valid(chosen_node)) {
@@ -720,7 +872,11 @@ enum board_boot_mode get_boot_mode(void)
 
 void setenv_boot_mode(void)
 {
-#ifdef CONFIG_ENV_IS_IN_NFS
+	/*
+	 * Allow env (e.g. env_k3.txt from bootfs) to force a boot path without
+	 * being overwritten by bootrom strap detection. Clear after use so it
+	 * doesn't "stick" across boots unless explicitly set again.
+	 */
 	const char *boot_override = env_get("boot_override");
 
 	if (boot_override) {
@@ -728,25 +884,43 @@ void setenv_boot_mode(void)
 		env_set("boot_override", NULL);
 		return;
 	}
-#endif
 
 	u32 boot_mode = get_boot_mode();
 	switch (boot_mode) {
 	case BOOT_MODE_NAND:
 		env_set("boot_device", "nand");
 		break;
-	case BOOT_MODE_NOR:
-		char *blk_name;
-		int blk_index;
-
-		if (get_available_boot_blk_dev(&blk_name, &blk_index)){
-			pr_err("can not get available blk dev\n");
-			return;
-		}
+	case BOOT_MODE_NOR: {
+		const struct k3_nor_boot_target *boot_prio;
+		unsigned int prio_count;
+		u32 i;
 
 		env_set("boot_device", "nor");
-		env_set("boot_devnum", simple_itoa(blk_index));
+		/*
+		 * NOR-boot: select external boot device by bootfs presence, with
+		 * priority SSD(NVMe) -> UFS(SCSI) -> eMMC(MMC) -> USB(UMS).
+		 */
+		boot_prio = k3_nor_get_boot_prio(&prio_count);
+		for (i = 0; i < prio_count; i++) {
+			u32 dev = env_get_u32_default(boot_prio[i].devnum_env,
+						      boot_prio[i].devnum_default);
+			struct blk_desc *desc;
+
+			desc = k3_nor_get_desc_by_target(&boot_prio[i], dev);
+			if (desc && desc->type != DEV_TYPE_UNKNOWN &&
+			    k3_nor_has_bootfs(desc)) {
+				env_set("bootfs_devname", boot_prio[i].blk_name);
+				env_set("boot_devnum", simple_itoa(dev));
+				break;
+			}
+		}
+
+		if (!env_get("bootfs_devname"))
+			env_set("bootfs_devname", "mmc");
+		if (!env_get("boot_devnum"))
+			env_set("boot_devnum", simple_itoa(MMC_DEV_EMMC));
 		break;
+	}
 	case BOOT_MODE_EMMC:
 		env_set("boot_device", "mmc");
 		env_set("boot_devnum", simple_itoa(MMC_DEV_EMMC));
@@ -815,7 +989,7 @@ enum env_location env_get_location(enum env_operation op, int prio)
 	}
 }
 
-void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev)
+static int _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev)
 {
 	int err;
 	u32 part;
@@ -832,7 +1006,7 @@ void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev
 		}
 	}
 	if (part > MAX_SEARCH_PARTITIONS)
-		return;
+		return -1;
 
 	env_set("bootfs_part", simple_itoa(part));
 	env_set("bootfs_devname", dev_name);
@@ -843,14 +1017,16 @@ void _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, int dev
 			dev, part, CONFIG_FASTBOOT_BUF_ADDR, CONFIG_SYS_CONFIG_NAME);
 	pr_debug("cmd:%s\n", cmd);
 	if (run_command(cmd, 0))
-		return;
+		return -1;
 
 	memset(cmd, '\0', 128);
 	sprintf(cmd, "env import -t 0x%lx", CONFIG_FASTBOOT_BUF_ADDR);
 	pr_debug("cmd:%s\n", cmd);
 	if (!run_command(cmd, 0)){
 		pr_info("load env_%s.txt from bootfs successful\n", CONFIG_SYS_CONFIG_NAME);
+		return 0;
 	}
+	return -1;
 }
 
 char* parse_mtdparts_and_find_bootfs(void) {
@@ -965,20 +1141,29 @@ void import_env_from_bootfs(void)
 	case BOOT_MODE_NAND:
 		load_env_from_nand_bootfs();
 		break;
-	case BOOT_MODE_NOR:
-		struct blk_desc *dev_desc;
-		char *blk_name;
-		int blk_index;
+	case BOOT_MODE_NOR: {
+		const struct k3_nor_boot_target *boot_prio;
+		unsigned int prio_count;
+		u32 i;
 
-		if (get_available_boot_blk_dev(&blk_name, &blk_index)){
-			pr_err("can not get available blk dev\n");
-			return;
+		/*
+		 * NOR-boot boards: prefer loading env from external bootfs with
+		 * explicit priority: SSD(NVMe) -> UFS -> eMMC -> USB.
+		 */
+		boot_prio = k3_nor_get_boot_prio(&prio_count);
+		for (i = 0; i < prio_count; i++) {
+			u32 dev = env_get_u32_default(boot_prio[i].devnum_env,
+						      boot_prio[i].devnum_default);
+			struct blk_desc *desc;
+
+			desc = k3_nor_get_desc_by_target(&boot_prio[i], dev);
+			if (desc && desc->type != DEV_TYPE_UNKNOWN) {
+				if (!_load_env_from_blk(desc, boot_prio[i].blk_name, dev))
+					return;
+			}
 		}
-
-		dev_desc = blk_get_dev(blk_name, blk_index);
-		if (dev_desc)
-			_load_env_from_blk(dev_desc, blk_name, blk_index);
 		break;
+	}
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
 #ifdef CONFIG_MMC
