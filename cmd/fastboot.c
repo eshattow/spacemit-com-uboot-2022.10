@@ -54,19 +54,21 @@ static int do_fastboot_usb(int argc, char *const argv[],
 		pr_err("Error: Wrong USB controller index format\n");
 		return CMD_RET_FAILURE;
 	}
-#if defined(CONFIG_K3_BOARD_ASIC)
-	ret = tcpm_get(0, &tcpm_dev);
-	if (ret && ret != -ENODEV) {
-		pr_err("TCPM init failed: %d\n", ret);
-		return CMD_RET_FAILURE;
-	}
-#endif
 
 	ret = usb_gadget_initialize(controller_index);
 	if (ret) {
 		pr_err("USB init failed: %d\n", ret);
 		return CMD_RET_FAILURE;
 	}
+
+#if defined(CONFIG_K3_BOARD_ASIC)
+	ret = tcpm_get(0, &tcpm_dev);
+	if (ret && ret != -ENODEV) {
+		pr_err("TCPM init failed: %d\n", ret);
+		ret = CMD_RET_FAILURE;
+		goto exit;
+	}
+#endif
 
 	g_dnl_clear_detach();
 	ret = g_dnl_register("usb_dnl_fastboot");

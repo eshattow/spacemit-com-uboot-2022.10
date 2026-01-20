@@ -769,7 +769,8 @@
 		};
 
 		usb3_porta_u3phy: phy@0cad30000{
-			compatible = "spacemit,k3-usb3-phy";
+			compatible = "spacemit,k3-usb3-phy",
+				     "spacemit,k3-typec-switch";
 			reg = <0x0 0xcad30000 0x0 0x200>,
 			      <0x0 0xcad40000 0x0 0x200>,
 			      <0x0 0xd4282800 0x0 0x114>,

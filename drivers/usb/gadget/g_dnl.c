@@ -48,6 +48,13 @@ static const char product[] = "USB download gadget";
 static char g_dnl_serial[MAX_STRING_SERIAL];
 static const char manufacturer[] = CONFIG_USB_GADGET_MANUFACTURER;
 
+static enum usb_device_speed fastboot_max_speed = USB_SPEED_SUPER;
+
+void g_dnl_set_max_speed(enum usb_device_speed speed)
+{
+	fastboot_max_speed = speed;
+}
+
 void g_dnl_set_serialnumber(char *s)
 {
 	memset(g_dnl_serial, 0, MAX_STRING_SERIAL);
@@ -327,6 +334,9 @@ int g_dnl_register(const char *name)
 
 	debug("%s: g_dnl_driver.name = %s\n", __func__, name);
 	g_dnl_driver.name = name;
+
+	g_dnl_driver.max_speed = fastboot_max_speed;
+	debug("%s: g_dnl_driver.max_speed = %d\n", __func__, fastboot_max_speed);
 
 	ret = usb_composite_register(&g_dnl_driver);
 	if (ret) {

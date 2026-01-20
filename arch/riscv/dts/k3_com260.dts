@@ -7,6 +7,7 @@
 
 #include "k3.dtsi"
 #include "k3-pinctrl.dtsi"
+#include <dt-bindings/usb/pd.h>
 
 / {
 	model = "spacemit k3 com260 board";
@@ -24,9 +25,13 @@
 		 <&ccu CLK_PLL3>,
 		 <&ccu CLK_PLL4>,
 		 <&ccu CLK_PLL5>,
-		 <&ccu CLK_PLL8>;
+		 <&ccu CLK_PLL8>,
+		 <&ccu CLK_PLL3_D1>,
+		 <&ccu CLK_CPU_C1_PLL_SRC>,
+		 <&ccu CLK_PLL5_D1>,
+		 <&ccu CLK_CPU_C3_PLL_SRC>;
 	clock-names = "topd", "axi", "cci", "cluster0", "cluster1", "cluster2", "cluster3",
-		       "pll3", "pll4", "pll5", "pll8";
+		       "pll3", "pll4", "pll5", "pll8", "pll_src3", "clt1_pll_src", "pll_src5", "clt3_pll_src";
 	topd_frequency = <800000000>;
 	axi_frequency =  <307000000>;
 	cci_frequency =  <1000000000>;
@@ -44,6 +49,35 @@
 
 &uart0 {
 	status = "okay";
+};
+
+&i2c0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c0_0>;
+	status = "okay";
+
+	tcpc@25 {
+		compatible = "fcs,fusb301";
+		reg = <0x25>;
+
+		connector {
+			compatible = "usb-c-connector";
+			label = "USB-C";
+			power-role = "dual";
+			data-role = "dual";
+			try-power-role = "sink";
+			source-pdos = <PDO_FIXED(5000, 2500, PDO_FIXED_USB_COMM)>;
+			sink-pdos = <PDO_FIXED(5000, 1400, PDO_FIXED_USB_COMM)>;
+			op-sink-microwatt = <15000000>;
+			self-powered;
+
+			port {
+				fusb301_sw_ep: endpoint {
+					remote-endpoint = <&typec_orient_sw>;
+				};
+			};
+		};
+	};
 };
 
 &i2c2 {
@@ -80,12 +114,17 @@
 
 &usb3_porta_u3phy {
 	status = "okay";
+	orientation-switch;
+	port {
+		typec_orient_sw: endpoint {
+			remote-endpoint = <&fusb301_sw_ep>;
+		};
+	};
 };
 
 &usb3_porta {
 	status = "okay";
 	dwc3@cad00000 {
-		maximum-speed = "high-speed";
 		dr_mode = "peripheral";
 	};
 };

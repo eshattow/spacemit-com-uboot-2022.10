@@ -1462,6 +1462,7 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 	unsigned long		flags;
 	int			ret = 0;
 	u32			reg;
+	enum usb_device_speed   max_speed;
 
 	spin_lock_irqsave(&dwc->lock, flags);
 
@@ -1494,7 +1495,9 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 	if (dwc->revision < DWC3_REVISION_220A) {
 		reg |= DWC3_DCFG_SUPERSPEED;
 	} else {
-		switch (dwc->maximum_speed) {
+		max_speed = min_t(enum usb_device_speed, dwc->maximum_speed,
+				  driver->speed);
+		switch (max_speed) {
 		case USB_SPEED_LOW:
 			reg |= DWC3_DSTS_LOWSPEED;
 			break;

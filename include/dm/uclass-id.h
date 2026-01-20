@@ -125,6 +125,7 @@ enum uclass_id {
 	UCLASS_SYSINFO,		/* Device information from hardware */
 	UCLASS_SYSRESET,	/* System reset device */
 	UCLASS_TCPM,		/* TypeC port manager */
+	UCLASS_TYPEC_SWITCH,	/* TypeC orient switch */
 	UCLASS_TEE,		/* Trusted Execution Environment device */
 	UCLASS_THERMAL,		/* Thermal sensor */
 	UCLASS_TIMER,		/* Timer device */
