@@ -630,7 +630,6 @@ static void tftp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 		net_set_timeout_handler(timeout_ms, tftp_timeout_handler);
 
 		if (store_block(tftp_cur_block, pkt + 2, len)) {
-			eth_halt();
 			net_set_state(NETLOOP_FAIL);
 			break;
 		}
@@ -660,7 +659,6 @@ static void tftp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 			env_set("tftp_err", "file_not_found");
 		case TFTP_ERR_ACCESS_DENIED:
 			puts("Not retrying...\n");
-			eth_halt();
 			net_set_state(NETLOOP_FAIL);
 			break;
 		case TFTP_ERR_UNDEFINED:
