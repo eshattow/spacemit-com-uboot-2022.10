@@ -772,9 +772,13 @@ int dram_init_banksize(void)
 
 ulong board_get_usable_ram_top(ulong total_size)
 {
-	return gd->ram_base + gd->ram_size;
+	// DPU can only access 34bit address space
+	if ((gd->ram_base + gd->ram_size) > 0x400000000) {
+		return 0x400000000;
+	} else {
+		return gd->ram_base + gd->ram_size;
+	}
 }
-
 void *board_fdt_blob_setup(int *err)
 {
 	*err = 0;
