@@ -14,6 +14,10 @@
 #include <dt-bindings/power-domain/k3-pmu.h>
 #include "secure_boot.dtsi"
 
+#ifdef CONFIG_RISCV_OPTEE_SUPPORT
+#include "k3-optee.dtsi"
+#endif
+
 / {
 	#address-cells = <2>;
 	#size-cells = <2>;
