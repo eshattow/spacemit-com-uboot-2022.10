@@ -345,7 +345,7 @@
 			compatible = "riscv,rpmi-mpxy-rtc";
 			mboxes = <&rpmi_shmem_mbox 14>;
 			riscv,sbi-mpxy-channel-id = <14>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		rpmi_mpxy_pwrkey: rpmi-mpxy-pwrkey@0 {
