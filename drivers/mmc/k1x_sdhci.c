@@ -8,18 +8,15 @@
 #include <clk.h>
 #include <dm.h>
 #include <dm/pinctrl.h>
+#include <dm/device_compat.h>
 #include <fdtdec.h>
-#include <linux/libfdt.h>
+#include <reset-uclass.h>
+#include <power/regulator.h>
+#include <linux/bitfield.h>
 #include <linux/delay.h>
-#include <malloc.h>
+#include <linux/iopoll.h>
 #include <mmc.h>
 #include <sdhci.h>
-#include <reset-uclass.h>
-#include <linux/bitfield.h>
-#include <power/regulator.h>
-#include <dm/device_compat.h>
-#include <linux/iopoll.h>
-#include <mapmem.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -124,10 +121,6 @@ struct spacemit_sdhci_priv {
 	struct sdhci_host host;
 	struct reset_ctl_bulk resets;
 	struct clk_bulk clks;
-
-	u32 aib_mmc1_io_reg;
-	u32 apbc_asfar_reg;
-	u32 apbc_assar_reg;
 
 	struct rx_tuning rxtuning;
 	u8 phy_driver_sel;
@@ -268,42 +261,6 @@ static void spacemit_sdhci_set_voltage(struct sdhci_host *host)
 	}
 }
 
-static void spacemit_set_aib_mmc1_io(struct sdhci_host *host, int vol)
-{
-#define MMC1_IO_V18EN	BIT(2)
-#define AKEY_ASFAR	0xBABA
-#define AKEY_ASSAR	0xEB10
-	void __iomem *aib_mmc1_io, *apbc_asfar, *apbc_assar;
-	struct mmc *mmc = host->mmc;
-	struct spacemit_sdhci_priv *priv = dev_get_priv(mmc->dev);
-	u32 reg;
-
-	if (!priv->aib_mmc1_io_reg ||
-		!priv->apbc_asfar_reg ||
-		!priv->apbc_assar_reg)
-		return;
-
-	aib_mmc1_io = map_sysmem((uintptr_t)priv->aib_mmc1_io_reg, sizeof(uintptr_t));
-	apbc_asfar = map_sysmem((uintptr_t)priv->apbc_asfar_reg, sizeof(uintptr_t));
-	apbc_assar = map_sysmem((uintptr_t)priv->apbc_assar_reg, sizeof(uintptr_t));
-
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_assar);
-	reg = readl(aib_mmc1_io);
-
-	switch (vol) {
-	case MMC_SIGNAL_VOLTAGE_180:
-		reg |= MMC1_IO_V18EN;
-		break;
-	default:
-		reg &= ~MMC1_IO_V18EN;
-		break;
-	}
-	writel(AKEY_ASFAR, apbc_asfar);
-	writel(AKEY_ASSAR, apbc_assar);
-	writel(reg, aib_mmc1_io);
-}
-
 static void spacemit_sdhci_set_clk_gate(struct sdhci_host *host, int auto_gate)
 {
 	if (auto_gate)
@@ -348,10 +305,24 @@ static void spacemit_sdhci_set_control_reg(struct sdhci_host *host)
 	u32 cmd;
 
 	dev_dbg(mmc->dev, "select mode: %s, io voltage: %d\n", mmc_mode_name(mmc->selected_mode),
-		 mmc->signal_voltage);
+		mmc->signal_voltage);
 
 	spacemit_sdhci_set_voltage(host);
-	spacemit_set_aib_mmc1_io(host, mmc->signal_voltage);
+
+	/* set pinctrl state for SD card only */
+#ifdef CONFIG_PINCTRL
+	if (IS_SD(mmc)) {
+		if (mmc->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
+			if (mmc->bus_width < 4) {
+				pinctrl_select_state(mmc->dev, "debug");
+			} else {
+				pinctrl_select_state(mmc->dev, "default");
+			}
+		} else if (mmc->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
+			pinctrl_select_state(mmc->dev, "uhs");
+		}
+	}
+#endif
 
 	if (IS_SD(mmc)) {
 		cmd = SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND));
@@ -373,16 +344,6 @@ static void spacemit_sdhci_set_control_reg(struct sdhci_host *host)
 		spacemit_sdhci_setbits(host, SDHC_TX_INT_CLK_SEL, SPACEMIT_SDHC_TX_CFG_REG);
 	else
 		spacemit_sdhci_clrbits(host, SDHC_TX_INT_CLK_SEL, SPACEMIT_SDHC_TX_CFG_REG);
-
-	/* set pinctrl state */
-#ifdef CONFIG_PINCTRL
-	if (mmc->clock >= 200000000)
-		pinctrl_select_state(mmc->dev, "fast");
-	else if (mmc->bus_width < 4)
-		pinctrl_select_state(mmc->dev, "debug");
-	else
-		pinctrl_select_state(mmc->dev, "default");
-#endif
 
 	if (mmc->selected_mode >= MMC_HS_200) {
 		spacemit_sdhci_setbits(host, (mmc->selected_mode == MMC_HS_200) ? SDHC_MMC_HS200 : SDHC_MMC_HS400,
@@ -744,10 +705,6 @@ static int spacemit_sdhci_of_to_plat(struct udevice *dev)
 
 	priv->phy_module = dev_read_u32_default(dev, "sdh-phy-module", 0);
 	priv->phy_driver_sel = dev_read_u32_default(dev, "spacemit,phy_driver_sel", PHY_DRIVE_SEL_DEFAULT);
-
-	priv->aib_mmc1_io_reg = dev_read_u32_default(dev, "spacemit,aib_mmc1_io_reg", 0xD401E81C);
-	priv->apbc_asfar_reg = dev_read_u32_default(dev, "spacemit,apbc_asfar_reg", 0xD4015050);
-	priv->apbc_assar_reg = dev_read_u32_default(dev, "spacemit,apbc_assar_reg", 0xD4015054);
 
 	/* read rx tuning dline_reg */
 	priv->rxtuning.rx_dline_reg = dev_read_u32_default(dev, "spacemit,rx_dline_reg", RX_TUNING_DLINE_REG);
