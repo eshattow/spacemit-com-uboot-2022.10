@@ -568,7 +568,10 @@ void recovery_show_result(struct flash_dev *fdev, int ret)
 	/*free the malloc paramenter*/
 	free_flash_dev(fdev);
 
-
+	while(1){
+		/* do not return while flashing over! */
+		WATCHDOG_RESET();
+	}
 }
 
 int get_blk_part_info(struct blk_desc *dev_desc, struct flash_parts_info *parts_info,
