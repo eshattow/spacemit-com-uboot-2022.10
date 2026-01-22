@@ -69,9 +69,9 @@
 };
 
 &sdhci0 {
-	pinctrl-names = "default","fast";
+	pinctrl-names = "default","uhs";
 	pinctrl-0 = <&pinctrl_mmc1>;
-	pinctrl-1 = <&pinctrl_mmc1_fast>;
+	pinctrl-1 = <&pinctrl_mmc1_uhs>;
 	bus-width = <4>;
 	cd-gpios = <&gpio 86 0>;
 	cd-inverted;
