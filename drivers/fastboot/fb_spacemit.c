@@ -38,6 +38,10 @@
 
 #define EMMC_MAX_BLK_WRITE 16384
 
+#if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
+static struct flash_dev *fastboot_flash_fdev;
+#endif
+
 static u32 env_get_u32_default(const char *name, u32 default_value)
 {
 	const char *val = env_get(name);
@@ -647,6 +651,29 @@ free_cjson:
 	return result;
 }
 
+bool fastboot_spacemit_is_hidden_partition(const char *part_name)
+{
+#if !CONFIG_IS_ENABLED(SPACEMIT_FLASH)
+	return false;
+#else
+	int i;
+
+	if (!fastboot_flash_fdev || !part_name || !*part_name)
+		return false;
+
+	for (i = 0; i < MAX_PARTITION_NUM; i++) {
+		const struct flash_parts_info *part = &fastboot_flash_fdev->parts_info[i];
+
+		if (!part->part_name)
+			continue;
+		if (!strcmp(part_name, part->part_name))
+			return part->hidden;
+	}
+
+	return false;
+#endif
+}
+
 
 
 /**
@@ -671,6 +698,8 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
 			fastboot_fail("offset must larger then previous size and offset", response);
 		return;
 	}
+
+	fastboot_flash_fdev = fdev;
 
 	if (strlen(fdev->gptinfo.gpt_table) > 0 && fdev->gptinfo.fastboot_flash_gpt){
 		if (_write_gpt_partition(fdev)){

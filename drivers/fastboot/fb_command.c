@@ -450,6 +450,20 @@ void fastboot_data_complete(char *response)
 
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 /**
+ * is_bootloader_hidden_partition() - Check if partition is marked hidden
+ *
+ * Hidden partitions live on primary boot media (NOR/NAND) and should not be
+ * written to secondary block devices.
+ *
+ * @part_name: Partition name to check
+ * @return: true if partition is a hidden bootloader partition
+ */
+static bool is_bootloader_hidden_partition(const char *part_name)
+{
+	return fastboot_spacemit_is_hidden_partition(part_name);
+}
+
+/**
  * flash() - write the downloaded image to the indicated partition.
  *
  * @cmd_parameter: Pointer to partition name
@@ -477,6 +491,27 @@ static void flash(char *cmd_parameter, char *response)
 						response);
 		}else{
 			/* flash blk dev */
+			/* Skip hidden bootloader partitions - they exist on primary boot media (NOR/NAND) */
+			if (is_bootloader_hidden_partition(cmd_parameter)) {
+				char *blk_dev;
+				int blk_index;
+
+				const char *boot_media = "NOR/NAND";
+
+				if (boot_mode == BOOT_MODE_NOR)
+					boot_media = "NOR";
+				else if (boot_mode == BOOT_MODE_NAND)
+					boot_media = "NAND";
+
+				if (!get_available_blk_dev(&blk_dev, &blk_index))
+					pr_info("Skip hidden partition '%s' on %s %d (exists on %s)\n",
+						cmd_parameter, blk_dev, blk_index, boot_media);
+				else
+					pr_info("Skip hidden partition '%s' on secondary block device (exists on %s)\n",
+						cmd_parameter, boot_media);
+				fastboot_okay(NULL, response);
+				return;
+			}
 			fastboot_blk_flash_write(cmd_parameter, fastboot_buf_addr, image_size, response);
 		}
 
