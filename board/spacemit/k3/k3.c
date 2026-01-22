@@ -962,9 +962,12 @@ void setenv_boot_mode(void)
  *******************************************************************************/
 int mmc_get_env_dev(void)
 {
-	u32 boot_mode = 0;
-	boot_mode = get_boot_mode();
+	u32 boot_mode = get_boot_mode();
 	pr_debug("%s, uboot boot_mode:%x\n", __func__, boot_mode);
+
+	/* In USB mode, use hardware boot pin to determine target device */
+	if (boot_mode == BOOT_MODE_USB)
+		boot_mode = get_boot_pin_select();
 
 	if (boot_mode == BOOT_MODE_EMMC)
 		return MMC_DEV_EMMC;
@@ -978,23 +981,27 @@ enum env_location env_get_location(enum env_operation op, int prio)
 		return ENVL_UNKNOWN;
 
 	u32 boot_mode = get_boot_mode();
+	/* In USB mode, use hardware boot pin to determine env location */
+	if (boot_mode == BOOT_MODE_USB)
+		boot_mode = get_boot_pin_select();
+
 	switch (boot_mode) {
-#ifdef CONFIG_ENV_IS_IN_MTD
+#if CONFIG_IS_ENABLED(ENV_IS_IN_MTD)
 	case BOOT_MODE_NAND:
 	case BOOT_MODE_NOR:
 		return ENVL_MTD;
 #endif
-#ifdef CONFIG_ENV_IS_IN_MMC
+#if CONFIG_IS_ENABLED(ENV_IS_IN_MMC)
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
 		return ENVL_MMC;
 #endif
-#ifdef CONFIG_ENV_IS_IN_UFS
+#if CONFIG_IS_ENABLED(ENV_IS_IN_UFS)
 	case BOOT_MODE_UFS:
 		return ENVL_UFS;
 #endif
 	default:
-#ifdef CONFIG_ENV_IS_NOWHERE
+#if CONFIG_IS_ENABLED(ENV_IS_NOWHERE)
 		return ENVL_NOWHERE;
 #else
 		return ENVL_UNKNOWN;

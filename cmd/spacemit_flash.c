@@ -1050,6 +1050,12 @@ static int parse_flash_config(struct flash_dev *fdev)
 		printf("update part info to env fail\n");
 		return -1;
 	}
+#if !defined(CONFIG_SPL_BUILD)
+	if (CONFIG_IS_ENABLED(CMD_SAVEENV)) {
+		if (env_save())
+			printf("save env fail\n");
+	}
+#endif
 	return 0;
 }
 

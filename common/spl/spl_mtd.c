@@ -13,6 +13,14 @@
 #include <env.h>
 #include <mapmem.h>
 
+static void spl_try_import_env(void)
+{
+#ifdef CONFIG_SPL_ENV_SUPPORT
+	env_init();
+	env_load();
+#endif
+}
+
 static uint mtd_len_to_pages(struct mtd_info *mtd, u64 len)
 {
 	do_div(len, mtd->writesize);
@@ -117,7 +125,8 @@ static ulong spl_spi_load_read(struct spl_load_info *load, ulong sector,
 
 
 static int mtd_load_image(struct spl_image_info *spl_image,
-			      struct spl_boot_device *bootdev, struct mtd_info *mtd)
+			      struct spl_boot_device *bootdev, struct mtd_info *mtd,
+			      u64 offset)
 {
 	struct image_header *header;
 	ulong len;
@@ -130,7 +139,7 @@ static int mtd_load_image(struct spl_image_info *spl_image,
 	}
 
 	header = spl_get_load_buffer(-sizeof(*header), sizeof(*header));
-	err = spl_mtd_read(mtd, 0, len, (void *)header);
+	err = spl_mtd_read(mtd, offset, len, (void *)header);
 	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) &&
 	    image_get_magic(header) == FDT_MAGIC) {
 		struct spl_load_info load;
@@ -141,7 +150,7 @@ static int mtd_load_image(struct spl_image_info *spl_image,
 		load.filename = NULL;
 		load.bl_len = 1;
 		load.read = spl_spi_load_read;
-		err = spl_load_simple_fit(spl_image, &load, 0, header);
+		err = spl_load_simple_fit(spl_image, &load, offset, header);
 	} else {
 		debug("unsupport Legacy image\n");
 		return -1;
@@ -157,15 +166,32 @@ static int spl_spi_load_image(struct spl_image_info *spl_image,
 	struct mtd_info *mtd;
 	int err = 0;
 	__maybe_unused int load_others_res = -1;
+	u64 opensbi_offset = 0;
 
 	mtd_probe_devices();
 
-	mtd = get_mtd_device_nm(CONFIG_SYS_LOAD_IMAGE_PARTITION_NAME);
+	/* Get the main MTD device (not partition) for absolute offset access */
+	mtd = get_mtd_device_nm("spi-flash");
+	if (IS_ERR_OR_NULL(mtd))
+		mtd = get_mtd_device_nm("nor0");
+	if (IS_ERR_OR_NULL(mtd))
+		mtd = get_mtd_device(NULL, 0);
 	if (IS_ERR_OR_NULL(mtd)){
-		debug("MTD device %s not found\n", CONFIG_SYS_LOAD_IMAGE_PARTITION_NAME);
+		pr_err("MTD device not found\n");
 		return -1;
 	}
-	err = mtd_load_image(spl_image, bootdev, mtd);
+
+	spl_try_import_env();
+#ifdef CONFIG_SPL_ENV_SUPPORT
+	opensbi_offset = env_get_ulong("opensbi_offset", 16, 0);
+#endif
+
+	if (!opensbi_offset) {
+		pr_err("SPL MTD: opensbi_offset not set in env\n");
+		return -1;
+	}
+
+	err = mtd_load_image(spl_image, bootdev, mtd, opensbi_offset);
 
 	if (!err || !load_others_res)
 		return 0;

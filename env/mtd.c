@@ -119,7 +119,6 @@ static int env_mtd_save(void) {
 	}
 
 	env_t env_new;
-	char *buf = env_new.data;
 
 	int ret = env_export(&env_new);
 	if (ret)
@@ -144,7 +143,7 @@ static int env_mtd_save(void) {
 		return -EIO;
 	}
 
-	ret = mtd_write(mtd, env_new_offset, CONFIG_ENV_SIZE, &retlen, buf);
+	ret = mtd_write(mtd, env_new_offset, CONFIG_ENV_SIZE, &retlen, (char *)&env_new);
 	if (ret) {
 		printf("Failed to write new environment to MTD device\n");
 		return -EIO;
@@ -197,7 +196,6 @@ static int env_mtd_save(void) {
 	}
 
 	env_t env_new;
-	char *buf = env_new.data;
 
 	int ret = env_export(&env_new);
 	if (ret)
@@ -210,7 +208,7 @@ static int env_mtd_save(void) {
 	}
 
 	size_t retlen;
-	ret = mtd_write(mtd, CONFIG_ENV_OFFSET, CONFIG_ENV_SIZE, &retlen, buf);
+	ret = mtd_write(mtd, CONFIG_ENV_OFFSET, CONFIG_ENV_SIZE, &retlen, (char *)&env_new);
 	if (ret) {
 		printf("Failed to write environment to MTD device\n");
 		return -EIO;
@@ -229,5 +227,4 @@ U_BOOT_ENV_LOCATION(mtd) = {
 	.erase    = ENV_ERASE_PTR(env_mtd_erase),
 	.init     = env_mtd_init,
 };
-
 

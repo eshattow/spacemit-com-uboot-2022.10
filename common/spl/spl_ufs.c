@@ -14,11 +14,43 @@
 #include <fat.h>
 #include <image.h>
 #include <part.h>
+#include <env.h>
 
-#ifndef CONFIG_SPL_UFS_RAW_U_BOOT_SECTOR
-/* Default sector to load U-Boot from UFS */
-#define CONFIG_SPL_UFS_RAW_U_BOOT_SECTOR 0x1000
+static void spl_try_import_env(void)
+{
+#ifdef CONFIG_SPL_ENV_SUPPORT
+	env_init();
+	env_load();
 #endif
+}
+
+static const char *spl_env_partition_name(void)
+{
+#ifdef CONFIG_SYS_LOAD_IMAGE_PARTITION_NAME
+	return CONFIG_SYS_LOAD_IMAGE_PARTITION_NAME;
+#else
+	return NULL;
+#endif
+}
+
+#if IS_ENABLED(CONFIG_SPL_FS_FAT)
+static const char *spl_env_payload_name(void)
+{
+#ifdef CONFIG_SPL_FS_LOAD_PAYLOAD_NAME
+	return CONFIG_SPL_FS_LOAD_PAYLOAD_NAME;
+#else
+	return NULL;
+#endif
+}
+#endif
+
+static ulong h_spl_ufs_load_read(struct spl_load_info *load, ulong sector,
+				 ulong count, void *buf)
+{
+	struct blk_desc *stor_dev = load->dev;
+
+	return blk_dread(stor_dev, sector, count, buf);
+}
 
 static int spl_ufs_load_image_raw(struct spl_image_info *spl_image,
 		struct spl_boot_device *bootdev,
@@ -37,6 +69,21 @@ static int spl_ufs_load_image_raw(struct spl_image_info *spl_image,
 	if (count == 0) {
 		pr_err("SPL UFS: Failed to read header from sector %lu\n", sector);
 		return -EIO;
+	}
+
+	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) &&
+	    image_get_magic(header) == FDT_MAGIC) {
+		struct spl_load_info load;
+
+		load.dev = stor_dev;
+		load.priv = NULL;
+		load.filename = NULL;
+		load.bl_len = stor_dev->blksz;
+		load.read = h_spl_ufs_load_read;
+		ret = spl_load_simple_fit(spl_image, &load, sector, header);
+		if (ret)
+			pr_err("SPL UFS: FIT load failed, ret=%d\n", ret);
+		return ret;
 	}
 
 	ret = spl_parse_image_header(spl_image, bootdev, header);
@@ -78,19 +125,25 @@ static int spl_ufs_load_image_partition(struct spl_image_info *spl_image,
 	int err = -ENOSYS;
 	int partition;
 	struct disk_partition info;
+	const char *part_name = spl_env_partition_name();
+
+	if (!part_name || !*part_name)
+		return -ENOENT;
 
 	/* Find partition by name */
-	partition = part_get_info_by_name(stor_dev,
-			CONFIG_SYS_LOAD_IMAGE_PARTITION_NAME, &info);
+	partition = part_get_info_by_name(stor_dev, part_name, &info);
 	if (partition < 0)
 		return -ENOENT;
 
 #if IS_ENABLED(CONFIG_SPL_FS_FAT)
-	err = spl_load_image_fat(spl_image, bootdev, stor_dev,
-				 partition,
-				 CONFIG_SPL_FS_LOAD_PAYLOAD_NAME);
-	if (!err)
-		return 0;
+	const char *payload = spl_env_payload_name();
+
+	if (payload) {
+		err = spl_load_image_fat(spl_image, bootdev, stor_dev,
+					 partition, payload);
+		if (!err)
+			return 0;
+	}
 #endif
 
 	/* Try raw load from partition start */
@@ -104,6 +157,7 @@ static int spl_ufs_load_image(struct spl_image_info *spl_image,
 {
 	int err = 0;
 	struct blk_desc *stor_dev;
+	ulong opensbi_offset = 0;
 
 	/* Probe UFS devices first */
 	err = ufs_probe();
@@ -115,8 +169,28 @@ static int spl_ufs_load_image(struct spl_image_info *spl_image,
 
 	/* Get the first SCSI block device */
 	stor_dev = blk_get_devnum_by_type(IF_TYPE_SCSI, 0);
-	if (!stor_dev)
+	if (!stor_dev) {
+		pr_err("SPL UFS: no SCSI block device\n");
 		return -ENODEV;
+	}
+
+	spl_try_import_env();
+#ifdef CONFIG_SPL_ENV_SUPPORT
+	opensbi_offset = env_get_ulong("opensbi_offset", 16, 0);
+#endif
+
+	if (opensbi_offset) {
+		ulong sector = opensbi_offset / stor_dev->blksz;
+
+		if (opensbi_offset % stor_dev->blksz) {
+			pr_err("SPL UFS: unaligned offset 0x%lx (blksz 0x%lx)\n",
+			       opensbi_offset, (ulong)stor_dev->blksz);
+		} else {
+			err = spl_ufs_load_image_raw(spl_image, bootdev, stor_dev, sector);
+			if (!err)
+				goto done;
+		}
+	}
 
 #if CONFIG_IS_ENABLED(OS_BOOT)
 	if (spl_start_uboot() ||

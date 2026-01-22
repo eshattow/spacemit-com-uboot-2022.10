@@ -582,6 +582,38 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 			fdev->parts_info[part_index].part_offset = combine_size * 1024;
 			fdev->parts_info[part_index].part_size = transfer_string_to_ul(node_size) * 1024;
 
+			/*
+			 * Only update offset env when partition source matches boot mode.
+			 * This avoids NOR+block boot flows overwriting MTD offsets with
+			 * block-device partition tables.
+			 * - MTD partition: only for NOR/NAND boot
+			 * - GPT partition: only for non-NOR/NAND boot (eMMC, SD, UFS)
+			 */
+			{
+				u32 boot_pin = get_boot_pin_select();
+				bool is_nor_nand_boot = (boot_pin == BOOT_MODE_NOR ||
+							 boot_pin == BOOT_MODE_NAND);
+				bool allow_offset_update = (parse_mtd_partition && is_nor_nand_boot) ||
+							   (!parse_mtd_partition && !is_nor_nand_boot);
+
+				if (allow_offset_update) {
+					if (!strcmp(node_part, "opensbi")) {
+						env_set_hex("opensbi_offset",
+							    (ulong)fdev->parts_info[part_index].part_offset);
+					} else if (!strcmp(node_part, "esos")) {
+						env_set_hex("esos_offset",
+							    (ulong)fdev->parts_info[part_index].part_offset);
+						if (parse_mtd_partition)
+							env_set("extra_esos_partition", "esos");
+					} else if (!strcmp(node_part, "uboot")) {
+						env_set_hex("uboot_offset",
+							    (ulong)fdev->parts_info[part_index].part_offset);
+						if (parse_mtd_partition)
+							env_set("extra_uboot_partition", "uboot");
+					}
+				}
+			}
+
 			/*save as the next part offset*/
 			combine_size += transfer_string_to_ul(node_size);
 
@@ -720,6 +752,26 @@ void fastboot_oem_flash_gpt(const char *cmd, void *download_buffer, u32 download
 		fastboot_fail("clear env fail", response);
 		return;
 	}
+#if !defined(CONFIG_SPL_BUILD)
+	if (CONFIG_IS_ENABLED(CMD_SAVEENV)) {
+		/*
+		 * Only save env when partition type matches boot mode:
+		 * - MTD partition: save for NOR/NAND boot
+		 * - GPT partition: save for non-NOR/NAND boot (eMMC, SD, UFS)
+		 */
+		u32 boot_mode = get_boot_pin_select();
+		bool is_nor_nand_boot = (boot_mode == BOOT_MODE_NOR ||
+					 boot_mode == BOOT_MODE_NAND);
+		bool is_mtd_partition = (strlen(fdev->mtd_table) > 0);
+		bool should_save_env = (is_mtd_partition && is_nor_nand_boot) ||
+				       (!is_mtd_partition && !is_nor_nand_boot);
+
+		if (should_save_env) {
+			if (env_save())
+				pr_err("save env fail\n");
+		}
+	}
+#endif
 
 	/*maybe there doesn't have gpt/mtd partition, should not return fail*/
 	fastboot_okay("parse gpt/mtd table okay", response);

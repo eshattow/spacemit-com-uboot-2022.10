@@ -148,6 +148,9 @@ const struct k3_nor_boot_target *k3_nor_get_boot_prio(unsigned int *count);
 	"uboot_itb_path=u-boot.itb\0" \
 	"extra_esos_partition=esos\0" \
 	"extra_uboot_partition=uboot\0" \
+	"opensbi_offset=0x700000\0" \
+	"esos_offset=0x400000\0" \
+	"uboot_offset=0x800000\0" \
 	"splashimage=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
 	"splashpos=m,m\0" \
 	"splashfile=bianbu.bmp\0"

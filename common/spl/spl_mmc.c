@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <mmc.h>
 #include <image.h>
+#include <env.h>
 
 static int mmc_load_legacy(struct spl_image_info *spl_image,
 			   struct spl_boot_device *bootdev,
@@ -65,6 +66,23 @@ static ulong h_spl_load_read(struct spl_load_info *load, ulong sector,
 	struct mmc *mmc = load->dev;
 
 	return blk_dread(mmc_get_blk_desc(mmc), sector, count, buf);
+}
+
+static void spl_try_import_env(void)
+{
+#ifdef CONFIG_SPL_ENV_SUPPORT
+	env_init();
+	env_load();
+#endif
+}
+
+static ulong spl_env_raw_offset(void)
+{
+	ulong offset = 0;
+#ifdef CONFIG_SPL_ENV_SUPPORT
+	offset = env_get_ulong("opensbi_offset", 16, 0);
+#endif
+	return offset;
 }
 
 static __maybe_unused unsigned long spl_mmc_raw_uboot_offset(int part)
@@ -423,6 +441,8 @@ int spl_mmc_load(struct spl_image_info *spl_image,
 		}
 	}
 
+	spl_try_import_env();
+
 	boot_mode = spl_mmc_boot_mode(mmc, bootdev->boot_device);
 	err = -EINVAL;
 	switch (boot_mode) {
@@ -448,6 +468,23 @@ int spl_mmc_load(struct spl_image_info *spl_image,
 			err = mmc_load_image_raw_os(spl_image, bootdev, mmc);
 			if (!err)
 				return err;
+		}
+
+		{
+			ulong raw_offset = spl_env_raw_offset();
+
+			if (raw_offset) {
+				ulong sector = raw_offset / mmc->read_bl_len;
+
+				if (raw_offset % mmc->read_bl_len) {
+					printf("spl: mmc unaligned offset 0x%lx (blksz 0x%lx)\n",
+					       raw_offset, (ulong)mmc->read_bl_len);
+				} else {
+					err = mmc_load_image_raw_sector(spl_image, bootdev, mmc, sector);
+					if (!err)
+						return err;
+				}
+			}
 		}
 
 		raw_sect = spl_mmc_get_uboot_raw_sector(mmc, raw_sect);
