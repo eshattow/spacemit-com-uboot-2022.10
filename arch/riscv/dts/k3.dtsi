@@ -11,6 +11,7 @@
 #include "k3-cpus.dtsi"
 #include <dt-bindings/reset/reset-spacemit-k3.h>
 #include <dt-bindings/clock/spacemit-k3-clock.h>
+#include <dt-bindings/power-domain/k3-pmu.h>
 #include "secure_boot.dtsi"
 
 / {
@@ -962,11 +963,11 @@
 			status = "disabled";
 		};
 
-		dpu: dpu@c0300000 {
+		dpu: dpu@c0340000 {
 			compatible = "spacemit,dpu";
-			reg = <0x0 0xc0300000 0x0 0x100000>,
-				  <0x0 0xc0440000 0x0 0x40000>;
-			reg-names = "dsi", "dp";
+			reg = <0x0 0xc0340000 0x0 0x54000>,
+				  <0x0 0xc0440000 0x0 0x54000>;
+			reg-names = "crtc0", "crtc1";
 			status = "disabled";
 
 			dpu_out: port {
@@ -987,24 +988,26 @@
 			};
 		};
 
-		dp0: dp0@c0400500 {
+		dp0: dp0@cac84000 {
 			compatible = "spacemit,inno-dp";
 			reg = <0x0 0xcac84000 0x0 0x4000>;
 			reg-names = "dp";
 			clocks = <&ccu CLK_LCD_PXCLK>,
 					 <&ccu CLK_LCD_MCLK>,
 					 <&ccu CLK_LCD_HCLK>,
-					 <&ccu CLK_LCD_DSC>,
+					 <&ccu CLK_DSI_ESC>,
 					 <&ccu CLK_DPU_ACLK>,
+					 <&ccu CLK_LCD_DSC>,
 					 <&ccu CLK_EDP0_PXCLK>;
-			clock-names = "pxclk", "mclk", "hclk", "dscclk", "aclk", "edp0pxclk";
-			resets = <&reset RESET_DPU_ACLK>,
-					 <&reset RESET_LCD_MCLK>,
-					 <&reset RESET_LCD_DSCCLK>,
+			clock-names = "pxclk", "mclk", "hclk", "escclk", "aclk", "dscclk", "edp0pxclk";
+			resets = <&reset RESET_LCD_MCLK>,
 					 <&reset RESET_LCD>,
+					 <&reset RESET_DSI_ESC>,
+					 <&reset RESET_DPU_ACLK>,
+					 <&reset RESET_LCD_DSCCLK>,
 					 <&reset RESET_EDP0>;
-			reset-names= "aclk_reset", "mclk_reset", "dscclk_reset", "lcd_reset", "edp0_reset";
-			// power-domains = <&pmu K3X_PMU_LCD_PWR_DOMAIN>;
+			reset-names= "mclk_reset", "lcd_reset", "esc_reset", "aclk_reset", "dscclk_reset", "edp0_reset";
+			power-domains = <&pmu K3_PMU_LCD0_PWR_DOMAIN>;
 			status = "disabled";
 
 			ports {

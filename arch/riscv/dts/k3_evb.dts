@@ -541,3 +541,13 @@
 		};
 	};
 };
+
+&dpu {
+	status = "okay";
+};
+
+&dp0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_dp0_2>;
+	status = "okay";
+};
