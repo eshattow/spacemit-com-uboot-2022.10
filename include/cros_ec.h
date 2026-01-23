@@ -113,6 +113,7 @@ int cros_ec_read_current_image(struct udevice *dev,
  */
 int cros_ec_read_hash(struct udevice *dev, uint hash_offset,
 		      struct ec_response_vboot_hash *hash);
+int cros_ec_invalidate_hash(struct udevice *dev);
 
 /**
  * Send a reboot command to the CROS-EC device.
