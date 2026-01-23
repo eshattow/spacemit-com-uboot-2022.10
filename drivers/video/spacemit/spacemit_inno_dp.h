@@ -26,12 +26,14 @@ struct spacemit_inno_dp_priv {
 	struct clk pxclk;
 	struct clk mclk;
 	struct clk hclk;
+	struct clk escclk;
 	struct clk dscclk;
 	struct clk aclk;
 	struct clk edp0pxclk;
 
 	struct reset_ctl aclk_reset;
 	struct reset_ctl mclk_reset;
+	struct reset_ctl esc_reset;
 	struct reset_ctl dscclk_reset;
 	struct reset_ctl lcd_reset;
 	struct reset_ctl edp0_reset;

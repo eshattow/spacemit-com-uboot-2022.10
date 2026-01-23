@@ -83,6 +83,7 @@ static int spacemit_dp_probe(struct udevice *dev)
 {
 	struct spacemit_inno_dp_priv *priv = dev_get_priv(dev);
 	struct power_domain pm_domain;
+	unsigned long rate;
 	int ret;
 
 	pr_debug("%s() \n", __func__);
@@ -112,6 +113,12 @@ static int spacemit_dp_probe(struct udevice *dev)
 	ret = clk_get_by_name(dev, "hclk", &priv->hclk);
 	if (ret) {
 		pr_err("clk_get_by_name hclk failed: %d", ret);
+		return ret;
+	}
+
+	ret = clk_get_by_name(dev, "escclk", &priv->escclk);
+	if (ret) {
+		pr_err("clk_get_by_name escclk failed: %d", ret);
 		return ret;
 	}
 
@@ -145,6 +152,12 @@ static int spacemit_dp_probe(struct udevice *dev)
 		return ret;
 	}
 
+	ret = reset_get_by_name(dev, "esc_reset", &priv->esc_reset);
+	if (ret) {
+		pr_err("reset_get_by_name esc_reset failed: %d\n", ret);
+		return ret;
+	}
+
 	ret = reset_get_by_name(dev, "dscclk_reset", &priv->dscclk_reset);
 	if (ret) {
 		pr_err("reset_get_by_name dscclk_reset failed: %d\n", ret);
@@ -163,15 +176,21 @@ static int spacemit_dp_probe(struct udevice *dev)
 		return ret;
 	}
 
+	ret = reset_deassert(&priv->mclk_reset);
+	if (ret) {
+		pr_err("reset_assert mclk_reset failed: %d\n", ret);
+		return ret;
+	}
+
 	ret = reset_deassert(&priv->aclk_reset);
 	if (ret) {
 		pr_err("reset_assert aclk_reset failed: %d\n", ret);
 		return ret;
 	}
 
-	ret = reset_deassert(&priv->mclk_reset);
+	ret = reset_deassert(&priv->esc_reset);
 	if (ret) {
-		pr_err("reset_assert mclk_reset failed: %d\n", ret);
+		pr_err("reset_assert esc_reset failed: %d\n", ret);
 		return ret;
 	}
 
@@ -187,21 +206,15 @@ static int spacemit_dp_probe(struct udevice *dev)
 		return ret;
 	}
 
-	ret = reset_deassert(&priv->edp0_reset);
-	if (ret) {
-		pr_err("reset_assert edp0_reset failed: %d\n", ret);
-		return ret;
-	}
-
-	ret = clk_enable(&priv->pxclk);
-	if (ret < 0) {
-		pr_err("clk_enable pxclk failed: %d\n", ret);
-		return ret;
-	}
-
 	ret = clk_enable(&priv->mclk);
 	if (ret < 0) {
 		pr_err("clk_enable mclk failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = clk_enable(&priv->escclk);
+	if (ret < 0) {
+		pr_err("clk_enable escclk failed: %d\n", ret);
 		return ret;
 	}
 
@@ -223,13 +236,82 @@ static int spacemit_dp_probe(struct udevice *dev)
 		return ret;
 	}
 
+	ret = clk_enable(&priv->pxclk);
+	if (ret < 0) {
+		pr_err("clk_enable pxclk failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = clk_set_rate(&priv->mclk, 307200000);
+	if (ret < 0) {
+		pr_err("clk_set_rate mclk failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = clk_set_rate(&priv->aclk, 409600000);
+	if (ret < 0) {
+		pr_err("clk_set_rate aclk failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = clk_set_rate(&priv->escclk, 51200000);
+	if (ret < 0) {
+		pr_err("clk_set_rate escclk failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = clk_set_rate(&priv->dscclk, 614400000);
+	if (ret < 0) {
+		pr_err("clk_set_rate dscclk failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = clk_set_rate(&priv->pxclk, 148500000);
+	if (ret < 0) {
+		pr_err("clk_set_rate pxclk failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = reset_deassert(&priv->edp0_reset);
+	if (ret) {
+		pr_err("reset_assert edp0_reset failed: %d\n", ret);
+		return ret;
+	}
+
 	ret = clk_enable(&priv->edp0pxclk);
 	if (ret < 0) {
 		pr_err("clk_enable edp0pxclk failed: %d\n", ret);
 		return ret;
 	}
 
-	priv->dp_conn = inno_get_conn_module(INNO_CONN_DP0);
+	ret = clk_set_rate(&priv->edp0pxclk, 148500000);
+	if (ret < 0) {
+		pr_err("clk_set_rate edp0pxclk failed: %d\n", ret);
+		return ret;
+	}
+
+	rate = clk_get_rate(&priv->mclk);
+	pr_info("%s clk_get_rate mclk rate = %ld\n", __func__, rate);
+
+	rate = clk_get_rate(&priv->aclk);
+	pr_info("%s clk_get_rate aclk rate = %ld\n", __func__, rate);
+
+	rate = clk_get_rate(&priv->hclk);
+	pr_info("%s clk_get_rate hclk rate = %ld\n", __func__, rate);
+
+	rate = clk_get_rate(&priv->escclk);
+	pr_info("%s clk_get_rate escclk rate = %ld\n", __func__, rate);
+
+	rate = clk_get_rate(&priv->dscclk);
+	pr_info("%s clk_get_rate dscclk rate = %ld\n", __func__, rate);
+
+	rate = clk_get_rate(&priv->pxclk);
+	pr_info("%s clk_get_rate pxclk rate = %ld\n", __func__, rate);
+
+	rate = clk_get_rate(&priv->edp0pxclk);
+	pr_info("%s clk_get_rate edp0pxclk rate = %ld\n", __func__, rate);
+
+	priv->dp_conn = inno_get_conn_module(INNO_CONN_DP);
 	priv->dp_type = INNO_DP;
 
 	inno_conn_init(priv->dp_conn);

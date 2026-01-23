@@ -11,12 +11,10 @@
 
 enum modules {
 	INNO_CONN_NONE = -1,
-	INNO_CONN_DP0,
-
+	INNO_CONN_DP = 0,
+	INNO_CONN_EDP = 1,
 	INNO_CONN_MAX,
 };
-
-#define inno_conn_is_dp(_id)		((_id) == INNO_CONN_DP0)
 
 #define INNO_CONN_FLAG_NONE		(0x0)
 #define INNO_CONN_FLAG_BIST		(0x1)
@@ -59,8 +57,11 @@ struct inno_conn_t {
 	uint32_t width; //need match with vic
 	uint32_t height; //need match with vic
 
+	bool edp_enable;
 	struct inno_conn_func_t *func;
 	struct inno_mode out_mode;
+	bool edid_valid;
+	uint8_t edid_data[256];
 
 	void *priv;
 	bool is_enable;

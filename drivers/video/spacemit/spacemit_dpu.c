@@ -659,8 +659,12 @@ static int spacemit_dpu_probe(struct udevice *dev)
 	ofnode port, node;
 	int ret;
 
-	priv->regs_dsi = dev_remap_addr_name(dev, "dsi");
-	if (!priv->regs_dsi)
+	priv->regs_crtc0 = dev_remap_addr_name(dev, "crtc0");
+	if (!priv->regs_crtc0)
+		return -EINVAL;
+
+	priv->regs_crtc1 = dev_remap_addr_name(dev, "crtc1");
+	if (!priv->regs_crtc1)
 		return -EINVAL;
 
 	port = dev_read_subnode(dev, "port");

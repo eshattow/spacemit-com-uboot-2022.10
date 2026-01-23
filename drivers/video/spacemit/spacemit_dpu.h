@@ -44,8 +44,8 @@ struct fb_info {
 };
 
 struct spacemit_dpu_priv {
-	void __iomem *regs_dsi;
-	void __iomem *regs_hdmi;
+	void __iomem *regs_crtc0;
+	void __iomem *regs_crtc1;
 	struct udevice *conn_dev;
 	struct display_timing timing;
 };
