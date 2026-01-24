@@ -986,6 +986,7 @@ int spacemit_dsi_probe(void)
 
 	spacemit_dsi_dev.esc_clk_rate = SPACEMIT_ESC_CLK_DEFAULT;
 	spacemit_dsi_dev.bit_clk_rate = SPACEMIT_BIT_CLK_DEFAULT;
+	spacemit_dsi_dev.version = DSI_VERSION_2;
 
 	ret = spacemit_dsi_register_device(&spacemit_dsi_dev);
 	if(ret != 0){

@@ -12,7 +12,7 @@ menuconfig VIDEO_SPACEMIT
 config VIDEO_SPACEMIT_MAX_XRES
 	int "Maximum horizontal resolution (for memory allocation purposes)"
 	depends on VIDEO_SPACEMIT
-	default 3840
+	default 1920
 	help
 	  The maximum horizontal resolution to support for the framebuffer.
 	  This configuration is used for reserving/allocating memory for the
@@ -21,7 +21,7 @@ config VIDEO_SPACEMIT_MAX_XRES
 config VIDEO_SPACEMIT_MAX_YRES
 	int "Maximum vertical resolution (for memory allocation purposes)"
 	depends on VIDEO_SPACEMIT
-	default 2160
+	default 1080
 	help
 	  The maximum vertical resolution to support for the framebuffer.
 	  This configuration is used for reserving/allocating memory for the

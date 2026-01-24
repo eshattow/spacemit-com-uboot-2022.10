@@ -650,6 +650,15 @@ int board_late_init(void)
 		printf("Warn: Failed to init RT7451 retimer (err=%d)\n", ret);
 #endif
 
+	ret = uclass_probe_all(UCLASS_VIDEO);
+	if (ret) {
+		pr_info("video devices not found or not probed yet: %d\n", ret);
+	}
+	ret = uclass_probe_all(UCLASS_DISPLAY);
+	if (ret) {
+		pr_info("display devices not found or not probed yet: %d\n", ret);
+	}
+
 	set_env_ethaddr();
 	set_dev_serial_no();
 	refresh_config_info();

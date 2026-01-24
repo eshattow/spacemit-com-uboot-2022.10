@@ -16,6 +16,8 @@
 #define m_INT_HOTPLUG			(1 << 1)
 #define v_MASK_INT_HOTPLUG(n)	((n & 0x1) << 5)
 
+#define PLL_MODE_LWG_PLL  0
+#define PLL_MODE_5G_PLL   1
 
 struct spacemit_mipi_priv {
 	void __iomem *base;
@@ -27,12 +29,20 @@ struct spacemit_mipi_priv {
 	struct clk mclk;
 	struct clk hclk;
 	struct clk escclk;
-	struct clk bitclk;
+	struct clk dscclk;
+	struct clk aclk;
 
 	struct reset_ctl aclk_reset;
 	struct reset_ctl mclk_reset;
 	struct reset_ctl esc_reset;
 	struct reset_ctl lcd_reset;
+	struct reset_ctl dsc_reset;
+};
+
+struct pll_freq_range_t{
+	u16 low;
+	u16 mid;
+	u16 high;
 };
 
 #endif
