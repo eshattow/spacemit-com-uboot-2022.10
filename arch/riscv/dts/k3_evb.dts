@@ -551,3 +551,16 @@
 	pinctrl-0 = <&pinctrl_dp0_2>;
 	status = "okay";
 };
+
+&mipi_dsi {
+	status = "disabled";
+};
+
+&panel {
+	force-attached = "icnl9911c";
+	dcp-gpios = <&gpio 56 0>;
+	dcn-gpios = <&gpio 57 0>;
+	enable-gpios = <&gpio 61 0>;
+	reset-gpios = <&gpio 63 0>;
+	status = "disabled";
+};
