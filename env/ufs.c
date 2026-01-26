@@ -153,12 +153,19 @@ static inline int read_env(struct blk_desc *desc, unsigned long size,
 static int env_ufs_load(void)
 {
 #if !defined(ENV_IS_EMBEDDED)
-	ALLOC_CACHE_ALIGN_BUFFER(char, buf, CONFIG_ENV_SIZE);
+	char *buf;
 	struct blk_desc *desc;
 	u32 offset;
 	int ret;
 	const char *errmsg = NULL;
 	env_t *ep = NULL;
+
+	buf = malloc_cache_aligned(CONFIG_ENV_SIZE);
+	if (!buf) {
+		errmsg = "env malloc failed";
+		ret = -ENOMEM;
+		goto err;
+	}
 
 	desc = init_ufs_for_env();
 	if (!desc) {
