@@ -544,12 +544,33 @@
 
 &dpu {
 	status = "okay";
+
+	dpu_out: port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		dpu_out_dp0: endpoint@1 {
+			reg = <1>;
+			remote-endpoint = <&dp0_in_dpu>;
+		};
+	};
 };
 
 &dp0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_dp0_2>;
 	status = "okay";
+
+	ports {
+		dp0_in: port {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			dp0_in_dpu: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&dpu_out_dp0>;
+			};
+		};
+	};
 };
 
 &mipi_dsi {

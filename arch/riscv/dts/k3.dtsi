@@ -983,10 +983,6 @@
 					remote-endpoint = <&dsi_in_dpu>;
 				};
 
-				dpu_out_dp: endpoint@1 {
-					reg = <1>;
-					remote-endpoint = <&dp_in_dpu>;
-				};
 			};
 		};
 
@@ -1002,27 +998,41 @@
 					 <&ccu CLK_DPU_ACLK>,
 					 <&ccu CLK_LCD_DSC>,
 					 <&ccu CLK_EDP0_PXCLK>;
-			clock-names = "pxclk", "mclk", "hclk", "escclk", "aclk", "dscclk", "edp0pxclk";
+			clock-names = "pxclk", "mclk", "hclk", "escclk", "aclk", "dscclk", "dppxclk";
 			resets = <&reset RESET_LCD_MCLK>,
 					 <&reset RESET_LCD>,
 					 <&reset RESET_DSI_ESC>,
 					 <&reset RESET_DPU_ACLK>,
 					 <&reset RESET_LCD_DSCCLK>,
 					 <&reset RESET_EDP0>;
-			reset-names= "mclk_reset", "lcd_reset", "esc_reset", "aclk_reset", "dscclk_reset", "edp0_reset";
+			reset-names= "mclk_reset", "lcd_reset", "esc_reset", "aclk_reset", "dscclk_reset", "dp_reset";
 			power-domains = <&pmu K3_PMU_LCD0_PWR_DOMAIN>;
 			status = "disabled";
 
-			ports {
-				dp_in: port {
-					#address-cells = <1>;
-					#size-cells = <0>;
-					dp_in_dpu: endpoint@0 {
-						reg = <0>;
-						remote-endpoint = <&dpu_out_dp>;
-					};
-				};
-			};
+		};
+
+		dp1: dp1@cac88000 {
+			compatible = "spacemit,inno-dp";
+			reg = <0x0 0xcac88000 0x0 0x4000>;
+			reg-names = "dp";
+			dpu-id = <1>;
+			clocks = <&ccu CLK_DSI4LN2_LCD_PXCLK>,
+					 <&ccu CLK_DSI4LN2_LCD_MCLK>,
+					 <&ccu CLK_DSI4LN2_DSI_ESC>,
+					 <&ccu CLK_DSI4LN2_DPU_ACLK>,
+					 <&ccu CLK_DSI4LN2_LCD_DSC>,
+					 <&ccu CLK_EDP1_PXCLK>;
+			clock-names = "pxclk", "mclk", "escclk", "aclk", "dscclk", "dppxclk";
+			resets = <&reset RESET_DSI4LN2_LCD_MCLK>,
+					 <&reset RESET_DSI4LN2_LCD_SW>,
+					 <&reset RESET_DSI4LN2_ESCCLK>,
+					 <&reset RESET_DSI4LN2_DPU_ACLK>,
+					 <&reset RESET_DSI4LN2_LCD_DSCCLK>,
+					 <&reset RESET_EDP1>;
+			reset-names= "mclk_reset", "lcd_reset", "esc_reset", "aclk_reset", "dscclk_reset", "dp_reset";
+			power-domains = <&pmu K3_PMU_LCD1_PWR_DOMAIN>;
+			status = "disabled";
+
 		};
 
 		mipi_dsi: mipi@d421a800 {
