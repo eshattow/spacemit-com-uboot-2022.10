@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include "inno_dp_api.h"
 #include "inno_conn.h"
-#include "inno_dp_reg.h"
 #include "inno_dp.h"
 #include "inno_edid.h"
 #include "inno_dp_common.h"
@@ -19,8 +18,8 @@ struct inno_conn_t g_inno_conn_table[INNO_CONN_MAX] = {
 		.conn_id = INNO_CONN_DP,
 		.valid = true,
 		.flag = INNO_CONN_FLAG_NONE,
-		.regbase = DP_REGISTER_BASE_ADDRESS,
-		.regsize = DP_REGISTER_SIZE,
+		.regbase = DP0_REGISTER_BASE_ADDRESS,
+		.regsize = DP0_REGISTER_SIZE,
 		.use_phy_board = false,
 		.phy_i2c_id = 3,
 		.lane_count = 4,
@@ -36,8 +35,8 @@ struct inno_conn_t g_inno_conn_table[INNO_CONN_MAX] = {
 		.conn_id = INNO_CONN_EDP,
 		.valid = true,
 		.flag = INNO_CONN_FLAG_NONE,
-		.regbase = DP_REGISTER_BASE_ADDRESS,
-		.regsize = DP_REGISTER_SIZE,
+		.regbase = DP0_REGISTER_BASE_ADDRESS,
+		.regsize = DP0_REGISTER_SIZE,
 		.use_phy_board = false,
 		.phy_i2c_id = 3,
 		.lane_count = 4,

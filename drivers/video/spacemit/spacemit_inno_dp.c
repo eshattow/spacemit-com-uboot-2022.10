@@ -87,7 +87,6 @@ static int spacemit_dp_probe(struct udevice *dev)
 	int ret;
 
 	pr_debug("%s() \n", __func__);
-
 	priv->base = dev_remap_addr_name(dev, "dp");
 	if (!priv->base)
 		return -EINVAL;
@@ -305,7 +304,7 @@ static int spacemit_dp_probe(struct udevice *dev)
 	if (priv->dp_id == 0) {
 		rate = clk_get_rate(&priv->hclk);
 		pr_info("%s clk_get_rate hclk rate = %ld\n", __func__, rate);
-        }
+	}
 
 	rate = clk_get_rate(&priv->escclk);
 	pr_info("%s clk_get_rate escclk rate = %ld\n", __func__, rate);
@@ -321,6 +320,14 @@ static int spacemit_dp_probe(struct udevice *dev)
 
 	priv->dp_conn = inno_get_conn_module(INNO_CONN_DP);
 	priv->dp_type = INNO_DP;
+
+	if (priv->dp_id == 0) {
+		priv->dp_conn->regbase = DP0_REGISTER_BASE_ADDRESS;
+		priv->dp_conn->regsize = DP0_REGISTER_SIZE;
+	} else {
+		priv->dp_conn->regbase = DP1_REGISTER_BASE_ADDRESS;
+		priv->dp_conn->regsize = DP1_REGISTER_SIZE;
+	}
 
 	inno_conn_init(priv->dp_conn);
 

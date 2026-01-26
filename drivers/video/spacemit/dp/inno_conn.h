@@ -9,6 +9,11 @@
 
 #include "inno_modes.h"
 
+#define DP0_REGISTER_BASE_ADDRESS	0xcac84000
+#define DP1_REGISTER_BASE_ADDRESS	0xcac88000
+#define DP0_REGISTER_SIZE			0x4000
+#define DP1_REGISTER_SIZE			0x4000
+
 enum modules {
 	INNO_CONN_NONE = -1,
 	INNO_CONN_DP = 0,

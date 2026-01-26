@@ -179,8 +179,8 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 			__func__, dev_read_name(dev));
 		dpu_id = 0;
 	}
-	pr_debug("dpu_id: %d\n", dpu_id);
 
+	pr_info("dpu_id: %d\n", dpu_id);
 	compat = ofnode_get_property(remote, "compatible", NULL);
 	if (!compat) {
 		pr_info("%s(%s): Failed to find compatible property\n",
