@@ -242,6 +242,7 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 		}
 
 		spacemit_mode = &fbi.mode;
+		spacemit_mode->pix_fmt_out = OUTFMT_RGB888;
 		spacemit_mode->pixclock_freq = timing.pixelclock.typ;
 		spacemit_mode->left_margin = timing.hback_porch.typ;
 		spacemit_mode->right_margin = timing.hfront_porch.typ;
