@@ -44,8 +44,8 @@ struct fb_info {
 };
 
 struct spacemit_dpu_priv {
-	void __iomem *regs_dsi;
-	void __iomem *regs_hdmi;
+	void __iomem *regs_crtc0;
+	void __iomem *regs_crtc1;
 	struct udevice *conn_dev;
 	struct display_timing timing;
 };
@@ -56,5 +56,11 @@ struct spacemit_dpu_driverdata {
 	/* block-specific setters/getters */
 	void (*set_pin_polarity)(struct udevice *, enum dpu_modes, u32);
 };
+
+static inline void dpu_writel(void __iomem *addr, uint32_t offset, uint32_t data)
+{
+	// trace_spacemit_dpu_reg_write((u32)data, offset, NULL);
+	writel(data, (addr + offset));
+}
 
 #endif

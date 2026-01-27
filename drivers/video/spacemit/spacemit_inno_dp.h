@@ -19,22 +19,24 @@ enum spacemit_inno_dp_types {
 struct spacemit_inno_dp_priv {
 	void __iomem *base;
 	struct inno_conn_t *dp_conn;
-	struct clk dp_mclk;
-	struct reset_ctl dp_reset;
 	enum spacemit_inno_dp_types dp_type;
+
+	u32 dp_id;
 
 	struct clk pxclk;
 	struct clk mclk;
 	struct clk hclk;
+	struct clk escclk;
 	struct clk dscclk;
 	struct clk aclk;
-	struct clk edp0pxclk;
+	struct clk dppxclk;
 
 	struct reset_ctl aclk_reset;
 	struct reset_ctl mclk_reset;
+	struct reset_ctl esc_reset;
 	struct reset_ctl dscclk_reset;
 	struct reset_ctl lcd_reset;
-	struct reset_ctl edp0_reset;
+	struct reset_ctl dp_reset;
 };
 
 #endif /* _SPACEMIT_INNO_DP_H_ */

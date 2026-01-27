@@ -451,19 +451,23 @@ int lcd_mipi_probe(void)
 		tx_device_client.panel_type = LCD_EDP;
 		tx_device.panel_type = tx_device_client.panel_type;
 		lcd_lt8911ext_edp_1080p_init();
-	} else if(strcmp("lcd_tc358762xbg_dpi", priv->panel_name) == 0) {
+	} else if (strcmp("lcd_tc358762xbg_dpi_800x480", priv->panel_name) == 0) {
 		tx_device_client.panel_type = LCD_DPI;
 		tx_device.panel_type = tx_device_client.panel_type;
 		lcd_tc358762xbg_dpi_800x480_init();
-	} else if(strcmp("icnl9951r", priv->panel_name) == 0) {
+	} else if (strcmp("icnl9951r", priv->panel_name) == 0) {
 		tx_device_client.panel_type = LCD_MIPI;
 		tx_device.panel_type = tx_device_client.panel_type;
 		lcd_icnl9951r_init();
-	} else if(strcmp("jd9365dah3", priv->panel_name) == 0) {
+	} else if (strcmp("icnl9911c", priv->panel_name) == 0) {
+		tx_device_client.panel_type = LCD_MIPI;
+		tx_device.panel_type = tx_device_client.panel_type;
+		lcd_icnl9911c_init();
+	} else if (strcmp("jd9365dah3", priv->panel_name) == 0) {
 		tx_device_client.panel_type = LCD_MIPI;
 		tx_device.panel_type = tx_device_client.panel_type;
 		lcd_jd9365dah3_init();
-	} else if(strcmp("ft8201sinx101", priv->panel_name) == 0) {
+	} else if (strcmp("ft8201sinx101", priv->panel_name) == 0) {
 		tx_device_client.panel_type = LCD_MIPI;
 		tx_device.panel_type = tx_device_client.panel_type;
 		lcd_ft8201sinx101_init();

@@ -11,11 +11,38 @@
 #include <cros_ec.h>
 #include <dm.h>
 #include <log.h>
+#include <malloc.h>
+#include <watchdog.h>
 #include <dm/device-internal.h>
 #include <dm/uclass-internal.h>
 
 /* Note: depends on enum ec_current_image */
 static const char * const ec_current_image_name[] = {"unknown", "RO", "RW"};
+
+static void cros_ec_show_progress(const char *label, uint32_t done,
+				  uint32_t total)
+{
+	const int width = 40;
+	int percent;
+	int filled;
+	int i;
+
+	if (!total)
+		percent = 100;
+	else
+		percent = (int)((done * 100U) / total);
+	if (percent > 100)
+		percent = 100;
+
+	filled = (percent * width) / 100;
+
+	printf("\r%s: [", label);
+	for (i = 0; i < width; i++)
+		putc(i < filled ? '#' : '-');
+	printf("] %3d%%", percent);
+	if (done >= total)
+		printf("\n");
+}
 
 /**
  * Decode a flash region parameter
@@ -534,6 +561,11 @@ static int do_cros_ec(struct cmd_tbl *cmdtp, int flag, int argc,
 		unsigned long addr;
 		unsigned long size;
 		char *endp;
+		uint32_t rw_offset, rw_size;
+		uint32_t off, todo;
+		const uint8_t *image;
+		uint8_t *verify_buf;
+		uint32_t chunk = 4096;
 
 		/* Expect: crosec update <addr> <size> */
 		if (argc < 4)
@@ -547,7 +579,78 @@ static int do_cros_ec(struct cmd_tbl *cmdtp, int flag, int argc,
 		if (*argv[3] == 0 || *endp != 0)
 			return CMD_RET_USAGE;
 
-		ret = cros_ec_flash_update_rw(dev, (const uint8_t *)addr, (int)size);
+		ret = cros_ec_flash_offset(dev, EC_FLASH_REGION_ACTIVE,
+					   &rw_offset, &rw_size);
+		if (ret) {
+			printf("Could not read RW region info (ret=%d)\n", ret);
+			return 1;
+		}
+		if (size > rw_size) {
+			printf("Image too large (0x%lx > 0x%x)\n", size, rw_size);
+			return 1;
+		}
+
+		image = (const uint8_t *)addr;
+
+		/* Invalidate hash before update */
+		ret = cros_ec_invalidate_hash(dev);
+		if (ret) {
+			printf("EC hash invalidate failed (ret=%d)\n", ret);
+			return 1;
+		}
+
+		printf("Erasing RW region...\n");
+		watchdog_reset();
+		ret = cros_ec_flash_erase(dev, rw_offset, rw_size);
+		if (ret) {
+			printf("EC RW erase failed (ret=%d)\n", ret);
+			return 1;
+		}
+
+		printf("Writing RW firmware...\n");
+		for (off = 0; off < size; off += todo) {
+			todo = min((uint32_t)size - off, chunk);
+			ret = cros_ec_flash_write(dev, image + off,
+						  rw_offset + off, todo);
+			if (ret) {
+				printf("EC RW write failed (ret=%d)\n", ret);
+				return 1;
+			}
+			watchdog_reset();
+			cros_ec_show_progress("Writing", off + todo, size);
+		}
+
+		verify_buf = malloc(min((uint32_t)size, chunk));
+		if (!verify_buf) {
+			printf("EC RW verify buffer alloc failed\n");
+			return 1;
+		}
+
+		printf("Verifying RW firmware...\n");
+		for (off = 0; off < size; off += todo) {
+			todo = min((uint32_t)size - off, chunk);
+			ret = cros_ec_flash_read(dev, verify_buf,
+						 rw_offset + off, todo);
+			if (ret) {
+				printf("EC RW readback failed (ret=%d)\n", ret);
+				free(verify_buf);
+				return 1;
+			}
+			watchdog_reset();
+			if (memcmp(verify_buf, image + off, todo)) {
+				printf("EC RW verify mismatch at 0x%08x\n",
+				       rw_offset + off);
+				printf("Erasing RW region due to verify failure...\n");
+				watchdog_reset();
+				cros_ec_flash_erase(dev, rw_offset, rw_size);
+				free(verify_buf);
+				return 1;
+			}
+			cros_ec_show_progress("Verifying", off + todo, size);
+		}
+		free(verify_buf);
+
+		ret = 0;
 		if (ret) {
 			printf("EC RW firmware update failed (ret=%d)\n", ret);
 			return 1;

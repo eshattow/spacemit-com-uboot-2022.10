@@ -495,8 +495,56 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 		}
 	} else if (strcmp(fdev->device_name, "net") == 0) {
 		int ret = download_file_via_tftp(temp_fname, load_str);
+
 		if (ret != RESULT_OK) {
-			printf("Failed to download file via TFTP, error code: %d\n", ret);
+			u32 curr_size = fdev->mtdinfo.size;
+			int curr_type = fdev->mtdinfo.size_type;
+			char raw_filename[32];
+			char suffix;
+
+			printf("TFTP: %s failed, trying smaller sizes (min 2M)...\n", temp_fname);
+
+			while (1) {
+				curr_size /= 2;
+
+				if (curr_size == 0) {
+					if (curr_type == MTD_SIZE_G) {
+						curr_type = MTD_SIZE_M;
+						curr_size = 512;
+					} else {
+						break;
+					}
+				}
+
+				if (curr_type == MTD_SIZE_M && curr_size < 2) {
+					printf("TFTP: Reached min limit (2M), stop trying.\n");
+					break;
+				}
+
+				suffix = (curr_type == MTD_SIZE_M) ? 'M' : 'G';
+				sprintf(raw_filename, "partition_%d%c.json", curr_size, suffix);
+
+				if (strlen(FLASH_IMG_FOLDER) > 0) {
+					sprintf(temp_fname, "%s/%s", FLASH_IMG_FOLDER, raw_filename);
+				} else {
+					strcpy(temp_fname, raw_filename);
+				}
+
+				printf("TFTP: Trying %s...\n", temp_fname);
+
+				ret = download_file_via_tftp(temp_fname, load_str);
+				if (ret == RESULT_OK) {
+					printf("TFTP: Found suitable partition file: %s\n", temp_fname);
+					strcpy(fdev->partition_file_name, raw_filename);
+					fdev->mtdinfo.size = curr_size;
+					fdev->mtdinfo.size_type = curr_type;
+					break;
+				}
+			}
+		}
+
+		if (ret != RESULT_OK) {
+			printf("Failed to download partition file via TFTP (min 2M limit reached).\n");
 			retval = ret;
 		} else {
 			printf("Downloaded file via TFTP successfully\n");
@@ -521,14 +569,13 @@ void recovery_show_result(struct flash_dev *fdev, int ret)
 	free_flash_dev(fdev);
 
 	while(1){
-		/* do not retrun while flashing over! */
+		/* do not return while flashing over! */
 		WATCHDOG_RESET();
 	}
-
 }
 
-int get_blk_part_info(struct flash_parts_info *parts_info, const char *name,
-		struct disk_partition *info)
+int get_blk_part_info(struct blk_desc *dev_desc, struct flash_parts_info *parts_info,
+		const char *name, struct disk_partition *info)
 {
 	int i;
 
@@ -537,7 +584,7 @@ int get_blk_part_info(struct flash_parts_info *parts_info, const char *name,
 			if (parts_info[i].part_name == NULL)
 				break;
 			if (strcmp(parts_info[i].part_name, name) == 0) {
-				info->blksz = 512;
+				info->blksz = dev_desc->blksz;
 				info->start = parts_info[i].part_offset / info->blksz;
 				info->size = parts_info[i].part_size / info->blksz;
 				return 0;
@@ -737,7 +784,7 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 		return RESULT_FAIL;
 	}
 
-	if (fdev->blk_write != NULL && get_blk_part_info(fdev->parts_info, partition, &info) < 0) {
+	if (fdev->blk_write != NULL && get_blk_part_info(fdev->dev_desc, fdev->parts_info, partition, &info) < 0) {
 		printf("can not get part %s in partition table\n", partition);
 		return RESULT_FAIL;
 	}
@@ -1003,6 +1050,12 @@ static int parse_flash_config(struct flash_dev *fdev)
 		printf("update part info to env fail\n");
 		return -1;
 	}
+#if !defined(CONFIG_SPL_BUILD)
+	if (CONFIG_IS_ENABLED(CMD_SAVEENV)) {
+		if (env_save())
+			printf("save env fail\n");
+	}
+#endif
 	return 0;
 }
 
@@ -1042,6 +1095,7 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
+	case BOOT_MODE_UFS:
 	case BOOT_MODE_NOR:
 #ifdef CONFIG_TARGET_SPACEMIT_K3
 		if (k3_select_nor_flash_blk_dev(&blk_dev, &blk_index)) {
@@ -1107,6 +1161,7 @@ void get_mtd_partition_file(struct flash_dev *fdev)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MTD)
 	case BOOT_MODE_NOR:
 	case BOOT_MODE_NAND:
+	case BOOT_MODE_UFS:
 		/*if select nor/nand, it would check if mtd dev exists or not*/
 		struct mtd_info *mtd;
 		mtd_probe_devices();
@@ -1144,6 +1199,7 @@ void get_blk_partition_file(char *file_name)
 
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
+	case BOOT_MODE_UFS:
 	case BOOT_MODE_NOR:
 #ifdef CONFIG_TARGET_SPACEMIT_K3
 		if (k3_select_nor_flash_blk_dev(&blk_name, &blk_index)) {

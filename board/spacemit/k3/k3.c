@@ -495,6 +495,10 @@ int board_init(void)
 {
 	int ret = 0;
 
+#if CONFIG_IS_ENABLED(RT7451_RETIMER)
+	struct udevice *dev;
+#endif
+
 #ifdef CONFIG_DM_REGULATOR_SPM8XX
 	ret = regulators_enable_boot_on(true);
 	if (ret)
@@ -502,6 +506,29 @@ int board_init(void)
 #endif
 
 	cpu_frequency_set();
+#ifdef CONFIG_ESPI
+	ret = uclass_probe_all(UCLASS_ESPI);
+	if (ret) {
+		if (ret != -ENODEV)
+			printf("Warn: Failed to probe eSPI (err=%d), skipping EC\n", ret);
+		env_set("espi_disabled", "1");
+	} else if (!spacemit_espi_is_ready()) {
+		printf("eSPI not ready, skipping EC probe\n");
+		env_set("espi_disabled", "1");
+	} else {
+		/* Probe CrosEC and its children (I2C tunnel devices) */
+		ret = uclass_probe_all(UCLASS_CROS_EC);
+		if (ret)
+			printf("Warn: Failed to probe CrosEC (err=%d)\n", ret);
+	}
+#endif
+
+#if CONFIG_IS_ENABLED(RT7451_RETIMER)
+	ret = uclass_get_device_by_driver(UCLASS_MISC,
+					  DM_DRIVER_GET(rt7451), &dev);
+	if (ret && ret != -ENODEV)
+		printf("Warn: Failed to init RT7451 retimer (err=%d)\n", ret);
+#endif
 
 	return 0;
 }
@@ -619,23 +646,6 @@ int board_late_init(void)
 	ofnode chosen_node;
 	int ret;
 
-#ifdef CONFIG_ESPI
-	ret = uclass_probe_all(UCLASS_ESPI);
-	if (ret) {
-		if (ret != -ENODEV)
-			printf("Warn: Failed to probe eSPI (err=%d), skipping EC\n", ret);
-		env_set("espi_disabled", "1");
-	} else if (!spacemit_espi_is_ready()) {
-		printf("eSPI not ready, skipping EC probe\n");
-		env_set("espi_disabled", "1");
-	} else {
-		/* Probe CrosEC and its children (I2C tunnel devices) */
-		ret = uclass_probe_all(UCLASS_CROS_EC);
-		if (ret)
-			printf("Warn: Failed to probe CrosEC (err=%d)\n", ret);
-	}
-#endif
-
 #if CONFIG_IS_ENABLED(HWMON_SENSORS_CTF2301)
 	ret = uclass_get_device_by_driver(UCLASS_MISC,
 					  DM_DRIVER_GET(ctf2301), &dev);
@@ -643,12 +653,14 @@ int board_late_init(void)
 		printf("Warn: Failed to force init ctf2301 fan (err=%d)\n", ret);
 #endif
 
-#if CONFIG_IS_ENABLED(RT7451_RETIMER)
-	ret = uclass_get_device_by_driver(UCLASS_MISC,
-					  DM_DRIVER_GET(rt7451), &dev);
-	if (ret && ret != -ENODEV)
-		printf("Warn: Failed to init RT7451 retimer (err=%d)\n", ret);
-#endif
+	ret = uclass_probe_all(UCLASS_VIDEO);
+	if (ret) {
+		pr_info("video devices not found or not probed yet: %d\n", ret);
+	}
+	ret = uclass_probe_all(UCLASS_DISPLAY);
+	if (ret) {
+		pr_info("display devices not found or not probed yet: %d\n", ret);
+	}
 
 	set_env_ethaddr();
 	set_dev_serial_no();
@@ -772,9 +784,13 @@ int dram_init_banksize(void)
 
 ulong board_get_usable_ram_top(ulong total_size)
 {
-	return gd->ram_base + gd->ram_size;
+	// DPU can only access 34bit address space
+	if ((gd->ram_base + gd->ram_size) > 0x400000000) {
+		return 0x400000000;
+	} else {
+		return gd->ram_base + gd->ram_size;
+	}
 }
-
 void *board_fdt_blob_setup(int *err)
 {
 	*err = 0;
@@ -949,9 +965,12 @@ void setenv_boot_mode(void)
  *******************************************************************************/
 int mmc_get_env_dev(void)
 {
-	u32 boot_mode = 0;
-	boot_mode = get_boot_mode();
+	u32 boot_mode = get_boot_mode();
 	pr_debug("%s, uboot boot_mode:%x\n", __func__, boot_mode);
+
+	/* In USB mode, use hardware boot pin to determine target device */
+	if (boot_mode == BOOT_MODE_USB)
+		boot_mode = get_boot_pin_select();
 
 	if (boot_mode == BOOT_MODE_EMMC)
 		return MMC_DEV_EMMC;
@@ -965,23 +984,27 @@ enum env_location env_get_location(enum env_operation op, int prio)
 		return ENVL_UNKNOWN;
 
 	u32 boot_mode = get_boot_mode();
+	/* In USB mode, use hardware boot pin to determine env location */
+	if (boot_mode == BOOT_MODE_USB)
+		boot_mode = get_boot_pin_select();
+
 	switch (boot_mode) {
-#ifdef CONFIG_ENV_IS_IN_MTD
+#if CONFIG_IS_ENABLED(ENV_IS_IN_MTD)
 	case BOOT_MODE_NAND:
 	case BOOT_MODE_NOR:
 		return ENVL_MTD;
 #endif
-#ifdef CONFIG_ENV_IS_IN_MMC
+#if CONFIG_IS_ENABLED(ENV_IS_IN_MMC)
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
 		return ENVL_MMC;
 #endif
-#ifdef CONFIG_ENV_IS_IN_UFS
+#if CONFIG_IS_ENABLED(ENV_IS_IN_UFS)
 	case BOOT_MODE_UFS:
 		return ENVL_UFS;
 #endif
 	default:
-#ifdef CONFIG_ENV_IS_NOWHERE
+#if CONFIG_IS_ENABLED(ENV_IS_NOWHERE)
 		return ENVL_NOWHERE;
 #else
 		return ENVL_UNKNOWN;

@@ -418,6 +418,15 @@ config ENV_IS_IN_MTD
 	  during a "saveenv" operation. CONFIG_ENV_OFFSET_REDUND must be
 	  aligned to an erase sector boundary.
 
+config SPL_ENV_IS_IN_MTD
+	bool "SPL Environment in a MTD device"
+	depends on !SPL_ENV_IS_NOWHERE
+	depends on ENV_IS_IN_MTD
+	depends on SPL_MTD_SUPPORT
+	default y
+	help
+	  Similar to ENV_IS_IN_MTD, used for SPL environment.
+
 config ENV_SECT_SIZE_AUTO
 	bool "Use automatically detected sector size"
 	depends on ENV_IS_IN_SPI_FLASH
@@ -798,6 +807,15 @@ config SPL_ENV_IS_IN_MMC
 	default y
 	help
 	  Similar to ENV_IS_IN_MMC, used for SPL environment.
+
+config SPL_ENV_IS_IN_UFS
+	bool "SPL Environment in a UFS device"
+	depends on !SPL_ENV_IS_NOWHERE
+	depends on ENV_IS_IN_UFS
+	depends on SPL_SCSI
+	default y
+	help
+	  Similar to ENV_IS_IN_UFS, used for SPL environment.
 
 config SPL_ENV_IS_IN_FAT
 	bool "SPL Environment is in a FAT filesystem"

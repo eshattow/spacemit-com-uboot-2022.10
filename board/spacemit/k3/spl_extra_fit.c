@@ -33,6 +33,23 @@
 
 enum board_boot_mode get_boot_mode(void);
 
+static void spl_extra_import_env(void)
+{
+#ifdef CONFIG_SPL_ENV_SUPPORT
+	env_init();
+	env_load();
+#endif
+}
+
+static ulong spl_extra_env_offset(const char *name)
+{
+#ifdef CONFIG_SPL_ENV_SUPPORT
+	return env_get_ulong(name, 16, 0);
+#else
+	return 0;
+#endif
+}
+
 #ifdef CONFIG_SPL_MMC
 /* ================= MMC support ================= */
 static ulong spl_extra_mmc_read(struct spl_load_info *load, ulong sector, ulong count, void *buf)
@@ -202,6 +219,35 @@ static int load_fit_from_mmc(struct spl_image_info *caller_spl_image, const char
 	}
 	return ret;
 }
+
+static int load_fit_from_mmc_offset(struct spl_image_info *caller_spl_image, ulong offset,
+				    ulong *out_entry)
+{
+	struct blk_desc *bd = get_default_mmc_blk_desc();
+	struct spl_image_info temp = { 0 };
+	ulong lba;
+	int ret;
+
+	if (!bd)
+		return -ENODEV;
+	if (!offset)
+		return -EINVAL;
+	if (offset % bd->blksz) {
+		pr_err("MMC: unaligned offset 0x%lx (blksz 0x%lx)\n",
+		       offset, (ulong)bd->blksz);
+		return -EINVAL;
+	}
+
+	lba = offset / bd->blksz;
+	ret = extra_mmc_load_image(&temp, bd, lba);
+	if (!ret) {
+		if (temp.fdt_addr)
+			caller_spl_image->fdt_addr = temp.fdt_addr;
+		if (out_entry && temp.entry_point)
+			*out_entry = temp.entry_point;
+	}
+	return ret;
+}
 #endif /* CONFIG_SPL_MMC */
 
 #ifdef CONFIG_SPL_UFS
@@ -332,6 +378,35 @@ static int __maybe_unused load_fit_from_ufs(struct spl_image_info *caller_spl_im
 			else
 				*out_entry = CONFIG_SYS_TEXT_BASE;
 		}
+	}
+	return ret;
+}
+
+static int load_fit_from_ufs_offset(struct spl_image_info *caller_spl_image, ulong offset,
+				    ulong *out_entry)
+{
+	struct blk_desc *bd = get_ufs_blk_desc();
+	struct spl_image_info temp = { 0 };
+	ulong lba;
+	int ret;
+
+	if (!bd)
+		return -ENODEV;
+	if (!offset)
+		return -EINVAL;
+	if (offset % bd->blksz) {
+		pr_err("UFS: unaligned offset 0x%lx (blksz 0x%lx)\n",
+		       offset, (ulong)bd->blksz);
+		return -EINVAL;
+	}
+
+	lba = offset / bd->blksz;
+	ret = extra_ufs_load_image(&temp, bd, lba);
+	if (!ret) {
+		if (temp.fdt_addr)
+			caller_spl_image->fdt_addr = temp.fdt_addr;
+		if (out_entry && temp.entry_point)
+			*out_entry = temp.entry_point;
 	}
 	return ret;
 }
@@ -608,8 +683,13 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 	extern void board_boot_order(u32 * spl_boot_list);
 	u32 spl_boot_list[2] = { 0 };
 	int load_esos_res = -1, load_uboot_res = -1;
+	ulong esos_off = 0, uboot_off = 0;
 
 	board_boot_order(spl_boot_list);
+	spl_extra_import_env();
+
+	esos_off = spl_extra_env_offset("esos_offset");
+	uboot_off = spl_extra_env_offset("uboot_offset");
 
 	switch (spl_boot_list[0]) {
 #ifdef CONFIG_SPL_MMC
@@ -678,13 +758,19 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 				part_uboot = strdup(tmp);
 
 			if (part_esos && *part_esos) {
-				load_esos_res = load_fit_from_mmc(spl_image, part_esos, NULL);
+				if (esos_off)
+					load_esos_res = load_fit_from_mmc_offset(spl_image, esos_off, NULL);
+				else
+					load_esos_res = load_fit_from_mmc(spl_image, part_esos, NULL);
 			} else {
 				pr_debug("extra_esos_partition not set, skip MMC esos\n");
 			}
 			if (part_uboot && *part_uboot) {
-				load_uboot_res =
-					load_fit_from_mmc(spl_image, part_uboot, uboot_entry);
+				if (uboot_off)
+					load_uboot_res = load_fit_from_mmc_offset(spl_image, uboot_off, uboot_entry);
+				else
+					load_uboot_res =
+						load_fit_from_mmc(spl_image, part_uboot, uboot_entry);
 			} else {
 				pr_debug("extra_uboot_partition not set, skip MMC uboot\n");
 			}
@@ -781,10 +867,18 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 		else
 			part_uboot = strdup("uboot");
 
-		if (part_esos && *part_esos)
-			load_esos_res = load_fit_from_ufs(spl_image, part_esos, NULL);
-		if (part_uboot && *part_uboot)
-			load_uboot_res = load_fit_from_ufs(spl_image, part_uboot, uboot_entry);
+		if (part_esos && *part_esos) {
+			if (esos_off)
+				load_esos_res = load_fit_from_ufs_offset(spl_image, esos_off, NULL);
+			else
+				load_esos_res = load_fit_from_ufs(spl_image, part_esos, NULL);
+		}
+		if (part_uboot && *part_uboot) {
+			if (uboot_off)
+				load_uboot_res = load_fit_from_ufs_offset(spl_image, uboot_off, uboot_entry);
+			else
+				load_uboot_res = load_fit_from_ufs(spl_image, part_uboot, uboot_entry);
+		}
 
 		if (part_esos)
 			free(part_esos);
@@ -800,7 +894,6 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 	}
 
 	if (!load_uboot_res || !load_esos_res) {
-		pr_info("load result: uboot=%d esos=%d\n", load_uboot_res, load_esos_res);
 		spl_perform_fixups(spl_image);
 		return 0;
 	} else {

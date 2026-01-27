@@ -287,15 +287,6 @@ int cros_ec_lpc_packet(struct udevice *udev, int out_bytes, int in_bytes)
 		return log_msg_ret("Timeout waiting ready\n", -ETIMEDOUT);
 	}
 	/* Write data */
-	/* debug: Print offset for FLASH_WRITE command (0x12) to monitor progress */
-	if (out_bytes > 12) {
-		uint8_t *p = (uint8_t *) dev->dout;
-		// Check for EC_CMD_FLASH_WRITE (0x0012)
-		if (p[2] == 0x12 && p[3] == 0x00) {
-			uint32_t off = p[8] | (p[9] << 8) | (p[10] << 16) | (p[11] << 24);
-			printf("Writing Offset: 0x%x\n", off);
-		}
-	}
 
 	debug("%s: Writing %d bytes to EC packet buffer\n", __func__, out_bytes);
 	debug("%s: Sending data: ", __func__);

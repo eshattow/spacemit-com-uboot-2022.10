@@ -11,7 +11,12 @@
 #include "k3-cpus.dtsi"
 #include <dt-bindings/reset/reset-spacemit-k3.h>
 #include <dt-bindings/clock/spacemit-k3-clock.h>
+#include <dt-bindings/power-domain/k3-pmu.h>
 #include "secure_boot.dtsi"
+
+#ifdef CONFIG_RISCV_OPTEE_SUPPORT
+#include "k3-optee.dtsi"
+#endif
 
 / {
 	#address-cells = <2>;
@@ -345,7 +350,7 @@
 			compatible = "riscv,rpmi-mpxy-rtc";
 			mboxes = <&rpmi_shmem_mbox 14>;
 			riscv,sbi-mpxy-channel-id = <14>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		rpmi_mpxy_pwrkey: rpmi-mpxy-pwrkey@0 {
@@ -962,61 +967,111 @@
 			status = "disabled";
 		};
 
-		dpu: dpu@c0300000 {
+		dpu: dpu@c0340000 {
 			compatible = "spacemit,dpu";
-			reg = <0x0 0xc0300000 0x0 0x100000>,
-				  <0x0 0xc0440000 0x0 0x40000>;
-			reg-names = "dsi", "dp";
+			reg = <0x0 0xc0340000 0x0 0x54000>,
+				  <0x0 0xc0440000 0x0 0x54000>;
+			reg-names = "crtc0", "crtc1";
 			status = "disabled";
 
 			dpu_out: port {
 				#address-cells = <1>;
 				#size-cells = <0>;
 
-				/*
 				dpu_out_dsi: endpoint@0 {
 					reg = <0>;
 					remote-endpoint = <&dsi_in_dpu>;
 				};
-				*/
 
-				dpu_out_dp: endpoint@1 {
-					reg = <1>;
-					remote-endpoint = <&dp_in_dpu>;
+			};
+		};
+
+		dp0: dp0@cac84000 {
+			compatible = "spacemit,inno-dp";
+			reg = <0x0 0xcac84000 0x0 0x4000>;
+			reg-names = "dp";
+			dpu-id = <0>;
+			clocks = <&ccu CLK_LCD_PXCLK>,
+					 <&ccu CLK_LCD_MCLK>,
+					 <&ccu CLK_LCD_HCLK>,
+					 <&ccu CLK_DSI_ESC>,
+					 <&ccu CLK_DPU_ACLK>,
+					 <&ccu CLK_LCD_DSC>,
+					 <&ccu CLK_EDP0_PXCLK>;
+			clock-names = "pxclk", "mclk", "hclk", "escclk", "aclk", "dscclk", "dppxclk";
+			resets = <&reset RESET_LCD_MCLK>,
+					 <&reset RESET_LCD>,
+					 <&reset RESET_DSI_ESC>,
+					 <&reset RESET_DPU_ACLK>,
+					 <&reset RESET_LCD_DSCCLK>,
+					 <&reset RESET_EDP0>;
+			reset-names= "mclk_reset", "lcd_reset", "esc_reset", "aclk_reset", "dscclk_reset", "dp_reset";
+			power-domains = <&pmu K3_PMU_LCD0_PWR_DOMAIN>;
+			status = "disabled";
+
+		};
+
+		dp1: dp1@cac88000 {
+			compatible = "spacemit,inno-dp";
+			reg = <0x0 0xcac88000 0x0 0x4000>;
+			reg-names = "dp";
+			dpu-id = <1>;
+			clocks = <&ccu CLK_DSI4LN2_LCD_PXCLK>,
+					 <&ccu CLK_DSI4LN2_LCD_MCLK>,
+					 <&ccu CLK_DSI4LN2_DSI_ESC>,
+					 <&ccu CLK_DSI4LN2_DPU_ACLK>,
+					 <&ccu CLK_DSI4LN2_LCD_DSC>,
+					 <&ccu CLK_EDP1_PXCLK>;
+			clock-names = "pxclk", "mclk", "escclk", "aclk", "dscclk", "dppxclk";
+			resets = <&reset RESET_DSI4LN2_LCD_MCLK>,
+					 <&reset RESET_DSI4LN2_LCD_SW>,
+					 <&reset RESET_DSI4LN2_ESCCLK>,
+					 <&reset RESET_DSI4LN2_DPU_ACLK>,
+					 <&reset RESET_DSI4LN2_LCD_DSCCLK>,
+					 <&reset RESET_EDP1>;
+			reset-names= "mclk_reset", "lcd_reset", "esc_reset", "aclk_reset", "dscclk_reset", "dp_reset";
+			power-domains = <&pmu K3_PMU_LCD1_PWR_DOMAIN>;
+			status = "disabled";
+
+		};
+
+		mipi_dsi: mipi@d421a800 {
+			compatible = "spacemit,mipi-dsi";
+			reg = <0x0 0xd421a800 0 0x200>;
+			reg-names = "dsi";
+			dpu-id = <0>;
+			clocks = <&ccu CLK_LCD_PXCLK>,
+				<&ccu CLK_LCD_MCLK>,
+				<&ccu CLK_LCD_HCLK>,
+				<&ccu CLK_DSI_ESC>,
+				<&ccu CLK_LCD_DSC>,
+				<&ccu CLK_DPU_ACLK>;
+			clock-names = "pxclk", "mclk", "hclk", "escclk", "dscclk", "aclk";
+			resets = <&reset RESET_DPU_ACLK>,
+				<&reset RESET_LCD_DSCCLK>,
+				<&reset RESET_LCD_MCLK>,
+				<&reset RESET_DSI_ESC>,
+				<&reset RESET_LCD>;
+			reset-names= "aclk_reset", "dsc_reset", "mclk_reset", "esc_reset", "lcd_reset";
+			power-domains = <&pmu K3_PMU_LCD0_PWR_DOMAIN>;
+
+			status = "disabled";
+
+			ports {
+				mipi_in: port {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					dsi_in_dpu: endpoint@0 {
+						reg = <0>;
+						remote-endpoint = <&dpu_out_dsi>;
+					};
 				};
 			};
 		};
 
-		dp0: dp0@c0400500 {
-			compatible = "spacemit,inno-dp";
-			reg = <0x0 0xcac84000 0x0 0x4000>;
-			reg-names = "dp";
-			clocks = <&ccu CLK_LCD_PXCLK>,
-					 <&ccu CLK_LCD_MCLK>,
-					 <&ccu CLK_LCD_HCLK>,
-					 <&ccu CLK_LCD_DSC>,
-					 <&ccu CLK_DPU_ACLK>,
-					 <&ccu CLK_EDP0_PXCLK>;
-			clock-names = "pxclk", "mclk", "hclk", "dscclk", "aclk", "edp0pxclk";
-			resets = <&reset RESET_DPU_ACLK>,
-					 <&reset RESET_LCD_MCLK>,
-					 <&reset RESET_LCD_DSCCLK>,
-					 <&reset RESET_LCD>,
-					 <&reset RESET_EDP0>;
-			reset-names= "aclk_reset", "mclk_reset", "dscclk_reset", "lcd_reset", "edp0_reset";
-			// power-domains = <&pmu K3X_PMU_LCD_PWR_DOMAIN>;
-			status = "disabled";
-
-			ports {
-				dp_in: port {
-					#address-cells = <1>;
-					#size-cells = <0>;
-					dp_in_dpu: endpoint@0 {
-						reg = <0>;
-						remote-endpoint = <&dpu_out_dp>;
-					};
-				};
-			};
+		panel: panel {
+			  compatible = "spacemit,panel";
+			  status = "disabled";
 		};
 
 		i2c0: twsi0@d4010800 {
@@ -1177,6 +1232,118 @@
 	wdt_reboot {
 		compatible = "wdt-reboot";
 		status = "okay";
+	};
+	pmu {
+		compatible = "riscv,pmu";
+
+		riscv,event-to-mhpmevent =
+			/* CPU_CYCLES */
+			<0x00001 0x0 0x1e>,
+			/* INSTRUCTIONS */
+			<0x00002 0x0 0x1f>,
+			/* D_CACHE_REFERENCES */
+			<0x00003 0x0 0x06>,
+			/* D_CACHE_MISSES */
+			<0x00004 0x0 0x05>,
+			/* BRANCH_INSTRUCTIONS */
+			<0x00005 0x0 0x01>,
+			/* BRANCH_MISSES */
+			<0x00006 0x0 0x02>,
+			/* STALLED_CYCLES_FRONTEND */
+			<0x00008 0x0 0x03>,
+			/* STALLED_CYCLES_BACKEND */
+			<0x00009 0x0 0x04>,
+			/* L1D_READ_ACCESS */
+			<0x10000 0x0 0x06>,
+			/* L1D_READ_MISS */
+			<0x10001 0x0 0x05>,
+			/* L1D_WRITE_ACCESS */
+			<0x10002 0x0 0x0a>,
+			/* L1D_WRITE_MISS */
+			<0x10003 0x0 0x09>,
+			/* L1D_PREFETCH_ACCESS */
+			<0x10004 0x0 0x08>,
+			/* L1D_PREFETCH_MISS */
+			<0x10005 0x0 0x07>,
+			/* L1I_READ_ACCESS  */
+			<0x10008 0x0 0x0c>,
+			/* L1I_READ_MISS */
+			<0x10009 0x0 0x0b>,
+			/* DTLB_READ_ACCESS */
+			<0x10018 0x0 0x16>,
+			/* DTLB_WRITE_ACCESS */
+			<0x1001a 0x0 0x1a>,
+			/* DTLB_WRITE_MISS */
+			<0x1001b 0x0 0x19>,
+			/* ITLB_READ_ACCESS */
+			<0x10020 0x0 0x1c>,
+			/* ITLB_READ_MISS */
+			<0x10021 0x0 0x1b>;
+
+		/* 16 valid counters: mhpmcounter3 ~ mhpmcounter18 */
+		riscv,event-to-mhpmcounters =
+			<0x00001 0x00001 0x00020000>,
+			<0x00002 0x00002 0x00040000>,
+			<0x00005 0x00006 0x0001fff8>,
+			<0x00008 0x00009 0x0001fff8>,
+			<0x10000 0x10005 0x0001fff8>,
+			<0x10008 0x10009 0x0001fff8>,
+			<0x10018 0x10018 0x0001fff8>,
+			<0x1001a 0x1001b 0x0001fff8>,
+			<0x10020 0x10021 0x0001fff8>;
+
+
+		riscv,raw-event-to-mhpmcounters =
+			<0x0 0x01 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x02 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x03 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x04 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x05 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x06 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x07 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x08 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x09 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x0a 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x0b 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x0c 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x10 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x11 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x12 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x13 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x14 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x15 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x16 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x17 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x18 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x19 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x1a 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x1b 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x1c 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x1e 0xffffffff 0xffffffff 0x00020000>,
+			<0x0 0x1f 0xffffffff 0xffffffff 0x00040000>,
+			<0x0 0x20 0xffffffff 0xffffffe0 0x0001fff8>,
+			<0x0 0x21 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x22 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x24 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x25 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x26 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x27 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x28 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x29 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x2b 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x2d 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x32 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x33 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x34 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x35 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x36 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x37 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x38 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x3a 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x3b 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x3c 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x3d 0xffffffff 0xffffffff 0x0001fff8>,
+			<0x0 0x3f 0xffffffff 0xffffffff 0x0001fff8>;
 	};
 
 };

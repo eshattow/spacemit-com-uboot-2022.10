@@ -347,6 +347,7 @@ int check_gzip_format(const unsigned char *src, unsigned long len);
 void clear_storage_data(char *cmd_parameter, char *response);
 int _write_gpt_partition(struct flash_dev *fdev);
 int _write_mtd_partition(struct flash_dev *fdev);
+bool fastboot_spacemit_is_hidden_partition(const char *part_name);
 
 /**
  * @brief detect blk dev exist or not.
