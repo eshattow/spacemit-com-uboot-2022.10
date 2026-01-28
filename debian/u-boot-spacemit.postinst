@@ -66,8 +66,9 @@ configure)
             FSBL_SEEK=$((1536 * 1024))
             ENV=/dev/mmcblk0
             ENV_SEEK=$((640 * 1024))
-            UBOOT_MOUNT="/dev/mmcblk0p1"
-            UBOOT_COPY_MODE=1
+            UBOOT=/dev/mmcblk0
+            # 以KB为单位
+            UBOOT_SEEK=8192
             ;;
         "/dev/mmcblk2"*)
             BOOTINFO_FILE=bootinfo_block.bin
@@ -77,8 +78,9 @@ configure)
             FSBL_SEEK=$((1536 * 1024))
             ENV=/dev/mmcblk2
             ENV_SEEK=$((640 * 1024))
-            UBOOT_MOUNT="/dev/mmcblk2p1"
-            UBOOT_COPY_MODE=1
+            UBOOT=/dev/mmcblk2
+            # 以KB为单位
+            UBOOT_SEEK=8192
             ;;
         "/dev/sda"*)
             BOOTINFO_FILE=bootinfo_block.bin
@@ -88,8 +90,9 @@ configure)
             FSBL_SEEK=$((1536 * 1024))
             ENV=/dev/sda
             ENV_SEEK=$((640 * 1024))
-            UBOOT_MOUNT="/dev/sda1"
-            UBOOT_COPY_MODE=1
+            UBOOT=/dev/sda
+            # 以KB为单位
+            UBOOT_SEEK=8192
             ;;
         "/dev/nvme0n1"*)
             if [ -e "/dev/mtdblock6" ]; then
@@ -139,12 +142,7 @@ configure)
 
     BIN_DIR="/usr/lib/u-boot/$target"
     # 待检查文件列表
-    files="${BIN_DIR}/${BOOTINFO_FILE} ${BIN_DIR}/FSBL.bin ${BIN_DIR}/env.bin ${BIN_DIR}/u-boot.itb $BOOTINFO $FSBL $ENV"
-    if [ -z "$UBOOT_COPY_MODE" ]; then
-        files="$files $UBOOT"
-    else
-        files="$files $UBOOT_MOUNT"
-    fi
+    files="${BIN_DIR}/${BOOTINFO_FILE} ${BIN_DIR}/FSBL.bin ${BIN_DIR}/env.bin ${BIN_DIR}/u-boot.itb $BOOTINFO $FSBL $ENV $UBOOT"
     for file in $files; do
         if [ ! -e "$file" ]; then
             # 任意不存在则退出
@@ -162,19 +160,7 @@ configure)
     fi
     dd if=/usr/lib/u-boot/$target/FSBL.bin of=$FSBL seek=$FSBL_SEEK bs=1 && sync
     dd if=/usr/lib/u-boot/$target/env.bin of=$ENV seek=$ENV_SEEK bs=1 && sync
-
-    if [ -n "$UBOOT_COPY_MODE" ]; then
-        # SD卡模式：挂载分区并复制文件
-        mkdir -p /mnt/uboot-install
-        mount $UBOOT_MOUNT /mnt/uboot-install
-        cp /usr/lib/u-boot/$target/u-boot.itb /mnt/uboot-install/
-        sync
-        umount /mnt/uboot-install
-        rmdir /mnt/uboot-install
-    else
-        # 直接写入模式
-        dd if=/usr/lib/u-boot/$target/u-boot.itb of=$UBOOT seek=$UBOOT_SEEK bs=1K && sync
-    fi
+    dd if=/usr/lib/u-boot/$target/u-boot.itb of=$UBOOT seek=$UBOOT_SEEK bs=1K && sync
     set +x
     ;;
 esac
