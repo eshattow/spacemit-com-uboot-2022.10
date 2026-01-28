@@ -19,6 +19,7 @@
 #include <part.h>
 #include <fs.h>
 #include <asm/io.h>
+#include <u-boot/md5.h>
 
 #ifdef CONFIG_SPL_MMC
 #include <mmc.h>
@@ -54,7 +55,8 @@ static ulong spl_extra_env_offset(const char *name)
 /* ================= MMC support ================= */
 static ulong spl_extra_mmc_read(struct spl_load_info *load, ulong sector, ulong count, void *buf)
 {
-	struct blk_desc *bd = load->dev;
+	struct mmc *mmc = load->dev;
+	struct blk_desc *bd = mmc_get_blk_desc(mmc);
 	ulong n;
 
 	pr_debug("%s: sector %lx, count %lx, buf %lx\n", __func__, sector, count, (ulong) buf);
@@ -62,41 +64,56 @@ static ulong spl_extra_mmc_read(struct spl_load_info *load, ulong sector, ulong 
 	return n == count ? count : 0;
 }
 
-static int extra_mmc_load_image(struct spl_image_info *spl_image, struct blk_desc *bd,
+static int extra_mmc_load_image(struct spl_image_info *spl_image, struct mmc *mmc,
 				ulong start_lba)
 {
 	struct image_header *header;
 	int err = 0;
+	struct blk_desc *bd = mmc_get_blk_desc(mmc);
 	ulong hdr_cnt = DIV_ROUND_UP(sizeof(*header), bd->blksz);
 
 	header = spl_get_load_buffer(-sizeof(*header), sizeof(*header));
-	if (blk_dread(bd, start_lba, hdr_cnt, header) != hdr_cnt) {
-		pr_err("MMC: read header failed\n");
+	if (blk_dread(bd, start_lba, hdr_cnt, header) != hdr_cnt)
 		return -EIO;
-	}
 
-	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) && image_get_magic(header) == FDT_MAGIC) {
+	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) &&
+	    image_get_magic(header) == FDT_MAGIC) {
 		struct spl_load_info load;
-		pr_debug("MMC: found FIT at LBA 0x%lx\n", start_lba);
-		load.dev = bd;
+
+		load.dev = mmc;
 		load.priv = NULL;
 		load.filename = NULL;
 		/* bl_len must be the block size in bytes for FIT loader */
 		load.bl_len = bd->blksz;
 		load.read = spl_extra_mmc_read;
+
 		err = spl_load_simple_fit(spl_image, &load, start_lba, header);
 	} else {
-		pr_err("MMC: unsupported legacy image\n");
 		return -EINVAL;
 	}
+
 	return err;
 }
 
-/* Helper to get an MMC block device based on boot mode */
-static struct blk_desc *get_default_mmc_blk_desc(void)
+static int select_mmc_user_part(struct mmc *mmc)
+{
+	int ret;
+
+	if (CONFIG_IS_ENABLED(MMC_TINY))
+		ret = mmc_switch_part(mmc, 0);
+	else
+		ret = blk_dselect_hwpart(mmc_get_blk_desc(mmc), 0);
+
+	if (ret)
+		pr_debug("MMC: switch to user part failed (%d)\n", ret);
+
+	return ret;
+}
+
+/* Helper to get an MMC device based on boot mode */
+static struct mmc *get_default_mmc_device(void)
 {
 	struct mmc *mmc;
-	struct blk_desc *bd;
 	int mmc_dev_index;
 	enum board_boot_mode boot_mode;
 
@@ -120,16 +137,11 @@ static struct blk_desc *get_default_mmc_blk_desc(void)
 	mmc = find_mmc_device(mmc_dev_index);
 	if (mmc) {
 		if (!mmc_init(mmc)) {
-			bd = mmc_get_blk_desc(mmc);
-			if (bd) {
-				pr_debug("MMC: using device %d based on boot mode 0x%x\n",
-					 mmc_dev_index, boot_mode);
-				return bd;
-			}
+			if (select_mmc_user_part(mmc))
+				return NULL;
+			return mmc;
 		}
 	}
-
-	pr_err("MMC: device %d not available for boot mode 0x%x\n", mmc_dev_index, boot_mode);
 	return NULL;
 }
 
@@ -142,7 +154,8 @@ static int load_fit_from_mmc(struct spl_image_info *caller_spl_image, const char
 {
 	int ret = -1;
 	ulong lba = 0;
-	struct blk_desc *bd = get_default_mmc_blk_desc();
+	struct mmc *mmc = get_default_mmc_device();
+	struct blk_desc *bd = mmc ? mmc_get_blk_desc(mmc) : NULL;
 	struct spl_image_info temp = { 0 };
 
 	if (!bd)
@@ -170,7 +183,7 @@ static int load_fit_from_mmc(struct spl_image_info *caller_spl_image, const char
 			lba = simple_strtoul(image, NULL, 10);
 			pr_debug("MMC: interpret '%s' as LBA=%lu\n", image, lba);
 			pr_debug("MMC: load FIT @ LBA 0x%lx (numeric)\n", lba);
-			ret = extra_mmc_load_image(&temp, bd, lba);
+			ret = extra_mmc_load_image(&temp, mmc, lba);
 		} else {
 			/* treat as partition name and scan */
 			struct disk_partition info;
@@ -190,7 +203,7 @@ static int load_fit_from_mmc(struct spl_image_info *caller_spl_image, const char
 			if (found) {
 				pr_debug("MMC: found partition '%s', start LBA=0x%lx\n", image,
 					 lba);
-				ret = extra_mmc_load_image(&temp, bd, lba);
+				ret = extra_mmc_load_image(&temp, mmc, lba);
 			} else {
 				pr_debug("MMC: partition '%s' not found, will fallback to default "
 					 "LBA\n",
@@ -220,10 +233,11 @@ static int load_fit_from_mmc(struct spl_image_info *caller_spl_image, const char
 	return ret;
 }
 
-static int load_fit_from_mmc_offset(struct spl_image_info *caller_spl_image, ulong offset,
-				    ulong *out_entry)
+static int load_fit_from_mmc_offset(struct spl_image_info *caller_spl_image,
+				    ulong offset, ulong *out_entry)
 {
-	struct blk_desc *bd = get_default_mmc_blk_desc();
+	struct mmc *mmc = get_default_mmc_device();
+	struct blk_desc *bd = mmc ? mmc_get_blk_desc(mmc) : NULL;
 	struct spl_image_info temp = { 0 };
 	ulong lba;
 	int ret;
@@ -232,20 +246,19 @@ static int load_fit_from_mmc_offset(struct spl_image_info *caller_spl_image, ulo
 		return -ENODEV;
 	if (!offset)
 		return -EINVAL;
-	if (offset % bd->blksz) {
-		pr_err("MMC: unaligned offset 0x%lx (blksz 0x%lx)\n",
-		       offset, (ulong)bd->blksz);
+	if (offset % bd->blksz)
 		return -EINVAL;
-	}
 
 	lba = offset / bd->blksz;
-	ret = extra_mmc_load_image(&temp, bd, lba);
+	ret = extra_mmc_load_image(&temp, mmc, lba);
 	if (!ret) {
 		if (temp.fdt_addr)
 			caller_spl_image->fdt_addr = temp.fdt_addr;
+
 		if (out_entry && temp.entry_point)
 			*out_entry = temp.entry_point;
 	}
+
 	return ret;
 }
 #endif /* CONFIG_SPL_MMC */
@@ -580,6 +593,72 @@ static int load_fit_from_mtd(struct spl_image_info *caller_spl_image, const char
 	}
 	return ret;
 }
+
+/* MTD loader using absolute offset
+ * offset: absolute byte offset in MTD device
+ * out_entry: only meaningful for uboot loading
+ */
+static int load_fit_from_mtd_offset(struct spl_image_info *caller_spl_image, ulong offset,
+				    ulong *out_entry)
+{
+	struct mtd_info *mtd;
+	int ret = -1;
+	struct spl_image_info temp = { 0 };
+	struct image_header *header;
+	ulong len;
+
+	/* Get the first available MTD device for absolute offset access */
+	mtd = get_mtd_device(NULL, 0);
+	if (IS_ERR_OR_NULL(mtd)) {
+		pr_err("MTD device not found\n");
+		return -ENODEV;
+	}
+
+	pr_debug("MTD: load FIT from offset 0x%lx\n", offset);
+	pr_debug("MTD: mtd:%p erasesize:0x%x writesize:0x%x type:%d\n", mtd,
+		 mtd->erasesize, mtd->writesize, mtd->type);
+
+	/* Read header first */
+	len = sizeof(*header);
+	if (!mtd_is_aligned_with_min_io_size(mtd, len))
+		len = round_up(len, mtd->writesize);
+
+	header = spl_get_load_buffer(-sizeof(*header), sizeof(*header));
+	ret = spl_extra_mtd_read(mtd, offset, len, (void *)header);
+	if (ret) {
+		pr_err("MTD: failed to read header at offset 0x%lx\n", offset);
+		return ret;
+	}
+
+	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) && image_get_magic(header) == FDT_MAGIC) {
+		struct spl_load_info load;
+
+		pr_debug("MTD: found FIT at offset 0x%lx\n", offset);
+		load.dev = mtd;
+		load.priv = NULL;
+		load.filename = NULL;
+		load.bl_len = 1;
+		load.read = spl_extra_load_read;
+
+		ret = spl_load_simple_fit(&temp, &load, offset, header);
+	} else {
+		pr_err("MTD: unsupported legacy image at offset 0x%lx\n", offset);
+		return -EINVAL;
+	}
+
+	pr_debug("load_fit_from_mtd_offset ret:%d\n", ret);
+	if (!ret) {
+		if (temp.fdt_addr) {
+			caller_spl_image->fdt_addr = temp.fdt_addr;
+			pr_debug("Set DTB from loaded FIT @ %p\n", temp.fdt_addr);
+		}
+		if (out_entry && temp.entry_point) {
+			*out_entry = temp.entry_point;
+			pr_debug("Loaded entry: 0x%lx\n", *out_entry);
+		}
+	}
+	return ret;
+}
 #endif /* CONFIG_SPL_MTD_LOAD */
 
 #if defined(CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME)
@@ -593,13 +672,15 @@ static int load_fit_from_mtd(struct spl_image_info *caller_spl_image, const char
  */
 static int load_image_from_mmc_blfs(struct spl_image_info *image, const char *image_path)
 {
+	struct mmc *mmc;
 	struct blk_desc *bd;
 	struct disk_partition info;
 	int ret = -1, part;
 	const char *blfs_name;
 
 	/* Get mmc block device */
-	bd = get_default_mmc_blk_desc();
+	mmc = get_default_mmc_device();
+	bd = mmc ? mmc_get_blk_desc(mmc) : NULL;
 	if (!bd) {
 		pr_err("BLFS: failed to get block device\n");
 		return -ENODEV;
@@ -788,6 +869,8 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 	case BOOT_DEVICE_NAND: {
 		const char *tmp;
 		char *part_esos = NULL, *part_uboot = NULL;
+		ulong esos_off = 0, uboot_off = 0;
+
 		tmp = env_get("extra_esos_partition");
 		if (tmp)
 			part_esos = strdup(tmp);
@@ -795,19 +878,47 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 		if (tmp)
 			part_uboot = strdup(tmp);
 
+		/* Get offset as fallback if partition not set */
+		esos_off = env_get_ulong("esos_offset", 16, 0);
+		uboot_off = env_get_ulong("uboot_offset", 16, 0);
+
 		mtd_probe_devices();
+
+		/* Load esos: env partition -> default "esos" -> offset */
 		if (part_esos && *part_esos) {
 			load_esos_res = load_fit_from_mtd(
 				spl_image, strcmp(part_esos, "1") == 0 ? "esos" : part_esos, NULL);
 		} else {
-			pr_debug("extra_esos_partition not set, skip MTD esos\n");
+			/* Try default partition name "esos" */
+			struct mtd_info *mtd = get_mtd_device_nm("esos");
+			if (!IS_ERR_OR_NULL(mtd)) {
+				pr_debug("MTD: loading esos from default partition 'esos'\n");
+				load_esos_res = load_fit_from_mtd(spl_image, "esos", NULL);
+			} else if (esos_off) {
+				pr_debug("MTD: loading esos from offset 0x%lx\n", esos_off);
+				load_esos_res = load_fit_from_mtd_offset(spl_image, esos_off, NULL);
+			} else {
+				pr_debug("MTD: no esos partition or offset available\n");
+			}
 		}
+
+		/* Load uboot: env partition -> default "uboot" -> offset */
 		if (part_uboot && *part_uboot) {
 			load_uboot_res = load_fit_from_mtd(
 				spl_image, strcmp(part_uboot, "1") == 0 ? "uboot" : part_uboot,
 				uboot_entry);
 		} else {
-			pr_debug("extra_uboot_partition not set, skip MTD uboot\n");
+			/* Try default partition name "uboot" */
+			struct mtd_info *mtd = get_mtd_device_nm("uboot");
+			if (!IS_ERR_OR_NULL(mtd)) {
+				pr_debug("MTD: loading uboot from default partition 'uboot'\n");
+				load_uboot_res = load_fit_from_mtd(spl_image, "uboot", uboot_entry);
+			} else if (uboot_off) {
+				pr_debug("MTD: loading uboot from offset 0x%lx\n", uboot_off);
+				load_uboot_res = load_fit_from_mtd_offset(spl_image, uboot_off, uboot_entry);
+			} else {
+				pr_debug("MTD: no uboot partition or offset available\n");
+			}
 		}
 
 		if (part_esos)

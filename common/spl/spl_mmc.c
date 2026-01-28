@@ -17,6 +17,7 @@
 #include <mmc.h>
 #include <image.h>
 #include <env.h>
+#include <linux/libfdt.h>
 
 static int mmc_load_legacy(struct spl_image_info *spl_image,
 			   struct spl_boot_device *bootdev,
@@ -401,50 +402,36 @@ int __weak spl_mmc_emmc_boot_partition(struct mmc *mmc)
 	return default_spl_mmc_emmc_boot_partition(mmc);
 }
 
-static int spl_mmc_get_mmc_devnum(struct mmc *mmc)
-{
-	struct blk_desc *block_dev;
-#if !CONFIG_IS_ENABLED(BLK)
-	block_dev = &mmc->block_dev;
-#else
-	block_dev = dev_get_uclass_plat(mmc->dev);
-#endif
-	return block_dev->devnum;
-}
-
 int spl_mmc_load(struct spl_image_info *spl_image,
-		 struct spl_boot_device *bootdev,
-		 const char *filename,
-		 int raw_part,
-		 unsigned long raw_sect)
+                 struct spl_boot_device *bootdev,
+                 const char *filename,
+                 int raw_part,
+                 unsigned long raw_sect)
 {
-	static struct mmc *mmc;
-	u32 boot_mode;
-	int err = 0;
-	__maybe_unused int part = 0;
-	int mmc_dev;
+    struct mmc *mmc = NULL;
+    u32 boot_mode;
+    int err = 0;
+    __maybe_unused int part = 0;
+    int mmc_dev;
 
-	/* Perform peripheral init only once for an mmc device */
-	mmc_dev = spl_mmc_get_device_index(bootdev->boot_device);
-	if (!mmc || spl_mmc_get_mmc_devnum(mmc) != mmc_dev) {
-		err = spl_mmc_find_device(&mmc, bootdev->boot_device);
-		if (err)
-			return err;
+    /* Perform peripheral init */
+    mmc_dev = spl_mmc_get_device_index(bootdev->boot_device);
 
-		err = mmc_init(mmc);
-		if (err) {
-			mmc = NULL;
-#ifdef CONFIG_SPL_LIBCOMMON_SUPPORT
-			printf("spl: mmc init failed with error: %d\n", err);
-#endif
-			return err;
-		}
-	}
+    /* Always find and init the device since we don't use static anymore */
+    err = spl_mmc_find_device(&mmc, bootdev->boot_device);
+    if (err)
+        return err;
 
-	spl_try_import_env();
+    err = mmc_init(mmc);
+    if (err) {
+        pr_err("spl: mmc init failed with error: %d\n", err);
+        return err;
+    }
 
-	boot_mode = spl_mmc_boot_mode(mmc, bootdev->boot_device);
-	err = -EINVAL;
+    spl_try_import_env();
+
+    boot_mode = spl_mmc_boot_mode(mmc, bootdev->boot_device);
+    err = -EINVAL;
 	switch (boot_mode) {
 	case MMCSD_MODE_EMMCBOOT:
 		part = spl_mmc_emmc_boot_partition(mmc);
@@ -455,40 +442,47 @@ int spl_mmc_load(struct spl_image_info *spl_image,
 			err = blk_dselect_hwpart(mmc_get_blk_desc(mmc), part);
 
 		if (err) {
-#ifdef CONFIG_SPL_LIBCOMMON_SUPPORT
 			puts("spl: mmc partition switch failed\n");
-#endif
 			return err;
 		}
 		/* Fall through */
 	case MMCSD_MODE_RAW:
-		debug("spl: mmc boot mode: raw\n");
+		if (CONFIG_IS_ENABLED(MMC_TINY))
+			err = mmc_switch_part(mmc, 0);
+		else
+			err = blk_dselect_hwpart(mmc_get_blk_desc(mmc), 0);
+		if (err) {
+			pr_err("spl: switch to user part failed (%d)\n", err);
+			return err;
+		}
 
+		/* 1. try raw OS image */
 		if (!spl_start_uboot()) {
 			err = mmc_load_image_raw_os(spl_image, bootdev, mmc);
 			if (!err)
 				return err;
 		}
 
+		/* 2. try env-defined raw offset (hidden partition path) */
 		{
 			ulong raw_offset = spl_env_raw_offset();
 
 			if (raw_offset) {
-				ulong sector = raw_offset / mmc->read_bl_len;
+				ulong blksz = mmc->read_bl_len;
+				ulong sector = raw_offset / blksz;
 
-				if (raw_offset % mmc->read_bl_len) {
-					printf("spl: mmc unaligned offset 0x%lx (blksz 0x%lx)\n",
-					       raw_offset, (ulong)mmc->read_bl_len);
-				} else {
-					err = mmc_load_image_raw_sector(spl_image, bootdev, mmc, sector);
+				if (!(raw_offset % blksz)) {
+					err = mmc_load_image_raw_sector(
+						spl_image, bootdev, mmc, sector);
+
 					if (!err)
 						return err;
 				}
 			}
 		}
 
+		/* 3. fallback to default raw u-boot sector */
 		raw_sect = spl_mmc_get_uboot_raw_sector(mmc, raw_sect);
-
 #ifdef CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION
 		err = mmc_load_image_raw_partition(spl_image, bootdev,
 						   mmc, raw_part,

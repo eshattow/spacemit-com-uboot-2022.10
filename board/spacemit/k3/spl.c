@@ -201,6 +201,16 @@ void board_fit_image_post_process(const void *fit, int node, void **p_image, siz
 #endif
 
 #ifdef CONFIG_SPL_LOAD_FIT
+/*
+ * Override default FIT buffer address to avoid conflict with uboot load address.
+ * Use CONFIG_SPL_LOAD_FIT_ADDRESS (0x110000000) instead of CONFIG_SYS_TEXT_BASE
+ * (0x102000000) to prevent FIT data from being overwritten when uboot is loaded.
+ */
+void *board_spl_fit_buffer_addr(ulong fit_size, int sectors, int bl_len)
+{
+	return (void *)CONFIG_SPL_LOAD_FIT_ADDRESS;
+}
+
 int board_fit_config_name_match(const char* name)
 {
 	char product_name[64];

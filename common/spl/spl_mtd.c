@@ -166,32 +166,56 @@ static int spl_spi_load_image(struct spl_image_info *spl_image,
 	struct mtd_info *mtd;
 	int err = 0;
 	__maybe_unused int load_others_res = -1;
-	u64 opensbi_offset = 0;
+	ulong opensbi_offset = 0;
+	const char *opensbi_part = NULL;
 
 	mtd_probe_devices();
 
-	/* Get the main MTD device (not partition) for absolute offset access */
-	mtd = get_mtd_device_nm("spi-flash");
-	if (IS_ERR_OR_NULL(mtd))
-		mtd = get_mtd_device_nm("nor0");
-	if (IS_ERR_OR_NULL(mtd))
-		mtd = get_mtd_device(NULL, 0);
-	if (IS_ERR_OR_NULL(mtd)){
-		pr_err("MTD device not found\n");
-		return -1;
-	}
-
 	spl_try_import_env();
+
 #ifdef CONFIG_SPL_ENV_SUPPORT
-	opensbi_offset = env_get_ulong("opensbi_offset", 16, 0);
+	/* First try partition name from env, then fall back to offset */
+	opensbi_part = env_get("opensbi_partition");
+	if (!opensbi_part)
+		opensbi_offset = env_get_ulong("opensbi_offset", 16, 0);
+	debug("SPL MTD: opensbi_part=%s, opensbi_offset=0x%lx\n",
+	       opensbi_part ? opensbi_part : "(null)", opensbi_offset);
 #endif
 
-	if (!opensbi_offset) {
-		pr_err("SPL MTD: opensbi_offset not set in env\n");
-		return -1;
+	/* Try partition name first (from env or default "opensbi") */
+	if (opensbi_part && *opensbi_part) {
+		mtd = get_mtd_device_nm(opensbi_part);
+		if (!IS_ERR_OR_NULL(mtd)) {
+			printf("SPL MTD: loading opensbi from partition '%s'\n", opensbi_part);
+			err = mtd_load_image(spl_image, bootdev, mtd, 0);
+			goto done;
+		}
+		pr_err("MTD partition '%s' not found\n", opensbi_part);
 	}
 
-	err = mtd_load_image(spl_image, bootdev, mtd, opensbi_offset);
+	/* Try default partition name "opensbi" */
+	mtd = get_mtd_device_nm("opensbi");
+	if (!IS_ERR_OR_NULL(mtd)) {
+		err = mtd_load_image(spl_image, bootdev, mtd, 0);
+		goto done;
+	}
+
+	/* Fall back to offset */
+	if (opensbi_offset) {
+		mtd = get_mtd_device(NULL, 0);
+		if (IS_ERR_OR_NULL(mtd)) {
+			pr_err("MTD device not found\n");
+			return -1;
+		}
+		debug("SPL MTD: loading opensbi from offset 0x%lx\n", opensbi_offset);
+		err = mtd_load_image(spl_image, bootdev, mtd, opensbi_offset);
+		goto done;
+	}
+
+	pr_err("SPL MTD: no opensbi partition or offset available\n");
+	return -1;
+
+done:
 
 	if (!err || !load_others_res)
 		return 0;
