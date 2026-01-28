@@ -36,6 +36,7 @@
 #include <u-boot/crc.h>
 #include <linux/log2.h>
 #include <spi_flash.h>
+#include <tee/optee.h>
 
 #ifdef CONFIG_ESPI
 extern bool spacemit_espi_is_ready(void);
@@ -1884,6 +1885,7 @@ static int ft_board_mac_addr_fixup(void *blob, struct bd_info *bd)
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	__maybe_unused struct fdt_memory mem;
+	int ret;
 
 	if (CONFIG_IS_ENABLED(FDT_SIMPLEFB)) {
 		/* reserved with no-map tag the video buffer */
@@ -1896,6 +1898,11 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	ft_board_cpu_fixup(blob, bd);
 	ft_board_info_fixup(blob, bd);
 	ft_board_mac_addr_fixup(blob, bd);
+
+	ret = riscv_optee_copy_fdt_nodes(blob);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 

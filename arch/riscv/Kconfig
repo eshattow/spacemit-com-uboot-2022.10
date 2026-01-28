@@ -446,6 +446,7 @@ endmenu
 
 config RISCV_OPTEE_SUPPORT
 	bool "Enable OP-TEE related DTS nodes for RISC-V"
+	depends on OF_LIBFDT && OF_BOARD_SETUP
 	default n
 
 endmenu
