@@ -18,6 +18,7 @@
 #include <fb_spacemit.h>
 #include <fb_mtd.h>
 #include <fb_blk.h>
+#include <search.h>
 #include <dm.h>
 
 /**
@@ -475,6 +476,30 @@ static bool is_bootloader_hidden_partition(const char *part_name)
 static void flash(char *cmd_parameter, char *response)
 {
 	u32 boot_mode = get_boot_pin_select();
+	/* For env partition: save offsets before flashing */
+	char *saved_opensbi_offset = NULL;
+	char *saved_esos_offset = NULL;
+	char *saved_uboot_offset = NULL;
+	int is_env_partition = 0;
+
+	/* Check if this is env partition and save offsets before flashing */
+	if (!strcmp(cmd_parameter, "env")) {
+		const char *tmp;
+		is_env_partition = 1;
+		tmp = env_get("opensbi_offset");
+		if (tmp)
+			saved_opensbi_offset = strdup(tmp);
+		tmp = env_get("esos_offset");
+		if (tmp)
+			saved_esos_offset = strdup(tmp);
+		tmp = env_get("uboot_offset");
+		if (tmp)
+			saved_uboot_offset = strdup(tmp);
+		printf("flash env: saving opensbi_offset=%s, esos_offset=%s, uboot_offset=%s\n",
+		       saved_opensbi_offset ? saved_opensbi_offset : "(null)",
+		       saved_esos_offset ? saved_esos_offset : "(null)",
+		       saved_uboot_offset ? saved_uboot_offset : "(null)");
+	}
 
 	switch(boot_mode){
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MTD)
@@ -510,25 +535,25 @@ static void flash(char *cmd_parameter, char *response)
 					pr_info("Skip hidden partition '%s' on secondary block device (exists on %s)\n",
 						cmd_parameter, boot_media);
 				fastboot_okay(NULL, response);
-				return;
+				goto done;
 			}
 			fastboot_blk_flash_write(cmd_parameter, fastboot_buf_addr, image_size, response);
 		}
 
-		return;
+		goto done;
 #endif
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
 		fastboot_mmc_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
 					response);
-		return;
+		goto done;
 #endif
 #if CONFIG_IS_ENABLED(FASTBOOT_SUPPORT_BLOCK_DEV)
 	case BOOT_MODE_UFS:
 		/* UFS uses block device interface */
 		fastboot_blk_flash_write(cmd_parameter, fastboot_buf_addr, image_size, response);
-		return;
+		goto done;
 #endif
 	}
 
@@ -536,6 +561,39 @@ static void flash(char *cmd_parameter, char *response)
 	fastboot_nand_flash_write(cmd_parameter, fastboot_buf_addr, image_size,
 				  response);
 #endif
+
+done:
+	/* Restore offsets after flashing env partition */
+	if (is_env_partition) {
+		/*
+		 * After flashing env.bin, we need to merge the new env with
+		 * the offsets calculated from the partition table.
+		 *
+		 * Strategy:
+		 * 1. Reset to default environment (from compiled-in k3.env)
+		 *    This is equivalent to "env default -a" and matches env.bin content
+		 * 2. Restore offsets (skip mtdparts to avoid MTD re-initialization)
+		 * 3. Save the combined environment
+		 */
+		printf("flash env: resetting to default environment\n");
+		env_set_default(NULL, 0);
+
+		printf("flash env: restoring offsets\n");
+		if (saved_opensbi_offset) {
+			env_set("opensbi_offset", saved_opensbi_offset);
+			free(saved_opensbi_offset);
+		}
+		if (saved_esos_offset) {
+			env_set("esos_offset", saved_esos_offset);
+			free(saved_esos_offset);
+		}
+		if (saved_uboot_offset) {
+			env_set("uboot_offset", saved_uboot_offset);
+			free(saved_uboot_offset);
+		}
+		printf("flash env: saving environment\n");
+		env_save();
+	}
 }
 
 /**

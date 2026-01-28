@@ -593,6 +593,72 @@ static int load_fit_from_mtd(struct spl_image_info *caller_spl_image, const char
 	}
 	return ret;
 }
+
+/* MTD loader using absolute offset
+ * offset: absolute byte offset in MTD device
+ * out_entry: only meaningful for uboot loading
+ */
+static int load_fit_from_mtd_offset(struct spl_image_info *caller_spl_image, ulong offset,
+				    ulong *out_entry)
+{
+	struct mtd_info *mtd;
+	int ret = -1;
+	struct spl_image_info temp = { 0 };
+	struct image_header *header;
+	ulong len;
+
+	/* Get the first available MTD device for absolute offset access */
+	mtd = get_mtd_device(NULL, 0);
+	if (IS_ERR_OR_NULL(mtd)) {
+		pr_err("MTD device not found\n");
+		return -ENODEV;
+	}
+
+	pr_debug("MTD: load FIT from offset 0x%lx\n", offset);
+	pr_debug("MTD: mtd:%p erasesize:0x%x writesize:0x%x type:%d\n", mtd,
+		 mtd->erasesize, mtd->writesize, mtd->type);
+
+	/* Read header first */
+	len = sizeof(*header);
+	if (!mtd_is_aligned_with_min_io_size(mtd, len))
+		len = round_up(len, mtd->writesize);
+
+	header = spl_get_load_buffer(-sizeof(*header), sizeof(*header));
+	ret = spl_extra_mtd_read(mtd, offset, len, (void *)header);
+	if (ret) {
+		pr_err("MTD: failed to read header at offset 0x%lx\n", offset);
+		return ret;
+	}
+
+	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) && image_get_magic(header) == FDT_MAGIC) {
+		struct spl_load_info load;
+
+		pr_debug("MTD: found FIT at offset 0x%lx\n", offset);
+		load.dev = mtd;
+		load.priv = NULL;
+		load.filename = NULL;
+		load.bl_len = 1;
+		load.read = spl_extra_load_read;
+
+		ret = spl_load_simple_fit(&temp, &load, offset, header);
+	} else {
+		pr_err("MTD: unsupported legacy image at offset 0x%lx\n", offset);
+		return -EINVAL;
+	}
+
+	pr_debug("load_fit_from_mtd_offset ret:%d\n", ret);
+	if (!ret) {
+		if (temp.fdt_addr) {
+			caller_spl_image->fdt_addr = temp.fdt_addr;
+			pr_debug("Set DTB from loaded FIT @ %p\n", temp.fdt_addr);
+		}
+		if (out_entry && temp.entry_point) {
+			*out_entry = temp.entry_point;
+			pr_debug("Loaded entry: 0x%lx\n", *out_entry);
+		}
+	}
+	return ret;
+}
 #endif /* CONFIG_SPL_MTD_LOAD */
 
 #if defined(CONFIG_SYS_BOOTLOADER_FS_PARTITION_NAME)
@@ -803,6 +869,8 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 	case BOOT_DEVICE_NAND: {
 		const char *tmp;
 		char *part_esos = NULL, *part_uboot = NULL;
+		ulong esos_off = 0, uboot_off = 0;
+
 		tmp = env_get("extra_esos_partition");
 		if (tmp)
 			part_esos = strdup(tmp);
@@ -810,19 +878,47 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 		if (tmp)
 			part_uboot = strdup(tmp);
 
+		/* Get offset as fallback if partition not set */
+		esos_off = env_get_ulong("esos_offset", 16, 0);
+		uboot_off = env_get_ulong("uboot_offset", 16, 0);
+
 		mtd_probe_devices();
+
+		/* Load esos: env partition -> default "esos" -> offset */
 		if (part_esos && *part_esos) {
 			load_esos_res = load_fit_from_mtd(
 				spl_image, strcmp(part_esos, "1") == 0 ? "esos" : part_esos, NULL);
 		} else {
-			pr_debug("extra_esos_partition not set, skip MTD esos\n");
+			/* Try default partition name "esos" */
+			struct mtd_info *mtd = get_mtd_device_nm("esos");
+			if (!IS_ERR_OR_NULL(mtd)) {
+				pr_debug("MTD: loading esos from default partition 'esos'\n");
+				load_esos_res = load_fit_from_mtd(spl_image, "esos", NULL);
+			} else if (esos_off) {
+				pr_debug("MTD: loading esos from offset 0x%lx\n", esos_off);
+				load_esos_res = load_fit_from_mtd_offset(spl_image, esos_off, NULL);
+			} else {
+				pr_debug("MTD: no esos partition or offset available\n");
+			}
 		}
+
+		/* Load uboot: env partition -> default "uboot" -> offset */
 		if (part_uboot && *part_uboot) {
 			load_uboot_res = load_fit_from_mtd(
 				spl_image, strcmp(part_uboot, "1") == 0 ? "uboot" : part_uboot,
 				uboot_entry);
 		} else {
-			pr_debug("extra_uboot_partition not set, skip MTD uboot\n");
+			/* Try default partition name "uboot" */
+			struct mtd_info *mtd = get_mtd_device_nm("uboot");
+			if (!IS_ERR_OR_NULL(mtd)) {
+				pr_debug("MTD: loading uboot from default partition 'uboot'\n");
+				load_uboot_res = load_fit_from_mtd(spl_image, "uboot", uboot_entry);
+			} else if (uboot_off) {
+				pr_debug("MTD: loading uboot from offset 0x%lx\n", uboot_off);
+				load_uboot_res = load_fit_from_mtd_offset(spl_image, uboot_off, uboot_entry);
+			} else {
+				pr_debug("MTD: no uboot partition or offset available\n");
+			}
 		}
 
 		if (part_esos)
