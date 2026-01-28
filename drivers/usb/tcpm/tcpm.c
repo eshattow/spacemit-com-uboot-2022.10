@@ -2087,13 +2087,18 @@ void tcpm_pd_hard_reset(struct udevice *dev)
 		       0);
 }
 
-static void tcpm_init(struct udevice *dev)
+static int tcpm_init(struct udevice *dev)
 {
 	const struct dm_tcpm_ops *drvops = dev_get_driver_ops(dev);
 	struct tcpm_port *port = dev_get_uclass_plat(dev);
 	enum typec_cc_status cc1, cc2;
+	int ret;
 
-	drvops->init(dev);
+	ret = drvops->init(dev);
+	if (ret < 0) {
+		dev_err(dev, "TCPM: failed to init port: %d\n", ret);
+		return ret;
+	}
 
 	tcpm_reset_port(dev);
 
@@ -2126,6 +2131,8 @@ static void tcpm_init(struct udevice *dev)
 
 	if (drvops->get_cc(dev, &cc1, &cc2) == 0)
 		_tcpm_cc_change(dev, cc1, cc2);
+
+	return 0;
 }
 
 static int tcpm_fw_get_caps(struct udevice *dev)
@@ -2222,7 +2229,11 @@ static int tcpm_port_init(struct udevice *dev)
 	port->try_role = port->typec_prefer_role;
 	port->port_type = port->typec_type;
 
-	tcpm_init(dev);
+	err = tcpm_init(dev);
+	if (err < 0) {
+		dev_err(dev, "TCPM: failed to init tcpm: %d\n", err);
+		return err;
+	}
 
 	dev_info(dev, "TCPM: init finished\n");
 
