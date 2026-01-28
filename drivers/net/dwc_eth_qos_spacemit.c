@@ -225,14 +225,10 @@ struct eqos_config __maybe_unused eqos_spacemit_k1pro_config = {
 #define RGMII_RX_PHASE_MASK		GENMASK(22, 20)
 
 #define EMAC_RX_DLINE_EN		BIT(0)
-#define EMAC_RX_DLINE_STEP_OFFSET	(4)
-#define EMAC_RX_DLINE_STEP_MASK		GENMASK(5, 4)
 #define EMAC_RX_DLINE_CODE_OFFSET	(8)
 #define EMAC_RX_DLINE_CODE_MASK		GENMASK(15, 8)
 
 #define EMAC_TX_DLINE_EN		BIT(16)
-#define EMAC_TX_DLINE_STEP_OFFSET	(20)
-#define EMAC_TX_DLINE_STEP_MASK		GENMASK(21, 20)
 #define EMAC_TX_DLINE_CODE_OFFSET	(24)
 #define EMAC_TX_DLINE_CODE_MASK		GENMASK(31, 24)
 
@@ -302,11 +298,9 @@ static int clk_phase_rgmii_set(struct spacemit_plat_data *pdata, bool is_tx)
 		if (is_tx) {
 			val &= ~EMAC_TX_DLINE_CODE_MASK;
 			val |= (pdata->tx_clk_phase & 0xff) << EMAC_TX_DLINE_CODE_OFFSET;
-			val |= EMAC_TX_DLINE_EN;
 		} else {
 			val &= ~EMAC_RX_DLINE_CODE_MASK;
 			val |= (pdata->rx_clk_phase & 0xff) << EMAC_RX_DLINE_CODE_OFFSET;
-			val |= EMAC_RX_DLINE_EN;
 		}
 		writel(val, pdata->dline_reg);
 		break;
@@ -321,13 +315,29 @@ static int clk_phase_rgmii_set(struct spacemit_plat_data *pdata, bool is_tx)
 
 static int clk_phase_set(struct spacemit_plat_data *pdata, bool is_tx)
 {
-	if (pdata->clk_tuning_enable) {
-		if (phy_iface_is_rmii(pdata))
-			return clk_phase_rmii_set(pdata, is_tx);
-		else
-			return clk_phase_rgmii_set(pdata, is_tx);
-	}
-	return 0;
+	if (!pdata->clk_tuning_enable)
+		return 0;
+
+	if (pdata->phy_iface == PHY_INTERFACE_MODE_MII)
+		return 0;
+
+	if (phy_iface_is_rmii(pdata))
+		return clk_phase_rmii_set(pdata, is_tx);
+	else
+		return clk_phase_rgmii_set(pdata, is_tx);
+}
+
+static void k3_delayline_init(struct spacemit_plat_data *pdata)
+{
+	u32 val;
+
+	/*
+	 * On K3, TX/RX delayline must be enabled for reliable DMA init.
+	 * This is required for all phy-modes (rgmii/rmii/mii).
+	 */
+	val = readl(pdata->dline_reg);
+	val |= (EMAC_TX_DLINE_EN | EMAC_RX_DLINE_EN);
+	writel(val, pdata->dline_reg);
 }
 
 static void k3_eqos_iface_config(struct spacemit_plat_data *pdata)
@@ -380,7 +390,7 @@ static int k3_eqos_phy_reset(struct spacemit_plat_data *pdata)
 		return ret;
 	}
 
-	mdelay(10);
+	mdelay(20);
 
 	ret = gpio_direction_output(pdata->phy_reset_gpio, 1);
 	if (ret < 0) {
@@ -388,7 +398,7 @@ static int k3_eqos_phy_reset(struct spacemit_plat_data *pdata)
 		return ret;
 	}
 
-	mdelay(10);
+	mdelay(100);
 
 	return 0;
 }
@@ -403,11 +413,16 @@ static ulong k3_eqos_get_tick_clk_rate(struct udevice *dev)
 	return k3_eqos_get_csr_clk();
 }
 
-static int k3_validate_iface_and_refclk(struct spacemit_plat_data *pdata)
+static int k3_validate_iface_and_clk(struct spacemit_plat_data *pdata)
 {
 	switch (pdata->phy_iface) {
 	case PHY_INTERFACE_MODE_MII:
-		return 0;
+		/* MII: tx_clk cannot be configured */
+		return pdata->tx_clk_from_soc ? -EOPNOTSUPP : 0;
+
+	case PHY_INTERFACE_MODE_RMII:
+		/* RMII: TXC pin is unused */
+		return pdata->tx_clk_from_soc ? -EOPNOTSUPP : 0;
 
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_RGMII_ID:
@@ -415,11 +430,8 @@ static int k3_validate_iface_and_refclk(struct spacemit_plat_data *pdata)
 	case PHY_INTERFACE_MODE_RGMII_TXID:
 		return 0;
 
-	case PHY_INTERFACE_MODE_RMII:
-		/* Only accept RMII with TX clock comes from PHY */
-		return pdata->tx_clk_from_soc ? -EOPNOTSUPP : 0;
-
 	default:
+		/* Only support MII / RMII / RGMII */
 		return -EOPNOTSUPP;
 	}
 }
@@ -486,7 +498,7 @@ static int k3_eqos_probe_resources(struct udevice *dev)
 	/* phy clock source select */
 	pdata->phy_clk_from_soc = dev_read_bool(dev, "phy-clock-from-soc");
 
-	ret = k3_validate_iface_and_refclk(pdata);
+	ret = k3_validate_iface_and_clk(pdata);
 	if (ret) {
 		pr_err("unsupported phy-mode=%s with tx clk from %s\n",
 		       phy_string_for_interface(pdata->phy_iface),
@@ -583,9 +595,9 @@ static int k3_eqos_probe_resources(struct udevice *dev)
 		pr_err("k3_eqos_phy_reset() failed\n");
 		goto err_disable_phy_clk;
 	}
-
-	/* After k3_validate_iface_and_refclk() passes, these won't fail */
+	/* After k3_validate_iface_and_clk() passes, these won't fail */
 	k3_eqos_iface_config(pdata);
+	k3_delayline_init(pdata);
 	k3_eqos_set_clk_phase(pdata);
 
 	debug("%s: OK\n", __func__);
