@@ -119,7 +119,6 @@
 	rx-phase = <50>;
 
 	phy-mode = "rgmii";
-	phy-addr = <0>;
 	phy-handle = <&rgmii0>;
 
 	status = "okay";
@@ -148,7 +147,6 @@
 	rx-phase = <58>;
 
 	phy-mode = "rgmii";
-	phy-addr = <0>;
 	phy-handle = <&rgmii1>;
 
 	status = "okay";
@@ -177,7 +175,6 @@
 	rx-phase = <52>;
 
 	phy-mode = "rgmii";
-	phy-addr = <0>;
 	phy-handle = <&rgmii2>;
 
 	status = "okay";
