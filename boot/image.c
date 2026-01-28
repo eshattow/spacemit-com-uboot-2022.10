@@ -70,6 +70,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #include <u-boot/lz4.h>
 
 static const table_entry_t uimage_arch[] = {
+#ifndef CONFIG_SPL_BUILD
 	{	IH_ARCH_INVALID,	"invalid",	"Invalid ARCH",	},
 	{	IH_ARCH_ALPHA,		"alpha",	"Alpha",	},
 	{	IH_ARCH_ARM,		"arm",		"ARM",		},
@@ -96,6 +97,7 @@ static const table_entry_t uimage_arch[] = {
 	{	IH_ARCH_X86_64,		"x86_64",	"AMD x86_64",	},
 	{	IH_ARCH_XTENSA,		"xtensa",	"Xtensa",	},
 	{	IH_ARCH_RISCV,		"riscv",	"RISC-V",	},
+#endif
 	{	-1,			"",		"",		},
 };
 
@@ -139,6 +141,7 @@ static const table_entry_t uimage_os[] = {
 };
 
 static const table_entry_t uimage_type[] = {
+#ifndef CONFIG_SPL_BUILD
 	{	IH_TYPE_AISIMAGE,   "aisimage",   "Davinci AIS image",},
 	{	IH_TYPE_FILESYSTEM, "filesystem", "Filesystem Image",	},
 	{	IH_TYPE_FIRMWARE,   "firmware",	  "Firmware",		},
@@ -180,6 +183,7 @@ static const table_entry_t uimage_type[] = {
 	{	IH_TYPE_COPRO, "copro", "Coprocessor Image"},
 	{	IH_TYPE_SUNXI_EGON, "sunxi_egon",  "Allwinner eGON Boot Image" },
 	{	IH_TYPE_SUNXI_TOC0, "sunxi_toc0",  "Allwinner TOC0 Boot Image" },
+#endif
 	{	-1,		    "",		  "",			},
 };
 
@@ -201,12 +205,14 @@ struct table_info {
 };
 
 static const struct comp_magic_map image_comp[] = {
+#ifndef CONFIG_SPL_BUILD
 	{	IH_COMP_BZIP2,	"bzip2",	{0x42, 0x5a},},
 	{	IH_COMP_GZIP,	"gzip",		{0x1f, 0x8b},},
 	{	IH_COMP_LZMA,	"lzma",		{0x5d, 0x00},},
 	{	IH_COMP_LZO,	"lzo",		{0x89, 0x4c},},
 	{	IH_COMP_LZ4,    "lz4",          {0x04, 0x22},},
 	{	IH_COMP_ZSTD,   "zstd",         {0x28, 0xb5},},
+#endif
 	{	IH_COMP_NONE,	"none",		{},	},
 };
 

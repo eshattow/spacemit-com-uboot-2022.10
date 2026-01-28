@@ -17,6 +17,7 @@
 #include <asm/io.h>
 #include <dm/device_compat.h>
 #include <linux/sizes.h>
+#include <linux/lzo.h>
 #ifdef CONFIG_K1_X_BOARD_FPGA
 #include "ddr_init_fpga.h"
 #endif
@@ -26,39 +27,23 @@
 #define DDR_CHECK_CNT			(0x1000)
 #define TOP_DDR_NUM				1
 
-extern u32 ddr_cs_num, ddr_tx_odt;
+extern u32 ddr_cs_num, ddr_tx_odt, ddr_datarate;
 extern const char *ddr_type;
-extern int ddr_freq_change(u32 data_rate);
+extern char _image_binary_end[], __ddr_training_start[], __ddr_training_end[], __ddr1_training_end[];
+extern uint8_t k1_lpddr3_training_img[], k1_lpddr4_training_img[];
+
+extern int ddr_freq_change(const char *ddr_type, u32 data_rate);
 extern void qos_set_default(void);
+extern uint32_t lpddr4_silicon_init(uint32_t base, const char *ddr_type, uint32_t data_rate);
+extern uint32_t lpddr3_silicon_init(uint32_t base, const char *ddr_type, uint32_t data_rate);
 
-u32 ddr_datarate;
-
-static int test_pattern(fdt_addr_t base, fdt_size_t size)
+int test_pattern(fdt_addr_t base, fdt_size_t size)
 {
 	fdt_addr_t addr;
-	fdt_size_t check_size;
 	uint32_t offset;
-	uint32_t *ddr_data = NULL;
-	uint32_t *save_data;
 	int err = 0;
 
-	// use code sram as temp data buffer(16KB), not enough heap memory
-	ddr_data = (uint32_t*)0xC08D0000;
-	check_size = (DDR_CHECK_SIZE / DDR_CHECK_STEP) * DDR_CHECK_CNT;
-	if (check_size > 0x4000) {
-		pr_err("test zone malloc fail size 0x%llx\n", check_size);
-		return -1;
-	}
-
-	save_data = ddr_data;
-	/* to avoid overlap important data as image or ramdump  */
-	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
-		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
-			*save_data = readl((void*)addr + offset);
-			save_data++;
-		}
-	}
-
+	/* may overwrite important data as image or ramdump before reboot */
 	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
 		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
 			writel((uint32_t)(addr + offset), (void*)addr + offset);
@@ -103,25 +88,58 @@ static int test_pattern(fdt_addr_t base, fdt_size_t size)
 	}
 
 ERR_HANDLE:
-	save_data = ddr_data;
-	for (addr = base; addr < base + size; addr += DDR_CHECK_STEP) {
-		for (offset = 0; offset < DDR_CHECK_CNT; offset += 4) {
-			writel(*save_data, (void*)addr + offset);
-			save_data++;
-		}
-	}
 	if (err != 0) {
 		pr_emerg("dram pattern test failed!\n");
 	}
 
-	// free(ddr_data);
-
 	return err;
 }
 
-#ifdef CONFIG_K1_X_BOARD_ASIC
-extern uint32_t lpddr4_silicon_init(uint32_t base, const char *ddr_type, uint32_t data_rate);
-#endif
+int decompress_ddr_code(const char* ddr_type)
+{
+	void *dtb;
+	unsigned long flush_lenth;
+	size_t dtb_length, code_size, decompress_size;
+	int ret;
+	uint8_t *code_start;
+
+	// dtb was copied to AUDIO_BUFFER_ADDRESS during eraly boot stage
+	dtb = (void *)AUDIO_BUFFER_ADDRESS;
+	dtb_length = round_up(fdt_totalsize(dtb), 16);
+
+	// move compressed DDR training code to audio buffer
+	if (0 == strcasecmp(ddr_type, "LPDDR3")) {
+		code_start = (uint8_t*)k1_lpddr3_training_img;
+		code_size = (size_t)__ddr1_training_end - (size_t)code_start;
+	}
+	else {
+		code_start = (uint8_t*)k1_lpddr4_training_img;
+		code_size = (size_t)__ddr_training_end - (size_t)code_start;
+	}
+	if ((code_size + dtb_length) > AUDIO_BUFFER_SIZE) {
+		pr_err("Error: DDR training code or dtb is too large: 0x%lx + 0x%lx > 0x%x\n",
+			code_size, dtb_length, AUDIO_BUFFER_SIZE);
+		return -EFBIG;
+	}
+	memcpy((void*)AUDIO_BUFFER_ADDRESS + dtb_length, code_start, code_size);
+
+	// uint64_t start = get_timer_us(0);
+	decompress_size = CONFIG_SPL_BSS_START_ADDR - DDR_TRAINING_DATA_BASE;
+	ret = lzop_decompress((uint8_t*)AUDIO_BUFFER_ADDRESS + dtb_length, code_size,
+		(uint8_t*)DDR_TRAINING_DATA_BASE, &decompress_size);
+
+	if (0 != ret) {
+		return ret;
+	}
+	// start = get_timer_us(start);
+	// printf("Decompress consume %lldus\n", start);
+
+	pr_debug("Decompressed code size is %ld\n", decompress_size);
+	flush_lenth = round_up(decompress_size, CONFIG_RISCV_CBOM_BLOCK_SIZE);
+	flush_dcache_range(DDR_TRAINING_DATA_BASE, DDR_TRAINING_DATA_BASE + flush_lenth);
+
+	return 0;
+}
 
 static int spacemit_ddr_probe(struct udevice *dev)
 {
@@ -165,13 +183,24 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	}
 	printf("DDR type %s\n", ddr_type);
 
+	ret = decompress_ddr_code(ddr_type);
+	if (0 != ret) {
+		pr_emerg("decompress ddr code failed(%d)!\n", ret);
+		return ret;
+	}
+
 	/* init dram */
 	uint64_t start = get_timer(0);
-	data_rate = lpddr4_silicon_init(ddrc_base, ddr_type, ddr_datarate);
+	if (0 == strcasecmp(ddr_type, "LPDDR3")) {
+		data_rate = lpddr3_silicon_init(ddrc_base, ddr_type, ddr_datarate);
+	}
+	else {
+		data_rate = lpddr4_silicon_init(ddrc_base, ddr_type, ddr_datarate);
+	}
 	start = get_timer(start);
-	printf("lpddr4_silicon_init consume %lldms\n", start);
+	printf("lpddr silicon init consume %lldms\n", start);
 #endif
-	ddr_freq_change(data_rate);
+	ddr_freq_change(ddr_type, data_rate);
 
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
 	if (ret < 0) {

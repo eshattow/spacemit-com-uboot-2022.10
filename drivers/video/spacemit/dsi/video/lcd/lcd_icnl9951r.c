@@ -28,7 +28,8 @@ struct spacemit_mode_modeinfo icnl9951r_spacemit_modelist[] = {
 		.hsync_invert = 0,
 		.vsync_invert = 0,
 		.invert_pixclock = 0,
-		.pixclock_freq = 87*1000,
+		// .pixclock_freq = 87*1000,
+		.pixclock_freq = 153*1000,
 		.pix_fmt_out = OUTFMT_RGB888,
 		.width = 147,
 		.height = 236,
@@ -49,8 +50,10 @@ struct spacemit_mipi_info icnl9951r_mipi_info = {
 	.work_mode = SPACEMIT_DSI_MODE_VIDEO, /*command_mode, video_mode*/
 	.rgb_mode = DSI_INPUT_DATA_RGB_MODE_888,
 	.lane_number = 4,
-	.phy_bit_clock = 614400000,
-	.phy_esc_clock = 51200000,
+	// .phy_bit_clock = 614400000,
+	// .phy_esc_clock = 51200000,
+	.phy_bit_clock = 1000000000,
+	.phy_esc_clock = 76800000,
 	.split_enable = 0,
 	.eotp_enable = 0,
 
@@ -124,8 +127,8 @@ static struct spacemit_dsi_cmd_desc icnl9951r_sleep_in_cmds[] = {
 };
 
 
-struct lcd_mipi_panel_info lcd_icnl9951r = {
-	.lcd_name = "icnl9951r",
+struct lcd_mipi_panel_info lcd_icnl9951r_mipi = {
+	.lcd_name = "lcd_icnl9951r_mipi",
 	.lcd_id = 0x9951,
 	.panel_id0 = 0x99,
 	.power_value = 0x9c,
@@ -156,10 +159,10 @@ struct lcd_mipi_panel_info lcd_icnl9951r = {
 	.pxclk_div = 6,
 };
 
-int lcd_icnl9951r_init(void)
+int lcd_icnl9951r_mipi_init(void)
 {
 	int ret;
 
-	ret = lcd_mipi_register_panel(&lcd_icnl9951r);
+	ret = lcd_mipi_register_panel(&lcd_icnl9951r_mipi);
 	return ret;
 }

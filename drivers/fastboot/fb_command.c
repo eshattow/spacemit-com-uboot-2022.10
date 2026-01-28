@@ -63,6 +63,7 @@ static void oem_bootbus(char *, char *);
 
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_READ)
 static void oem_read(char *cmd_parameter, char *response);
+static void oem_log(char *cmd_parameter, char *response);
 #endif
 
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS)
@@ -164,6 +165,10 @@ static const struct {
 		.command = "oem read",
 		.dispatch = oem_read,
 	},
+	[FASTBOOT_COMMAND_OEM_LOG] = {
+		.command = "oem log",
+		.dispatch = oem_log,
+	},
 #endif
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_CONFIG_ACCESS)
 	[FASTBOOT_COMMAND_CONFIG_ACCESS] = {
@@ -212,7 +217,7 @@ int fastboot_handle_command(char *cmd_string, char *response)
 	strsep(&cmd_parameter, ":");
 
 	for (i = 0; i < FASTBOOT_COMMAND_COUNT; i++) {
-		if (!strcmp(commands[i].command, cmd_string)) {
+		if (commands[i].command && !strcmp(commands[i].command, cmd_string)) {
 			if (commands[i].dispatch) {
 				commands[i].dispatch(cmd_parameter,
 							response);
@@ -741,6 +746,17 @@ static u32 read_console_log(char *fb_buf) {
 	gd->console_log.read_ptr = log_ptr;
 
 	return read_size;
+}
+
+/*
+ * oem_log() - Execute the OEM log command
+ *
+ * @cmd_parameter: Pointer to command parameter
+ * @response: Pointer to fastboot response buffer
+ */
+static void oem_log(char *cmd_parameter, char *response)
+{
+	fastboot_response("TEXT", response, "transfering log\n");
 }
 
 /**

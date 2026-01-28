@@ -33,46 +33,6 @@
 #define STORAGE_API_P_ADDR	(0xC0838498)
 #define SDCARD_API_ENTRY	(0xFFE0A548)
 
-/* pin mux */
-#define MUX_MODE0       0
-#define MUX_MODE1       1
-#define MUX_MODE2       2
-#define MUX_MODE3       3
-#define MUX_MODE4       4
-#define MUX_MODE5       5
-#define MUX_MODE6       6
-#define MUX_MODE7       7
-
-/* edge detect */
-#define EDGE_NONE       (1 << 6)
-#define EDGE_RISE       (1 << 4)
-#define EDGE_FALL       (1 << 5)
-#define EDGE_BOTH       (3 << 4)
-
-/* driver strength*/
-#define PAD_1V8_DS0     (0 << 11)
-#define PAD_1V8_DS1     (1 << 11)
-#define PAD_1V8_DS2     (2 << 11)
-#define PAD_1V8_DS3     (3 << 11)
-
-/*
- * notice: !!!
- * ds2 ---> bit10, ds1 ----> bit12, ds0 ----> bit11
-*/
-#define PAD_3V_DS0      (0 << 10)     /* bit[12:10] 000 */
-#define PAD_3V_DS1      (2 << 10)     /* bit[12:10] 010 */
-#define PAD_3V_DS2      (4 << 10)     /* bit[12:10] 100 */
-#define PAD_3V_DS3      (6 << 10)     /* bit[12:10] 110 */
-#define PAD_3V_DS4      (1 << 10)     /* bit[12:10] 001 */
-#define PAD_3V_DS5      (3 << 10)     /* bit[12:10] 011 */
-#define PAD_3V_DS6      (5 << 10)     /* bit[12:10] 101 */
-#define PAD_3V_DS7      (7 << 10)     /* bit[12:10] 111 */
-
-/* pull up/down */
-#define PULL_DIS        (0 << 13)     /* bit[15:13] 000 */
-#define PULL_UP         (6 << 13)     /* bit[15:13] 110 */
-#define PULL_DOWN       (5 << 13)     /* bit[15:13] 101 */
-
 #define MFPR_MMC1_BASE     0xD401E1B8
 #define MMC1_DATA3_OFFSET  0x00
 #define MMC1_DATA2_OFFSET  0x04
@@ -94,6 +54,7 @@ extern void spl_fixup_fdt(void *fdt_blob);
 char *product_name;
 extern u32 ddr_cs_num, ddr_datarate, ddr_tx_odt;
 extern const char *ddr_type;
+extern char _image_binary_end[];
 
 /* LED configurations for different boards */
 #define MAX_PRODUCT_NAMES 1
@@ -492,7 +453,7 @@ void update_ddr_training_info(uint64_t chipid, uint64_t mac_addr)
 	// flush_dcache_range(flush_start, flush_start + flush_lenth);
 }
 
-void update_ddr_config_info(uint32_t cs_num)
+void update_ddr_config_info(uint32_t cs_num, const char *ddr_type)
 {
 	struct ddr_training_info_t *info;
 
@@ -501,6 +462,8 @@ void update_ddr_config_info(uint32_t cs_num)
 	info->magic = DDR_TRAINING_INFO_MAGIC;
 	info->version = DDR_TRAINING_INFO_VER;
 	info->cs_num = cs_num;
+	info->ddr_datarate = ddr_datarate;
+	sprintf(info->ddr_type, "%s", ddr_type);
 	info->crc32 = crc32(0, (const uchar *)&info->chipid, sizeof(*info) - 8);
 }
 
@@ -555,7 +518,7 @@ int spl_board_init_f(void)
 	}
 
 	// update_ddr_training_info(chipid, mac_addr);
-	update_ddr_config_info(ddr_cs_num);
+	update_ddr_config_info(ddr_cs_num, ddr_type);
 	timer_init();
 
 	return 0;
@@ -826,4 +789,24 @@ void spl_perform_fixups(struct spl_image_info *spl_image)
 {
 	dram_init_banksize();
 	spl_fixup_fdt(spl_image->fdt_addr);
+}
+
+void *board_fdt_blob_setup(int *err)
+{
+	*err = 0;
+	void *dtb, *dtb_new;
+	unsigned long dtb_length;
+
+	// copy dtb to audio buffer, DDR training code would overlap dtb data
+	dtb = (void *)_image_binary_end;
+	dtb_new = (void *)AUDIO_BUFFER_ADDRESS;
+	dtb_length = fdt_totalsize(dtb);
+	if (dtb_length > AUDIO_BUFFER_SIZE) {
+		// dtb size MUST NOT larger than 16KB
+		*err = -1;
+		return NULL;
+	}
+
+	memcpy(dtb_new, dtb, dtb_length);
+	return dtb_new;
 }

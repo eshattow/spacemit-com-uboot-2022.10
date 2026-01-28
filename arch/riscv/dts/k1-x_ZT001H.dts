@@ -212,7 +212,7 @@
 };
 
 &panel {
-	force-attached = "ft8201sinx101";
+	force-attached = "lcd_ft8201sinx101_mipi";
 	dcp-gpios = <&gpio 34 0>;
 	dcn-gpios = <&gpio 42 0>;
 	avee-gpios = <&gpio 35 0>;

@@ -17,6 +17,7 @@
 #include <regmap.h>
 #include <syscon.h>
 #include <video.h>
+#include <env.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -30,9 +31,10 @@
 
 #include "spacemit_dpu.h"
 
-extern bool is_video_connected;
-
 DECLARE_GLOBAL_DATA_PTR;
+
+#define ENV_LCD_NAME	"lcd_name"
+extern bool is_video_connected;
 
 struct fb_info fbi = {0};
 
@@ -150,7 +152,7 @@ static int spacemit_panel_init(void)
 	return 0;
 }
 
-#if 0
+#if 1
 static unsigned int dsi_dpu_read(void __iomem *addr)
 {
 	unsigned int val = readl(addr + 0xc0340000);
@@ -165,10 +167,18 @@ static void dsi_dpu_write(void __iomem *addr, unsigned int val)
 	writel(val, addr + 0xc0340000);
 }
 
-static void dsi_dpu_init(struct spacemit_mode_modeinfo *spacemit_mode, ulong fbbase)
+static void dsi_dpu_init(struct spacemit_mode_modeinfo *spacemit_mode, enum spacemit_dpu_work_mode work_mode, ulong fbbase)
 {
 	unsigned int vsync, hsync, vbp, vfp, hbp, hfp, vsp, hsp;
 	unsigned int reg_val = 0;
+
+	if (work_mode == SPACEMIT_DPU_MODE_CMD) {
+		// enable cpn
+		pr_debug("dpu is worked in cmd mode, enable cpn\n");
+		reg_val = readl((void __iomem *)SPARE_CFG_ADDRESS);
+		reg_val |= (CFG_DSI_HCLK_DIS | CFG_CPN_EN | CFG_VPN_EN);
+		writel(reg_val, (void __iomem *)SPARE_CFG_ADDRESS);
+	}
 
 	vsync = spacemit_mode->vsync_len & 0x3ff;
 	hsync = spacemit_mode->hsync_len & 0x3ff;
@@ -184,8 +194,17 @@ static void dsi_dpu_init(struct spacemit_mode_modeinfo *spacemit_mode, ulong fbb
 
 	dsi_dpu_write((void __iomem *)0xa1c, 0x2223);
 	dsi_dpu_write((void __iomem *)0x18000, (spacemit_mode->yres << 16) | spacemit_mode->xres);
-	dsi_dpu_write((void __iomem *)0x18018, 0x20);
-	dsi_dpu_write((void __iomem *)0x1807c, 0x100);
+
+	if (work_mode == SPACEMIT_DPU_MODE_CMD) {
+		// enable cmd screen
+		pr_debug("dpu is worked in cmd mode, enable cmd screen\n");
+		dsi_dpu_write((void __iomem *)0x18018, 0x30);
+		dsi_dpu_write((void __iomem *)0x1807c, 0x0);
+	} else {
+		dsi_dpu_write((void __iomem *)0x18018, 0x20);
+		dsi_dpu_write((void __iomem *)0x1807c, 0x100);
+	}
+
 	reg_val = (hbp << 16) | hfp;
 	dsi_dpu_write((void __iomem *)0x18080, reg_val);
 	reg_val = (vbp << 16) | vfp;
@@ -214,10 +233,43 @@ static void dsi_dpu_init(struct spacemit_mode_modeinfo *spacemit_mode, ulong fbb
 	dsi_dpu_write((void __iomem *)0x4c54, 0xff0000);
 
 	dsi_dpu_write((void __iomem *)0x560, 0x40008);
-	dsi_dpu_write((void __iomem *)0x588, 0x821);
+
+	if (work_mode == SPACEMIT_DPU_MODE_CMD) {
+		// cmd mode
+		pr_debug("dpu is worked in cmd mode, disable video mode\n");
+		dsi_dpu_write((void __iomem *)0x588, 0x820);
+		dsi_dpu_write((void __iomem *)0x568, 0x1);
+	} else
+		dsi_dpu_write((void __iomem *)0x588, 0x821);
+
 	dsi_dpu_write((void __iomem *)0x56c, 0x1);
 	dsi_dpu_write((void __iomem *)0x58c, 0x1);
 }
+
+#if 0
+static void dsi_dpu_deinit(void)
+{
+	unsigned int val = 0;
+	unsigned int timeout = 50;
+
+	dsi_dpu_write((void __iomem *)0x560, 0x0);
+	dsi_dpu_write((void __iomem *)0x56c, 0x1);
+
+	val = dsi_dpu_read((void __iomem *)0x56c);
+	while ((val & BIT(0))) {
+			mdelay(1);
+			val = dsi_dpu_read((void __iomem *)0x56c);
+			if (0 == --timeout)
+					break;
+	};
+
+	if (timeout == 0) {
+			pr_info("%s timeout\n", __func__);
+	}
+
+	dsi_dpu_write((void __iomem *)0x938, 0x0);
+}
+#endif
 
 static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_node)
 {
@@ -355,6 +407,13 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 		}
 		is_video_connected = true;
 
+		if (fbi.tx->lcd_name) {
+			pr_info("%s: lcd name %s\n", __func__, fbi.tx->lcd_name);
+#if defined(CONFIG_DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS)
+			env_set(ENV_LCD_NAME, fbi.tx->lcd_name);
+#endif
+		}
+
 		spacemit_mode = &fbi.mode;
 		uc_priv->xsize = spacemit_mode->xres;
 		uc_priv->ysize = spacemit_mode->yres;
@@ -367,13 +426,15 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 		pr_debug("%s: panel type %d\n", __func__, fbi.tx->panel_type);
 
 		if (fbi.tx->panel_type == LCD_MIPI) {
-			dsi_dpu_init(spacemit_mode, fbbase);
+			if (fbi.tx->work_mode == SPACEMIT_DPU_MODE_VIDEO)
+				dsi_dpu_init(spacemit_mode, fbi.tx->work_mode, fbbase);
 			video_tx_esd_check(fbi.tx);
 			video_tx = fbi.tx;
+			fbi.fbbase = fbbase;
 			video_tx->driver->bl_enable(video_tx, true);
 
 		} else if (fbi.tx->panel_type == LCD_EDP){
-			dsi_dpu_init(spacemit_mode, fbbase);
+			dsi_dpu_init(spacemit_mode, fbi.tx->work_mode, fbbase);
 			video_tx_reset(fbi.tx);
 			video_tx = fbi.tx;
 
@@ -406,7 +467,7 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 				return ret;
 			}
 
-			dsi_dpu_init(spacemit_mode, fbbase);
+			dsi_dpu_init(spacemit_mode, fbi.tx->work_mode, fbbase);
 			video_tx_reset(fbi.tx);
 			video_tx = fbi.tx;
 
@@ -499,8 +560,34 @@ static int spacemit_dpu_probe(struct udevice *dev)
 	return 0;
 }
 
+void dsi_dpu_wait_vsync(void)
+{
+	unsigned int val = 0;
+	unsigned int timeout = 30;
+
+	val = dsi_dpu_read((void __iomem *)DPU_INT_REG_24);
+	if (val & BIT(0))
+		dsi_dpu_write((void __iomem *)DPU_INT_REG_14, val);
+	val = dsi_dpu_read((void __iomem *)DPU_INT_REG_24);
+	while (!(val & BIT(0))) {
+		mdelay(1);
+		val = dsi_dpu_read((void __iomem *)DPU_INT_REG_24);
+		if (0 == --timeout)
+			break;
+	};
+	if (timeout == 0)
+		pr_info("dpu Vsync timeout\n");
+}
+
 static int spacemit_dpu_remove(struct udevice *dev)
 {
+	if (fbi.tx) {
+		if (fbi.tx->work_mode == SPACEMIT_DPU_MODE_CMD) {
+			dsi_dpu_init(&fbi.mode, fbi.tx->work_mode, fbi.fbbase);
+			dsi_dpu_wait_vsync();
+			dsi_dpu_wait_vsync();
+		}
+	}
 	return 0;
 }
 
@@ -536,6 +623,7 @@ U_BOOT_DRIVER(spacemit_dpu) = {
 	.ops	= &spacemit_dpu_ops,
 	.bind	= spacemit_dpu_bind,
 	.probe	= spacemit_dpu_probe,
+	.flags	= DM_FLAG_OS_PREPARE,
 	.remove = spacemit_dpu_remove,
 	.priv_auto	= sizeof(struct spacemit_dpu_priv),
 };

@@ -22,6 +22,7 @@
 #include <linux/usb/composite.h>
 #include <linux/compiler.h>
 #include <g_dnl.h>
+#include <dm.h>
 
 #define FASTBOOT_INTERFACE_CLASS	0xff
 #define FASTBOOT_INTERFACE_SUB_CLASS	0x42
@@ -499,7 +500,6 @@ static void tx_handler_up_image(struct usb_ep *ep, struct usb_request *in_req)
 	if (transfer_size > remain_size)
 		transfer_size = remain_size;
 
-
 	fastboot_data_upload(buffer, transfer_size, response);
 
 	if (response[0]) {
@@ -508,6 +508,68 @@ static void tx_handler_up_image(struct usb_ep *ep, struct usb_request *in_req)
 	}
 
 	in_req->length = transfer_size;
+	usb_ep_queue(ep, in_req, 0);
+}
+#endif
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_READ)
+static int already_called = 0;
+static u64 total_bytes = 0;
+static u64 bytes_sent = 0;
+static int too_much_log = 0;
+static int log_finish = 0;
+
+static void log_handler(struct usb_ep *ep, struct usb_request *in_req)
+{
+	// init console log
+	const char *too_much_log_prompt = "too much log!\n";
+	char response[FASTBOOT_RESPONSE_LEN] = {0};
+	char *buffer = in_req->buf;
+	int bytes_this_time = 0;
+
+	if (already_called == 0) {
+		bytes_sent = 0;
+		total_bytes = gd->console_log.write_ptr - gd->console_log.read_ptr;
+		already_called = 1;
+		too_much_log = (gd->console_log.write_ptr < gd->console_log.read_ptr) ? 1 : 0;
+	}
+
+	if (in_req->status != 0) {
+		pr_err("Bad status: %d\n", in_req->status);
+		return;
+	}
+
+	if (too_much_log && !log_finish) {
+		// too much log content
+		log_finish = 1;
+		memcpy(buffer, "TEXT", 4);
+		memcpy(buffer + 4, too_much_log_prompt, strlen(too_much_log_prompt));
+		in_req->length = strlen(too_much_log_prompt) + 4;
+		usb_ep_queue(ep, in_req, 0);
+		return ;
+	}
+
+	// copy content to usb buffer
+	bytes_this_time = (total_bytes - bytes_sent > 60) ? 60 : total_bytes - bytes_sent;
+	if (bytes_this_time > 0) {
+		memcpy(buffer, "TEXT", 4);
+		memcpy(buffer + 4, gd->console_log.read_ptr, bytes_this_time);
+		gd->console_log.read_ptr += bytes_this_time;
+	}
+
+	// complete sending?
+	if (bytes_sent >= total_bytes || log_finish) {
+		fastboot_okay(NULL, response);
+		in_req->complete = fastboot_complete;
+		fastboot_tx_write_str(response);
+		already_called = 0;
+		log_finish = 0;
+		return;
+	}
+
+	// send to host
+	bytes_sent += bytes_this_time;
+	in_req->length = bytes_this_time + 4;
 	usb_ep_queue(ep, in_req, 0);
 }
 #endif
@@ -604,7 +666,7 @@ static void rx_handler_command(struct usb_ep *ep, struct usb_request *req)
 	}
 #endif
 
-	if (!strncmp("OKAY", response, 4)) {
+	if (!strncmp("OKAY", response, 4) || !strncmp("TEXT", response, 4)) {
 		switch (cmd) {
 #if !defined(CONFIG_SPL_BUILD)
 		case FASTBOOT_COMMAND_BOOT:
@@ -629,6 +691,12 @@ static void rx_handler_command(struct usb_ep *ep, struct usb_request *req)
 			break;
 #endif
 #endif /* !defined(CONFIG_SPL_BUILD) */
+
+#if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_READ)
+		case FASTBOOT_COMMAND_OEM_LOG:
+			fastboot_func->in_req->complete = log_handler;
+			break;
+#endif
 		}
 	}
 

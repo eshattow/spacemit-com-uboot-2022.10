@@ -39,6 +39,8 @@
 #include <fdt_simplefb.h>
 #include <mtd_node.h>
 #include <misc.h>
+#include <mmc.h>
+#include <linux/mtd/mtd.h>
 #ifdef CONFIG_ENV_IS_IN_NFS
 #include "nfs_env.h"
 #endif
@@ -58,10 +60,12 @@ extern int update_tlvinfo(void);
 
 DECLARE_GLOBAL_DATA_PTR;
 static char found_partition[64] = {0};
-extern u32 ddr_cs_num;
+extern u32 ddr_cs_num, ddr_datarate;
+extern const char *ddr_type;
 bool is_video_connected = false;
 uint32_t reboot_config;
 void refresh_config_info(void);
+int detect_nand_devices_and_override_mtdparts(void);
 
 void set_boot_mode(enum board_boot_mode boot_mode)
 {
@@ -310,9 +314,14 @@ void get_ddr_config_info(void)
 		(info->crc32 == crc32(0, (const uchar *)&info->chipid, sizeof(*info) - 8))) {
 		// get DDR cs number that is update in spl stage
 		ddr_cs_num = info->cs_num;
+		ddr_datarate = info->ddr_datarate;
+		ddr_type = info->ddr_type;
 	}
-	else
+	else {
 		ddr_cs_num = DDR_CS_NUM;
+		ddr_datarate = 2400;
+		ddr_type = "LPDDR4x";
+	}
 }
 
 u32 get_reboot_config(void)
@@ -1011,6 +1020,8 @@ int board_late_init(void)
 	}
 #endif
 
+	detect_nand_devices_and_override_mtdparts();
+
 	run_fastboot_command();
 
 	run_cardfirmware_flash_command();
@@ -1036,6 +1047,20 @@ int board_late_init(void)
 
 	setenv_boot_mode();
 
+	// Resize the last partition for sd
+	const char *boot_device = env_get("boot_device");
+	if (boot_device && strcmp(boot_device, "mmc") == 0) {
+		const char *boot_devnum = env_get("boot_devnum");
+		unsigned long devnum = simple_strtoul(boot_devnum, NULL, 10);
+		if (devnum == MMC_DEV_SD) {
+			printf("Resize the last partition for boot dev %s devnum %lu\n", boot_device, devnum);
+			struct blk_desc *dev_desc = blk_get_devnum_by_type(IF_TYPE_MMC, devnum);
+			if (dev_desc) {
+				sd_last_partition_resize(dev_desc);
+			}
+		}
+	}
+
 	/*save ram size to env, transfer to MB*/
 	sprintf(ram_size_str, "mem=%dMB", (int)(gd->ram_size / SZ_1MB));
 	env_set("ram_size", ram_size_str);
@@ -1058,6 +1083,7 @@ int board_late_init(void)
 	return 0;
 }
 
+#if !defined(CONFIG_SPL_BUILD)
 void *board_fdt_blob_setup(int *err)
 {
 	*err = 0;
@@ -1072,6 +1098,7 @@ void *board_fdt_blob_setup(int *err)
 	}
 	return (ulong *)&_end;
 }
+#endif
 
 enum env_location env_get_location(enum env_operation op, int prio)
 {
@@ -1285,7 +1312,7 @@ static int ft_board_info_fixup(void *blob, struct bd_info *bd)
 
 	part_number = env_get("part#");
 	if (NULL != part_number)
-		fdt_setprop(blob, node, "part-number", part_number, strlen(part_number));
+		fdt_setprop_string(blob, node, "part-number", part_number);
 
 	return 0;
 }
@@ -1308,10 +1335,29 @@ static int ft_board_mac_addr_fixup(void *blob, struct bd_info *bd)
 		if (NULL != addr_value) {
 			// memset(addr_str, 0, sizeof(addr_str));
 			// sprintf(addr_str, "%pM", addr_value);
-			fdt_setprop(blob, node, mac_item[i], addr_value, strlen(addr_value));
+			fdt_setprop_string(blob, node, mac_item[i], addr_value);
 		}
 	}
 
+	return 0;
+}
+
+static int ft_board_lcd_name_fixup(void *blob, struct bd_info *bd)
+{
+	int node;
+	const char *lcd_name = env_get("lcd_name");
+
+	if (NULL == lcd_name)
+		return 0;
+
+	// path of lcd_name is fixed at following node
+	node = fdt_path_offset(blob, "/soc/dsi2@d421a800/panel2@0");
+	if (node < 0) {
+		pr_err("Can't find lcd panel path!\n");
+		return -EINVAL;
+	}
+
+	fdt_setprop_string(blob, node, "force-attached", lcd_name);
 	return 0;
 }
 
@@ -1338,6 +1384,260 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	ft_board_cpu_fixup(blob, bd);
 	ft_board_info_fixup(blob, bd);
 	ft_board_mac_addr_fixup(blob, bd);
+	ft_board_lcd_name_fixup(blob, bd);
+	return 0;
+}
+
+/**
+ * Get device name from device tree or use default fallback
+ */
+static const char *get_device_name(struct mtd_info *mtd)
+{
+	const char *device_name = NULL;
+	struct udevice *dev = mtd->dev;
+
+	if (dev && device_active(dev)) {
+		device_name = dev_read_string(dev, "device-name");
+	}
+
+	/* If no device-name property found, use default mapping */
+	if (!device_name) {
+		device_name = "spi4.0"; /* Default fallback */
+		pr_debug(
+			"Debug: No device-name property found, using default '%s'\n",
+			device_name);
+	} else {
+		pr_debug("Debug: Found device-name property: '%s'\n",
+			 device_name);
+	}
+
+	pr_debug("Debug: Mapping device '%s' to '%s'\n", mtd->name,
+		 device_name);
+	return device_name;
+}
+
+/**
+ * Build mtdids string entry for a NAND device
+ */
+static int build_mtdids_entry(char *mtdids_buf, size_t buf_size, int nand_count,
+			      const char *device_name)
+{
+	char temp[128];
+
+	if (nand_count == 0) {
+		snprintf(mtdids_buf, buf_size, "nand%d=%s", nand_count,
+			 device_name);
+	} else {
+		int remaining = buf_size - strlen(mtdids_buf) - 1;
+		snprintf(temp, sizeof(temp), ",nand%d=%s", nand_count,
+			 device_name);
+		if (strlen(temp) >= remaining) {
+			pr_debug("Warning: mtdids buffer full, truncating\n");
+			return -1;
+		}
+		strncat(mtdids_buf, temp, remaining);
+	}
+	return 0;
+}
+
+/**
+ * Build partition string for a single partition
+ */
+static void build_partition_string(char *temp_part, size_t temp_size,
+				   struct mtd_info *part_mtd)
+{
+	/* Calculate partition size */
+	if (part_mtd->size >= (1 << 20)) {
+		/* >= 1MB, use MB unit */
+		snprintf(temp_part, temp_size, "%lluM(%s)",
+			 part_mtd->size >> 20, part_mtd->name);
+	} else if (part_mtd->size >= (1 << 10)) {
+		/* >= 1KB, use KB unit */
+		snprintf(temp_part, temp_size, "%lluK(%s)",
+			 part_mtd->size >> 10, part_mtd->name);
+	} else {
+		/* < 1KB, use byte unit */
+		snprintf(temp_part, temp_size, "0x%llx(%s)", part_mtd->size,
+			 part_mtd->name);
+	}
+}
+
+/**
+ * Build mtdparts string for a NAND device and its partitions
+ */
+static int build_mtdparts_entry(struct mtd_info *mtd, const char *device_name,
+				char *part_str, size_t part_str_size)
+{
+	char temp_part[128];
+	int part_count = 0;
+	struct mtd_info *part_mtd;
+
+	/* Iterate through all partitions of this physical device */
+	mtd_for_each_device(part_mtd)
+	{
+		if (!part_mtd || !mtd_is_partition(part_mtd))
+			continue;
+		/* Check if this is a partition of the current physical device */
+		if (part_mtd->parent == mtd) {
+			if (part_count == 0) {
+				snprintf(part_str, part_str_size,
+					 "%s:", device_name);
+			}
+
+			build_partition_string(temp_part, sizeof(temp_part),
+					       part_mtd);
+
+			/* Add partition to string */
+			if (part_count > 0) {
+				strncat(part_str, ",",
+					part_str_size - strlen(part_str) - 1);
+			}
+			strncat(part_str, temp_part,
+				part_str_size - strlen(part_str) - 1);
+			part_count++;
+		}
+	}
+
+	/* If no partitions found, use the entire device */
+	if (part_count == 0) {
+		snprintf(part_str, part_str_size, "%s:-(data)", device_name);
+	}
+
+	return part_count;
+}
+
+/**
+ * Add mtdparts entry to the main mtdparts buffer
+ */
+static int add_mtdparts_entry(char *mtdparts_buf, size_t buf_size,
+			      int nand_count, const char *part_str)
+{
+	if (nand_count == 0) {
+		snprintf(mtdparts_buf, buf_size, "%s", part_str);
+	} else {
+		char temp[512];
+		int remaining = buf_size - strlen(mtdparts_buf) - 1;
+		snprintf(temp, sizeof(temp), ";%s", part_str);
+		if (strlen(temp) >= remaining) {
+			pr_debug("Warning: mtdparts buffer full at device %d\n",
+				 nand_count);
+			return -1;
+		}
+		strncat(mtdparts_buf, temp, remaining);
+	}
+	return 0;
+}
+
+/**
+ * Set environment variables for mtdids and mtdparts
+ */
+static int set_mtd_environment(const char *mtdids_buf, const char *mtdparts_buf,
+			       int nand_count)
+{
+	int ret;
+
+	if (nand_count > 0) {
+		printf("Setting mtdids: %s\n", mtdids_buf);
+		printf("Setting mtdparts: %s\n", mtdparts_buf);
+
+		/* Set environment variables */
+		ret = env_set("mtdids", mtdids_buf);
+		if (ret) {
+			pr_debug("Failed to set mtdids: %d\n", ret);
+			return ret;
+		}
+		ret = env_set("mtdparts", mtdparts_buf);
+		if (ret) {
+			pr_debug("Failed to set mtdparts: %d\n", ret);
+			return ret;
+		}
+		pr_debug("Successfully configured %d physical NAND device(s)\n",
+			 nand_count);
+	} else {
+		pr_debug("No physical NAND devices found\n");
+		/* Check if there are NAND partitions but no physical device */
+		struct mtd_info *mtd;
+		mtd_for_each_device(mtd)
+		{
+			if (mtd && (mtd->type == MTD_NANDFLASH ||
+				    mtd->type == MTD_MLCNANDFLASH)) {
+				pr_debug(
+					"Note: Found NAND partition '%s' but no physical device\n",
+					mtd->name);
+				break;
+			}
+		}
+	}
+
+	return 0;
+}
+
+int detect_nand_devices_and_override_mtdparts(void)
+{
+	struct mtd_info *mtd;
+	char mtdids_buf[512] = { 0 };
+	char mtdparts_buf[2048] = { 0 };
+	int nand_count = 0;
+	int ret = 0;
+
+	pr_debug("Detecting NAND devices...\n");
+	char *cmd_para = "mtd list";
+	run_command(cmd_para, 0);
+
+	/* Iterate through all MTD devices */
+	mtd_for_each_device(mtd)
+	{
+		if (!mtd)
+			continue;
+
+		/* Only detect top-level physical NAND devices (not partitions) */
+		if (mtd_type_is_nand(mtd) && !mtd_is_partition(mtd)) {
+			pr_debug(
+				"Found physical NAND device: %s, size: 0x%llx (%llu MB)\n",
+				mtd->name, mtd->size, mtd->size >> 20);
+
+			/* Check device name validity */
+			if (!mtd->name || strlen(mtd->name) == 0) {
+				pr_debug(
+					"Warning: NAND device has invalid name, skipping\n");
+				continue;
+			}
+
+			/* Get device name from device tree or use default */
+			const char *device_name = get_device_name(mtd);
+
+			/* Build mtdids string entry */
+			if (build_mtdids_entry(mtdids_buf, sizeof(mtdids_buf),
+					       nand_count, device_name) < 0) {
+				break;
+			}
+
+			/* Build mtdparts string entry */
+			char part_str[512] = { 0 };
+			build_mtdparts_entry(mtd, device_name, part_str,
+					     sizeof(part_str));
+
+			/* Add to main mtdparts buffer */
+			if (add_mtdparts_entry(mtdparts_buf,
+					       sizeof(mtdparts_buf), nand_count,
+					       part_str) < 0) {
+				break;
+			}
+
+			nand_count++;
+		}
+	}
+
+	/* Set environment variables */
+	ret = set_mtd_environment(mtdids_buf, mtdparts_buf, nand_count);
+	if (ret) {
+		return ret;
+	}
+
+	/* Update bootargs with mtdparts */
+	char *cmd_para_mtd =
+		"setenv bootargs \"${bootargs} mtdparts=${mtdparts}\"";
+	run_command(cmd_para_mtd, 0);
 	return 0;
 }
 
@@ -1447,4 +1747,24 @@ char *board_fdt_chosen_bootargs(void)
 	}
 
 	return merged;
+}
+
+void arch_print_bdinfo(void)
+{
+	const char *info;
+
+	info = fdt_getprop(gd->fdt_blob, 0, "model", NULL);
+	if (info)
+		printf("model: %s\n", info);
+	info = fdt_getprop(gd->fdt_blob, 0, "compatible", NULL);
+	if (info)
+		printf("compatible: %s\n", info);
+
+	if (ddr_type)
+		printf("DDR type: %s\n", ddr_type);
+
+	if (ddr_datarate)
+		printf("DDR speed: %d MT/s\n", ddr_datarate);
+
+	printf("DDR size: %d MB\n", ddr_get_density());
 }

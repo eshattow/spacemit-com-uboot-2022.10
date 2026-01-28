@@ -11,16 +11,6 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#define MUX_MODE0	0					/* func 0 */
-#define MUX_MODE1	BIT(0)				/* func 1 */
-#define MUX_MODE2	BIT(1)				/* func 2 */
-#define MUX_MODE3	BIT(0) | BIT(1)		/* func 3 */
-#define MUX_MODE4	BIT(2)				/* func 4 */
-#define MUX_MODE5	BIT(0) | BIT(2)		/* func 5 */
-#define EDGE_NONE	BIT(6)				/* edge-detection is unabled */
-#define PAD_1V8_DS2	BIT(12)				/* voltage:1.8v, driver strength: 2 */
-#define PULL_UP		BIT(14) | BIT(15)	/* pull-up */
-
 #define I2C_PIN_CONFIG(x)	((x) | EDGE_NONE | PULL_UP | PAD_1V8_DS2)
 #define READ_I2C_LINE_LEN (16)
 

@@ -221,7 +221,7 @@ static int check_nand_bootfs(void)
 		return -1;
 	}
 
-	snprintf(cmd, sizeof(cmd), "ubi part %s", parse_mtdparts_and_find_bootfs());
+	snprintf(cmd, sizeof(cmd), "ubi part %s", bootfs_name);
 	if (run_command(cmd, 0) != 0) {
 		return -1;
 	}
@@ -234,7 +234,7 @@ static int check_nand_bootfs(void)
 	return 0;
 }
 
-static int check_nor_bootfs(void)
+static int check_nor_nand_bootfs(void)
 {
 	int part, blk_index;
 	char *blk_name;
@@ -242,6 +242,10 @@ static int check_nor_bootfs(void)
 
 	if (get_available_boot_blk_dev(&blk_name, &blk_index)) {
 		pr_err("Cannot get available block device\n");
+		int ret = check_nand_bootfs();
+		if (ret == 0) {
+			return 0;
+		}
 		return -1;
 	}
 
@@ -301,10 +305,8 @@ int check_bootfs_exists(void)
 
 	switch (boot_mode) {
 	case BOOT_MODE_NAND:
-		ret = check_nand_bootfs();
-		break;
 	case BOOT_MODE_NOR:
-		ret = check_nor_bootfs();
+		ret = check_nor_nand_bootfs();
 		break;
 	case BOOT_MODE_EMMC:
 		ret = check_mmc_bootfs(MMC_DEV_EMMC);

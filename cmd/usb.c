@@ -402,7 +402,12 @@ static void usb_show_tree_graph(struct usb_device *dev, char *pre)
 					portspeed(dev->speed),
 					dev->config.desc.bMaxPower * 2);
 	if (strlen(dev->mf) || strlen(dev->prod) || strlen(dev->serial))
+#if CONFIG_IS_ENABLED(DM_USB)
+		printf(" %s  %s %s %s %s\n", pre, dev->mf, dev->prod,
+		       dev->serial, dev->controller_dev->name);
+#else
 		printf(" %s  %s %s %s\n", pre, dev->mf, dev->prod, dev->serial);
+#endif
 	printf(" %s\n", pre);
 #ifdef CONFIG_DM_USB
 	struct udevice *child;

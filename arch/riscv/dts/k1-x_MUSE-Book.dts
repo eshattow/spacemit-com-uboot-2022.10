@@ -265,7 +265,7 @@
 };
 
 &panel {
-	force-attached = "lt8911ext_edp_1080p";
+	force-attached = "lcd_lt8911_edp_1920x1080";
 	backlight = <&backlight>;
 	status = "okay";
 };

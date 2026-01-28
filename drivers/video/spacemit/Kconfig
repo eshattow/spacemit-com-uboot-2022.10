@@ -10,7 +10,7 @@ menuconfig VIDEO_SPACEMIT
 	  This driver supports the on-chip video output device.
 
 config VIDEO_SPACEMIT_MAX_XRES
-        int "Maximum horizontal resolution (for memory allocation purposes)"
+	int "Maximum horizontal resolution (for memory allocation purposes)"
 	depends on VIDEO_SPACEMIT
 	default 1920
 	help
@@ -19,15 +19,13 @@ config VIDEO_SPACEMIT_MAX_XRES
 	  framebuffer during device-model binding/probing.
 
 config VIDEO_SPACEMIT_MAX_YRES
-        int "Maximum vertical resolution (for memory allocation purposes)"
+	int "Maximum vertical resolution (for memory allocation purposes)"
 	depends on VIDEO_SPACEMIT
 	default 1200
 	help
 	  The maximum vertical resolution to support for the framebuffer.
 	  This configuration is used for reserving/allocating memory for the
 	  framebuffer during device-model binding/probing.
-
-if VIDEO_SPACEMIT
 
 config DISPLAY_SPACEMIT_HDMI
 	bool "HDMI port"
@@ -57,4 +55,4 @@ config DISPLAY_SPACEMIT_DPI
 	  This enables Mobile Industry Processor Interface(DPI) display
 	  support.
 
-endif
+source "drivers/video/spacemit/dsi/Kconfig"

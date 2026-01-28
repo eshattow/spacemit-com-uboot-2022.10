@@ -17,6 +17,10 @@
 #include <mtd.h>
 #include <fb_spacemit.h>
 #include <command.h>
+#include <dm.h>
+#include <dm/uclass.h>
+#include <dm/device.h>
+#include <dm/device-internal.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -246,15 +250,38 @@ static void getvar_current_slot(char *var_parameter, char *response)
 static void getvar_mtd_size(char *var_parameter, char *response)
 {
 	u32 boot_mode = get_boot_pin_select();
+	struct mtd_info *mtd;
+
 	switch(boot_mode){
 	case BOOT_MODE_NOR:
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MTD)
+		/*if select nor/nand, it would check if mtd dev exists or not*/
+		mtd_probe_devices();
+		mtd_for_each_device(mtd) {
+				if (!mtd_is_partition(mtd) && (mtd->type == MTD_NORFLASH)) {
+					if (mtd->size / 0x40000000){
+					fastboot_response("OKAY", response, "%lldG", mtd->size / 0x40000000);
+					return;
+				}
+				if (mtd->size / 0x100000){
+					fastboot_response("OKAY", response, "%lldM", mtd->size / 0x100000);
+					return;
+				}
+				if (mtd->size / 0x400){
+					fastboot_response("OKAY", response, "%lldK", mtd->size / 0x400);
+					return;
+				}
+			}
+		}
+		fastboot_fail("no mtd device", response);
+		break;
+#endif
 	case BOOT_MODE_NAND:
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MTD)
 		/*if select nor/nand, it would check if mtd dev exists or not*/
-		struct mtd_info *mtd;
 		mtd_probe_devices();
 		mtd_for_each_device(mtd) {
-			if (!mtd_is_partition(mtd)) {
+			if (!mtd_is_partition(mtd) && mtd_type_is_nand(mtd)) {
 				if (mtd->size / 0x40000000){
 					fastboot_response("OKAY", response, "%lldG", mtd->size / 0x40000000);
 					return;
@@ -294,9 +321,28 @@ static void getvar_blk_size(char *var_parameter, char *response)
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
 	case BOOT_MODE_NOR:
-	case BOOT_MODE_NAND:
+		struct mtd_info *mtd;
 		if (get_available_blk_dev(&blk_name, &blk_index)){
-			fastboot_fail("no block device", response);
+			mtd_probe_devices();
+			{
+				mtd_for_each_device(mtd) {
+					if (!mtd_is_partition(mtd) && mtd_type_is_nand(mtd)) {
+						if (mtd->size / 0x40000000){
+							fastboot_response("OKAY", response, "%lldG", mtd->size / 0x40000000);
+							return;
+						}
+						if (mtd->size / 0x100000){
+							fastboot_response("OKAY", response, "%lldM", mtd->size / 0x100000);
+							return;
+						}
+						if (mtd->size / 0x400){
+							fastboot_response("OKAY", response, "%lldK", mtd->size / 0x400);
+							return;
+						}
+					}
+				}
+			}
+			fastboot_fail("no block or nand device", response);
 			return;
 		}
 
@@ -304,8 +350,9 @@ static void getvar_blk_size(char *var_parameter, char *response)
 		if (dev_desc != NULL)
 			fastboot_okay("universal", response);
 		else
-			fastboot_fail("no block device", response);
+			fastboot_fail("no block or nand device", response);
 		return;
+	case BOOT_MODE_NAND:
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
 #ifdef CONFIG_FASTBOOT_FLASH_MMC_DEV

@@ -574,7 +574,14 @@ int vidconsole_put_char(struct udevice *dev, char ch)
 		void *start = vid_priv->fb + priv->ycur * vid_priv->line_length;
 		void *end = start + vid_priv->line_length;
 
+#if defined(CONFIG_RISCV) && !CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
+		/* Align to cache block boundaries for RISC-V */
+		unsigned long aligned_start = round_down((unsigned long)start, CONFIG_RISCV_CBOM_BLOCK_SIZE);
+		unsigned long aligned_end = round_up((unsigned long)end, CONFIG_RISCV_CBOM_BLOCK_SIZE);
+		flush_dcache_range(aligned_start, aligned_end);
+#else
 		flush_dcache_range((unsigned long)start, (unsigned long)end);
+#endif
 		break;
 	}
 
@@ -610,7 +617,14 @@ int vidconsole_put_string(struct udevice *dev, const char *str)
 	void *start = vid_priv->fb;
 	void *end = start + vid_priv->fb_size;
 
+#if defined(CONFIG_RISCV) && !CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
+	/* Align to cache block boundaries for RISC-V */
+	unsigned long aligned_start = round_down((unsigned long)start, CONFIG_RISCV_CBOM_BLOCK_SIZE);
+	unsigned long aligned_end = round_up((unsigned long)end, CONFIG_RISCV_CBOM_BLOCK_SIZE);
+	flush_dcache_range(aligned_start, aligned_end);
+#else
 	flush_dcache_range((unsigned long)start, (unsigned long)end);
+#endif
 	return 0;
 }
 

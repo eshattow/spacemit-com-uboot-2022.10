@@ -360,11 +360,14 @@
 };
 
 &mipi_dsi {
+	esc-clk = <76800000>;
+	bit-clk = <1000000000>;
+	pix-clk = <153000000>;
 	status = "okay";
 };
 
 &panel {
-	force-attached = "icnl9951r";
+	force-attached = "lcd_icnl9951r_mipi";
 	dcp-gpios = <&gpio 34 0>;
 	dcn-gpios = <&gpio 42 0>;
 	avee-gpios = <&gpio 35 0>;
