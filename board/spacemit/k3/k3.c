@@ -1375,6 +1375,44 @@ int board_fit_config_name_match(const char *name)
 }
 #endif
 
+static void update_boot_mode_to_bootargs(void)
+{
+	uint32_t boot_mode;
+	char *boot_mode_str, *new_boot_args;
+	const char *boot_args;
+
+	/* when boot from sdcard, can NOT get its boot mode from strap pin */
+	boot_mode = get_boot_mode();
+	if (BOOT_MODE_SD != boot_mode)
+		boot_mode = get_boot_pin_select();
+
+	switch (boot_mode) {
+	case BOOT_MODE_EMMC:
+		boot_mode_str = "boot_mode=emmc";
+		break;
+	case BOOT_MODE_NOR:
+		boot_mode_str = "boot_mode=nor";
+		break;
+	case BOOT_MODE_NAND:
+		boot_mode_str = "boot_mode=nand";
+		break;
+	case BOOT_MODE_UFS:
+		boot_mode_str = "boot_mode=ufs";
+		break;
+	default:
+		boot_mode_str = "boot_mode=sdcard";
+		break;
+    }
+
+	boot_args = env_get("bootargs");
+	new_boot_args = calloc(1, strlen(boot_args) + 32);
+	strcpy(new_boot_args, boot_args);
+	strcat(new_boot_args, " ");
+	strcat(new_boot_args, boot_mode_str);
+	env_set("bootargs", new_boot_args);
+	free(new_boot_args);
+}
+
 static bool has_bootarg(const char *args, const char *param, size_t param_len)
 {
 	const char *p = args;
@@ -1406,11 +1444,14 @@ static bool has_bootarg(const char *args, const char *param, size_t param_len)
 char *board_fdt_chosen_bootargs(void)
 {
 	const void *fdt;
-	const char *env_args = env_get("bootargs");
+	const char *env_args;
 	const char *dts_args = NULL;
 	char *merged = NULL;
 	int nodeoffset;
 
+	update_boot_mode_to_bootargs();
+
+	env_args = env_get("bootargs");
 	fdt = (void *)env_get_hex("fdt_addr", 0);
 	if (!fdt) {
 		return (char *)env_args;
