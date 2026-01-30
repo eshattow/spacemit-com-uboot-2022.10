@@ -36,6 +36,7 @@ configure)
         exit 0
     fi
 
+    BOOT_MODE=""
     for x in $(cat /proc/cmdline); do
         case $x in
         root=UUID=*)
@@ -53,12 +54,99 @@ configure)
         root=*)
             ROOT=${x#root=}
             ;;
+        boot_mode=*)
+            BOOT_MODE=${x#boot_mode=}
+            ;;
         esac
     done
 
-    if [ -n $ROOT ]; then
-        case $ROOT in
+    # 根据boot_mode获取启动介质设备
+    get_boot_device_from_mode() {
+        local mode=$1
+        case $mode in
+        emmc)
+            echo "/dev/mmcblk2"
+            ;;
+        sdcard)
+            echo "/dev/mmcblk0"
+            ;;
+        nor)
+            if [ -e "/dev/mtdblock0" ]; then
+                echo "/dev/mtdblock0"
+            else
+                echo ""
+            fi
+            ;;
+        nand)
+            # NAND设备也使用MTD子系统，通常是/dev/mtdblock0
+            if [ -e "/dev/mtdblock0" ]; then
+                echo "/dev/mtdblock0"
+            else
+                echo ""
+            fi
+            ;;
+        ufs)
+            echo "/dev/sda"
+            ;;
+        *)
+            echo ""
+            ;;
+        esac
+    }
+
+    # 从rootfs设备路径获取基础设备
+    get_base_device() {
+        local dev=$1
+        case $dev in
         "/dev/mmcblk0"*)
+            echo "/dev/mmcblk0"
+            ;;
+        "/dev/mmcblk2"*)
+            echo "/dev/mmcblk2"
+            ;;
+        "/dev/sda"*)
+            echo "/dev/sda"
+            ;;
+        "/dev/nvme0n1"*)
+            echo "/dev/nvme0n1"
+            ;;
+        *)
+            echo ""
+            ;;
+        esac
+    }
+
+    # 确定目标设备：如果有boot_mode且与rootfs设备不同，使用启动设备；否则使用rootfs设备
+    TARGET_DEVICE=""
+    if [ -n "$BOOT_MODE" ]; then
+        BOOT_DEVICE=$(get_boot_device_from_mode "$BOOT_MODE")
+        if [ -n "$BOOT_DEVICE" ] && [ -n "$ROOT" ]; then
+            ROOT_BASE_DEVICE=$(get_base_device "$ROOT")
+            # 比较启动设备和rootfs基础设备
+            if [ "$BOOT_DEVICE" != "$ROOT_BASE_DEVICE" ]; then
+                TARGET_DEVICE="$BOOT_DEVICE"
+                echo "Boot device ($BOOT_MODE -> $BOOT_DEVICE) differs from rootfs device ($ROOT_BASE_DEVICE), using boot device."
+            else
+                TARGET_DEVICE="$ROOT_BASE_DEVICE"
+                echo "Boot device matches rootfs device, using $TARGET_DEVICE."
+            fi
+        elif [ -n "$BOOT_DEVICE" ]; then
+            TARGET_DEVICE="$BOOT_DEVICE"
+            echo "Using boot device from boot_mode=$BOOT_MODE: $TARGET_DEVICE"
+        else
+            echo "Unsupported boot_mode=$BOOT_MODE, unable to determine boot device."
+            exit 1
+        fi
+    fi
+
+    # 如果没有确定目标设备（无boot_mode或解析失败），使用原有逻辑
+    if [ -z "$TARGET_DEVICE" ] && [ -n "$ROOT" ]; then
+        TARGET_DEVICE=$(get_base_device "$ROOT")
+    fi
+
+    if [ -n "$TARGET_DEVICE" ]; then
+        case $TARGET_DEVICE in
+        "/dev/mmcblk0")
             BOOTINFO_FILE=bootinfo_block.bin
             BOOTINFO=/dev/mmcblk0
             BOOTINFO_SEEK=$((1024 * 1024))
@@ -70,7 +158,7 @@ configure)
             # 以KB为单位
             UBOOT_SEEK=8192
             ;;
-        "/dev/mmcblk2"*)
+        "/dev/mmcblk2")
             BOOTINFO_FILE=bootinfo_block.bin
             BOOTINFO=/dev/mmcblk2
             BOOTINFO_SEEK=$((1024 * 1024))
@@ -82,7 +170,7 @@ configure)
             # 以KB为单位
             UBOOT_SEEK=8192
             ;;
-        "/dev/sda"*)
+        "/dev/sda")
             BOOTINFO_FILE=bootinfo_block.bin
             BOOTINFO=/dev/sda
             BOOTINFO_SEEK=$((1024 * 1024))
@@ -94,10 +182,28 @@ configure)
             # 以KB为单位
             UBOOT_SEEK=8192
             ;;
-        "/dev/nvme0n1"*)
+        "/dev/mtdblock0")
+            if [ "$BOOT_MODE" = "nand" ]; then
+                BOOTINFO_FILE=bootinfo_spinand.bin
+            else
+                BOOTINFO_FILE=bootinfo_spinor.bin
+            fi
+            BOOTINFO=/dev/mtdblock0
+            BOOTINFO_SEEK=0
+            FSBL=/dev/mtdblock0
+            FSBL_SEEK=$((128 * 1024))
+            ENV=/dev/mtdblock0
+            ENV_SEEK=$((640 * 1024))
+            UBOOT=/dev/mtdblock0
+            # 以KB为单位
+            UBOOT_SEEK=2112
+            ;;
+        "/dev/nvme0n1")
+            # 兼容无bootmode的情况
             if [ -e "/dev/mtdblock6" ]; then
                 BOOTINFO_FILE=bootinfo_spinor.bin
                 BOOTINFO=/dev/mtdblock1
+                BOOTINFO_SEEK=0
                 FSBL=/dev/mtdblock2
                 FSBL_SEEK=0
                 ENV=/dev/mtdblock3
@@ -131,12 +237,12 @@ configure)
             fi
             ;;
         *)
-            echo "Unsupported root=$ROOT"
+            echo "Unsupported target device=$TARGET_DEVICE"
             exit 1
             ;;
         esac
     else
-        echo "Missing root= in cmdline"
+        echo "Unable to determine target device (missing root= or boot_mode= in cmdline)"
         exit 1
     fi
 
@@ -153,11 +259,7 @@ configure)
 
     # 此前已经做了所有检查
     set -x
-    if [ -n "$BOOTINFO_SEEK" ]; then
-        dd if=/usr/lib/u-boot/$target/$BOOTINFO_FILE of=$BOOTINFO seek=$BOOTINFO_SEEK bs=1 && sync
-    else
-        dd if=/usr/lib/u-boot/$target/$BOOTINFO_FILE of=$BOOTINFO && sync
-    fi
+    dd if=/usr/lib/u-boot/$target/$BOOTINFO_FILE of=$BOOTINFO seek=$BOOTINFO_SEEK bs=1 && sync
     dd if=/usr/lib/u-boot/$target/FSBL.bin of=$FSBL seek=$FSBL_SEEK bs=1 && sync
     dd if=/usr/lib/u-boot/$target/env.bin of=$ENV seek=$ENV_SEEK bs=1 && sync
     dd if=/usr/lib/u-boot/$target/u-boot.itb of=$UBOOT seek=$UBOOT_SEEK bs=1K && sync
