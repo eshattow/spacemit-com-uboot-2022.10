@@ -1405,6 +1405,9 @@ static void update_boot_mode_to_bootargs(void)
     }
 
 	boot_args = env_get("bootargs");
+	if (!boot_args)
+		return;
+
 	new_boot_args = calloc(1, strlen(boot_args) + 32);
 	strcpy(new_boot_args, boot_args);
 	strcat(new_boot_args, " ");
