@@ -158,7 +158,6 @@
 	rx-phase = <53>;
 
 	phy-mode = "rgmii";
-	phy-addr = <0>;
 	phy-handle = <&rgmii1>;
 
 	status = "okay";
