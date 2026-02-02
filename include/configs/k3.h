@@ -103,6 +103,11 @@
 // for those has NOT been through test procedure(ATE)
 #define SVT_DRO_DEFAULT_VALUE		(120)
 
+// non-volatile register in P1
+#define P1_NON_VOLATILE_REG		(0xab)
+#define P1_NON_VOLATILE_REG_FASTBOOT	(0x1)
+#define P1_NON_VOLATILE_REG_MASK	(0x7)
+
 #ifndef __ASSEMBLY__
 enum board_boot_mode {
 	BOOT_MODE_NONE	= 0,
