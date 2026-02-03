@@ -94,6 +94,11 @@ static struct blk_desc *k3_nor_get_usb_desc(u32 devnum)
 {
 	static bool usb_scanned;
 
+	if (BOOT_MODE_USB == get_boot_mode()) {
+		pr_info("Should NOT scan USB storage during fastboot download mode\n");
+		return NULL;
+	}
+
 	if (!usb_scanned) {
 		usb_init();
 		usb_stor_scan(1);
