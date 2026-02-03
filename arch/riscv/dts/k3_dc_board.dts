@@ -96,11 +96,11 @@
 };
 
 &usb2_host_u2phy {
-	status = "okay";
+	status = "disabled";
 };
 
 &usb2_host {
-	status = "okay";
+	status = "disabled";
 };
 
 &usb3_porta_u2phy {
