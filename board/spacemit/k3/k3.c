@@ -90,7 +90,7 @@ static u32 env_get_u32_default(const char *name, u32 default_value)
 }
 
 #if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
-static int k3_nor_usb_scan_once(void)
+static struct blk_desc *k3_nor_get_usb_desc(u32 devnum)
 {
 	static bool usb_scanned;
 
@@ -100,12 +100,6 @@ static int k3_nor_usb_scan_once(void)
 		usb_scanned = true;
 	}
 
-	return 0;
-}
-
-static struct blk_desc *k3_nor_get_usb_desc(u32 devnum)
-{
-	k3_nor_usb_scan_once();
 	return blk_get_dev("usb", devnum);
 }
 #endif
