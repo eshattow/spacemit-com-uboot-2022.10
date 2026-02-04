@@ -1521,29 +1521,62 @@ static inline void ufshcd_remove_non_printable(uint8_t *val)
 static int ufshcd_uic_pwr_ctrl(struct ufs_hba *hba, struct uic_command *cmd)
 {
 	unsigned long start = 0;
+	u32 intr_status;
+	u32 enabled_intr_status;
 	u8 status;
-	int ret;
+	int ret = 0;
 
-	ret = ufshcd_send_uic_cmd(hba, cmd);
-	if (ret) {
+	if (!ufshcd_ready_for_uic_cmd(hba)) {
 		dev_err(hba->dev,
-			"pwr ctrl cmd 0x%x with mode 0x%x uic error %d\n",
-			cmd->command, cmd->argument3, ret);
-
-		return ret;
+			"Controller not ready to accept UIC commands\n");
+		return -EIO;
 	}
 
+	/* Write Args */
+	ufshcd_writel(hba, cmd->argument1, REG_UIC_COMMAND_ARG_1);
+	ufshcd_writel(hba, cmd->argument2, REG_UIC_COMMAND_ARG_2);
+	ufshcd_writel(hba, cmd->argument3, REG_UIC_COMMAND_ARG_3);
+
+	/* Write UIC Cmd */
+	ufshcd_writel(hba, cmd->command & COMMAND_OPCODE_MASK,
+		      REG_UIC_COMMAND);
+
+	/*
+	 * For power mode change commands, we need to wait for UIC_POWER_MODE
+	 * interrupt specifically, not just UIC_COMMAND_COMPL.
+	 */
 	start = get_timer(0);
 	do {
-		status = ufshcd_get_upmcrs(hba);
+		intr_status = ufshcd_readl(hba, REG_INTERRUPT_STATUS);
+		enabled_intr_status = intr_status & hba->intr_mask;
+		ufshcd_writel(hba, intr_status, REG_INTERRUPT_STATUS);
+
 		if (get_timer(start) > UFS_UIC_CMD_TIMEOUT) {
 			dev_err(hba->dev,
-				"pwr ctrl cmd 0x%x failed, host upmcrs:0x%x\n",
-				cmd->command, status);
-			ret = (status != PWR_OK) ? status : -1;
-			break;
+				"pwr ctrl cmd 0x%x with mode 0x%x completion timeout\n",
+				cmd->command, cmd->argument3);
+			ret = -ETIMEDOUT;
+			goto check_upmcrs;
 		}
-	} while (status != PWR_LOCAL);
+
+		if (enabled_intr_status & UFSHCD_ERROR_MASK) {
+			dev_err(hba->dev, "Error in status:%08x\n",
+				enabled_intr_status);
+			return -EIO;
+		}
+	} while (!(enabled_intr_status & UIC_POWER_MODE));
+
+	cmd->argument2 = ufshcd_get_uic_cmd_result(hba);
+	cmd->argument3 = ufshcd_get_dme_attr_val(hba);
+
+check_upmcrs:
+	status = ufshcd_get_upmcrs(hba);
+	if (status != PWR_LOCAL) {
+		dev_err(hba->dev,
+			"pwr ctrl cmd 0x%x failed, host upmcrs:0x%x\n",
+			cmd->command, status);
+		ret = (status != PWR_OK) ? status : -1;
+	}
 
 	return ret;
 }
