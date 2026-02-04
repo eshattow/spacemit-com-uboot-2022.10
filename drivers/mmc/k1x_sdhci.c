@@ -143,6 +143,11 @@ struct spacemit_sdhci_priv {
 #define SDHC_DEFAULT_MAX_CLOCK (204800000)
 #define SDHC_MIN_CLOCK (200*1000)
 
+#if CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
+static int spacemit_sdhci_post_select_hs400(struct sdhci_host *host);
+static int spacemit_sdhci_pre_hs400_downgrade(struct sdhci_host *host);
+#endif
+
 /* All helper functions will update clr/set while preserve rest bits */
 static inline void spacemit_sdhci_setbits(struct sdhci_host *host, u32 val, int reg)
 {
@@ -195,7 +200,7 @@ static void spacemit_sdhci_set_voltage(struct sdhci_host *host)
 {
 	if (IS_ENABLED(CONFIG_MMC_IO_VOLTAGE)) {
 		struct mmc *mmc = (struct mmc *)host->mmc;
-		u32 ctrl;
+		u16 ctrl;
 
 		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 
@@ -214,20 +219,17 @@ static void spacemit_sdhci_set_voltage(struct sdhci_host *host)
 				}
 			}
 #endif
-			if (IS_SD(mmc)) {
-				ctrl &= ~SDHCI_CTRL_VDD_180;
-				sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
-			}
+			ctrl &= ~SDHCI_CTRL_VDD_180;
+			sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
 
 			/* Wait for 5ms */
 			mdelay(5);
 
 			/* 3.3V regulator output should be stable within 5 ms */
-			if (IS_SD(mmc)) {
-				if (ctrl & SDHCI_CTRL_VDD_180) {
-					pr_err("3.3V regulator output did not become stable\n");
-					return;
-				}
+			ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+			if (ctrl & SDHCI_CTRL_VDD_180) {
+				pr_err("3.3V regulator output did not become stable\n");
+				return;
 			}
 
 			break;
@@ -245,20 +247,17 @@ static void spacemit_sdhci_set_voltage(struct sdhci_host *host)
 				}
 			}
 #endif
-			if (IS_SD(mmc)) {
-				ctrl |= SDHCI_CTRL_VDD_180;
-				sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
-			}
+			ctrl |= SDHCI_CTRL_VDD_180;
+			sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
 
 			/* Wait for 5 ms */
 			mdelay(5);
 
 			/* 1.8V regulator output has to be stable within 5 ms */
-			if (IS_SD(mmc)) {
-				if (!(ctrl & SDHCI_CTRL_VDD_180)) {
-					pr_err("1.8V regulator output did not become stable\n");
-					return;
-				}
+			ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+			if (!(ctrl & SDHCI_CTRL_VDD_180)) {
+				pr_err("1.8V regulator output did not become stable\n");
+				return;
 			}
 
 			break;
@@ -362,6 +361,10 @@ static void spacemit_sdhci_set_control_reg(struct sdhci_host *host)
 		}
 	}
 
+#if CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
+	if (mmc->selected_mode == MMC_HS)
+		spacemit_sdhci_pre_hs400_downgrade(host);
+#endif
 	/* according to the SDHC_TX_CFG_REG(0x11c<bit>),
 	 * set TX_INT_CLK_SEL to gurantee the hold time
 	 * at default speed mode or HS/SDR12/SDR25/SDR50 mode.
@@ -391,6 +394,16 @@ static void spacemit_sdhci_set_control_reg(struct sdhci_host *host)
 
 	sdhci_set_uhs_timing(host);
 	return;
+}
+
+static int spacemit_sdhci_set_ios_post(struct sdhci_host *host)
+{
+#if CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
+	if (host->mmc->selected_mode == MMC_HS_400)
+		spacemit_sdhci_post_select_hs400(host);
+#endif
+
+	return 0;
 }
 
 #ifdef MMC_SUPPORTS_TUNING
@@ -509,15 +522,22 @@ static int spacemit_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
 	 * Tuning is required for SDR50/SDR104, HS200/HS400 cards and
 	 * if clock frequency is greater than 100MHz in these modes.
 	 */
-	if (!IS_SD(host->mmc) ||
-		!((mmc->selected_mode == UHS_SDR50) ||
+	if (mmc->clock < 100 * 1000 * 1000 ||
+		!((mmc->selected_mode == MMC_HS_200) ||
+		  (mmc->selected_mode == UHS_SDR50) ||
 		  (mmc->selected_mode == UHS_SDR104)))
 		return 0;
+
+	if (IS_SD(mmc) && !mmc_getcd(mmc)) {
+		return 0;
+	}
 
 	/* TX tuning config */
 	if (!priv->phy_module) {
 		dev_info(mmc->dev, "set tx_delaycode: %d\n", rxtuning->tx_delaycode);
 		spacemit_sw_tx_tuning_prepare(host);
+	} else {
+		dev_info(mmc->dev, "use tx default timing\n");
 	}
 
 	/* step 2: get pass window and calculate the select_delay */
@@ -534,7 +554,7 @@ static int spacemit_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
 }
 #endif
 
-#if CONFIG_IS_ENABLED(MMC_HS400_ES_SUPPORT)
+#if CONFIG_IS_ENABLED(MMC_HS400_ES_SUPPORT) || CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
 static int spacemit_sdhci_phy_dll_init(struct sdhci_host *host)
 {
 	u32 state;
@@ -561,10 +581,45 @@ static int spacemit_sdhci_phy_dll_init(struct sdhci_host *host)
 
 	return 0;
 }
+#endif
 
+#if CONFIG_IS_ENABLED(MMC_HS400_ES_SUPPORT)
 static int spacemit_sdhci_hs400_enhanced_strobe(struct sdhci_host *host)
 {
 	spacemit_sdhci_setbits(host, SDHC_ENHANCE_STROBE_EN, SPACEMIT_SDHC_MMC_CTRL_REG);
+	return spacemit_sdhci_phy_dll_init(host);
+}
+#endif
+
+#if CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
+static int spacemit_sdhci_pre_hs400_downgrade(struct sdhci_host *host)
+{
+	spacemit_sdhci_clrbits(host, SDHC_PHY_FUNC_EN | SDHC_PHY_PLL_LOCK,
+			       SPACEMIT_SDHC_PHY_CTRL_REG);
+	spacemit_sdhci_clrbits(host, SDHC_MMC_HS400 | SDHC_MMC_HS200 | SDHC_ENHANCE_STROBE_EN,
+			       SPACEMIT_SDHC_MMC_CTRL_REG);
+	spacemit_sdhci_clrbits(host, SDHC_HS200_USE_RFIFO, SPACEMIT_SDHC_PHY_FUNC_REG);
+
+	udelay(5);
+
+	spacemit_sdhci_setbits(host, SDHC_PHY_FUNC_EN | SDHC_PHY_PLL_LOCK,
+			       SPACEMIT_SDHC_PHY_CTRL_REG);
+
+	return 0;
+}
+
+static int spacemit_sdhci_pre_select_hs400(struct udevice *dev)
+{
+	struct spacemit_sdhci_priv *priv = dev_get_priv(dev);
+	struct sdhci_host *host = &priv->host;
+
+	spacemit_sdhci_setbits(host, SDHC_MMC_HS400, SPACEMIT_SDHC_MMC_CTRL_REG);
+
+	return 0;
+}
+
+static int spacemit_sdhci_post_select_hs400(struct sdhci_host *host)
+{
 	return spacemit_sdhci_phy_dll_init(host);
 }
 #endif
@@ -620,6 +675,7 @@ static inline int spacemit_sdhci_get_clocks(struct udevice *dev)
 
 const struct sdhci_ops spacemit_sdhci_ops = {
 	.set_control_reg = spacemit_sdhci_set_control_reg,
+	.set_ios_post = spacemit_sdhci_set_ios_post,
 #ifdef MMC_SUPPORTS_TUNING
 	.platform_execute_tuning = spacemit_sdhci_execute_tuning,
 #endif
@@ -650,7 +706,9 @@ static int spacemit_sdhci_probe(struct udevice *dev)
 	host->host_caps = MMC_MODE_HS | MMC_MODE_HS_52MHz;
 	host->ops = &spacemit_sdhci_ops;
 	mmc_driver_ops->wait_dat0 = spacemit_sdhci_wait_dat0;
-
+#if CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
+	mmc_driver_ops->hs400_prepare_ddr = spacemit_sdhci_pre_select_hs400;
+#endif
 	host->mmc = &plat->mmc;
 	host->mmc->dev = dev;
 	ret = sdhci_setup_cfg(&plat->cfg, host, host->max_clk, SDHC_MIN_CLOCK);
@@ -695,6 +753,8 @@ static int spacemit_sdhci_of_to_plat(struct udevice *dev)
 	priv->rxtuning.rx_dline_reg = dev_read_u32_default(dev, "spacemit,rx_dline_reg", RX_TUNING_DLINE_REG);
 	/* read rx tuning window limit */
 	priv->rxtuning.window_limit = dev_read_u32_default(dev, "spacemit,rx_tuning_limit", RX_TUNING_WINDOW_THRESHOLD);
+	/* read rx tuning window type */
+	priv->rxtuning.window_type = dev_read_u32_default(dev, "spacemit,rx_tuning_type", MIDDLE_WINDOW);
 
 	/* tx tuning dline_reg */
 	priv->rxtuning.tx_dline_reg = dev_read_u32_default(dev, "spacemit,tx_dline_reg", TX_TUNING_DLINE_REG);
