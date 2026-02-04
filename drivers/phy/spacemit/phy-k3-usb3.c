@@ -30,6 +30,7 @@
 
 #define PLL_TIMEOUT 500000 /* For PHY PLL lock (usec) */
 #define POLL_DELAY 500 /* Time between polls (usec) */
+#define PU_CAL_TIMEOUT 2000000
 
 /* Selecting the combo PHY operating mode requires APMU regmap access */
 #define SYSCON_APMU "spacemit,syscon-apmu"
@@ -74,6 +75,7 @@
 #define PU_CAL BIT(17)
 
 #define APB_SPARE_RCAL_HSIO 0x17c
+#define PU_CAL_DONE BIT(8)
 #define R_CAL_OVRD_NTRIM_EN BIT(29)
 #define R_CAL_OVRD_NTRIM_MASK GENMASK(27, 24)
 #define R_CAL_OVRD_NTRIM_VAL(val) FIELD_PREP(R_CAL_OVRD_NTRIM_MASK, val)
@@ -305,16 +307,19 @@ static int k3_usb3phy_init_single(struct k3_usb3phy *k3_phy, void __iomem *base)
 
 	k3_update_bits(apb_spare, APB_SPARE_PU_CAL, PU_CAL, PU_CAL);
 
-	k3_update_bits(apb_spare, APB_SPARE_RCAL_HSIO,
-		       R_CAL_OVRD_NTRIM_EN | R_CAL_OVRD_PTRIM_EN,
-		       R_CAL_OVRD_NTRIM_EN | R_CAL_OVRD_PTRIM_EN);
+	ret = readl_poll_timeout(apb_spare + APB_SPARE_RCAL_HSIO,
+				 reg, (reg & PU_CAL_DONE) == PU_CAL_DONE, PU_CAL_TIMEOUT);
+	if (ret) {
+		dev_err(k3_phy->dev,"PU PHY RCAL timeout, trim override\n");
+		k3_update_bits(apb_spare, APB_SPARE_RCAL_HSIO,
+			       R_CAL_OVRD_NTRIM_EN | R_CAL_OVRD_PTRIM_EN,
+			       R_CAL_OVRD_NTRIM_EN | R_CAL_OVRD_PTRIM_EN);
 
-	k3_update_bits(apb_spare, APB_SPARE_RCAL_HSIO,
-		       R_CAL_OVRD_NTRIM_MASK | R_CAL_OVRD_PTRIM_MASK,
-		       R_CAL_OVRD_NTRIM_VAL(NTRIM_DEFAULT) |
-		       R_CAL_OVRD_PTRIM_VAL(PTRIM_DEFAULT));
-
-	mdelay(100);
+		k3_update_bits(apb_spare, APB_SPARE_RCAL_HSIO,
+			       R_CAL_OVRD_NTRIM_MASK | R_CAL_OVRD_PTRIM_MASK,
+			       R_CAL_OVRD_NTRIM_VAL(NTRIM_DEFAULT) |
+			       R_CAL_OVRD_PTRIM_VAL(PTRIM_DEFAULT));
+	}
 
 	/* Do not wait CDR lock before sampling data */
 	k3_update_bits(base, PHY_RESET_CFG, EN_SAMPLE_DATA_AFTER_LOCK, 0);
