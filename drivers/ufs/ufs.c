@@ -79,6 +79,13 @@ static inline bool ufshcd_is_hba_active(struct ufs_hba *hba);
 static inline void ufshcd_hba_stop(struct ufs_hba *hba);
 static int ufshcd_hba_enable(struct ufs_hba *hba);
 
+#ifndef CONFIG_SPACEMIT_K3_UFS
+static int ufshcd_query_attr_retry(struct ufs_hba *hba,
+				   enum query_opcode opcode,
+				   enum attr_idn idn, u8 index, u8 selector,
+				   u32 *attr_val);
+#endif
+
 /*
  * ufshcd_wait_for_register - wait for register value to change
  */
@@ -121,7 +128,11 @@ static void ufshcd_init_pwr_info(struct ufs_hba *hba)
  * ufshcd_print_pwr_info - print power params as saved in hba
  * power info
  */
+#ifdef CONFIG_SPACEMIT_K3_UFS
+void ufshcd_print_pwr_info(struct ufs_hba *hba)
+#else
 static void ufshcd_print_pwr_info(struct ufs_hba *hba)
+#endif
 {
 	static const char * const names[] = {
 		"INVALID MODE",
@@ -1123,6 +1134,97 @@ static int ufshcd_query_flag_retry(struct ufs_hba *hba,
 	return ret;
 }
 
+/**
+ * ufshcd_query_attr() - API function for sending attribute query requests
+ */
+static int ufshcd_query_attr(struct ufs_hba *hba, enum query_opcode opcode,
+			     enum attr_idn idn, u8 index, u8 selector,
+			     u32 *attr_val)
+{
+	struct ufs_query_req *request = NULL;
+	struct ufs_query_res *response = NULL;
+	int err;
+	int timeout = QUERY_REQ_TIMEOUT;
+
+	ufshcd_init_query(hba, &request, &response, opcode, idn, index,
+			  selector);
+
+	switch (opcode) {
+	case UPIU_QUERY_OPCODE_WRITE_ATTR:
+		if (!attr_val) {
+			dev_err(hba->dev, "%s: Invalid argument for write request\n",
+				__func__);
+			err = -EINVAL;
+			goto out;
+		}
+		request->query_func = UPIU_QUERY_FUNC_STANDARD_WRITE_REQUEST;
+		request->upiu_req.value = cpu_to_be32(*attr_val);
+		break;
+	case UPIU_QUERY_OPCODE_READ_ATTR:
+		if (!attr_val) {
+			dev_err(hba->dev, "%s: Invalid argument for read request\n",
+				__func__);
+			err = -EINVAL;
+			goto out;
+		}
+		request->query_func = UPIU_QUERY_FUNC_STANDARD_READ_REQUEST;
+		break;
+	default:
+		dev_err(hba->dev,
+			"%s: Expected query attr opcode but got = %d\n",
+			__func__, opcode);
+		err = -EINVAL;
+		goto out;
+	}
+
+	err = ufshcd_exec_dev_cmd(hba, DEV_CMD_TYPE_QUERY, timeout);
+	if (err) {
+		dev_err(hba->dev,
+			"%s: Sending attr query for idn %d failed, err = %d\n",
+			__func__, idn, err);
+		goto out;
+	}
+
+	if (opcode == UPIU_QUERY_OPCODE_READ_ATTR && attr_val)
+		*attr_val = be32_to_cpu(response->upiu_res.value);
+
+out:
+	return err;
+}
+
+#ifdef CONFIG_SPACEMIT_K3_UFS
+int ufshcd_query_attr_retry(struct ufs_hba *hba,
+			    enum query_opcode opcode,
+			    enum attr_idn idn, u8 index, u8 selector,
+			    u32 *attr_val)
+#else
+static int ufshcd_query_attr_retry(struct ufs_hba *hba,
+				   enum query_opcode opcode,
+				   enum attr_idn idn, u8 index, u8 selector,
+				   u32 *attr_val)
+#endif
+{
+	int ret;
+	int retries;
+
+	for (retries = 0; retries < QUERY_REQ_RETRIES; retries++) {
+		ret = ufshcd_query_attr(hba, opcode, idn, index,
+					selector, attr_val);
+		if (ret)
+			dev_dbg(hba->dev,
+				"%s: failed with error %d, retries %d\n",
+				__func__, ret, retries);
+		else
+			break;
+	}
+
+	if (ret)
+		dev_err(hba->dev,
+			"%s: query attribute, opcode %d, idn %d, failed with error %d after %d retries\n",
+			__func__, opcode, idn, ret, retries);
+	return ret;
+}
+
 static int __ufshcd_query_descriptor(struct ufs_hba *hba,
 				     enum query_opcode opcode,
 				     enum desc_idn idn, u8 index, u8 selector,
@@ -1793,7 +1895,11 @@ out:
 /**
  * ufshcd_get_max_pwr_mode - reads the max power mode negotiated with device
  */
+#ifdef CONFIG_SPACEMIT_K3_UFS
+int ufshcd_get_max_pwr_mode(struct ufs_hba *hba)
+#else
 static __maybe_unused  int ufshcd_get_max_pwr_mode(struct ufs_hba *hba)
+#endif
 {
 	struct ufs_pa_layer_attr *pwr_info = &hba->max_pwr_info.info;
 
@@ -1853,8 +1959,13 @@ static __maybe_unused  int ufshcd_get_max_pwr_mode(struct ufs_hba *hba)
 	return 0;
 }
 
+#ifdef CONFIG_SPACEMIT_K3_UFS
+int ufshcd_change_power_mode(struct ufs_hba *hba,
+			     struct ufs_pa_layer_attr *pwr_mode)
+#else
 static __maybe_unused  int ufshcd_change_power_mode(struct ufs_hba *hba,
 				    struct ufs_pa_layer_attr *pwr_mode)
+#endif
 {
 	int ret;
 
@@ -2050,6 +2161,20 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 			udelay(1000);
 	}
 
+#ifdef CONFIG_SPACEMIT_K3_UFS
+	if (!err && !flag_res) {
+		/* Use platform-specific callback to set reference clock */
+		if (hba->ops && hba->ops->set_ref_clk) {
+			err = hba->ops->set_ref_clk(hba);
+			if (err == -EAGAIN)
+				return err;
+			/* Ignore other errors, continue with init */
+			if (err)
+				err = 0;
+		}
+	}
+#endif
+
 	if (err)
 		dev_err(hba->dev,
 			"%s reading fDeviceInit flag failed with error %d\n",
@@ -2103,32 +2228,16 @@ int ufs_start(struct ufs_hba *hba)
 	}
 
 	/* DEBUG: Test HS mode with gear 1, lane 1 */
-#if 1
-	if (ufshcd_get_max_pwr_mode(hba)) {
-		dev_err(hba->dev,
-			"%s: Failed getting max supported power mode\n",
-			__func__);
-	} else {
-		/*
-		 * Match Linux kernel settings:
-		 * HS-G3, 2 Lane, Rate B (hs_rate=2)
-		 */
-		hba->max_pwr_info.info.gear_rx = 3;
-		hba->max_pwr_info.info.gear_tx = 3;
-		hba->max_pwr_info.info.lane_rx = 2;
-		hba->max_pwr_info.info.lane_tx = 2;
-		hba->max_pwr_info.info.pwr_rx = FAST_MODE;
-		hba->max_pwr_info.info.pwr_tx = FAST_MODE;
-		hba->max_pwr_info.info.hs_rate = PA_HS_MODE_B;
-
-		ret = ufshcd_change_power_mode(hba, &hba->max_pwr_info.info);
+#ifdef CONFIG_SPACEMIT_K3_UFS
+	/* Use platform-specific callback to set power mode */
+	if (hba->ops && hba->ops->set_power_mode) {
+		ret = hba->ops->set_power_mode(hba);
 		if (ret) {
 			dev_err(hba->dev, "%s: Failed setting power mode, err = %d\n",
 				__func__, ret);
-
 			return ret;
 		}
-
+	} else {
 		ufshcd_print_pwr_info(hba);
 	}
 #else

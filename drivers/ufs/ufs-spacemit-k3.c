@@ -26,6 +26,7 @@ struct spacemit_k3_ufs_priv {
 	struct reset_ctl reset;
 	u32 phy_mng_base;
 	u32 atop_base;
+	u32 ref_clk_freq;	/* Reference clock frequency from DTS */
 };
 
 /*UFS PMUAP_REG*/
@@ -134,6 +135,97 @@ struct spacemit_k3_ufs_priv {
 extern int ufshcd_query_descriptor_retry(struct ufs_hba *hba, enum query_opcode opcode,
 					 enum desc_idn idn, u8 index, u8 selector, u8 *desc_buf,
 					 int *buf_len);
+
+/**
+ * spacemit_k3_ufs_set_ref_clk - Set UFS device reference clock frequency
+ * @hba: UFS host controller handle
+ *
+ * Read the expected reference clock frequency from DTS and configure
+ * the UFS device's bRefClkFreq attribute if it differs from current value.
+ *
+ * Returns: 0 on success, -EAGAIN if reinit required, negative error code on failure
+ */
+static int spacemit_k3_ufs_set_ref_clk(struct ufs_hba *hba)
+{
+	struct udevice *dev = hba->dev;
+	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
+	u32 ref_clk = priv->ref_clk_freq;
+	u32 cur_clk = 0;
+	int err;
+	bool updated = false;
+
+	err = ufshcd_query_attr_retry(hba,
+				      UPIU_QUERY_OPCODE_READ_ATTR,
+				      QUERY_ATTR_IDN_REF_CLK_FREQ,
+				      0, 0, &cur_clk);
+	if (err) {
+		dev_warn(hba->dev,
+			 "Failed to read bRefClkFreq, err = %d\n", err);
+		return err;
+	}
+
+	printf("ufs: bRefClkFreq current=%u expected=%u\n", cur_clk, ref_clk);
+
+	if (cur_clk != ref_clk) {
+		err = ufshcd_query_attr_retry(hba,
+					      UPIU_QUERY_OPCODE_WRITE_ATTR,
+					      QUERY_ATTR_IDN_REF_CLK_FREQ,
+					      0, 0, &ref_clk);
+		if (err) {
+			dev_warn(hba->dev,
+				 "Failed to set bRefClkFreq to %u, err = %d\n",
+				 ref_clk, err);
+			return err;
+		}
+		updated = true;
+	}
+
+	if (updated) {
+		printf("ufs: bRefClkFreq updated, reinit required\n");
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
+/**
+ * spacemit_k3_ufs_set_power_mode - Configure UFS power mode
+ * @hba: UFS host controller handle
+ *
+ * Configure the UFS link to the maximum supported power mode.
+ * Uses ufshcd_get_max_pwr_mode() to get the negotiated parameters,
+ * then switches to Rate B for better compatibility.
+ *
+ * Returns: 0 on success, negative error code on failure
+ */
+static int spacemit_k3_ufs_set_power_mode(struct ufs_hba *hba)
+{
+	int ret;
+
+	ret = ufshcd_get_max_pwr_mode(hba);
+	if (ret) {
+		dev_err(hba->dev,
+			"%s: Failed getting max supported power mode\n",
+			__func__);
+		return ret;
+	}
+
+	/*
+	 * Switch to Rate B for better compatibility with K3 platform.
+	 * ufshcd_get_max_pwr_mode() sets Rate A by default.
+	 */
+	hba->max_pwr_info.info.hs_rate = PA_HS_MODE_B;
+
+	ret = ufshcd_change_power_mode(hba, &hba->max_pwr_info.info);
+	if (ret) {
+		dev_err(hba->dev, "%s: Failed setting power mode, err = %d\n",
+			__func__, ret);
+		return ret;
+	}
+
+	ufshcd_print_pwr_info(hba);
+	return 0;
+}
 
 static void spacemit_k3_ufs_set_aclk_low_freq(void)
 {
@@ -416,8 +508,6 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 	/* deasserted ufs device reset & refer clk output enable */
 	ufshcd_writel(hba, 0x101, priv->phy_mng_base + UFS_DEVICE_IO_CTRL);
 	mdelay(1);
-
-	/* note: refer clk 26MHz */
 
 	/* wait PLL_lock here, bit31 at 0x0104 */
 	{
@@ -830,6 +920,8 @@ static const struct ufs_hba_ops spacemit_k3_ufs_vops = {
 	.hce_enable_notify = spacemit_k3_ufs_hce_enable_notify,
 	.link_startup_notify = spacemit_k3_ufs_link_startup_notify,
 	.device_reset = spacemit_k3_ufs_silent_reset,
+	.set_ref_clk = spacemit_k3_ufs_set_ref_clk,
+	.set_power_mode = spacemit_k3_ufs_set_power_mode,
 };
 
 static int spacemit_k3_ufs_pltfm_bind(struct udevice *dev)
@@ -892,6 +984,7 @@ static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 	const char *compat;
 	int compat_length;
 	int ret;
+	u32 ref_clk_freq;
 
 	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
 
@@ -903,6 +996,26 @@ static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 	if (!strcmp(compat, "spacemit,k3-ufshci")) {
 		priv->phy_mng_base = UFS_ARASAN_PHY_MNG_BASE;
 		priv->atop_base = UFS_ARASAN_TOP_BASE;
+	}
+
+	/*
+	 * Read reference clock frequency from DTS.
+	 * Default to 19.2MHz (value 0) if not specified.
+	 * Valid values: 0=19.2MHz, 1=26MHz, 2=38.4MHz, 3=52MHz
+	 */
+	ret = dev_read_u32(dev, "ref-clk-freq", &ref_clk_freq);
+	if (ret) {
+		/* Default to 19.2MHz if not specified in DTS */
+		priv->ref_clk_freq = UFS_REF_CLK_FREQ_19_2_MHZ;
+		dev_dbg(dev, "ufs: ref-clk-freq not found in DTS, using default 19.2MHz\n");
+	} else {
+		if (ref_clk_freq > UFS_REF_CLK_FREQ_52_MHZ) {
+			dev_warn(dev, "ufs: invalid ref-clk-freq %u, using default 19.2MHz\n",
+				 ref_clk_freq);
+			priv->ref_clk_freq = UFS_REF_CLK_FREQ_19_2_MHZ;
+		} else {
+			priv->ref_clk_freq = ref_clk_freq;
+		}
 	}
 
 	ret = clk_get_by_index(dev, 0, &priv->aclk);
