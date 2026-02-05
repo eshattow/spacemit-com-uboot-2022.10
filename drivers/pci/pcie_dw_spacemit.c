@@ -76,7 +76,7 @@ static void pcie_eq_preset(struct spacemit_pcie *pci)
 
 	val = readl(pci->dw.dbi_base + GEN3_EQ_CONTROL_OFF);
 	val &= ~(0xffff<<8);
-	val |= ((0x1<<4)<<8);
+	val |= ((0x1<<7)<<8);
 	writel(val, pci->dw.dbi_base + GEN3_EQ_CONTROL_OFF);
 }
 
