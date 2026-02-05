@@ -489,9 +489,20 @@ static int spacemit_pcie_probe(struct udevice *dev)
 	clk_enable(&pcie->clock);
 	reset_deassert(&pcie->reset);
 
+	pcie->dw.first_busno = dev_seq(dev);
+	pcie->dw.dev = dev;
+
+	ret = spacemit_pcie_phy_init(pcie);
+	if (ret) {
+		dev_err(dev, "failed to init phy: %d\n", ret);
+		return ret;
+	}
+
 	reg = spacemit_pcie_readl(pcie, PCIECTRL_SPACEMIT_CONF_DEVICE_CMD);
 	reg &= ~LTSSM_EN;
 	spacemit_pcie_writel(pcie, PCIECTRL_SPACEMIT_CONF_DEVICE_CMD, reg);
+
+	pcie_set_mode(pcie, DW_PCIE_RC_TYPE);
 
 	/* set Perst# (fundamental reset) gpio low state*/
 	reg = spacemit_pcie_readl(pcie, PCIE_CTRL_LOGIC);
@@ -503,16 +514,7 @@ static int spacemit_pcie_probe(struct udevice *dev)
 	reg &= ~PCIE_PERSTN_OUT;
 	spacemit_pcie_writel(pcie, PCIE_CTRL_LOGIC, reg);
 
-	pcie->dw.first_busno = dev_seq(dev);
-	pcie->dw.dev = dev;
-
-	pcie_set_mode(pcie, DW_PCIE_RC_TYPE);
 	spacemit_pcie_host_init(pcie);
-	ret = spacemit_pcie_phy_init(pcie);
-	if (ret) {
-		dev_err(dev, "failed to init phy: %d\n", ret);
-		return ret;
-	}
 	pcie_eq_preset(pcie);
 	pcie_dw_setup_host(&pcie->dw);
 	pcie_dw_init_id(pcie);
