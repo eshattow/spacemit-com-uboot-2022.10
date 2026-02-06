@@ -1153,6 +1153,45 @@
 		>;
 	};
 
+	pinctrl_espi1: espi1_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_00, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d0 */
+			K3_PADCONF(GPIO_01, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d1 */
+			K3_PADCONF(GPIO_02, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d2 */
+			K3_PADCONF(GPIO_03, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d3 */
+			K3_PADCONF(GPIO_04, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_cs */
+			K3_PADCONF(GPIO_05, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_clk */
+			K3_PADCONF(GPIO_06, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_resetn */
+			K3_PADCONF(GPIO_07, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_alert */
+		>;
+	};
+
+	pinctrl_espi2: espi2_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_68, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d0 */
+			K3_PADCONF(GPIO_69, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d1 */
+			K3_PADCONF(GPIO_70, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d2 */
+			K3_PADCONF(GPIO_71, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d3 */
+			K3_PADCONF(GPIO_72, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_cs */
+			K3_PADCONF(GPIO_73, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_clk */
+			K3_PADCONF(GPIO_74, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_resetn */
+			K3_PADCONF(GPIO_75, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_alert */
+		>;
+	};
+
+	pinctrl_rcpu_espi0: rcpu_espi0_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_86, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d0 */
+			K3_PADCONF(GPIO_87, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d1 */
+			K3_PADCONF(GPIO_88, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d2 */
+			K3_PADCONF(GPIO_89, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d3 */
+			K3_PADCONF(GPIO_90, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_cs */
+			K3_PADCONF(GPIO_91, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_clk */
+			K3_PADCONF(GPIO_92, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_resetn */
+			K3_PADCONF(GPIO_93, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_alert */
+		>;
+	};
+
 	pinctrl_mmc1: mmc1_grp {
 		pinctrl-single,pins = <
 			K3_PADCONF(MMC1_DAT3, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* mmc1_d3 */
