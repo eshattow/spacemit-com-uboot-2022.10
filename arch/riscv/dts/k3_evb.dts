@@ -328,6 +328,7 @@
 &i2c8 {
 	clock-frequency = <100000>;
 	u-boot,dm-spl;
+	pinctrl-0 = <&pinctrl_i2c8>;
 	status = "okay";
 
 	spm8821: pmic@41 {
