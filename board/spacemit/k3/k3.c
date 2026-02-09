@@ -31,6 +31,7 @@
 #include <part.h>
 #include <mmc.h>
 #include "nfs_env.h"
+#include <power/pmic.h>
 
 #ifdef CONFIG_ESPI
 extern bool spacemit_espi_is_ready(void);
@@ -38,6 +39,7 @@ extern bool spacemit_espi_is_ready(void);
 
 bool is_video_connected = false;
 static char found_partition[64] = {0};
+static uint32_t reboot_config;
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -90,9 +92,14 @@ static u32 env_get_u32_default(const char *name, u32 default_value)
 }
 
 #if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
-static int k3_nor_usb_scan_once(void)
+static struct blk_desc *k3_nor_get_usb_desc(u32 devnum)
 {
 	static bool usb_scanned;
+
+	if (BOOT_MODE_USB == get_boot_mode()) {
+		pr_info("Should NOT scan USB storage during fastboot download mode\n");
+		return NULL;
+	}
 
 	if (!usb_scanned) {
 		usb_init();
@@ -100,12 +107,6 @@ static int k3_nor_usb_scan_once(void)
 		usb_scanned = true;
 	}
 
-	return 0;
-}
-
-static struct blk_desc *k3_nor_get_usb_desc(u32 devnum)
-{
-	k3_nor_usb_scan_once();
 	return blk_get_dev("usb", devnum);
 }
 #endif
@@ -533,9 +534,44 @@ int board_init(void)
 	return 0;
 }
 
+void get_reboot_config(void)
+{
+	int ret;
+
+	struct udevice *dev;
+	uint8_t value;
+	reboot_config = get_boot_mode();
+
+	ret = uclass_get_device_by_driver(UCLASS_PMIC,
+			DM_DRIVER_GET(spacemit_pm8xx), &dev);
+	if (ret) {
+		pr_err("spacemit reboot: get PMIC device failed: %d\n", ret);
+		return;
+	}
+
+	/* Read related P1 register's value to check if we should go to fastboot */
+	ret = pmic_read(dev, P1_NON_VOLATILE_REG, &value, 1);
+	if (ret < 0) {
+		pr_err("spacemit reboot: PMIC read failed\n");
+		return;
+	}
+	pr_info("spacemit reboot: read PMIC reg 0x%x value 0x%x\n", P1_NON_VOLATILE_REG, value);
+	if ((value & P1_NON_VOLATILE_REG_MASK) == P1_NON_VOLATILE_REG_FASTBOOT) {
+		reboot_config = BOOT_MODE_USB;
+	}
+
+	/* Clear related P1 register's value */
+	value &= ~P1_NON_VOLATILE_REG_MASK;
+	ret = pmic_write(dev, P1_NON_VOLATILE_REG, &value, 1);
+	if (ret < 0) {
+		pr_err("spacemit reboot: PMIC write failed\n");
+		return;
+	}
+}
+
 void run_fastboot_command(void)
 {
-	if (BOOT_MODE_USB == get_boot_mode()) {
+	if (BOOT_MODE_USB == get_boot_mode() || reboot_config == BOOT_MODE_USB) {
 		/* show flash log*/
 		env_set("stdout", env_get("stdout_flash"));
 
@@ -666,6 +702,7 @@ int board_late_init(void)
 	set_dev_serial_no();
 	refresh_config_info();
 
+	get_reboot_config();
 	run_fastboot_command();
 
 	if (BOOT_MODE_SD == get_boot_mode()) {

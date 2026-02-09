@@ -381,7 +381,7 @@ static int do_espi_vw_gpio_dump(struct udevice *dev)
 		group <= ESPI_VWIRE_GPIO_EXPANDER_GROUP_MAX; group++) {
 		for (vwire = 0; vwire < 4; vwire++) {
 			gpio = ESPI_VWIRE_GPIO_EXPANDER(group, vwire);
-			
+
 			/* Use espi_rx_vwire to get current state */
 			ret = espi_rx_vwire(gpio, &state);
 			if (ret) {
@@ -613,6 +613,16 @@ static int do_espi_vw(int argc, char *const argv[])
 	}
 }
 
+static u32 espi_get_pr_mem_size(void)
+{
+	u32 mem_size = ESPI_MEM_SIZE;
+
+	if (g_espi_priv && g_espi_priv->pr_mem_base1 > g_espi_priv->pr_mem_base0)
+		mem_size = g_espi_priv->pr_mem_base1 - g_espi_priv->pr_mem_base0;
+
+	return mem_size;
+}
+
 static int do_espi_mem_read(int argc, char *const argv[])
 {
 	u32 addr;
@@ -621,14 +631,18 @@ static int do_espi_mem_read(int argc, char *const argv[])
 	u8 data8;
 	int width;
 	void *mapped_addr;
+	u32 mem_size;
 	/* Check parameters */
 	if (argc < 5) {
+		mem_size = espi_get_pr_mem_size();
 		printf("Usage: espi mem read <addr> <width>\n");
-		printf("  addr: Memory address (0x0 - 0x1FF for 512-byte boundary)\n");
+		printf("  addr: Memory address (0x0 - 0x%x, size %u bytes)\n",
+		       mem_size - 1, mem_size);
 		printf("  width: Access width (1, 2, or 4 bytes)\n");
 		printf("Example: espi mem read 0x100 4\n");
 		return CMD_RET_USAGE;
 	}
+	mem_size = espi_get_pr_mem_size();
 	/* Parse address */
 	if (strncmp(argv[3], "0x", 2) == 0) {
 		addr = simple_strtoul(argv[3], NULL, 16);
@@ -637,9 +651,9 @@ static int do_espi_mem_read(int argc, char *const argv[])
 	}
 	/* Parse access width */
 	width = simple_strtoul(argv[4], NULL, 10);
-	/* Check address boundary (512 bytes) */
-	if (addr >= 512) {
-		printf("eSPI: Address 0x%x exceeds 512-byte boundary\n", addr);
+	/* Check address boundary */
+	if (addr >= mem_size) {
+		printf("eSPI: Address 0x%x exceeds %u-byte boundary\n", addr, mem_size);
 		return CMD_RET_FAILURE;
 	}
 	/* Check access width */
@@ -653,8 +667,8 @@ static int do_espi_mem_read(int argc, char *const argv[])
 		return CMD_RET_FAILURE;
 	}
 	/* Check if exceeds boundary */
-	if (addr + width > 512) {
-		printf("eSPI: Access would exceed 512-byte boundary\n");
+	if (addr + width > mem_size) {
+		printf("eSPI: Access would exceed %u-byte boundary\n", mem_size);
 		return CMD_RET_FAILURE;
 	}
 	printf("eSPI: Reading %d byte(s) from Shared Memory address 0x%03x...\n", width, addr);
@@ -690,15 +704,19 @@ static int do_espi_mem_write(int argc, char *const argv[])
 	int width;
 	unsigned long value;
 	void *mapped_addr;
+	u32 mem_size;
 	/* Check parameters */
 	if (argc < 6) {
+		mem_size = espi_get_pr_mem_size();
 		printf("Usage: espi mem write <addr> <width> <value>\n");
-		printf("  addr: Memory address (0x0 - 0x1FF for 512-byte boundary)\n");
+		printf("  addr: Memory address (0x0 - 0x%x, size %u bytes)\n",
+		       mem_size - 1, mem_size);
 		printf("  width: Access width (1, 2, or 4 bytes)\n");
 		printf("  value: Data value to write\n");
 		printf("Example: espi mem write 0x100 4 0x12345678\n");
 		return CMD_RET_USAGE;
 	}
+	mem_size = espi_get_pr_mem_size();
 	/* Parse address */
 	if (strncmp(argv[3], "0x", 2) == 0) {
 		addr = simple_strtoul(argv[3], NULL, 16);
@@ -713,9 +731,9 @@ static int do_espi_mem_write(int argc, char *const argv[])
 	} else {
 		value = simple_strtoul(argv[5], NULL, 10);
 	}
-	/* Check address boundary (512 bytes) */
-	if (addr >= 512) {
-		printf("eSPI: Address 0x%x exceeds 512-byte boundary\n", addr);
+	/* Check address boundary */
+	if (addr >= mem_size) {
+		printf("eSPI: Address 0x%x exceeds %u-byte boundary\n", addr, mem_size);
 		return CMD_RET_FAILURE;
 	}
 	/* Check access width */
@@ -729,8 +747,8 @@ static int do_espi_mem_write(int argc, char *const argv[])
 		return CMD_RET_FAILURE;
 	}
 	/* Check if exceeds boundary */
-	if (addr + width > 512) {
-		printf("eSPI: Access would exceed 512-byte boundary\n");
+	if (addr + width > mem_size) {
+		printf("eSPI: Access would exceed %u-byte boundary\n", mem_size);
 		return CMD_RET_FAILURE;
 	}
 	/* Check data value range */
@@ -922,10 +940,12 @@ static int do_espi_io_write(int argc, char *const argv[])
 static int do_espi_mem(int argc, char *const argv[])
 {
 	if (argc < 3) {
+		u32 mem_size = espi_get_pr_mem_size();
 		printf("Usage: espi mem <read|write> [args...]\n");
 		printf("  espi mem read <addr> <width> - read from shared memory\n");
 		printf("  espi mem write <addr> <width> <value> - write to shared memory\n");
-		printf("  addr: Memory address (0x0 - 0x1FF for 512-byte boundary)\n");
+		printf("  addr: Memory address (0x0 - 0x%x, size %u bytes)\n",
+		       mem_size - 1, mem_size);
 		printf("  width: Access width (1, 2, or 4 bytes)\n");
 		return CMD_RET_USAGE;
 	}

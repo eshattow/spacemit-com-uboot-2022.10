@@ -96,11 +96,12 @@
 };
 
 &usb2_host_u2phy {
-	status = "okay";
+	status = "disabled";
 };
 
 &usb2_host {
-	status = "okay";
+	/* Hub with BT, FG, CAM */
+	status = "disabled";
 };
 
 &usb3_porta_u2phy {
@@ -121,6 +122,32 @@
 		dr_mode = "peripheral";
 		u-boot,dm-spl;
 	};
+};
+
+&usb3_portb_u2phy {
+	status = "okay";
+};
+
+&usb3_portb_u3phy {
+       status = "okay";
+};
+
+&usb3_portb {
+	/* TypeC */
+	status = "okay";
+};
+
+&usb3_portc_u2phy {
+	status = "okay";
+};
+
+&usb3_portc_u3phy {
+       status = "okay";
+};
+
+&usb3_portc {
+	/* TypeC */
+	status = "okay";
 };
 
 &usb3_portd_u2phy {
@@ -176,6 +203,7 @@
 &i2c8 {
 	clock-frequency = <100000>;
 	u-boot,dm-spl;
+	pinctrl-0 = <&pinctrl_i2c8>;
 	status = "okay";
 
 	spm8821: pmic@41 {

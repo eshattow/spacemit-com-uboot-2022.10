@@ -77,8 +77,10 @@ typedef struct {
 extern ddr_part_info* part_info;
 extern const phy_init_config *lp5_pre_train_table[];
 extern const phy_init_config *lp5_train_table[];
-extern const phy_init_config *lp5_4g_pre_train_table[], *lp5_8g_pre_train_table[], *lp5_16g_pre_train_table[];
-extern const phy_init_config *lp5_4g_train_table[], *lp5_8g_train_table[], *lp5_16g_train_table[];
+extern const phy_init_config *lp5_4g_pre_train_table[], *lp5_8g_pre_train_table[];
+extern const phy_init_config *lp5_16g_5500_pre_train_table[], *lp5_16g_pre_train_table[];
+extern const phy_init_config *lp5_4g_train_table[], *lp5_8g_train_table[];
+extern const phy_init_config *lp5_16g_5500_train_table[], *lp5_16g_train_table[];
 
 extern void fpga_ddr_init(void);
 extern void lpddr5_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info);

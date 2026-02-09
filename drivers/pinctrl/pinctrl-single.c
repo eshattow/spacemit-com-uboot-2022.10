@@ -20,6 +20,7 @@
 #define AKEY_ASFAR		0xBABA
 #define AKEY_ASSAR		0xEB10
 #define IO_PWR_DOMAIN_1V8EN	BIT(2)
+#define IO_PWR_DOMAIN_3V3EN	(0)
 
 #define AIB_GPIO1_IO_REG_K3	0x4
 #define AIB_GPIO2_IO_REG_Kx	0xC
@@ -529,7 +530,7 @@ static int k3_pin2pwr_domain_offset(int pin)
 	return offset;
 }
 
-static int __maybe_unused k1_set_pwr_domain(const u32 *prop)
+static int __maybe_unused k1_set_pwr_domain(const u32 *prop, u32 power)
 {
 	int offset;
 	int pin;
@@ -548,11 +549,18 @@ static int __maybe_unused k1_set_pwr_domain(const u32 *prop)
 	writel(AKEY_ASFAR, apbc_asfar);
 	writel(AKEY_ASSAR, apbc_asfar + 4);
 
-	writel(IO_PWR_DOMAIN_1V8EN, aib_io);
-	return 0;
+	if (power == 1800) {
+		writel(IO_PWR_DOMAIN_1V8EN, aib_io);
+		return 0;
+	} else if (power == 3300) {
+		writel(IO_PWR_DOMAIN_3V3EN, aib_io);
+		return 0;
+	}
+	pr_err("pinctrl: pwr domain: invalid power source value: %d\n", power);
+	return -1;
 }
 
-static int k3_set_pwr_domain(const u32 *prop)
+static int k3_set_pwr_domain(const u32 *prop, u32 power)
 {
 	int offset;
 	int pin;
@@ -571,8 +579,15 @@ static int k3_set_pwr_domain(const u32 *prop)
 	writel(AKEY_ASFAR, apbc_asfar);
 	writel(AKEY_ASSAR, apbc_asfar + 4);
 
-	writel(IO_PWR_DOMAIN_1V8EN, aib_io);
-	return 0;
+	if (power == 1800) {
+		writel(IO_PWR_DOMAIN_1V8EN, aib_io);
+		return 0;
+	} else if (power == 3300) {
+		writel(IO_PWR_DOMAIN_3V3EN, aib_io);
+		return 0;
+	}
+	pr_err("pinctrl: pwr domain: invalid power source value: %d\n", power);
+	return -1;
 }
 static int single_set_state(struct udevice *dev,
 			    struct udevice *config)
@@ -590,13 +605,9 @@ static int single_set_state(struct udevice *dev,
 			dev_dbg(dev, "  invalid pin configuration in fdt\n");
 			return -FDT_ERR_BADSTRUCTURE;
 		}
-		if (!dev_read_u32(config, "power-source", &power)) {
-			if (power == 1800) {
-				if (k3_set_pwr_domain(prop) < 0)
-					pr_err("pinctrl: pwr domain: set pwr domain failed\n");
-			} else {
-				pr_warn("pinctrl: pwr domain: only support 1.8V switch, 3.3V is default\n");
-			}
+		if (!dev_read_u32(config, "power-source", &power) &&
+		    k3_set_pwr_domain(prop, power) < 0) {
+			pr_err("pinctrl: pwr domain: set pwr domain %d failed\n", power);
 		}
 		single_configure_pins(dev, prop, len, config->name);
 		return 0;

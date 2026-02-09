@@ -802,6 +802,8 @@ struct ufs_hba_ops {
 	int (*phy_initialization)(struct ufs_hba *hba);
 #ifdef CONFIG_SPACEMIT_K3_UFS
 	int (*device_reset)(struct ufs_hba *hba);
+	int (*set_ref_clk)(struct ufs_hba *hba);
+	int (*set_power_mode)(struct ufs_hba *hba);
 #endif
 };
 
@@ -835,6 +837,15 @@ struct ufs_hba {
 #define UFSHCD_QUIRK_HIBERN_FASTAUTO BIT(2)
 #define UFSHCD_QUIRK_HS_MODE_A BIT(3)
 #define UFSHCD_QUIRK_HS_GEAR_1 BIT(4)
+
+/*
+ * UFS Reference Clock Frequency Values
+ * bRefClkFreq attribute values per UFS specification
+ */
+#define UFS_REF_CLK_FREQ_19_2_MHZ	0
+#define UFS_REF_CLK_FREQ_26_MHZ		1
+#define UFS_REF_CLK_FREQ_38_4_MHZ	2
+#define UFS_REF_CLK_FREQ_52_MHZ		3
 #else
 #define UFSHCD_QUIRK_BROKEN_LCC 0x1
 #define UFSHCD_QUIRK_BROKEN_64BIT_ADDRESS 0
@@ -1038,5 +1049,17 @@ enum {
 #define UTP_TASK_REQ_LIST_RUN_STOP_BIT		0x1
 
 int ufshcd_probe(struct udevice *dev, struct ufs_hba_ops *hba_ops);
+
+#ifdef CONFIG_SPACEMIT_K3_UFS
+/* Functions exported from ufs.c for platform drivers */
+int ufshcd_get_max_pwr_mode(struct ufs_hba *hba);
+int ufshcd_change_power_mode(struct ufs_hba *hba,
+			     struct ufs_pa_layer_attr *pwr_mode);
+void ufshcd_print_pwr_info(struct ufs_hba *hba);
+int ufshcd_query_attr_retry(struct ufs_hba *hba,
+			    enum query_opcode opcode,
+			    enum attr_idn idn, u8 index, u8 selector,
+			    u32 *attr_val);
+#endif
 
 #endif

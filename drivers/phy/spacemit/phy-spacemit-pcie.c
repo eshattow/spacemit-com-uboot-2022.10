@@ -18,6 +18,9 @@
 #include <asm/io.h>
 #include <linux/iopoll.h>
 
+#define APB_SPARE31_REG_OFF	0
+#define APB_SPARE32_REG_OFF	0x4
+
 #define PCIE_REF_CLK_OUTPUT
 
 struct spacemit_pcie_phy {
@@ -50,6 +53,8 @@ static inline void phy_mod_bit(void __iomem *base, u32 offset, u32 mask, u32 set
 static void init_x1_phy(void __iomem *phy_base)
 {
 	u32 rd_data;
+	u32 rx_regs[7] = {0x10, 0x78, 0x98, 0xdf, 0xb4, 0x88, 0x28};
+	int id, lsh;
 
 	pr_info("Now int init_x1_puphy...\n");
 
@@ -75,9 +80,6 @@ static void init_x1_phy(void __iomem *phy_base)
 	phy_writel(phy_base, (0x16 << 2), rd_data);
 
 	phy_mod_bit(phy_base, (0x10 << 2), (0x1 << 13), 1);
-	phy_writel(phy_base, (0x02 << 2), 0xf << 3);
-	phy_mod_bit(phy_base, (0x50 << 2), (1 << 4), 1);
-	phy_mod_bit(phy_base, (0x19 << 2), (1 << 22), 1);
 
 	/* Force RCV Good / Dynamic Lock */
 	/* cdr fix bypass */
@@ -85,26 +87,34 @@ static void init_x1_phy(void __iomem *phy_base)
 	/* dynamic lock */
 	phy_mod_bit(phy_base, 0xC, (0x1 << 2), 1);
 
-	/* Force RCV done */
-	phy_mod_bit(phy_base, (0x06 << 2), (0x1 << 10), 1);
+	/* rx_reg 0~3 */
+	for (id = 0; id < 4; id++) {
+		rd_data = phy_readl(phy_base, 0x60);
+		lsh = id * 8;
+		rd_data &= ~(0xff << lsh);
+		rd_data |= (rx_regs[id] << lsh);
+		phy_writel(phy_base, 0x60, rd_data);
+	}
+
+	/* rx_reg 4~6 */
+	for (id = 4; id < 7; id++) {
+		rd_data = phy_readl(phy_base, 0x64);
+		lsh = (id - 4) * 8;
+		rd_data &= ~(0xff << lsh);
+		rd_data |= (rx_regs[id] << lsh);
+		phy_writel(phy_base, 0x64, rd_data);
+	}
 
 	/* Set init done */
 	/* cfg_sw_phy_init_done */
 	phy_mod_bit(phy_base, (0x02 << 2), (0x1 << 11), 1);
-	rd_data = phy_readl(phy_base, (0x02 << 2));
-	rd_data &= ~(0xf << 7);
-	phy_writel(phy_base, (0x02 << 2), rd_data);
-
-	/* aux clk 24M */
-	rd_data = phy_readl(phy_base, (0x02 << 2));
-	rd_data |= (0x2 << 7);
-	phy_writel(phy_base, (0x02 << 2), rd_data);
 }
 
 static void init_x2_phy(void __iomem *phy_base)
 {
-	int i;
+	int i, id, lsh;
 	u32 rd_data;
+	u32 rx_regs[7] = {0x10, 0x78, 0x98, 0xdf, 0xb4, 0x88, 0x28};
 	void __iomem *lane_base;
 
 	pr_info("Now int init_x2_puphy...\n");
@@ -134,26 +144,33 @@ static void init_x2_phy(void __iomem *phy_base)
 
 	for (i = 0; i < 2; i++) {
 		lane_base = phy_base + (0x400 * i);
-
 		phy_mod_bit(lane_base, (0x10 << 2), (0x1 << 13), 1);
-		phy_writel(lane_base, (0x02 << 2), 0xf << 3);
-		phy_mod_bit(lane_base, (0x50 << 2), (1 << 4), 1);
-		phy_mod_bit(lane_base, (0x19 << 2), (1 << 22), 1);
-	}
-
-	/* Force RCV Good / Dynamic Lock */
-	for (i = 0; i < 2; i++) {
-		lane_base = phy_base + (0x400 * i);
-
 		/* cdr fix bypass */
 		phy_mod_bit(lane_base, 0x4, (0x1 << 6), 0);
 		/* dynamic lock */
 		phy_mod_bit(lane_base, 0xC, (0x1 << 2), 1);
 	}
 
-	/* Force RCV done */
 	for (i = 0; i < 2; i++) {
-		phy_mod_bit(phy_base + (0x400 * i), (0x06 << 2), (0x1 << 10), 1);
+		lane_base = phy_base + (0x400 * i);
+
+		/* rx_reg 0~3 */
+		for (id = 0; id < 4; id++) {
+			rd_data = phy_readl(lane_base, 0x60);
+			lsh = id * 8;
+			rd_data &= ~(0xff << lsh);
+			rd_data |= (rx_regs[id] << lsh);
+			phy_writel(lane_base, 0x60, rd_data);
+		}
+
+		/* rx_reg 4~6 */
+		for (id = 4; id < 7; id++) {
+			rd_data = phy_readl(lane_base, 0x64);
+			lsh = (id - 4) * 8;
+			rd_data &= ~(0xff << lsh);
+			rd_data |= (rx_regs[id] << lsh);
+			phy_writel(lane_base, 0x64, rd_data);
+		}
 	}
 
 	/* Set init done */
@@ -161,15 +178,6 @@ static void init_x2_phy(void __iomem *phy_base)
 		lane_base = phy_base + (0x400 * i);
 		/* cfg_sw_phy_init_done */
 		phy_mod_bit(lane_base, (0x02 << 2), (0x1 << 11), 1);
-
-		rd_data = phy_readl(lane_base, (0x02 << 2));
-		rd_data &= ~(0xf << 7);
-		phy_writel(lane_base, (0x02 << 2), rd_data);
-
-		/* aux clk 24M */
-		rd_data = phy_readl(lane_base, (0x02 << 2));
-		rd_data |= (0x2 << 7);
-		phy_writel(lane_base, (0x02 << 2), rd_data);
 	}
 }
 
@@ -186,22 +194,43 @@ static void wait_phy_pll_lock(void __iomem *phy_base)
 static int spacemit_pcie_phy_power_on(struct phy *phy)
 {
 	struct spacemit_pcie_phy *priv = dev_get_priv(phy->dev);
+	u32 rd_data = 0;
+	int timeout = 100;
+
+	do {
+		mdelay(10);
+		rd_data = phy_readl(priv->apb_spare, APB_SPARE32_REG_OFF) & (0x1<<8);
+		timeout --;
+		if(timeout == 0)
+			break;
+	} while (!rd_data);
+
+	if (!rd_data) {
+		printf("rcal timeout, trim override\n");
+		rd_data = phy_readl(priv->apb_spare, APB_SPARE32_REG_OFF);
+		rd_data |= (0xa<<20 | 0x6<<24 | 0x7<<28);
+		phy_writel(priv->apb_spare, APB_SPARE32_REG_OFF, rd_data);
+
+		rd_data = phy_readl(priv->apb_spare, APB_SPARE32_REG_OFF);
+		rd_data |= (0x1<<31);
+		phy_writel(priv->apb_spare, APB_SPARE32_REG_OFF, rd_data);
+	}
 
 	if (priv->num_lanes == 1)
 		init_x1_phy(priv->phy_base);
-        else
+	else
 		init_x2_phy(priv->phy_base);
 
 	wait_phy_pll_lock(priv->phy_base);
 
-        return 0;
+	return 0;
 }
 
 static int spacemit_pcie_phy_init(struct phy *phy)
 {
 	struct spacemit_pcie_phy *priv = dev_get_priv(phy->dev);
 
-	phy_mod_bit(priv->apb_spare, 0, (0x1 << 17), 1);
+	phy_mod_bit(priv->apb_spare, APB_SPARE31_REG_OFF, (0x1 << 17), 1);
 	return 0;
 }
 
