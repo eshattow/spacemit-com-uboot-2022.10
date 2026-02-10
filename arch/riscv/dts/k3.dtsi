@@ -332,6 +332,13 @@
 			status = "okay";
 		};
 
+		rpmi_system_suspend: rpmi-system-suspend@0 {
+			compatible = "riscv,rpmi-system-suspend";
+			mboxes = <&rpmi_shmem_mbox 4>;
+			riscv,sbi-mpxy-channel-id = <4>;
+			status = "disabled";
+		};
+
 		rpmi_mpxy_hsm: rpmi-mpxy-hsm@0 {
 			compatible = "riscv,rpmi-hsm";
 			mboxes = <&rpmi_shmem_mbox 5>;
