@@ -52,6 +52,15 @@
 		>;
 		power-source = <1800>;
 	};
+
+	pcie0_1_grp {
+		pinctrl-single,pins =<
+			K3_PADCONF(GPIO_79, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15))
+			K3_PADCONF(GPIO_81, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15))
+		>;
+		power-source = <1800>;
+	};
+
 };
 
 &uart0 {
@@ -160,6 +169,24 @@
 
 &usb3_portd {
 	/* TypeC (USB3/DP/Power) (with ANX7447 chip) */
+	status = "okay";
+};
+
+&pcie_phy0 {
+	status = "okay";
+};
+
+&pcie_phy1 {
+	status = "okay";
+};
+
+&pcie0_rc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie0_1>;
+	num-lanes = <4>;
+	phys = <&pcie_phy0>, <&pcie_phy1>;
+	phy-names = "pcie-phy0", "pcie-phy1";
+
 	status = "okay";
 };
 
