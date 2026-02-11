@@ -67,6 +67,11 @@ typedef struct {
 } phy_init_config;
 
 typedef struct {
+	uint32_t offset;
+	uint32_t value;
+} ddr_phy_reg_config;
+
+typedef struct {
 	const char *part_number;
 	uint32_t crc32_value;
 	uint32_t type;
@@ -85,4 +90,6 @@ extern const phy_init_config *lp5_16g_5500_train_table[], *lp5_16g_train_table[]
 extern void fpga_ddr_init(void);
 extern void lpddr5_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info);
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
+extern void lpddr_training_table_init(unsigned int ddrc_base,
+	const phy_init_config* train_table[], ddr_phy_reg_config* override_table);
 #endif /* _K3_DDR_H_ */

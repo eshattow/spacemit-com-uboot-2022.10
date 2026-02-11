@@ -7,33 +7,53 @@
 
 #include <linux/kernel.h>
 
-static void lp5_training_table_init(unsigned int ddrc_base, const phy_init_config* train_table[])
+void lpddr_training_table_init(unsigned int ddrc_base,
+	const phy_init_config* train_table[], ddr_phy_reg_config* override_table)
 {
-	unsigned int reg_base;
+	unsigned int reg_base, reg_offset;
 	unsigned long DPHY_BASE = ddrc_base + 0x800000;
 	volatile uint32_t* phy_reg = (uint32_t*)DPHY_BASE;
+	uint16_t *phy_data;
 	const phy_init_config* sub_table;
-	int i, j;
+	int i, j, k;
+	bool need_override = false;
 
-	for (i = 0; NULL != train_table[i]; i++) {
+	for (i = 0, k = 0; NULL != train_table[i]; i++) {
 		sub_table = train_table[i];
 		reg_base = sub_table->base;
 
+		if ((NULL != override_table) && ((override_table[k].offset & ~0x7FFF) == reg_base)) {
+			need_override = true;
+		} else {
+			need_override = false;
+		}
+
 		if (sub_table->is_linear_increase) {
-			for (j = 0; j < sub_table->count / 2; j++) {
-				phy_reg[reg_base + j * 2]
-					= sub_table->sequence[j].b.value0;
-				phy_reg[reg_base + j * 2 + 1]
-					= sub_table->sequence[j].b.value1;
-			}
-			if (0 != (sub_table->count % 2)) {
-				phy_reg[reg_base + j * 2]
-					= sub_table->sequence[j].b.value0;
+			phy_data = (uint16_t*)sub_table->sequence;
+			for (j = 0; j < sub_table->count; j++) {
+				reg_offset = reg_base + j;
+				if (need_override && (override_table[k].offset == reg_offset)) {
+					phy_reg[reg_offset] = override_table[k].value;
+					k++;
+					if ((override_table[k].offset & ~0x7FFF) != reg_base) {
+						need_override = false;
+					}
+				} else {
+					phy_reg[reg_offset] = phy_data[j];
+				}
 			}
 		} else {
 			for (j = 0; j < sub_table->count; j++) {
-				phy_reg[reg_base + sub_table->sequence[j].a.offset]
-					= sub_table->sequence[j].a.value;
+				reg_offset = reg_base + sub_table->sequence[j].a.offset;
+				if (need_override && (override_table[k].offset == reg_offset)) {
+					phy_reg[reg_offset] = override_table[k].value;
+					k++;
+					if ((override_table[k].offset & ~0x7FFF) != reg_base) {
+						need_override = false;
+					}
+				} else {
+					phy_reg[reg_offset] = sub_table->sequence[j].a.value;
+				}
 			}
 		}
 	}
@@ -44,7 +64,7 @@ static void phyinit_lp5_pre_training(unsigned int ddrc_base, const phy_init_conf
 	unsigned int offset = 0;
 	unsigned long DPHY_BASE = ddrc_base + 0x800000;
 
-	lp5_training_table_init(ddrc_base, pre_train_table);
+	lpddr_training_table_init(ddrc_base, pre_train_table, NULL);
 
 	for (offset = 0x584d2; offset < 0x60000; offset++)
 		REG32(DPHY_BASE + offset * 4) = 0x0;
@@ -52,7 +72,7 @@ static void phyinit_lp5_pre_training(unsigned int ddrc_base, const phy_init_conf
 
 static void phyinit_lp5_training(unsigned int ddrc_base, const phy_init_config* train_table[])
 {
-	lp5_training_table_init(ddrc_base, train_table);
+	lpddr_training_table_init(ddrc_base, train_table, NULL);
 }
 
 #if TRAINING_DEBUG
