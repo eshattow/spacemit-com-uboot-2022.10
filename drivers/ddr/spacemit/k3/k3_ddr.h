@@ -57,8 +57,8 @@ typedef struct {
 
 typedef struct {
 	uint32_t base;
-	uint32_t count;
-	bool is_linear_increase;
+	uint16_t count;
+	uint16_t is_linear_increase;
 
 	union {
 		discrete_sequence a;
