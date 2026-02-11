@@ -8,7 +8,7 @@
 #include <linux/kernel.h>
 
 void lpddr_training_table_init(unsigned int ddrc_base,
-	const phy_init_config* train_table[], ddr_phy_reg_config* override_table)
+	const phy_init_config* train_table[], const ddr_phy_reg_config* override_table)
 {
 	unsigned int reg_base, reg_offset;
 	unsigned long DPHY_BASE = ddrc_base + 0x800000;
@@ -170,7 +170,7 @@ void major_message_all(unsigned int dphy_base)
 }
 
 #if (CONFIG_DDR_DATARATE == 1066)
-static void init_snps_lp45_ddrc_1066(unsigned DDRC_BASE, unsigned int rst_code)
+static void init_snps_lp5_ddrc_1066(unsigned DDRC_BASE, unsigned int rst_code)
 {
 	unsigned int read_data;
 	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
@@ -437,7 +437,7 @@ static void init_snps_lp45_ddrc_1066(unsigned DDRC_BASE, unsigned int rst_code)
 
 #elif (CONFIG_DDR_DATARATE == 4266)
 
-static void init_snps_lp45_ddrc_4266(unsigned DDRC_BASE, unsigned int rst_code)
+static void init_snps_lp5_ddrc_4266(unsigned DDRC_BASE, unsigned int rst_code)
 {
 	unsigned int read_data;
 	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
@@ -681,7 +681,7 @@ static void init_snps_lp45_ddrc_4266(unsigned DDRC_BASE, unsigned int rst_code)
 
 #else
 
-static void init_snps_lp45_4g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_code)
+static void init_snps_lp5_4g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_code)
 {
 	unsigned int read_data;
 	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
@@ -931,7 +931,7 @@ static void init_snps_lp45_4g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_cod
 	REG32(DDRC_BASE + 0x00010100) = 0x00000005;
 }
 
-static void init_snps_lp45_8g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_code)
+static void init_snps_lp5_8g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_code)
 {
 	unsigned int read_data;
 	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
@@ -1182,7 +1182,7 @@ static void init_snps_lp45_8g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_cod
 	REG32(DDRC_BASE + 0x00010100) = 0x00000005;
 }
 
-static void init_snps_lp45_16g_ddrc_5500(unsigned DDRC_BASE, unsigned int rst_code)
+static void init_snps_lp5_16g_ddrc_5500(unsigned DDRC_BASE, unsigned int rst_code)
 {
 	unsigned int read_data;
 	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
@@ -1422,7 +1422,7 @@ static void init_snps_lp45_16g_ddrc_5500(unsigned DDRC_BASE, unsigned int rst_co
 	REG32(DDRC_BASE + 0x00010184) = 0x00000000;
 }
 
-static void init_snps_lp45_16g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_code)
+static void init_snps_lp5_16g_ddrc_6400(unsigned DDRC_BASE, unsigned int rst_code)
 {
 	unsigned int read_data;
 	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
@@ -1730,24 +1730,28 @@ void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info)
 	}
 	REG32(CFG_BASE + 0x18) |= 0x1;
 
+	if (DDR_TYPE_LPDDR5 == part_info->type) {
 #if (CONFIG_DDR_DATARATE == 1066)
-	init_snps_lp45_ddrc_1066(DDRC_BASE, rst_code);
+		init_snps_lp5_ddrc_1066(DDRC_BASE, rst_code);
 #elif (CONFIG_DDR_DATARATE == 4266)
-	init_snps_lp45_ddrc_4266(DDRC_BASE, rst_code);
+		init_snps_lp5_ddrc_4266(DDRC_BASE, rst_code);
 #else
-	if (4096 == part_info->size_mb) {
-		init_snps_lp45_4g_ddrc_6400(DDRC_BASE, rst_code);
-	} else if (8192 == part_info->size_mb) {
-		init_snps_lp45_8g_ddrc_6400(DDRC_BASE, rst_code);
-	} else if (16384 == part_info->size_mb) {
-		if (5500 == part_info->data_rate_mtps)
-			init_snps_lp45_16g_ddrc_5500(DDRC_BASE, rst_code);
-		else
-			init_snps_lp45_16g_ddrc_6400(DDRC_BASE, rst_code);
-	} else {
-		LogMsg(0, "Unsupported DDR size %d MB\n", part_info->size_mb);
-	}
+		if (4096 == part_info->size_mb) {
+			init_snps_lp5_4g_ddrc_6400(DDRC_BASE, rst_code);
+		} else if (8192 == part_info->size_mb) {
+			init_snps_lp5_8g_ddrc_6400(DDRC_BASE, rst_code);
+		} else if (16384 == part_info->size_mb) {
+			if (5500 == part_info->data_rate_mtps)
+				init_snps_lp5_16g_ddrc_5500(DDRC_BASE, rst_code);
+			else
+				init_snps_lp5_16g_ddrc_6400(DDRC_BASE, rst_code);
+		} else {
+			LogMsg(0, "Unsupported DDR size %d MB\n", part_info->size_mb);
+		}
 #endif
+	} else if (DDR_TYPE_LPDDR4X == part_info->type) {
+		init_snps_lp4x_ddrc(DDRC_BASE, rst_code, part_info->size_mb);
+	}
 }
 
 void lpddr5_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info)

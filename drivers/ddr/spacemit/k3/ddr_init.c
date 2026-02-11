@@ -98,7 +98,9 @@ ERR_HANDLE:
 const ddr_part_info ddr_parts_info[] = {
 	{ "MT62F1G32D2DS", 0x0FD38DD9, DDR_TYPE_LPDDR5, 4096, CONFIG_DDR_DATARATE },
 	{ "MT62F2G32D4DS", 0x85D1F688, DDR_TYPE_LPDDR5, 8192, CONFIG_DDR_DATARATE },
-	{ "MT62F4G32D8DV", 0x3ACEF2E4, DDR_TYPE_LPDDR5, 16384, CONFIG_DDR_DATARATE }
+	{ "MT62F4G32D8DV", 0x3ACEF2E4, DDR_TYPE_LPDDR5, 16384, CONFIG_DDR_DATARATE },
+	{ "MT53E4G32D8CY", 0xAA9D4848, DDR_TYPE_LPDDR4X, 16384, 4266 },
+	{ "MT53E2G32D4DE", 0x3EA87223, DDR_TYPE_LPDDR4X, 8192, 4266 },
 };
 
 static ddr_part_info* find_ddr_info(const char *part_number)
@@ -150,7 +152,7 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	part_info = find_ddr_info((const char*)ddr_part_number);
 	printf("DDR Part Number: %s, Size: %dMB, Data Rate: %dMT/s\n",
 		part_info->part_number, part_info->size_mb, part_info->data_rate_mtps);
-	if (DDR_TYPE_LPDDR5 != part_info->type) {
+	if ((DDR_TYPE_LPDDR5 != part_info->type) && (DDR_TYPE_LPDDR4X != part_info->type)) {
 		pr_err("unsupported ddr type %d\n", part_info->type);
 		return 1;
 	}

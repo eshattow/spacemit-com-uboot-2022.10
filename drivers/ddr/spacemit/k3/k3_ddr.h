@@ -87,9 +87,16 @@ extern const phy_init_config *lp5_16g_5500_pre_train_table[], *lp5_16g_pre_train
 extern const phy_init_config *lp5_4g_train_table[], *lp5_8g_train_table[];
 extern const phy_init_config *lp5_16g_5500_train_table[], *lp5_16g_train_table[];
 
+extern const phy_init_config *lp4x_pre_train_table[];
+extern const phy_init_config *lp4x_4g_train_table[], *lp4x_8g_train_table[], *lp4x_16g_train_table[];
+extern const ddr_phy_reg_config phy_override_seq_lp4x_8g[], phy_override_seq_lp4x_16g[];
+
 extern void fpga_ddr_init(void);
 extern void lpddr5_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info);
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
+
+extern void major_message_all(unsigned int dphy_base);
 extern void lpddr_training_table_init(unsigned int ddrc_base,
-	const phy_init_config* train_table[], ddr_phy_reg_config* override_table);
+    const phy_init_config* train_table[], const ddr_phy_reg_config* override_table);
+extern void init_snps_lp4x_ddrc(unsigned DDRC_BASE, unsigned int rst_code, unsigned int ddr_size_mbyte);
 #endif /* _K3_DDR_H_ */
