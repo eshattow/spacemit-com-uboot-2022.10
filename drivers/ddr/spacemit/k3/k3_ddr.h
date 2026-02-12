@@ -8,18 +8,13 @@
 
 #include <stdio.h>
 
-// current only support 4GB, 8GB or 16GB
-// default is 8GB
-#define DDR_SIZE_GB		(4)
+#define DDR_CONFIG_BYPASS_MAGIC	(0xdeadbeef)
+
 // support 4266MT/s, 5500MT/s, 6000MT/s, 6400MT/s
 #define CONFIG_DDR_DATARATE	(6400)
 
 // 2D training configuration
 #define DISABLE_DDR_2D_TRAINING	(0)
-
-#if (DDR_SIZE_GB != 4) && (DDR_SIZE_GB != 8) && (DDR_SIZE_GB != 16)
-#error "Unsupported DDR size"
-#endif
 
 #if (CONFIG_DDR_DATARATE != 6400) && (CONFIG_DDR_DATARATE != 6000) \
 	&& (CONFIG_DDR_DATARATE != 5500) && (CONFIG_DDR_DATARATE != 4266)
@@ -81,11 +76,9 @@ typedef struct {
 
 extern ddr_part_info* part_info;
 extern const phy_init_config *lp5_pre_train_table[];
-extern const phy_init_config *lp5_train_table[];
-extern const phy_init_config *lp5_4g_pre_train_table[], *lp5_8g_pre_train_table[];
-extern const phy_init_config *lp5_16g_5500_pre_train_table[], *lp5_16g_pre_train_table[];
-extern const phy_init_config *lp5_4g_train_table[], *lp5_8g_train_table[];
-extern const phy_init_config *lp5_16g_5500_train_table[], *lp5_16g_train_table[];
+extern const phy_init_config *lp5_4g_train_table[], *lp5_train_table[];
+extern const ddr_phy_reg_config phy_override_pre_seq_lp5_4g[], phy_override_pre_seq_lp5_16g[];
+extern const ddr_phy_reg_config phy_override_seq_lp5_16g[];
 
 extern const phy_init_config *lp4x_pre_train_table[];
 extern const phy_init_config *lp4x_4g_train_table[], *lp4x_8g_train_table[], *lp4x_16g_train_table[];
@@ -95,8 +88,8 @@ extern void fpga_ddr_init(void);
 extern void lpddr5_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info);
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 
-extern void major_message_all(unsigned int dphy_base);
+extern uint32_t major_message_all(unsigned int dphy_base);
 extern void lpddr_training_table_init(unsigned int ddrc_base,
-    const phy_init_config* train_table[], const ddr_phy_reg_config* override_table);
+	const phy_init_config* train_table[], const ddr_phy_reg_config* override_table);
 extern void init_snps_lp4x_ddrc(unsigned DDRC_BASE, unsigned int rst_code, unsigned int ddr_size_mbyte);
 #endif /* _K3_DDR_H_ */
