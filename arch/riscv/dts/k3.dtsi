@@ -371,7 +371,7 @@
 			compatible = "riscv,rpmi-system-reset";
 			mboxes = <&rpmi_shmem_mbox 3>;
 			riscv,sbi-mpxy-channel-id = <3>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		ddr@3000000 {
