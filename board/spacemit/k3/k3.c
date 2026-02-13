@@ -41,6 +41,9 @@ bool is_video_connected = false;
 static char found_partition[64] = {0};
 static uint32_t reboot_config;
 
+#define K3_SRAM_CLEAR_ADDR	0xC0800000UL
+#define K3_SRAM_CLEAR_SIZE	(512 * 1024)
+
 DECLARE_GLOBAL_DATA_PTR;
 
 static const struct k3_nor_boot_target k3_nor_boot_prio[] = {
@@ -671,6 +674,21 @@ static void try_boot_from_udisk(void)
 }
 #endif
 
+static int k3_clear_sram(void)
+{
+	uint64_t *buf64;
+	ulong addr = K3_SRAM_CLEAR_ADDR;
+	size_t size = K3_SRAM_CLEAR_SIZE;
+
+	if (!size || (size % sizeof(*buf64)))
+		return -EINVAL;
+
+	buf64 = (uint64_t *)map_sysmem(addr, size);
+	memset(buf64, 0, size);
+	unmap_sysmem(buf64);
+	return 0;
+}
+
 int board_late_init(void)
 {
 #if CONFIG_IS_ENABLED(HWMON_SENSORS_CTF2301) || CONFIG_IS_ENABLED(RT7451_RETIMER)
@@ -679,6 +697,14 @@ int board_late_init(void)
 	ulong kernel_start;
 	ofnode chosen_node;
 	int ret;
+
+	ret = k3_clear_sram();
+	if (ret)
+		pr_warn("Failed to clear SRAM 0x%08lx (size=0x%x), err=%d\n",
+			(ulong)K3_SRAM_CLEAR_ADDR, K3_SRAM_CLEAR_SIZE, ret);
+	else
+		pr_info("SRAM cleared: addr=0x%08lx size=0x%x\n",
+			(ulong)K3_SRAM_CLEAR_ADDR, K3_SRAM_CLEAR_SIZE);
 
 #if CONFIG_IS_ENABLED(HWMON_SENSORS_CTF2301)
 	ret = uclass_get_device_by_driver(UCLASS_MISC,
