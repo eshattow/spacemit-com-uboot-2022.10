@@ -218,8 +218,8 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 	REG32(DDRC_BASE + 0x00010510) = 0x00010005;
 	REG32(DDRC_BASE + 0x00010518) = 0x70000000;
 	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
-	if (4096 == ddr_size_mbyte || 8192 == ddr_size_mbyte)
-		REG32(DDRC_BASE + 0x00010200) = 0x00000000;
+	if (4096 == ddr_size_mbyte)
+		REG32(DDRC_BASE + 0x00010200) = 0x010003f3;
 	else // dsty_16GB
 		REG32(DDRC_BASE + 0x00010200) = 0x00000361;
 
@@ -232,8 +232,8 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 	if (16384 == ddr_size_mbyte) {
 		REG32(DDRC_BASE + 0x00010104) = 0x0000000f;
 		REG32(DDRC_BASE + 0x00010108) = 0x0000000f;
-	} else // dsty_4GB || dsty_8GB
-	{
+	} else {
+		// dsty_4GB || dsty_8GB
 		REG32(DDRC_BASE + 0x00010104) = 0x00000005;
 		REG32(DDRC_BASE + 0x00010108) = 0x00000005;
 	}
@@ -296,8 +296,8 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 		REG32(DDRC_BASE + 0x00000604) = 0x00e00070;
 		REG32(DDRC_BASE + 0x00000608) = 0x06480000;
 		REG32(DDRC_BASE + 0x0000060c) = 0x3f000000;
-
 		REG32(DDRC_BASE + 0x00000610) = 0x00000000;
+
 		REG32(DDRC_BASE + 0x00000800) = 0x001804d7;
 		REG32(DDRC_BASE + 0x00000804) = 0x02800100;
 		REG32(DDRC_BASE + 0x00000d0c) = 0x00400010;
@@ -322,8 +322,8 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 		REG32(DDRC_BASE + 0x000005b8) = 0x00000147;
 		REG32(DDRC_BASE + 0x00000a80) = 0x00000070;
 		REG32(DDRC_BASE + 0x00000d08) = 0x0000160a;
-	} else // dsty_4GB || dsty_8GB
-	{
+	} else {
+		// dsty_4GB || dsty_8GB
 		REG32(DDRC_BASE + 0x00000000) = 0x28103622;
 		REG32(DDRC_BASE + 0x00000004) = 0x00100630;
 		REG32(DDRC_BASE + 0x00000008) = 0x09111117;
@@ -340,11 +340,13 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 		REG32(DDRC_BASE + 0x00000064) = 0x00002806;
 		REG32(DDRC_BASE + 0x00000078) = 0x00191318;
 		REG32(DDRC_BASE + 0x00000080) = 0x00030408;
-		REG32(DDRC_BASE + 0x00000600) = 0x02100061;
-		REG32(DDRC_BASE + 0x00000604) = 0x00e000e0;
+
+		REG32(DDRC_BASE + 0x00000600) = 0xc03d0c34;
+		REG32(DDRC_BASE + 0x00000604) = 0x00e00070;
 		REG32(DDRC_BASE + 0x00000608) = 0x06480000;
-		REG32(DDRC_BASE + 0x0000060c) = 0x10000000;
+		REG32(DDRC_BASE + 0x0000060c) = 0x3f000000;
 		REG32(DDRC_BASE + 0x00000610) = 0x00000000;
+
 		REG32(DDRC_BASE + 0x00000800) = 0x001804d7;
 		REG32(DDRC_BASE + 0x00000804) = 0x02800100;
 		REG32(DDRC_BASE + 0x00000d0c) = 0x00400010;
@@ -452,8 +454,8 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 		REG32(DDRC_BASE + 0x00030024) = 0x08080808;
 		REG32(DDRC_BASE + 0x00030028) = 0x08080808;
 		REG32(DDRC_BASE + 0x0003002c) = 0x00000808;
-	} else // dsty_16GB
-	{
+	} else {
+		// dsty_16GB
 		REG32(DDRC_BASE + 0x000200c0) = 0x00000008; // SARBASE0
 		REG32(DDRC_BASE + 0x000200c4) = 0x0000000f; // SARSIZE0
 		REG32(DDRC_BASE + 0x000200c8) = 0x00000018; // SARBASE1
