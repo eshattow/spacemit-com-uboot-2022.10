@@ -425,6 +425,76 @@ static void espi_configure_flash_channel(struct spacemit_espi_priv *priv, u32 sl
 	}
 }
 
+static u32 espi_freq_mhz_to_sel(u32 freq_mhz)
+{
+	switch (freq_mhz) {
+	case ESPI_GEN_OP_FREQ_66MHZ:
+	case 66:
+		return ESPI_GEN_OP_FREQ_66MHZ;
+	case ESPI_GEN_OP_FREQ_50MHZ:
+	case 50:
+		return ESPI_GEN_OP_FREQ_50MHZ;
+	case ESPI_GEN_OP_FREQ_33MHZ:
+	case 33:
+		return ESPI_GEN_OP_FREQ_33MHZ;
+	case ESPI_GEN_OP_FREQ_25MHZ:
+	case 25:
+		return ESPI_GEN_OP_FREQ_25MHZ;
+	case ESPI_GEN_OP_FREQ_20MHZ:
+	case 20:
+	default:
+		return ESPI_GEN_OP_FREQ_20MHZ;
+	}
+}
+
+static void spacemit_espi_build_master_only_config(struct spacemit_espi_priv *priv)
+{
+	u32 config = 0;
+	u32 freq_sel;
+
+	espi_configure_basic_features(priv, &config);
+
+	if (priv->alert_mode == ESPI_GEN_ALERT_MODE_PIN) {
+		config |= ESPI_GEN_ALERT_MODE_PIN;
+		if (priv->alert_type == ESPI_GEN_ALERT_TYPE_OD)
+			config |= ESPI_GEN_OPEN_DRAIN_ALERT_SEL;
+	}
+
+	config |= ESPI_GEN_IO_MODE_SET(priv->io_mode);
+	freq_sel = espi_freq_mhz_to_sel(priv->op_freq);
+	config |= (freq_sel & ESPI_GEN_OP_FREQ_SEL_MASK) << ESPI_GEN_OP_FREQ_SEL_OFFSET;
+
+	if (priv->peri_chan_enable) {
+		config |= ESPI_GEN_PERI_CHAN_SUP;
+		espi_peri_config = ESPI_ENABLE_PR_CHANNEL;
+	} else {
+		espi_peri_config = 0;
+	}
+
+	if (priv->vwire_chan_enable) {
+		config |= ESPI_GEN_VWIRE_CHAN_SUP;
+		espi_vw_config = ESPI_ENABLE_VW_CHANNEL;
+	} else {
+		espi_vw_config = 0;
+	}
+
+	if (priv->oob_chan_enable) {
+		config |= ESPI_GEN_OOB_CHAN_SUP;
+		espi_oob_config = ESPI_ENABLE_OOB_CHANNEL;
+	} else {
+		espi_oob_config = 0;
+	}
+
+	if (priv->flash_chan_enable) {
+		config |= ESPI_GEN_FLASH_CHAN_SUP;
+		espi_flash_config = ESPI_ENABLE_FLASH_CHANNEL;
+	} else {
+		espi_flash_config = 0;
+	}
+
+	espi_gen_config = config;
+}
+
 /**
  * Negotiate eSPI configuration with slave device
  * @priv: driver private data
@@ -721,6 +791,7 @@ static int spacemit_espi_receive_oob(struct udevice *dev, u8 *buf, size_t len)
 static int spacemit_espi_probe(struct udevice *dev)
 {
 	struct spacemit_espi_priv *priv = dev_get_priv(dev);
+	bool slave_ready = true;
 	int ret;
 
 	/* Step 0: Get and enable clocks */
@@ -807,8 +878,11 @@ static int spacemit_espi_probe(struct udevice *dev)
 	/* Step 5: Negotiate configuration with slave device */
 	ret = spacemit_espi_negotiate_config(priv);
 	if (ret) {
-		dev_err(dev, "eSPI configuration negotiation failed\n");
-		goto err_disable_clocks;
+		dev_warn(dev,
+			 "eSPI slave negotiation failed (%d), continue with master-only init\n",
+			 ret);
+		spacemit_espi_build_master_only_config(priv);
+		slave_ready = false;
 	}
 
 	/* Step 6: Apply negotiated configuration to master */
@@ -831,10 +905,13 @@ static int spacemit_espi_probe(struct udevice *dev)
 		espi_config_vwgpio(priv);
 	}
 
-	/* Mark initialization complete - this must be the last step */
-	priv->initialized = true;
+	/* Mark communication readiness (hardware is initialized regardless). */
+	priv->initialized = slave_ready;
+	if (slave_ready)
+		dev_info(dev, "SpacemiT eSPI controller initialized successfully\n");
+	else
+		dev_warn(dev, "SpacemiT eSPI initialized in master-only mode (no EC slave)\n");
 
-	dev_info(dev, "SpacemiT eSPI controller initialized successfully\n");
 	return 0;
 
 err_disable_clocks:
