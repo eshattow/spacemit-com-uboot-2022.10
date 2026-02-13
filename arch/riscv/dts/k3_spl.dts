@@ -12,6 +12,7 @@
 #include "k3-cpus.dtsi"
 #include <dt-bindings/reset/reset-spacemit-k3.h>
 #include <dt-bindings/clock/spacemit-k3-clock.h>
+#include <dt-bindings/pinctrl/k3-pinctrl.h>
 #include "secure_boot.dtsi"
 
 / {
@@ -139,6 +140,37 @@
 			status = "okay";
 		};
 
+		pinctrl: pinctrl@d401e000 {
+			u-boot,dm-spl;
+			compatible = "pinctrl-single";
+			reg = <0x0 0xd401e000 0x0 0x400>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			#pinctrl-cells = <2>;
+			#gpio-range-cells = <3>;
+			pinctrl-single,register-width = <32>;
+			pinctrl-single,function-mask = <0xff77>;
+
+			range: gpio-range {
+				#pinctrl-single,gpio-range-cells = <3>;
+			};
+
+			pinctrl_espi0: espi0_grp {
+				u-boot,dm-spl;
+				power-source = <1800>;
+				pinctrl-single,pins = <
+					K3_PADCONF(GPIO_91, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d0 */
+					K3_PADCONF(GPIO_92, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d1 */
+					K3_PADCONF(GPIO_93, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d2 */
+					K3_PADCONF(GPIO_94, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_d3 */
+					K3_PADCONF(GPIO_95, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_cs */
+					K3_PADCONF(GPIO_96, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_clk */
+					K3_PADCONF(GPIO_97, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_resetn */
+					K3_PADCONF(GPIO_98, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_alert */
+				>;
+			};
+		};
+
 		uart0: uart@d4017000 {
 			u-boot,dm-spl;
 			compatible = "ns16550";
@@ -216,6 +248,55 @@
 				broken-flash-reset;
 				status = "okay";
 			};
+		};
+
+		espi0: espi@cac8c000 {
+			u-boot,dm-spl;
+			compatible = "spacemit,k2-espi";
+			reg = <0x0 0xcac8c000 0x0 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_espi0>;
+			clocks = <&ccu CLK_ESPI_SCLK_SRC>,
+				 <&ccu CLK_ESPI_SCLK>,
+				 <&ccu CLK_ESPI_MCLK>;
+			clock-names = "sclk_src", "sclk", "mclk";
+			resets = <&reset RESET_ESPI>;
+			reset-names = "espi_reset";
+			assigned-clocks = <&ccu CLK_ESPI_SCLK>;
+			assigned-clock-parents = <&ccu CLK_ESPI_SCLK_SRC>;
+
+			pr_io_base = <0x86000000>;
+			pr-mem-base0 = <0x84000000>;
+			pr-mem-base1 = <0xCAC8C000>;
+
+			/* Virtual-wire GPIO mapping configuration */
+			/* vw-gpio-mapping = <0 0x80>,             */
+			/* 				<1 0x81>,                  */
+			/* 				<2 0x82>,                  */
+			/* 				<3 0x83>;                  */
+
+			/* eSPI Master configuration */
+			operating-frequency = <20>;   /* 20MHz (will negotiate with slave) */
+			io-mode = "single";           /* "single", "dual", or "quad" */
+			alert-mode = "io1";           /* "pin" or "io1" */
+			alert-type = "open-drain";    /* "open-drain" or "push-pull" */
+
+			/* Features */
+			crc-enable;                    /* Enable CRC checking */
+			response-modifier-enable;      /* Enable response modifier */
+			auto-gating-enable;            /* Enable auto clock gating */
+
+			/* Channel support (master capabilities) */
+			peripheral-channel-enable;     /* Enable Peripheral channel */
+			vwire-channel-enable;          /* Enable Virtual Wire channel */
+			oob-channel-enable;            /* Enable OOB channel */
+			flash-channel-enable;          /* Enable Flash channel */
+
+			/* Timing configuration */
+			watchdog-timeout = <0xFFFF>;   /* Watchdog timeout value */
+			status = "okay";
 		};
 
 		sdhci0: sdh@d4280000 {
