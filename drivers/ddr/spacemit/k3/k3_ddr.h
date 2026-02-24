@@ -85,7 +85,7 @@ extern const phy_init_config *lp4x_4g_train_table[], *lp4x_8g_train_table[], *lp
 extern const ddr_phy_reg_config phy_override_seq_lp4x_8g[], phy_override_seq_lp4x_16g[];
 
 extern void fpga_ddr_init(void);
-extern void lpddr5_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info);
+extern void lpddr_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info);
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 
 extern uint32_t major_message_all(unsigned int dphy_base);

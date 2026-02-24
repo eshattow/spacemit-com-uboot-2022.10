@@ -157,8 +157,8 @@ static int spacemit_ddr_probe(struct udevice *dev)
 		return 1;
 	}
 
-	lpddr5_silicon_init(ddrc0, part_info);
-	lpddr5_silicon_init(ddrc1, part_info);
+	lpddr_silicon_init(ddrc0, part_info);
+	lpddr_silicon_init(ddrc1, part_info);
 #endif
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
 	if (ret < 0) {

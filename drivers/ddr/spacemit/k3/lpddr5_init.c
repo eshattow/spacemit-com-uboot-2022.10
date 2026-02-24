@@ -649,7 +649,7 @@ void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info)
 	}
 }
 
-void lpddr5_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info)
+void lpddr_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info)
 {
 	LogMsg(0, "=== start init_lpddr() ===\n");
 	init_snps_lp45(ddrc_reg_base, part_info);
