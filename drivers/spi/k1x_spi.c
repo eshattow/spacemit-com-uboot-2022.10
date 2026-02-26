@@ -320,7 +320,6 @@ static int k1x_spi_release_bus(struct udevice *dev)
 	u32 val = 0;
 	struct udevice *bus = dev->parent;
 	struct k1x_spi *priv = dev_get_priv(bus);
-	printf("k1x spi release bus\n");
 
 	val = readl(priv->base + REG_SSP_TOP_CTRL);
 	val &= ~(BIT_SSP_SSE | BIT_SSP_HOLD_FRAME_LOW);
