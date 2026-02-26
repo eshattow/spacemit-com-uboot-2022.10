@@ -34,7 +34,7 @@
 		       "pll3", "pll4", "pll5", "pll8", "pll_src3", "clt1_pll_src", "pll_src5", "clt3_pll_src";
 	topd_frequency = <800000000>;
 	axi_frequency =  <307000000>;
-	cci_frequency =  <1000000000>;
+	cci_frequency =  <1228000000>;
 	cluster0_frequency = <2200000000>;
 	cluster1_frequency = <2200000000>;
 	cluster2_frequency = <1800000000>;
