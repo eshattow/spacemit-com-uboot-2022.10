@@ -420,6 +420,31 @@
 			status = "disabled";
 		};
 
+		qspi: spi@d420c000 {
+			compatible = "spacemit,k3-qspi";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x0 0xd420c000 0x0 0x1000>,
+			      <0x0 0xb8000000 0x0 0x4100000>;
+			reg-names = "qspi-base", "qspi-mmap";
+			qspi-sfa1ad = <0x4000000>;
+			qspi-sfa2ad = <0x100000>;
+			qspi-sfb1ad = <0x100000>;
+			qspi-sfb2ad = <0x100000>;
+			qspi-pmuap-reg = <0xd4282860>;
+			qspi-mpmu-acgr-reg = <0xd4051024>;
+			qspi-ahbread = <0>;
+			qspi-freq = <26500000>;
+			qspi-id = <4>;
+			clocks = <&ccu CLK_QSPI>,
+			          <&ccu CLK_QSPI_BUS>;
+			clock-names = "qspi_clk", "qspi_bus_clk";
+			resets = <&reset RESET_QSPI>,
+				<&reset RESET_QSPI_BUS>;
+			reset-names = "qspi_reset", "qspi_bus_reset";
+			status = "disabled";
+		};
+
 		spi0: spi0@d4040000 {
 			compatible = "spacemit,k3-spi";
 			reg = <0x0 0xd4040000 0x0 0x30>;
@@ -676,31 +701,6 @@
 				 <0x02000000 0x0  0xc0110000 0x12 0xc0110000 0x0 0x3fef0000>,
 				 <0x43000000 0x13 0x00000000 0x13 0x00000000 0x1 0x00000000>;
 			linux,pci-domain = <4>;
-			status = "disabled";
-		};
-
-		qspi: spi@d420c000 {
-			compatible = "spacemit,k3-qspi";
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0x0 0xd420c000 0x0 0x1000>,
-			      <0x0 0xb8000000 0x0 0x4100000>;
-			reg-names = "qspi-base", "qspi-mmap";
-			qspi-sfa1ad = <0x4000000>;
-			qspi-sfa2ad = <0x100000>;
-			qspi-sfb1ad = <0x100000>;
-			qspi-sfb2ad = <0x100000>;
-			qspi-pmuap-reg = <0xd4282860>;
-			qspi-mpmu-acgr-reg = <0xd4051024>;
-			qspi-ahbread = <0>;
-			qspi-freq = <26500000>;
-			qspi-id = <4>;
-			clocks = <&ccu CLK_QSPI>,
-			          <&ccu CLK_QSPI_BUS>;
-			clock-names = "qspi_clk", "qspi_bus_clk";
-			resets = <&reset RESET_QSPI>,
-				<&reset RESET_QSPI_BUS>;
-			reset-names = "qspi_reset", "qspi_bus_reset";
 			status = "disabled";
 		};
 
