@@ -26,7 +26,7 @@ struct spacemit_k3_ufs_priv {
 	struct reset_ctl reset;
 	u32 phy_mng_base;
 	u32 atop_base;
-	u32 ref_clk_freq;	/* Reference clock frequency from DTS */
+	u32 ref_clk_freq; /* Reference clock frequency from DTS */
 };
 
 /*UFS PMUAP_REG*/
@@ -56,7 +56,7 @@ struct spacemit_k3_ufs_priv {
 
 /* ufs_aclk parents in `uboot-2022.10/drivers/clk/spacemit/ccu-k3.c` */
 #define PLAT_UFS_ACLK_SEL_PLL1_D5_491P52 0
-#define PLAT_UFS_ACLK_SEL_PLL1_D6_409P6  1
+#define PLAT_UFS_ACLK_SEL_PLL1_D6_409P6 1
 
 #define UFS_CLK_SEL 0
 #define UFS_CLK_DIV 1
@@ -84,12 +84,13 @@ struct spacemit_k3_ufs_priv {
 
 #define UFS_BOOT_LU_SIZE 32
 
-#define UFSHCD_HCE_UIC_PWR_MASK                                                                    \
-	(UIC_HIBERNATE_ENTER | UIC_HIBERNATE_EXIT | UIC_POWER_MODE | UIC_COMMAND_COMPL)
+#define UFSHCD_HCE_UIC_PWR_MASK                                      \
+	(UIC_HIBERNATE_ENTER | UIC_HIBERNATE_EXIT | UIC_POWER_MODE | \
+	 UIC_COMMAND_COMPL)
 
-#define UFSHCD_LINK_ALL_MASK                                                                       \
-	(UFSHCD_HCE_UIC_PWR_MASK | UTP_TRANSFER_REQ_COMPL | UIC_ERROR | DEVICE_FATAL_ERROR |       \
-	 CONTROLLER_FATAL_ERROR | SYSTEM_BUS_FATAL_ERROR)
+#define UFSHCD_LINK_ALL_MASK                                            \
+	(UFSHCD_HCE_UIC_PWR_MASK | UTP_TRANSFER_REQ_COMPL | UIC_ERROR | \
+	 DEVICE_FATAL_ERROR | CONTROLLER_FATAL_ERROR | SYSTEM_BUS_FATAL_ERROR)
 
 /* PA Layer Gettable and settable M-PHY Specific Attributes */
 #define PA_TXHSG1SYNCLENGTH 0x1552
@@ -127,13 +128,16 @@ struct spacemit_k3_ufs_priv {
 #define UFS_MPHY_PU_PLL_LOCK BIT(31)
 
 /* UFS controller timing constants for 409MHz SYS1CLK */
-#define UFS_SYS1CLK_1US_409MHZ		409		/* 1us worth of SYS1CLK cycles at ~409MHz */
-#define UFS_TX_SYMBOL_CLK_NS_US_409MHZ	0x800	/* TX symbol clock ns/us ratio for 409MHz */
-#define UFS_PA_LINK_STARTUP_TIMER_MAX	0xffffffff	/* Max PA link startup timer */
-#define UFS_DL_AFC0REQTIMEOUTVAL_MAX	0xFFFF
+#define UFS_SYS1CLK_1US_409MHZ 409 /* 1us worth of SYS1CLK cycles at ~409MHz */
+#define UFS_TX_SYMBOL_CLK_NS_US_409MHZ \
+	0x800 /* TX symbol clock ns/us ratio for 409MHz */
+#define UFS_PA_LINK_STARTUP_TIMER_MAX 0xffffffff /* Max PA link startup timer */
+#define UFS_DL_AFC0REQTIMEOUTVAL_MAX 0xFFFF
 
-extern int ufshcd_query_descriptor_retry(struct ufs_hba *hba, enum query_opcode opcode,
-					 enum desc_idn idn, u8 index, u8 selector, u8 *desc_buf,
+extern int ufshcd_query_descriptor_retry(struct ufs_hba *hba,
+					 enum query_opcode opcode,
+					 enum desc_idn idn, u8 index,
+					 u8 selector, u8 *desc_buf,
 					 int *buf_len);
 
 /**
@@ -154,23 +158,21 @@ static int spacemit_k3_ufs_set_ref_clk(struct ufs_hba *hba)
 	int err;
 	bool updated = false;
 
-	err = ufshcd_query_attr_retry(hba,
-				      UPIU_QUERY_OPCODE_READ_ATTR,
-				      QUERY_ATTR_IDN_REF_CLK_FREQ,
-				      0, 0, &cur_clk);
+	err = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_READ_ATTR,
+				      QUERY_ATTR_IDN_REF_CLK_FREQ, 0, 0,
+				      &cur_clk);
 	if (err) {
-		dev_warn(hba->dev,
-			 "Failed to read bRefClkFreq, err = %d\n", err);
+		dev_warn(hba->dev, "Failed to read bRefClkFreq, err = %d\n",
+			 err);
 		return err;
 	}
 
 	printf("ufs: bRefClkFreq current=%u expected=%u\n", cur_clk, ref_clk);
 
 	if (cur_clk != ref_clk) {
-		err = ufshcd_query_attr_retry(hba,
-					      UPIU_QUERY_OPCODE_WRITE_ATTR,
-					      QUERY_ATTR_IDN_REF_CLK_FREQ,
-					      0, 0, &ref_clk);
+		err = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_WRITE_ATTR,
+					      QUERY_ATTR_IDN_REF_CLK_FREQ, 0, 0,
+					      &ref_clk);
 		if (err) {
 			dev_warn(hba->dev,
 				 "Failed to set bRefClkFreq to %u, err = %d\n",
@@ -238,13 +240,15 @@ static void spacemit_k3_ufs_set_aclk_low_freq(void)
 	 * "ufs-low-aclk-freq" init change from the other environment.
 	 */
 	reg_val = readl(ufs_clk_res_ctrl);
-	reg_val &= ~GENMASK(PLAT_UFS_ACLK_SEL_SHIFT + PLAT_UFS_ACLK_SEL_WIDTH - 1,
-			    PLAT_UFS_ACLK_SEL_SHIFT);
+	reg_val &=
+		~GENMASK(PLAT_UFS_ACLK_SEL_SHIFT + PLAT_UFS_ACLK_SEL_WIDTH - 1,
+			 PLAT_UFS_ACLK_SEL_SHIFT);
 	reg_val |= (PLAT_UFS_ACLK_SEL_PLL1_D6_409P6 << PLAT_UFS_ACLK_SEL_SHIFT);
 
 	/* aclk = clk_src / (div field + 1) */
-	reg_val &= ~GENMASK(PLAT_UFS_ACLK_DIV_SHIFT + PLAT_UFS_ACLK_DIV_WIDTH - 1,
-			    PLAT_UFS_ACLK_DIV_SHIFT);
+	reg_val &=
+		~GENMASK(PLAT_UFS_ACLK_DIV_SHIFT + PLAT_UFS_ACLK_DIV_WIDTH - 1,
+			 PLAT_UFS_ACLK_DIV_SHIFT);
 	reg_val |= (0 << PLAT_UFS_ACLK_DIV_SHIFT);
 
 	writel(reg_val, ufs_clk_res_ctrl);
@@ -284,7 +288,8 @@ static void spacemit_k3_ufs_clk_disable(struct spacemit_k3_ufs_priv *priv)
 	reset_assert(&priv->reset);
 }
 
-static int __maybe_unused debug_print_desc(struct udevice *dev, enum desc_idn idn)
+static int __maybe_unused debug_print_desc(struct udevice *dev,
+					   enum desc_idn idn)
 {
 	u8 *desc_buf;
 
@@ -317,10 +322,13 @@ static int __maybe_unused debug_print_desc(struct udevice *dev, enum desc_idn id
 	}
 
 	if (idn != QUERY_DESC_IDN_UNIT) {
-		ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC, idn, 0, 0,
-						    desc_buf, &desc_size);
+		ret = ufshcd_query_descriptor_retry(hba,
+						    UPIU_QUERY_OPCODE_READ_DESC,
+						    idn, 0, 0, desc_buf,
+						    &desc_size);
 		if (ret) {
-			dev_err(hba->dev, "%s:FAILed read descriptor%d\n", __func__, ret);
+			dev_err(hba->dev, "%s:FAILed read descriptor%d\n",
+				__func__, ret);
 			return ret;
 		}
 
@@ -335,10 +343,13 @@ static int __maybe_unused debug_print_desc(struct udevice *dev, enum desc_idn id
 	} else {
 		debug("ufs: debug print descriptor for idn %d\n", idn);
 		for (int i = 0; i < 8; i++) {
-			ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC, idn,
-							    i, 0, desc_buf, &desc_size);
+			ret = ufshcd_query_descriptor_retry(
+				hba, UPIU_QUERY_OPCODE_READ_DESC, idn, i, 0,
+				desc_buf, &desc_size);
 			if (ret) {
-				dev_err(hba->dev, "%s:FAILed read descriptor%d\n", __func__, ret);
+				dev_err(hba->dev,
+					"%s:FAILed read descriptor%d\n",
+					__func__, ret);
 
 				return ret;
 			}
@@ -357,130 +368,384 @@ out:
 	return ret;
 }
 
-static __maybe_unused int spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
+#define SPACEMIT_UFS_CONFIG_LUN_SLOTS 8
+#define SPACEMIT_UFS_UNIT_DESC_PARAM_LU_ENABLE 0x03
+
+static __maybe_unused int
+spacemit_k3_ufs_get_conf_desc_layout(struct ufs_hba *hba, int *head_desc_size,
+				     int *unit_desc_size)
 {
-	u8 *desc_buf;
-	uint64_t qTotalRawDeviceCapacity;
-	uint32_t dSegmentSize, total_lun_size;
-	uint8_t bAllocationUnitSize;
-	int ret;
-	uint32_t alloc_unit_bytes;
-	struct ufs_hba *hba = dev_get_uclass_priv(dev);
-	int enabled_lun_count = 0;
-	int i;
-
-	/* First read configuration descriptor to check current LUN configuration */
-	desc_buf = kmalloc(hba->desc_size.conf_desc, GFP_KERNEL);
-	if (!desc_buf)
-		return -ENOMEM;
-
-	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
-					    QUERY_DESC_IDN_CONFIGURATION, 0, 0, desc_buf,
-					    &hba->desc_size.conf_desc);
-	if (ret) {
-		dev_err(hba->dev, "%s: Failed to read config descriptor: %d\n", __func__, ret);
-		kfree(desc_buf);
-		return ret;
-	}
-
-	/* Count enabled LUNs */
-	for (i = 0; i < 8; i++) {
-		int offset = hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i;
-		if (desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] == 0x1)
-			enabled_lun_count++;
-	}
-
-	debug("ufs: Current configuration has %d enabled LUN(s)\n", enabled_lun_count);
-
-	/* If already single LUN, no need to reconfigure */
-	if (enabled_lun_count == 1) {
-		kfree(desc_buf);
+	if (hba->desc_size.conf_head_desc > 0 &&
+	    hba->desc_size.conf_unit_desc > 0 &&
+	    hba->desc_size.conf_head_desc +
+			    hba->desc_size.conf_unit_desc *
+				    SPACEMIT_UFS_CONFIG_LUN_SLOTS <=
+		    hba->desc_size.conf_desc) {
+		*head_desc_size = hba->desc_size.conf_head_desc;
+		*unit_desc_size = hba->desc_size.conf_unit_desc;
 		return 0;
 	}
 
-	kfree(desc_buf);
+	/* Try known descriptor layouts first. */
+	if (QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_HEAD +
+		    QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_UNIT *
+			    SPACEMIT_UFS_CONFIG_LUN_SLOTS <=
+	    hba->desc_size.conf_desc) {
+		*head_desc_size = QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_HEAD;
+		*unit_desc_size = QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_UNIT;
+		return 0;
+	}
 
-	/* Need to reconfigure - read geometry descriptor for capacity info */
+	if (QUERY_DESC_CONFIGURATION_DEF_SIZE_HEAD +
+		    QUERY_DESC_CONFIGURATION_DEF_SIZE_UNIT *
+			    SPACEMIT_UFS_CONFIG_LUN_SLOTS <=
+	    hba->desc_size.conf_desc) {
+		*head_desc_size = QUERY_DESC_CONFIGURATION_DEF_SIZE_HEAD;
+		*unit_desc_size = QUERY_DESC_CONFIGURATION_DEF_SIZE_UNIT;
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+static bool spacemit_k3_ufs_is_conf_desc_layout_valid(struct ufs_hba *hba,
+						      int head_desc_size,
+						      int unit_desc_size)
+{
+	if (head_desc_size <= 0 || unit_desc_size <= 0)
+		return false;
+
+	return head_desc_size +
+		       unit_desc_size * SPACEMIT_UFS_CONFIG_LUN_SLOTS <=
+	       hba->desc_size.conf_desc;
+}
+
+static int spacemit_k3_ufs_read_unit_lu_state(struct ufs_hba *hba,
+					      u8 *unit_lu_enabled,
+					      int *enabled_lun_count)
+{
+	u8 desc_buf[QUERY_DESC_MAX_SIZE];
+	int desc_size;
+	bool any_read_ok = false;
+	int i, ret;
+
+	*enabled_lun_count = 0;
+	memset(unit_lu_enabled, 0, SPACEMIT_UFS_CONFIG_LUN_SLOTS);
+
+	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+		desc_size = hba->desc_size.unit_desc;
+		if (desc_size <= SPACEMIT_UFS_UNIT_DESC_PARAM_LU_ENABLE ||
+		    desc_size > QUERY_DESC_MAX_SIZE)
+			desc_size = QUERY_DESC_UNIT_DEF_SIZE;
+
+		ret = ufshcd_query_descriptor_retry(hba,
+						    UPIU_QUERY_OPCODE_READ_DESC,
+						    QUERY_DESC_IDN_UNIT, i, 0,
+						    desc_buf, &desc_size);
+		if (ret) {
+			dev_dbg(hba->dev,
+				"%s: read unit descriptor[%d] failed: %d\n",
+				__func__, i, ret);
+			continue;
+		}
+
+		any_read_ok = true;
+		if (desc_size <= SPACEMIT_UFS_UNIT_DESC_PARAM_LU_ENABLE)
+			continue;
+
+		if (desc_buf[SPACEMIT_UFS_UNIT_DESC_PARAM_LU_ENABLE] == 0x1) {
+			unit_lu_enabled[i] = 1;
+			(*enabled_lun_count)++;
+		}
+	}
+
+	return any_read_ok ? 0 : -EIO;
+}
+
+static int spacemit_k3_ufs_score_conf_layout(const u8 *desc_buf,
+					     int head_desc_size,
+					     int unit_desc_size,
+					     const u8 *unit_lu_enabled)
+{
+	int i;
+	int score = 0;
+
+	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+		int offset = head_desc_size + unit_desc_size * i;
+		bool conf_lu_enabled =
+			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] == 0x1;
+
+		if (conf_lu_enabled == !!unit_lu_enabled[i])
+			score++;
+	}
+
+	return score;
+}
+
+static int spacemit_k3_ufs_select_conf_desc_layout(struct ufs_hba *hba,
+						   const u8 *desc_buf,
+						   const u8 *unit_lu_enabled,
+						   int *head_desc_size,
+						   int *unit_desc_size)
+{
+	int candidate_head[3];
+	int candidate_unit[3];
+	int candidate_count = 0;
+	int i;
+	int best = -1;
+	int best_score = -1;
+
+	candidate_head[candidate_count] = hba->desc_size.conf_head_desc;
+	candidate_unit[candidate_count++] = hba->desc_size.conf_unit_desc;
+
+	if (QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_HEAD !=
+		    hba->desc_size.conf_head_desc ||
+	    QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_UNIT !=
+		    hba->desc_size.conf_unit_desc) {
+		candidate_head[candidate_count] =
+			QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_HEAD;
+		candidate_unit[candidate_count++] =
+			QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_UNIT;
+	}
+
+	if (QUERY_DESC_CONFIGURATION_DEF_SIZE_HEAD !=
+		    hba->desc_size.conf_head_desc ||
+	    QUERY_DESC_CONFIGURATION_DEF_SIZE_UNIT !=
+		    hba->desc_size.conf_unit_desc) {
+		candidate_head[candidate_count] =
+			QUERY_DESC_CONFIGURATION_DEF_SIZE_HEAD;
+		candidate_unit[candidate_count++] =
+			QUERY_DESC_CONFIGURATION_DEF_SIZE_UNIT;
+	}
+
+	for (i = 0; i < candidate_count; i++) {
+		int score;
+
+		if (!spacemit_k3_ufs_is_conf_desc_layout_valid(
+			    hba, candidate_head[i], candidate_unit[i]))
+			continue;
+
+		score = spacemit_k3_ufs_score_conf_layout(desc_buf,
+							  candidate_head[i],
+							  candidate_unit[i],
+							  unit_lu_enabled);
+		if (score > best_score) {
+			best = i;
+			best_score = score;
+		}
+	}
+
+	if (best < 0)
+		return -EINVAL;
+
+	*head_desc_size = candidate_head[best];
+	*unit_desc_size = candidate_unit[best];
+
+	debug("ufs: selected config layout head=0x%x unit=0x%x score=%d\n",
+	      *head_desc_size, *unit_desc_size, best_score);
+
+	return 0;
+}
+
+static int
+spacemit_k3_ufs_get_total_alloc_units_from_geometry(struct ufs_hba *hba,
+						    u64 *total_alloc_units)
+{
+	u8 *desc_buf;
+	u64 qTotalRawDeviceCapacity;
+	u32 dSegmentSize;
+	u8 bAllocationUnitSize;
+	u64 alloc_unit_bytes;
+	int ret;
+
 	desc_buf = kmalloc(hba->desc_size.geom_desc, GFP_KERNEL);
 	if (!desc_buf)
 		return -ENOMEM;
 
 	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
-					    QUERY_DESC_IDN_GEOMETRY, 0, 0, desc_buf,
+					    QUERY_DESC_IDN_GEOMETRY, 0, 0,
+					    desc_buf,
 					    &hba->desc_size.geom_desc);
-	if (ret) {
-		dev_err(hba->dev, "%s: Failed to read geometry descriptor: %d\n", __func__, ret);
-		kfree(desc_buf);
-		return ret;
-	}
+	if (ret)
+		goto out;
 
-	qTotalRawDeviceCapacity = get_unaligned_be64(&desc_buf[GEO_DESC_PARAM_TOTAL_RAW_DEV_CAP]);
+	qTotalRawDeviceCapacity =
+		get_unaligned_be64(&desc_buf[GEO_DESC_PARAM_TOTAL_RAW_DEV_CAP]);
 	dSegmentSize = get_unaligned_be32(&desc_buf[GEO_DESC_PARAM_SEG_SIZE]);
 	bAllocationUnitSize = desc_buf[GEO_DESC_PARAM_ALLOC_UNIT_SIZE];
-	debug("ufs: Total capacity: %llu sectors, Segment size: %u, Alloc unit size: %d\n",
-		qTotalRawDeviceCapacity, dSegmentSize, bAllocationUnitSize);
-	kfree(desc_buf);
+	if (!dSegmentSize || !bAllocationUnitSize) {
+		ret = -EINVAL;
+		goto out;
+	}
 
-	/* Read and modify configuration descriptor */
+	alloc_unit_bytes = (u64)dSegmentSize * bAllocationUnitSize *
+			   UFS_LOGICAL_BLOCK_SIZE;
+	if (!alloc_unit_bytes) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	*total_alloc_units =
+		(qTotalRawDeviceCapacity * UFS_LOGICAL_BLOCK_SIZE) /
+		alloc_unit_bytes;
+	if (!*total_alloc_units || *total_alloc_units > 0xFFFFFFFFULL)
+		ret = -ERANGE;
+
+out:
+	kfree(desc_buf);
+	return ret;
+}
+
+/*
+ * Return values:
+ *   0: already single-LUN and active
+ *   1: descriptor changed or re-init still needed
+ *  <0: error
+ */
+static __maybe_unused int
+spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
+{
+	u8 *desc_buf;
+	u8 unit_lu_enabled[SPACEMIT_UFS_CONFIG_LUN_SLOTS];
+	u32 conf_desc_lock = 0;
+	u64 total_alloc_units = 0;
+	int ret;
+	int unit_state_ret;
+	int unit_enabled_lun_count = 0;
+	int conf_enabled_lun_count = 0;
+	int conf_head_desc;
+	int conf_unit_desc;
+	int i;
+	bool need_reconfigure;
+	struct ufs_hba *hba = dev_get_uclass_priv(dev);
+
 	desc_buf = kmalloc(hba->desc_size.conf_desc, GFP_KERNEL);
 	if (!desc_buf)
 		return -ENOMEM;
 
 	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
-					    QUERY_DESC_IDN_CONFIGURATION, 0, 0, desc_buf,
+					    QUERY_DESC_IDN_CONFIGURATION, 0, 0,
+					    desc_buf,
 					    &hba->desc_size.conf_desc);
 	if (ret) {
-		dev_err(hba->dev, "%s: Failed to read config descriptor: %d\n", __func__, ret);
-		kfree(desc_buf);
-		return ret;
+		dev_err(hba->dev, "%s: failed to read config descriptor: %d\n",
+			__func__, ret);
+		goto out;
 	}
 
-	/* Disable boot LUN */
+	unit_state_ret = spacemit_k3_ufs_read_unit_lu_state(
+		hba, unit_lu_enabled, &unit_enabled_lun_count);
+	if (unit_state_ret) {
+		dev_dbg(hba->dev, "%s: unit descriptor state unavailable: %d\n",
+			__func__, unit_state_ret);
+		ret = spacemit_k3_ufs_get_conf_desc_layout(hba, &conf_head_desc,
+							   &conf_unit_desc);
+	} else {
+		ret = spacemit_k3_ufs_select_conf_desc_layout(hba, desc_buf,
+							      unit_lu_enabled,
+							      &conf_head_desc,
+							      &conf_unit_desc);
+	}
+
+	if (ret) {
+		dev_err(hba->dev,
+			"%s: unsupported config descriptor layout (len=0x%x)\n",
+			__func__, hba->desc_size.conf_desc);
+		goto out;
+	}
+
+	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+		int offset = conf_head_desc + conf_unit_desc * i;
+
+		if (desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] == 0x1)
+			conf_enabled_lun_count++;
+
+		total_alloc_units += get_unaligned_be32(
+			&desc_buf[offset +
+				  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+	}
+
+	if (!unit_state_ret)
+		need_reconfigure =
+			(unit_enabled_lun_count != 1 || !unit_lu_enabled[0]);
+	else
+		need_reconfigure = (conf_enabled_lun_count != 1);
+
+	debug("ufs: conf_lun_count=%d unit_lun_count=%d total_alloc_units=%llu need_recfg=%d\n",
+	      conf_enabled_lun_count, unit_enabled_lun_count, total_alloc_units,
+	      need_reconfigure);
+
+	if (!need_reconfigure) {
+		ret = 0;
+		goto out;
+	}
+
+	if (!total_alloc_units || total_alloc_units > 0xFFFFFFFFULL) {
+		ret = spacemit_k3_ufs_get_total_alloc_units_from_geometry(
+			hba, &total_alloc_units);
+		if (ret) {
+			dev_err(hba->dev,
+				"%s: failed to get total alloc units from geometry: %d\n",
+				__func__, ret);
+			goto out;
+		}
+	}
+
+	ret = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_READ_ATTR,
+				      QUERY_ATTR_IDN_CONF_DESC_LOCK, 0, 0,
+				      &conf_desc_lock);
+	if (ret) {
+		dev_warn(hba->dev,
+			 "%s: failed to read bConfigDescrLock (%d), continue\n",
+			 __func__, ret);
+	} else if (conf_desc_lock) {
+		dev_err(hba->dev,
+			"%s: bConfigDescrLock is set, cannot reconfigure LUNs\n",
+			__func__);
+		ret = -EPERM;
+		goto out;
+	}
+
+	/* Keep only LU0 enabled and move all allocated units into LU0. */
 	desc_buf[CONFIG_DESC_HEADER_PARAM_BOOT_EN] = 0x0;
-
-	/* Calculate total capacity in allocation units */
-	alloc_unit_bytes = dSegmentSize * bAllocationUnitSize * UFS_LOGICAL_BLOCK_SIZE;
-	total_lun_size = (qTotalRawDeviceCapacity * UFS_LOGICAL_BLOCK_SIZE) / alloc_unit_bytes;
-
-	/* Configure all 8 LUN slots */
-	for (i = 0; i < 8; i++) {
-		int offset = hba->desc_size.conf_head_desc + hba->desc_size.conf_unit_desc * i;
+	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+		int offset = conf_head_desc + conf_unit_desc * i;
 
 		if (i == 0) {
-			/* LU0: Enable with full capacity */
 			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] = 0x1;
-			put_unaligned_be32(total_lun_size,
-					   &desc_buf[offset + CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+			put_unaligned_be32(
+				(u32)total_alloc_units,
+				&desc_buf[offset +
+					  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
 		} else {
-			/* LU1-LU7: Disable */
 			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] = 0x0;
-			put_unaligned_be32(0, &desc_buf[offset + CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+			put_unaligned_be32(
+				0,
+				&desc_buf[offset +
+					  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
 		}
 
 		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID] = 0x0;
-		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_WRI_PRO] = 0x0;
-		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_MEM_TYPE] = 0x0;
-		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_DATA_RELY] = 0x1;
-		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE] = 0x0C; /* 4KB */
-		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE] = 0x3;
 	}
 
-	debug("ufs: Reconfiguring to single LUN with size: 0x%x allocation units\n", total_lun_size);
-
-	/* Write configuration descriptor back to device */
 	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_WRITE_DESC,
-					    QUERY_DESC_IDN_CONFIGURATION, 0, 0, desc_buf,
+					    QUERY_DESC_IDN_CONFIGURATION, 0, 0,
+					    desc_buf,
 					    &hba->desc_size.conf_desc);
 	if (ret) {
-		dev_err(hba->dev, "%s: Failed to write config descriptor: %d\n", __func__, ret);
-		kfree(desc_buf);
-		return ret;
+		dev_err(hba->dev, "%s: failed to write config descriptor: %d\n",
+			__func__, ret);
+		goto out;
 	}
 
-	dev_info(hba->dev, "Single LUN configuration complete! Power cycle required.\n");
+	dev_info(
+		hba->dev,
+		"single-LUN config descriptor written, UFS re-init is required\n");
+	ret = 1;
 
+out:
 	kfree(desc_buf);
-	return 0;
+	return ret;
 }
 
 static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
@@ -513,7 +778,8 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 	{
 		u32 timeout = 100000;
 		do {
-			reg_val = ufshcd_readl(hba, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
+			reg_val = ufshcd_readl(hba, priv->phy_mng_base +
+							    UFS_MPHY_PU_CTRL);
 			pr_debug("ufs: UFS_MPHY_PU_CTRL:0x%x\n", reg_val);
 			if (reg_val & UFS_MPHY_PU_PLL_LOCK)
 				break;
@@ -547,7 +813,8 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 	return 0;
 }
 
-static void spacemit_k3_ufs_phy_shutdown(struct ufs_hba *hba, struct spacemit_k3_ufs_priv *priv)
+static void spacemit_k3_ufs_phy_shutdown(struct ufs_hba *hba,
+					 struct spacemit_k3_ufs_priv *priv)
 {
 	ufshcd_writel(hba, 0x000, priv->phy_mng_base + UFS_DEVICE_IO_CTRL);
 	udelay(20);
@@ -662,19 +929,22 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 
 	{
 		/* PA_STALLNOCONFIGTIME */
-		err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_STALLNOCONFIGTIME), 15);
+		err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_STALLNOCONFIGTIME),
+				     15);
 		if (err) {
 			pr_err("Writing PA_STALLNOCONFIGTIME error \n");
 		}
 
 		/* RX_LS_PREPARELEN_TIME RX0 */
-		err = ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(RX_LS_PRE_LEN_CAP, 4), 0x0B);
+		err = ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(RX_LS_PRE_LEN_CAP, 4),
+				     0x0B);
 		if (err) {
 			pr_err("Writing RX_LS_PREPARELEN_TIME RX0 error \n");
 		}
 
 		/* RX_LS_PREPARELEN_TIME RX1 */
-		err = ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(RX_LS_PRE_LEN_CAP, 5), 0X0B);
+		err = ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(RX_LS_PRE_LEN_CAP, 5),
+				     0X0B);
 		if (err) {
 			pr_err("Writing RX_LS_PREPARELEN_TIME RX1 error \n");
 		}
@@ -682,7 +952,8 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 		/* RX_HIBERNATE_BKEN RX0 */
 		err = ufshcd_dme_set(
 			hba,
-			UIC_ARG_MIB_SEL(RX_LANE_HB8_BKDOOR_ATTR, UIC_ARG_MPHY_RX_GEN_SEL_INDEX(0)),
+			UIC_ARG_MIB_SEL(RX_LANE_HB8_BKDOOR_ATTR,
+					UIC_ARG_MPHY_RX_GEN_SEL_INDEX(0)),
 			0x9F);
 		if (err) {
 			pr_err("Writing RX_HIBERNATE_BKEN RX0 error \n");
@@ -691,7 +962,8 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 		/* RX_HIBERNATE_BKEN RX1 */
 		err = ufshcd_dme_set(
 			hba,
-			UIC_ARG_MIB_SEL(RX_LANE_HB8_BKDOOR_ATTR, UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
+			UIC_ARG_MIB_SEL(RX_LANE_HB8_BKDOOR_ATTR,
+					UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
 			0x9F);
 		if (err) {
 			pr_err("Writing RX_HIBERNATE_BKEN RX1 error \n");
@@ -700,55 +972,68 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 		/* PWM_BURST_closure_length */
 		err = ufshcd_dme_set(
 			hba,
-			UIC_ARG_MIB_SEL(RX_PWRM_CLOSURE_LEN_CAP, UIC_ARG_MPHY_RX_GEN_SEL_INDEX(0)),
+			UIC_ARG_MIB_SEL(RX_PWRM_CLOSURE_LEN_CAP,
+					UIC_ARG_MPHY_RX_GEN_SEL_INDEX(0)),
 			15);
 		err = ufshcd_dme_set(
 			hba,
-			UIC_ARG_MIB_SEL(RX_PWRM_CLOSURE_LEN_CAP, UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
+			UIC_ARG_MIB_SEL(RX_PWRM_CLOSURE_LEN_CAP,
+					UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
 			15);
 
 		/* min_stall_not_config_time*/
 		err = ufshcd_dme_set(
-			hba, UIC_ARG_MIB_SEL(RX_MIN_STALL_CAP, UIC_ARG_MPHY_RX_GEN_SEL_INDEX(0)),
+			hba,
+			UIC_ARG_MIB_SEL(RX_MIN_STALL_CAP,
+					UIC_ARG_MPHY_RX_GEN_SEL_INDEX(0)),
 			0xFF);
 		err = ufshcd_dme_set(
-			hba, UIC_ARG_MIB_SEL(RX_MIN_STALL_CAP, UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
+			hba,
+			UIC_ARG_MIB_SEL(RX_MIN_STALL_CAP,
+					UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
 			0xFF);
 
 		/* TX HB8_TIME CAP */
-		err = ufshcd_dme_set(hba,
-						UIC_ARG_MIB_SEL(TX_HIBERN8TIME_CAPABILITY,
-								UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
-						0x64);
-		err = ufshcd_dme_set(hba,
-						UIC_ARG_MIB_SEL(TX_HIBERN8TIME_CAPABILITY,
-								UIC_ARG_MPHY_TX_GEN_SEL_INDEX(1)),
-						0x64);
+		err = ufshcd_dme_set(
+			hba,
+			UIC_ARG_MIB_SEL(TX_HIBERN8TIME_CAPABILITY,
+					UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
+			0x64);
+		err = ufshcd_dme_set(
+			hba,
+			UIC_ARG_MIB_SEL(TX_HIBERN8TIME_CAPABILITY,
+					UIC_ARG_MPHY_TX_GEN_SEL_INDEX(1)),
+			0x64);
 
 		/*RX HB8_TIME CAP*/
-		err = ufshcd_dme_set(hba,
-						UIC_ARG_MIB_SEL(RX_HIBERN8TIME_CAPABILITY,
-								UIC_ARG_MPHY_RX_GEN_SEL_INDEX(0)),
-						0x64);
-		err = ufshcd_dme_set(hba,
-						UIC_ARG_MIB_SEL(RX_HIBERN8TIME_CAPABILITY,
-								UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
-						0x64);
+		err = ufshcd_dme_set(
+			hba,
+			UIC_ARG_MIB_SEL(RX_HIBERN8TIME_CAPABILITY,
+					UIC_ARG_MPHY_RX_GEN_SEL_INDEX(0)),
+			0x64);
+		err = ufshcd_dme_set(
+			hba,
+			UIC_ARG_MIB_SEL(RX_HIBERN8TIME_CAPABILITY,
+					UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
+			0x64);
 
 		/*TX EQ 3DB*/
 		err = ufshcd_dme_set(
 			hba,
-			UIC_ARG_MIB_SEL(ANA_EQ_CTRL_REG_ATTR, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
+			UIC_ARG_MIB_SEL(ANA_EQ_CTRL_REG_ATTR,
+					UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
 			0x5);
 
 		/*RX garbage cnt = 32 SI*/
 		err = ufshcd_dme_set(
 			hba,
-			UIC_ARG_MIB_SEL(RX_LANE_SOF_BKDOOR_ATT, UIC_ARG_MPHY_RX_GEN_SEL_INDEX(0)),
+			UIC_ARG_MIB_SEL(RX_LANE_SOF_BKDOOR_ATT,
+					UIC_ARG_MPHY_RX_GEN_SEL_INDEX(0)),
 			0x9F);
 		err = ufshcd_dme_set(
 			hba,
-			UIC_ARG_MIB_SEL(RX_LANE_SOF_BKDOOR_ATT, UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
+			UIC_ARG_MIB_SEL(RX_LANE_SOF_BKDOOR_ATT,
+					UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
 			0x9F);
 	}
 
@@ -792,15 +1077,17 @@ static int spacemit_k3_ufs_silent_reset(struct ufs_hba *hba)
 	return 0;
 }
 
-static int spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
-					       enum ufs_notify_change_status status)
+static int
+spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
+				    enum ufs_notify_change_status status)
 {
 	struct udevice *dev = hba->dev;
 	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
 
 	uint32_t reg_val;
 
-	pr_debug("ufs: spacemit_k3_ufs_link_startup_notify, status:%d\n", status);
+	pr_debug("ufs: spacemit_k3_ufs_link_startup_notify, status:%d\n",
+		 status);
 	if (status == PRE_CHANGE) {
 		/* init is done in hce_enable_notify(POST_CHANGE) */
 		return 0;
@@ -820,7 +1107,8 @@ static int spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 			 REG_INTERRUPT_STATUS, reg_val);
 
 		if (reg_val & UIC_LINK_STARTUP)
-			ufshcd_writel(hba, UIC_LINK_STARTUP, REG_INTERRUPT_STATUS);
+			ufshcd_writel(hba, UIC_LINK_STARTUP,
+				      REG_INTERRUPT_STATUS);
 		if (reg_val & UIC_ERROR)
 			ufshcd_writel(hba, UIC_ERROR, REG_INTERRUPT_STATUS);
 
@@ -828,17 +1116,28 @@ static int spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 		pr_debug("ufs: REG_INTERRUPT_STATUS after clear (0x%x):0x%x\n",
 			 REG_INTERRUPT_STATUS, reg_val);
 
-		reg_val = ufshcd_readl(hba, REG_UIC_ERROR_CODE_PHY_ADAPTER_LAYER);
-		pr_debug("ufs: REG_UIC_ERROR_CODE_PHY_ADAPTER_LAYER(0x%x):0x%x\n",
-			 REG_UIC_ERROR_CODE_PHY_ADAPTER_LAYER, reg_val);
+		reg_val =
+			ufshcd_readl(hba, REG_UIC_ERROR_CODE_PHY_ADAPTER_LAYER);
+		pr_debug(
+			"ufs: REG_UIC_ERROR_CODE_PHY_ADAPTER_LAYER(0x%x):0x%x\n",
+			REG_UIC_ERROR_CODE_PHY_ADAPTER_LAYER, reg_val);
 
 		/* add 0xe8 make UFS2.1 run GEAR3+2Lane@409M*/
 		mdelay(5);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)), 0x97);
+		ufshcd_dme_set(
+			hba,
+			UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
+			0x97);
 		mdelay(1);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)), 0xd7);
+		ufshcd_dme_set(
+			hba,
+			UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
+			0xd7);
 		mdelay(1);
-		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)), 0x17);
+		ufshcd_dme_set(
+			hba,
+			UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
+			0x17);
 
 		/* DL_AFC0REQTIMEOUTVAL_MAX */
 		ufshcd_dme_set(hba, UIC_ARG_MIB(DL_AFC0REQTIMEOUTVAL),
@@ -846,20 +1145,30 @@ static int spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 
 		/*LCC_DISABLE*/
 		mdelay(5);
-		ufshcd_dme_set(hba,
-			       UIC_ARG_MIB_SEL(TX_LCC_ENABLE, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)), 0);
+		ufshcd_dme_set(
+			hba,
+			UIC_ARG_MIB_SEL(TX_LCC_ENABLE,
+					UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
+			0);
 		mdelay(1);
-		ufshcd_dme_set(hba,
-			       UIC_ARG_MIB_SEL(TX_LCC_ENABLE, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(1)), 0);
+		ufshcd_dme_set(
+			hba,
+			UIC_ARG_MIB_SEL(TX_LCC_ENABLE,
+					UIC_ARG_MPHY_TX_GEN_SEL_INDEX(1)),
+			0);
 
 		/*TX_Min_ActivateTime*/
 		mdelay(1);
 		ufshcd_dme_set(
-			hba, UIC_ARG_MIB_SEL(TX_MIN_ACTIVATETIME, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
+			hba,
+			UIC_ARG_MIB_SEL(TX_MIN_ACTIVATETIME,
+					UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
 			0x0);
 		mdelay(1);
 		ufshcd_dme_set(
-			hba, UIC_ARG_MIB_SEL(TX_MIN_ACTIVATETIME, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(1)),
+			hba,
+			UIC_ARG_MIB_SEL(TX_MIN_ACTIVATETIME,
+					UIC_ARG_MPHY_TX_GEN_SEL_INDEX(1)),
 			0x0);
 		mdelay(10);
 
@@ -872,7 +1181,9 @@ static int spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 		{
 			u32 timeout = 100000;
 			do {
-				reg_val = ufshcd_readl(hba, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
+				reg_val = ufshcd_readl(
+					hba,
+					priv->phy_mng_base + UFS_MPHY_PU_CTRL);
 				if (reg_val & UFS_MPHY_PU_PLL_LOCK)
 					break;
 				udelay(10);
@@ -887,8 +1198,9 @@ static int spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 	return 0;
 }
 
-static int spacemit_k3_ufs_hce_enable_notify(struct ufs_hba *hba,
-					     enum ufs_notify_change_status status)
+static int
+spacemit_k3_ufs_hce_enable_notify(struct ufs_hba *hba,
+				  enum ufs_notify_change_status status)
 {
 	pr_debug("ufs: spacemit_k3_ufs_hce_enable_notify, status:%d\n", status);
 
@@ -939,7 +1251,7 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 {
 	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
 	struct ufs_hba *hba = dev_get_uclass_priv(dev);
-	struct ufs_hba_ops *hba_ops = (struct ufs_hba_ops *) dev->driver_data;
+	struct ufs_hba_ops *hba_ops = (struct ufs_hba_ops *)dev->driver_data;
 	struct udevice *scsi_dev;
 	struct scsi_plat *scsi_plat;
 	int ret;
@@ -962,14 +1274,45 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 		pr_err("ufs host probe failed:%d\n", ret);
 	} else {
 #if !defined(CONFIG_SPL_BUILD)
+		int lun_cfg_ret;
+
 		/* Check and configure single LUN if needed - skip in SPL */
-		spacemit_k3_ufs_check_and_config_single_lun(dev);
+		lun_cfg_ret = spacemit_k3_ufs_check_and_config_single_lun(dev);
+		if (lun_cfg_ret > 0) {
+			dev_info(
+				hba->dev,
+				"restarting UFS once to apply single-LUN layout\n");
+			hba->ops->device_reset(hba);
+			ret = ufshcd_probe(dev, hba_ops);
+			if (ret) {
+				spacemit_k3_ufs_phy_shutdown(hba, priv);
+				spacemit_k3_ufs_clk_disable(priv);
+				dev_err(hba->dev,
+					"ufs reprobe after LUN config failed: %d\n",
+					ret);
+				return ret;
+			}
+
+			lun_cfg_ret =
+				spacemit_k3_ufs_check_and_config_single_lun(
+					dev);
+		}
+
+		if (lun_cfg_ret < 0) {
+			dev_warn(hba->dev,
+				 "failed to enforce single-LUN layout: %d\n",
+				 lun_cfg_ret);
+		} else if (lun_cfg_ret > 0) {
+			dev_warn(
+				hba->dev,
+				"single-LUN config pending, a cold power cycle may be required\n");
+		}
 #endif
 		/* Limit to single LUN - use only the main user data partition */
 		device_find_first_child(dev, &scsi_dev);
 		if (scsi_dev) {
 			scsi_plat = dev_get_uclass_plat(scsi_dev);
-			scsi_plat->max_id = 1;  /* UFS has single target */
+			scsi_plat->max_id = 1; /* UFS has single target */
 			scsi_plat->max_lun = 1; /* Use only main LUN */
 		} else {
 			pr_err("ufs: scsi_dev child not found!\n");
@@ -1007,11 +1350,14 @@ static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 	if (ret) {
 		/* Default to 19.2MHz if not specified in DTS */
 		priv->ref_clk_freq = UFS_REF_CLK_FREQ_19_2_MHZ;
-		dev_dbg(dev, "ufs: ref-clk-freq not found in DTS, using default 19.2MHz\n");
+		dev_dbg(dev,
+			"ufs: ref-clk-freq not found in DTS, using default 19.2MHz\n");
 	} else {
 		if (ref_clk_freq > UFS_REF_CLK_FREQ_52_MHZ) {
-			dev_warn(dev, "ufs: invalid ref-clk-freq %u, using default 19.2MHz\n",
-				 ref_clk_freq);
+			dev_warn(
+				dev,
+				"ufs: invalid ref-clk-freq %u, using default 19.2MHz\n",
+				ref_clk_freq);
 			priv->ref_clk_freq = UFS_REF_CLK_FREQ_19_2_MHZ;
 		} else {
 			priv->ref_clk_freq = ref_clk_freq;
@@ -1045,7 +1391,7 @@ static int spacemit_k3_ufs_pltfm_remove(struct udevice *dev)
 static const struct udevice_id spacemit_k3_ufs_pltfm_ids[] = {
 	{
 		.compatible = "spacemit,k3-ufshci",
-		.data = (ulong) &spacemit_k3_ufs_vops,
+		.data = (ulong)&spacemit_k3_ufs_vops,
 	},
 	{ /* sentinel */ }
 };

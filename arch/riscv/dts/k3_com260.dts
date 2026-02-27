@@ -34,7 +34,7 @@
 		       "pll3", "pll4", "pll5", "pll8", "pll_src3", "clt1_pll_src", "pll_src5", "clt3_pll_src";
 	topd_frequency = <800000000>;
 	axi_frequency =  <307000000>;
-	cci_frequency =  <1000000000>;
+	cci_frequency =  <1228000000>;
 	cluster0_frequency = <2200000000>;
 	cluster1_frequency = <2200000000>;
 	cluster2_frequency = <1800000000>;
@@ -91,6 +91,24 @@
 		compatible = "atmel,24c02";
 		reg = <0x50>;
 		status = "okay";
+	};
+};
+
+&i2c3 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c3_1>;
+
+	raspits-panel@45 {
+		compatible = "raspberrypi,7inch-touchscreen-panel";
+		reg = <0x45>;
+		status = "okay";
+
+		port {
+			panel_in_dsi1: endpoint {
+				remote-endpoint = <&dsi_out>;
+			};
+		};
 	};
 };
 
@@ -489,6 +507,60 @@
 				regulator-always-on;
 				regulator-boot-on;
 				u-boot,dm-spl;
+			};
+		};
+	};
+};
+
+&dpu {
+	status = "okay";
+
+	dpu_out: port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		dpu_out_dp1: endpoint@1 {
+			reg = <1>;
+			remote-endpoint = <&dp1_in_dpu>;
+		};
+	};
+
+};
+
+&mipi_dsi {
+	bit-clk = <700000000>;
+	pix-clk = <24000000>;
+	status = "okay";
+
+	ports {
+		mipi_in: port {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			dsi_out: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&panel_in_dsi1>;
+			};
+		};
+	};
+};
+
+&panel {
+	force-attached = "lcd_tc358762xbg_dpi_800x480";
+	status = "okay";
+};
+
+&dp1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_dp1_3>;
+	status = "okay";
+
+	ports {
+		dp1_in: port {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			dp1_in_dpu: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&dpu_out_dp1>;
 			};
 		};
 	};

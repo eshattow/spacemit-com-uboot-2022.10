@@ -274,6 +274,11 @@ static SPACEMIT_CCU_GATE_FACTOR(pll2_d8, "pll2_d8", "pll2",
 	BASE_TYPE_APBS, APBS_PLL2_SWCR2,
 	BIT(7), BIT(7), 0x0,
 	8, 1, 0);
+static SPACEMIT_CCU_FACTOR(pll2_66, "pll2_66", "pll2_d5", 9, 1);
+static SPACEMIT_CCU_FACTOR(pll2_33, "pll2_33", "pll2_66", 2, 1);
+static SPACEMIT_CCU_FACTOR(pll2_50, "pll2_50", "pll2_d5", 12, 1);
+static SPACEMIT_CCU_FACTOR(pll2_25, "pll2_25", "pll2_50", 2, 1);
+static SPACEMIT_CCU_FACTOR(pll2_20, "pll2_20", "pll2_d5", 30, 1);
 
 //pll1_d8
 static SPACEMIT_CCU_GATE(pll1_d8_307p2, "pll1_d8_307p2", "pll1_d8",
@@ -353,6 +358,34 @@ static SPACEMIT_CCU_DIV_FC_MUX_GATE(ufs_aclk, "ufs_aclk", ufs_aclk_parents,
 	BIT(1), BIT(1), 0x0,
 	0);
 
+static const char * const axi_clk_parents[] = {
+	"pll1_d8_307p2", "pll1_d6_409p6"
+};
+static SPACEMIT_CCU_DIV_FC_MUX(axi_clk, "axi_clk", axi_clk_parents,
+	BASE_TYPE_APMU, APMU_ACLK_CLK_CTRL,
+	1, 2, BIT(4),
+	0, 1,
+	0);
+
+static const char * const espi_sclk_src_parents[] = {
+	"pll2_20", "pll2_25", "pll2_33", "pll2_50", "pll2_66"
+};
+static SPACEMIT_CCU_MUX(espi_sclk_src, "espi_sclk_src", espi_sclk_src_parents,
+	BASE_TYPE_APMU, APMU_ESPI_CLK_RES_CTRL,
+	4, 3, 0);
+
+static const char * const espi_sclk_parents[] = {
+	"clk_dummy", "espi_sclk_src"
+};
+static SPACEMIT_CCU_MUX_GATE(espi_sclk, "espi_sclk", espi_sclk_parents,
+	BASE_TYPE_APMU, APMU_ESPI_CLK_RES_CTRL,
+	7, 1, BIT(3), BIT(3), 0x0,
+	0);
+static SPACEMIT_CCU_GATE(espi_mclk, "espi_mclk", "axi_clk",
+	BASE_TYPE_APMU, APMU_ESPI_CLK_RES_CTRL,
+	BIT(1), BIT(1), 0x0,
+	0);
+
 static u32 transfer_to_spl_list[][2] = {
 	{CLK_PLL1_2457P6, CLK_PLL1_2457P6_SPL},
 	{CLK_PLL2, CLK_PLL2_SPL},
@@ -379,6 +412,15 @@ static u32 transfer_to_spl_list[][2] = {
 	{CLK_QSPI, CLK_QSPI_SPL},
 	{CLK_QSPI_BUS, CLK_QSPI_BUS_SPL},
 	{CLK_UFS_ACLK, CLK_UFS_ACLK_SPL},
+	{CLK_PLL2_66, CLK_PLL2_66_SPL},
+	{CLK_PLL2_33, CLK_PLL2_33_SPL},
+	{CLK_PLL2_50, CLK_PLL2_50_SPL},
+	{CLK_PLL2_25, CLK_PLL2_25_SPL},
+	{CLK_PLL2_20, CLK_PLL2_20_SPL},
+	{CLK_AXICLK, CLK_AXICLK_SPL},
+	{CLK_ESPI_SCLK_SRC, CLK_ESPI_SCLK_SRC_SPL},
+	{CLK_ESPI_SCLK, CLK_ESPI_SCLK_SPL},
+	{CLK_ESPI_MCLK, CLK_ESPI_MCLK_SPL},
 };
 
 static struct spacemit_clk_table spacemit_k3_clks = {
@@ -408,6 +450,15 @@ static struct spacemit_clk_table spacemit_k3_clks = {
 		[CLK_QSPI_SPL]		= &qspi_clk.common.clk,
 		[CLK_QSPI_BUS_SPL]	= &qspi_bus_clk.common.clk,
 		[CLK_UFS_ACLK_SPL]	= &ufs_aclk.common.clk,
+		[CLK_PLL2_66_SPL]	= &pll2_66.common.clk,
+		[CLK_PLL2_33_SPL]	= &pll2_33.common.clk,
+		[CLK_PLL2_50_SPL]	= &pll2_50.common.clk,
+		[CLK_PLL2_25_SPL]	= &pll2_25.common.clk,
+		[CLK_PLL2_20_SPL]	= &pll2_20.common.clk,
+		[CLK_AXICLK_SPL]	= &axi_clk.common.clk,
+		[CLK_ESPI_SCLK_SRC_SPL]	= &espi_sclk_src.common.clk,
+		[CLK_ESPI_SCLK_SPL]	= &espi_sclk.common.clk,
+		[CLK_ESPI_MCLK_SPL]	= &espi_mclk.common.clk,
 	},
 	.num = CLK_MAX_NO_SPL,
 };
@@ -2567,4 +2618,3 @@ U_BOOT_DRIVER(spacemit_k3_ccu) = {
 	.ops = &ccu_clk_ops,
 	.probe = spacemit_k3_ccu_probe,
 };
-

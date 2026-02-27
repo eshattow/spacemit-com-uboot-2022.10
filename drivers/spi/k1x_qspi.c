@@ -551,25 +551,31 @@ static void k1x_qspi_prepare_lut(struct k1x_qspi *qspi,
 		op->cmd.opcode, lutval[0], lutval[1], lutval[2], lutval[3]);
 }
 
-static void k1x_qspi_select_mem(struct k1x_qspi *qspi, int chip_select)
+static u32 k1x_qspi_get_cs_offset(struct k1x_qspi *qspi, int cs)
 {
-	u64 size_kb;
-
-	size_kb = (qspi->memmap_phy + qspi->memmap_phy_size) & 0xFFFFFC00;
-	qspi_writel(qspi, size_kb, qspi->iobase + (QSPI_SFA1AD + 4 * chip_select));
-
-	dev_dbg(qspi->dev, "slave device[cs:%d] selected\n", chip_select);
+	switch (cs) {
+	case QSPI_CS_A1:
+		return 0;
+	case QSPI_CS_A2:
+		return qspi->sfa1ad;
+	case QSPI_CS_B1:
+		return qspi->sfa2ad;
+	case QSPI_CS_B2:
+		return qspi->sfb1ad;
+	default:
+		return 0;
+	}
 }
 
 static void k1x_qspi_ahb_read(struct k1x_qspi *qspi,
 				const struct spi_mem_op *op)
 {
 	u32 len = op->data.nbytes;
+	u32 cs_offset = k1x_qspi_get_cs_offset(qspi, qspi->cs_selected);
 
-	/* Read out the data directly from the AHB buffer. */
 	dev_dbg(qspi->dev, "ahb read %d bytes from address:0x%llx\n",
-				len, (qspi->memmap_phy + op->addr.val));
-	memcpy(op->data.buf.in, (qspi->ahb_addr + op->addr.val), len);
+				len, (qspi->memmap_phy + cs_offset + op->addr.val));
+	memcpy(op->data.buf.in, (qspi->ahb_addr + cs_offset + op->addr.val), len);
 }
 
 static void k1x_qspi_fill_txfifo(struct k1x_qspi *qspi,
@@ -685,6 +691,7 @@ static int k1x_qspi_exec_op(struct spi_slave *slave,
 	struct k1x_qspi *qspi;
 	struct udevice *bus;
 	void __iomem *base;
+	u32 cs_offset;
 	u32 mask;
 	u32 reg;
 	int err;
@@ -721,7 +728,8 @@ static int k1x_qspi_exec_op(struct spi_slave *slave,
 	qspi_writel(qspi, reg, base + QSPI_SPTRCLR);
 
 	/* set the flash address into the QSPI_SFAR */
-	err = qspi_write_sfar(qspi, qspi->memmap_phy + op->addr.val);
+	cs_offset = k1x_qspi_get_cs_offset(qspi, qspi->cs_selected);
+	err = qspi_write_sfar(qspi, qspi->memmap_phy + cs_offset + op->addr.val);
 	if (err) {
 		return err;
 	}
@@ -942,8 +950,9 @@ static int k1x_qspi_claim_bus(struct udevice *dev)
 	bus = dev->parent;
 	qspi = dev_get_priv(bus);
 
-	k1x_qspi_select_mem(qspi, slave_plat->cs);
+	qspi->cs_selected = slave_plat->cs;
 
+	dev_dbg(qspi->dev, "claim bus cs:%d\n", qspi->cs_selected);
 	return 0;
 }
 
