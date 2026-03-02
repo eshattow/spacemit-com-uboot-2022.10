@@ -1079,6 +1079,9 @@ static int _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, i
 	char cmd[128];
 	struct disk_partition info;
 
+	// env "boot_devname" should not bind with "bootfs" partition
+	env_set("boot_devname", dev_name);
+
 	for (part = 1; part <= MAX_SEARCH_PARTITIONS; part++) {
 		err = part_get_info(dev_desc, part, &info);
 		if (err)
@@ -1092,7 +1095,6 @@ static int _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, i
 		return -1;
 
 	env_set("bootfs_part", simple_itoa(part));
-	env_set("boot_devname", dev_name);
 
 	/*load env.txt and import to uboot*/
 	memset((void *)CONFIG_FASTBOOT_BUF_ADDR, 0, CONFIG_ENV_SIZE);
