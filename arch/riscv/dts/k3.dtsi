@@ -336,7 +336,7 @@
 			compatible = "riscv,rpmi-system-suspend";
 			mboxes = <&rpmi_shmem_mbox 4>;
 			riscv,sbi-mpxy-channel-id = <4>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		rpmi_mpxy_hsm: rpmi-mpxy-hsm@0 {

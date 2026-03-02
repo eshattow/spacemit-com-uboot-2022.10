@@ -669,7 +669,6 @@ static void try_boot_from_udisk(void)
 	env_set("boot_override", "udisk");
 	env_set("boot_device", "udisk");
 	env_set("boot_devname", "usb");
-	env_set("bootfs_devname", "usb");
 	env_set("boot_devnum", "0");
 }
 #endif
@@ -986,14 +985,14 @@ void setenv_boot_mode(void)
 			desc = k3_nor_get_desc_by_target(&boot_prio[i], dev);
 			if (desc && desc->type != DEV_TYPE_UNKNOWN &&
 			    k3_nor_has_bootfs(desc)) {
-				env_set("bootfs_devname", boot_prio[i].blk_name);
+				env_set("boot_devname", boot_prio[i].blk_name);
 				env_set("boot_devnum", simple_itoa(dev));
 				break;
 			}
 		}
 
-		if (!env_get("bootfs_devname"))
-			env_set("bootfs_devname", "mmc");
+		if (!env_get("boot_devname"))
+			env_set("boot_devname", "mmc");
 		if (!env_get("boot_devnum"))
 			env_set("boot_devnum", simple_itoa(MMC_DEV_EMMC));
 		break;
@@ -1009,7 +1008,7 @@ void setenv_boot_mode(void)
 	case BOOT_MODE_UFS:
 		env_set("boot_device", "ufs");
 		env_set("boot_devnum", "0");
-		env_set("bootfs_devname", "scsi");
+		env_set("boot_devname", "scsi");
 		break;
 	case BOOT_MODE_USB:
 		// for fastboot image download and run test
@@ -1080,6 +1079,9 @@ static int _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, i
 	char cmd[128];
 	struct disk_partition info;
 
+	// env "boot_devname" should not bind with "bootfs" partition
+	env_set("boot_devname", dev_name);
+
 	for (part = 1; part <= MAX_SEARCH_PARTITIONS; part++) {
 		err = part_get_info(dev_desc, part, &info);
 		if (err)
@@ -1093,7 +1095,6 @@ static int _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, i
 		return -1;
 
 	env_set("bootfs_part", simple_itoa(part));
-	env_set("bootfs_devname", dev_name);
 
 	/*load env.txt and import to uboot*/
 	memset((void *)CONFIG_FASTBOOT_BUF_ADDR, 0, CONFIG_ENV_SIZE);
