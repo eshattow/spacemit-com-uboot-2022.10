@@ -767,7 +767,13 @@ int board_load_extra_fits(struct spl_image_info *spl_image, ulong *uboot_entry)
 	ulong esos_off = 0, uboot_off = 0;
 
 	board_boot_order(spl_boot_list);
-	spl_extra_import_env();
+
+	/*
+	 * UFS path already imported env in SPL UFS loader. Avoid reloading here
+	 * to skip duplicated UFS/SCSI initialization work.
+	 */
+	if (spl_boot_list[0] != BOOT_DEVICE_UFS)
+		spl_extra_import_env();
 
 	esos_off = spl_extra_env_offset("esos_offset");
 	uboot_off = spl_extra_env_offset("uboot_offset");

@@ -41,9 +41,29 @@ static struct blk_desc *init_ufs_for_env(void)
 	struct blk_desc *desc;
 	int dev = ufs_get_env_dev();
 
+#ifdef CONFIG_SPL_BUILD
+	static bool scsi_scanned;
+
+	/*
+	 * SPL may call env_load() multiple times on UFS path. Reuse the
+	 * existing SCSI enumeration once it is available.
+	 */
+	if (!scsi_scanned) {
+		scsi_scan(false);
+		scsi_scanned = true;
+	}
+#else
 	scsi_scan(false);
+#endif
 
 	desc = blk_get_dev("scsi", dev);
+#ifdef CONFIG_SPL_BUILD
+	if (!desc) {
+		/* Retry once: first scan can happen before UFS is fully ready. */
+		scsi_scan(false);
+		desc = blk_get_dev("scsi", dev);
+	}
+#endif
 	if (!desc) {
 		pr_err("No UFS device found at dev %d\n", dev);
 		return NULL;
