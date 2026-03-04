@@ -41,6 +41,7 @@ static const char *global_compatible[] = {
 #define RTC_ENABLE	(0xf)
 #define RTC_IRQ_ENABLE	(1 << 4)
 #define INT_STA_EN_BIT	(1 << 2)
+#define PWRKEY_IRQ_ENABLE	(0x3)
 
 void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck_desc,
 		const struct pm8xx_buck_desc **ldo_desc, int *num_buck, int *num_ldo)
@@ -297,6 +298,10 @@ static int __board_pmic_init(const char *name)
 		i2c_read(saddr, 0x99, 1, &regval, 1);
 		regval |= RTC_IRQ_ENABLE;
 		i2c_write(saddr, 0x99, 1, &regval, 1);
+
+		i2c_read(saddr, 0x9e, 1, &regval, 1);
+		regval |= PWRKEY_IRQ_ENABLE;
+		i2c_write(saddr, 0x9e, 1, &regval, 1);
 	}
 #endif
 
