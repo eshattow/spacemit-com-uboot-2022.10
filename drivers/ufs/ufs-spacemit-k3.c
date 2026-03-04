@@ -167,7 +167,7 @@ static int spacemit_k3_ufs_set_ref_clk(struct ufs_hba *hba)
 		return err;
 	}
 
-	printf("ufs: bRefClkFreq current=%u expected=%u\n", cur_clk, ref_clk);
+	pr_info("ufs: bRefClkFreq current=%u expected=%u\n", cur_clk, ref_clk);
 
 	if (cur_clk != ref_clk) {
 		err = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_WRITE_ATTR,
@@ -183,7 +183,7 @@ static int spacemit_k3_ufs_set_ref_clk(struct ufs_hba *hba)
 	}
 
 	if (updated) {
-		printf("ufs: bRefClkFreq updated, reinit required\n");
+		pr_info("ufs: bRefClkFreq updated, reinit required\n");
 		return -EAGAIN;
 	}
 
@@ -1280,6 +1280,19 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 
 	/* Bring clocks/reset up as early as possible */
 	spacemit_k3_ufs_clk_enable(priv);
+
+#if defined(CONFIG_SPL_BUILD)
+	/*
+	 * SPL often starts from a warm hardware state. Pre-shutdown once so the
+	 * first ufshcd_probe starts from the same clean state as retry path.
+	 */
+	hba->dev = dev;
+	hba->ops = hba_ops;
+	hba->mmio_base = (void *)dev_read_addr(dev);
+	if (hba->ops && hba->ops->device_reset) {
+		hba->ops->device_reset(hba);
+	}
+#endif
 
 	for (retries = 3; retries > 0; retries--) {
 		ret = ufshcd_probe(dev, hba_ops);
