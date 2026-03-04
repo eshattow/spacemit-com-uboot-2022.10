@@ -531,6 +531,13 @@ static int k3_eqos_probe_resources(struct udevice *dev)
 	}
 	pdata->ctrl_reg = (void *)((ulong)(apmu_base_reg + ctrl_reg));
 
+	ret = dev_read_u32(dev, "dline-reg", &dline_reg);
+	if (ret) {
+		pr_err("'dline-reg' not configured in device tree!\n");
+		goto err_free_gpio;
+	}
+	pdata->dline_reg = (void *)((ulong)(apmu_base_reg + dline_reg));
+
 	pdata->clk_tuning_enable = dev_read_bool(dev, "clk_tuning_enable");
 	if (pdata->clk_tuning_enable) {
 		if (dev_read_bool(dev, "clk-tuning-by-reg")) {
@@ -539,12 +546,6 @@ static int k3_eqos_probe_resources(struct udevice *dev)
 			pdata->clk_tuning_way = CLK_TUNING_BY_CLK_REVERT;
 		} else if (dev_read_bool(dev, "clk-tuning-by-delayline")) {
 			pdata->clk_tuning_way = CLK_TUNING_BY_DLINE;
-			ret = dev_read_u32(dev, "dline-reg", &dline_reg);
-			if (ret) {
-				pr_err("'dline-reg' not configured in device tree!\n");
-				goto err_free_gpio;
-			}
-			pdata->dline_reg = (void *)((ulong)(apmu_base_reg + dline_reg));
 		} else {
 			pdata->clk_tuning_way = CLK_TUNING_BY_REG;
 		}
