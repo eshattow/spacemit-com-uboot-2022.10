@@ -18,8 +18,7 @@ static void phyinit_lp4x_pre_training(unsigned int ddrc_base, unsigned int ddr_s
 	} else if (8192 == ddr_size_mbyte) {
 		override_table = phy_override_seq_lp4x_8g;
 	} else {
-		pr_err("Unsupported DDR size: %d MB\n", ddr_size_mbyte);
-		return;
+		pr_info("Use default pre-training table for DDR(%d MB)\n", ddr_size_mbyte);
 	}
 
 	lpddr_training_table_init(ddrc_base, lp4x_pre_train_table, override_table);
