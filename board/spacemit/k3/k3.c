@@ -1035,6 +1035,38 @@ void setenv_boot_mode(void)
 	}
 }
 
+static bool k3_is_nfs_boot_path(void)
+{
+	const char *boot_device = env_get("boot_device");
+
+	return boot_device && !strcmp(boot_device, "nfs");
+}
+
+static bool k3_is_net_flash_path(void)
+{
+	const char *net_flash_mode = env_get("net_flash_protocol");
+
+	return net_flash_mode && !strcmp(net_flash_mode, "spacemit_tftp");
+}
+
+bool board_should_init_net(void)
+{
+	/*
+	 * Keep normal local boot path lean. Network can still be initialized
+	 * lazily by on-demand net commands.
+	 */
+	if (env_get_ulong("force_net_init", 10, 0))
+		return true;
+
+	if (k3_is_nfs_boot_path())
+		return true;
+
+	if (k3_is_net_flash_path())
+		return true;
+
+	return false;
+}
+
 /******************************************************************************
  * Load environment support function
  *******************************************************************************/

@@ -496,9 +496,17 @@ static int initr_scsi(void)
 }
 #endif
 
+__weak bool board_should_init_net(void)
+{
+	return true;
+}
+
 #ifdef CONFIG_CMD_NET
 static int initr_net(void)
 {
+	if (!board_should_init_net())
+		return 0;
+
 	printf("Net:   ");
 	eth_initialize();
 #if defined(CONFIG_RESET_PHY_R)
