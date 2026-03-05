@@ -129,14 +129,29 @@ static struct blk_desc *k3_nor_get_nvme_desc(u32 devnum)
 #endif
 
 #ifdef CONFIG_SCSI
-static struct blk_desc *k3_nor_get_scsi_desc(u32 devnum)
+int board_scsi_scan_once(bool verbose)
 {
 	static bool scsi_scanned;
+	int ret;
 
-	if (!scsi_scanned) {
-		scsi_scan(false);
+	if (scsi_scanned)
+		return 0;
+
+	ret = scsi_scan(verbose);
+	if (!ret) {
 		scsi_scanned = true;
+#ifndef CONFIG_SPL_BUILD
+		env_set("scsi_scanned", "1");
+#endif
 	}
+
+	return ret;
+}
+
+static struct blk_desc *k3_nor_get_scsi_desc(u32 devnum)
+{
+	if (board_scsi_scan_once(false))
+		return NULL;
 
 	return blk_get_dev("scsi", devnum);
 }
@@ -1272,7 +1287,7 @@ void import_env_from_bootfs(void)
 #ifdef CONFIG_SCSI
 		struct blk_desc *ufs_dev_desc;
 
-		scsi_scan(false);
+		board_scsi_scan_once(false);
 		ufs_dev_desc = blk_get_dev("scsi", 0);
 		if (ufs_dev_desc)
 			_load_env_from_blk(ufs_dev_desc, "scsi", 0);
