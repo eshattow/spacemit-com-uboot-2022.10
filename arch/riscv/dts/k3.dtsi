@@ -995,8 +995,9 @@
 		dp0: dp0@cac84000 {
 			compatible = "spacemit,inno-dp";
 			reg = <0x0 0xcac84000 0x0 0x4000>;
-			reg-names = "dp";
+			reg-names = "base";
 			dpu-id = <0>;
+			dp-id = <0>;
 			clocks = <&ccu CLK_LCD_PXCLK>,
 					 <&ccu CLK_LCD_MCLK>,
 					 <&ccu CLK_LCD_HCLK>,
@@ -1014,14 +1015,64 @@
 			reset-names= "mclk_reset", "lcd_reset", "esc_reset", "aclk_reset", "dscclk_reset", "dp_reset";
 			power-domains = <&pmu K3_PMU_LCD0_PWR_DOMAIN>;
 			status = "disabled";
+		};
 
+		edp0: edp0@cac84000 {
+			compatible = "spacemit,inno-edp";
+			reg = <0x0 0xcac84000 0x0 0x4000>;
+			reg-names = "base";
+			dpu-id = <0>;
+			edp-id = <0>;
+			clocks = <&ccu CLK_LCD_PXCLK>,
+					 <&ccu CLK_LCD_MCLK>,
+					 <&ccu CLK_LCD_HCLK>,
+					 <&ccu CLK_DSI_ESC>,
+					 <&ccu CLK_DPU_ACLK>,
+					 <&ccu CLK_LCD_DSC>,
+					 <&ccu CLK_EDP0_PXCLK>;
+			clock-names = "pxclk", "mclk", "hclk", "escclk", "aclk", "dscclk", "dppxclk";
+			resets = <&reset RESET_LCD_MCLK>,
+					 <&reset RESET_LCD>,
+					 <&reset RESET_DSI_ESC>,
+					 <&reset RESET_DPU_ACLK>,
+					 <&reset RESET_LCD_DSCCLK>,
+					 <&reset RESET_EDP0>;
+			reset-names= "mclk_reset", "lcd_reset", "esc_reset", "aclk_reset", "dscclk_reset", "dp_reset";
+			power-domains = <&pmu K3_PMU_LCD0_PWR_DOMAIN>;
+			status = "disabled";
 		};
 
 		dp1: dp1@cac88000 {
 			compatible = "spacemit,inno-dp";
 			reg = <0x0 0xcac88000 0x0 0x4000>;
-			reg-names = "dp";
+			reg-names = "base";
 			dpu-id = <1>;
+			dp-id = <1>;
+			clocks = <&ccu CLK_DSI4LN2_LCD_PXCLK>,
+					 <&ccu CLK_DSI4LN2_LCD_MCLK>,
+					 <&ccu CLK_DSI4LN2_DSI_ESC>,
+					 <&ccu CLK_DSI4LN2_DPU_ACLK>,
+					 <&ccu CLK_DSI4LN2_LCD_DSC>,
+					 <&ccu CLK_EDP1_PXCLK>;
+			clock-names = "pxclk", "mclk", "escclk", "aclk", "dscclk", "dppxclk";
+			resets = <&reset RESET_DSI4LN2_LCD_MCLK>,
+					 <&reset RESET_DSI4LN2_LCD_SW>,
+					 <&reset RESET_DSI4LN2_ESCCLK>,
+					 <&reset RESET_DSI4LN2_DPU_ACLK>,
+					 <&reset RESET_DSI4LN2_LCD_DSCCLK>,
+					 <&reset RESET_EDP1>;
+			reset-names= "mclk_reset", "lcd_reset", "esc_reset", "aclk_reset", "dscclk_reset", "dp_reset";
+			power-domains = <&pmu K3_PMU_LCD1_PWR_DOMAIN>;
+			status = "disabled";
+
+		};
+
+		edp1: edp1@cac88000 {
+			compatible = "spacemit,inno-edp";
+			reg = <0x0 0xcac88000 0x0 0x4000>;
+			reg-names = "base";
+			dpu-id = <1>;
+			edp-id = <1>;
 			clocks = <&ccu CLK_DSI4LN2_LCD_PXCLK>,
 					 <&ccu CLK_DSI4LN2_LCD_MCLK>,
 					 <&ccu CLK_DSI4LN2_DSI_ESC>,
