@@ -67,6 +67,16 @@
 				algo = "crc32";
 			};
 		};
+
+		fdt_6 {
+			description = "k3_com260_kit_v02.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3_com260_kit_v02.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -99,6 +109,12 @@
 			description = "k3_dc_board";
 			loadables = "uboot";
 			fdt = "fdt_5";
+		};
+
+		conf_6 {
+			description = "k3_com260_kit_v02";
+			loadables = "uboot";
+			fdt = "fdt_6";
 		};
 	};
 };
