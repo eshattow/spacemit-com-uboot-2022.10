@@ -77,6 +77,26 @@
 				algo = "crc32";
 			};
 		};
+
+		fdt_7 {
+			description = "k3_gemini_c0.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3_gemini_c0.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
+
+		fdt_8 {
+			description = "k3_gemini_c1.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3_gemini_c1.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -115,6 +135,18 @@
 			description = "k3_com260_kit_v02";
 			loadables = "uboot";
 			fdt = "fdt_6";
+		};
+
+		conf_7 {
+			description = "k3_gemini_c0";
+			loadables = "uboot";
+			fdt = "fdt_7";
+		};
+
+		conf_8 {
+			description = "k3_gemini_c1";
+			loadables = "uboot";
+			fdt = "fdt_8";
 		};
 	};
 };
