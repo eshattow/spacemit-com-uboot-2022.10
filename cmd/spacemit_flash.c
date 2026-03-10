@@ -1161,7 +1161,6 @@ void get_mtd_partition_file(struct flash_dev *fdev)
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MTD) || CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MTD)
 	case BOOT_MODE_NOR:
 	case BOOT_MODE_NAND:
-	case BOOT_MODE_UFS:
 		/*if select nor/nand, it would check if mtd dev exists or not*/
 		struct mtd_info *mtd;
 		mtd_probe_devices();
