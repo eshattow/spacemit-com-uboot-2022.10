@@ -27,6 +27,7 @@
 #include <video_bridge.h>
 #include <power/pmic.h>
 #include <panel.h>
+#include <edid.h>
 
 #include "spacemit_dpu.h"
 
@@ -52,16 +53,6 @@ static void dpu_init(struct spacemit_mode_modeinfo *spacemit_mode, ulong fbbase,
 	pr_debug("dpu_write hbp %d, hfp %d hsync %d vsp %d \n", hbp, hfp, hsync, vsp);
 	pr_debug("dpu_write vbp %d, vfp %d vsync %d hsp %d \n", vbp, vfp, vsync, hsp);
 
-	if (dpu_type == DPU_MODE_DP) {
-		void __iomem *ciu_addr;
-		uint32_t value;
-		ciu_addr = (void __iomem *)0xd4282c00;
-		value = readl(ciu_addr + 0x12c);
-		value |= BIT(8);
-		writel(value, (ciu_addr + 0x12c));
-		value = readl(ciu_addr + 0x12c);
-	}
-
 	dpu_writel(dpu_base_addr, 0x30000, 0x1);
 
 	dpu_writel(dpu_base_addr, 0x5120C, hfp << 16);
@@ -83,7 +74,8 @@ static void dpu_init(struct spacemit_mode_modeinfo *spacemit_mode, ulong fbbase,
 	dpu_writel(dpu_base_addr, 0x1044, 0x0);
 	dpu_writel(dpu_base_addr, 0x1048, (spacemit_mode->xres - 1) | ((spacemit_mode->yres-1) << 16));
 	dpu_writel(dpu_base_addr, 0x1074, 0x8);
-	dpu_writel(dpu_base_addr, 0x107c, 0x10000140);//support 2k
+	/* supports up to 3840x2160 */
+	dpu_writel(dpu_base_addr, 0x107c, 0x100001e0);
 
 	dpu_writel(dpu_base_addr, 0x30004, (spacemit_mode->xres | (spacemit_mode->yres << 16)));
 	dpu_writel(dpu_base_addr, 0x30020, ((spacemit_mode->xres-1) << 16));
@@ -139,9 +131,7 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 	struct udevice *panel = NULL;
 	void __iomem *dpu_base_addr;
 
-
 	struct spacemit_mode_modeinfo *spacemit_mode = NULL;
-
 
 	pr_debug("%s(%s, 0x%lx, %s)\n", __func__,
 			  dev_read_name(dev), fbbase, ofnode_get_name(ep_node));
@@ -193,6 +183,8 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 	} else if (strstr(compat, "hdmi")) {
 		dpu_type = DPU_MODE_HDMI;
 	} else if (strstr(compat, "dp")) {
+		dpu_type = DPU_MODE_DP;
+	} else if (strstr(compat, "edp")) {
 		dpu_type = DPU_MODE_DP;
 	} else {
 		pr_info("%s(%s): Failed to find dpu mode for %s\n",
@@ -255,6 +247,14 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 		spacemit_mode->yres = timing.vactive.typ;
 		spacemit_mode->hsync_invert = 1;
 		spacemit_mode->hsync_invert = 1;
+
+		if (timing.hactive.typ > 3840) {
+			pr_info("%s: no support the resolution of %dx%d\n", __func__, timing.hactive.typ, timing.vactive.typ);
+			return -EINVAL;
+		}
+
+		uc_priv->xsize = timing.hactive.typ;
+		uc_priv->ysize = timing.vactive.typ;
 
 		pr_info("fb=%lx, size=%dx%d\n", fbbase, uc_priv->xsize, uc_priv->ysize);
 

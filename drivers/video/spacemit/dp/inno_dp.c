@@ -4,811 +4,1192 @@
  *
  */
 
-#include "inno_modes.h"
-#include "inno_edid.h"
-#include "inno_conn.h"
-#include "inno_dp_common.h"
 #include "inno_dp.h"
-#include "inno_utils.h"
-#include "inno_parse_edid.h"
-#include <asm/io.h>
-#include <linux/io.h>
+#include "inno_dp_reg.h"
 
-static uint32_t inno_dp_aux_write(uint32_t cmd, uint32_t addr, uint32_t * wr_buf,
-				  uint32_t length, struct inno_conn_t *conn)
+#define dev_info(dev, fmt, ...) \
+	pr_info("[DP PHY INFO] " fmt, ##__VA_ARGS__)
+#define dev_err(dev, fmt, ...) \
+	pr_info("[DP PHY INFO] " fmt, ##__VA_ARGS__)
+#define dev_warn(dev, fmt, ...) \
+	pr_info("[DP PHY INFO] " fmt, ##__VA_ARGS__)
+
+/* Error Codes */
+#define EINVAL					-22
+#define ETIMEDOUT				-110
+#define EIO					-5
+#define EBUSY					-16
+
+#define DP_AUX_I2C_WRITE			0x0
+#define DP_AUX_I2C_READ				0x1
+#define DP_AUX_I2C_MOT				0x4
+#define DP_AUX_NATIVE_WRITE			0x8
+#define DP_AUX_NATIVE_READ			0x9
+
+#define DP_AUX_NATIVE_REPLY_ACK			0x00
+#define DP_AUX_NATIVE_REPLY_NACK		0x01
+#define DP_AUX_NATIVE_REPLY_DEFER		0x02
+
+#define DP_DPCD_REV				0x000
+#define DP_MAX_LINK_RATE			0x001
+#define DP_MAX_LANE_COUNT			0x002
+#define DP_MAX_LANE_COUNT_MASK			0x1f
+#define DP_TPS3_SUPPORTED			BIT(6)
+#define DP_ENHANCED_FRAME_CAP			BIT(7)
+
+#define DP_LINK_BW_SET				0x100
+#define DP_LINK_BW_1_62				0x06
+#define DP_LINK_BW_2_7				0x0a
+#define DP_LINK_BW_5_4				0x14
+#define DP_LINK_BW_8_1				0x1e
+
+#define DP_LANE_COUNT_SET			0x101
+#define DP_LANE_COUNT_ENHANCED_FRAME_EN		BIT(7)
+
+#define DP_TRAINING_PATTERN_SET			0x102
+#define DP_TRAINING_PATTERN_DISABLE		0
+#define DP_TRAINING_PATTERN_1			1
+#define DP_TRAINING_PATTERN_2			2
+#define DP_TRAINING_PATTERN_3			3
+#define DP_LINK_SCRAMBLING_DISABLE		BIT(5)
+
+#define DP_TRAINING_LANE0_SET			0x103
+#define DP_TRAIN_VOLTAGE_SWING_MASK		0x3
+#define DP_TRAIN_PRE_EMPHASIS_MASK		(3 << 3)
+#define DP_TRAIN_PRE_EMPHASIS_SHIFT		3
+#define DP_TRAIN_MAX_SWING_REACHED		BIT(2)
+#define DP_TRAIN_MAX_PRE_EMPHASIS_REACHED	BIT(5)
+
+#define DP_DOWNSPREAD_CTRL			0x107
+
+#define DP_MAIN_LINK_CHANNEL_CODING_SET		0x108
+#define DP_SET_ANSI_8B10B			BIT(0)
+
+#define DP_LANE0_1_STATUS			0x202
+#define DP_LANE_CR_DONE				BIT(0)
+#define DP_LANE_CHANNEL_EQ_DONE			BIT(1)
+#define DP_LANE_SYMBOL_LOCKED			BIT(2)
+
+#define DP_EDP_CONFIGURATION_SET		0x10a
+#define DP_ALTERNATE_SCRAMBLER_RESET_ENABLE	BIT(0)
+#define DP_FRAMING_CHANGE_ENABLE		BIT(1)
+#define DP_PANEL_SELF_TEST_ENABLE		BIT(7)
+
+#define DP_ADJUST_REQUEST_LANE0_1		0x206
+
+#define DP_SET_POWER				0x600
+#define DP_SET_POWER_D0				0x1
+
+#define DP_LINK_STATUS_SIZE			6
+
+#define SOC_DP_SWING_MAX			2
+#define SOC_DP_PREEMP_MAX			2
+
+static const struct soc_dp_link_config {
+	enum soc_dp_link_rate rate;
+	enum soc_dp_lane_count lanes;
+} soc_dp_link_priority_table[] = {
+	/* --- Tier 1: Low Bandwidth (< 4 Gbps) --- */
+	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_1},	/* 1.62 Gbps */
+	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_2},	/* 3.24 Gbps */
+	{SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_1},	/* 2.70 Gbps */
+
+	/* --- Tier 2: Medium Bandwidth (~5-6 Gbps) --- */
+	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_4},	/* 6.48 Gbps */
+	{SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_2},	/* 5.40 Gbps */
+	{SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_1},	/* 5.40 Gbps */
+
+	/* --- Tier 3: High Bandwidth (~10 Gbps) --- */
+	{SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_4},	/* 10.8 Gbps */
+	{SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_2},	/* 10.8 Gbps */
+
+	/* --- Tier 4: Ultra High Bandwidth (> 17 Gbps) --- */
+	{SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_4},	/* 21.6 Gbps */
+};
+
+static const struct soc_format_info {
+	u8 bpp; /* Bits Per Pixel */
+} format_info_table[] = {
+	[SOC_VIDEO_RGB_6BIT]      = { .bpp = 18 },
+	[SOC_VIDEO_RGB_8BIT]      = { .bpp = 24 },
+	[SOC_VIDEO_RGB_10BIT]     = { .bpp = 30 },
+	[SOC_VIDEO_RGB_12BIT]     = { .bpp = 36 },
+	[SOC_VIDEO_RGB_16BIT]     = { .bpp = 48 },
+
+	[SOC_VIDEO_YUV444_8BIT]   = { .bpp = 24 },
+	[SOC_VIDEO_YUV444_10BIT]  = { .bpp = 30 },
+	[SOC_VIDEO_YUV444_12BIT]  = { .bpp = 36 },
+	[SOC_VIDEO_YUV444_16BIT]  = { .bpp = 48 },
+
+	[SOC_VIDEO_YUV422_8BIT]   = { .bpp = 16 },
+	[SOC_VIDEO_YUV422_10BIT]  = { .bpp = 20 },
+	[SOC_VIDEO_YUV422_12BIT]  = { .bpp = 24 },
+	[SOC_VIDEO_YUV422_16BIT]  = { .bpp = 32 },
+};
+
+static int soc_dp_get_bpp(u32 format)
 {
-	//Read Request Transaction
-	if (cmd & 0x1) {
-	osal_write32(0x404,//(0x400 INNODP_PHY_AUX_ENC_CMD)
-					(length << 24) | (addr << 4) | cmd, conn);
-	//Write Request Transaction
-	} else {
-	osal_write32(0x404,//(0x400 INNODP_PHY_AUX_ENC_CMD)
-					(length << 24) | (addr << 4) | cmd, conn);
-		osal_write32(0x418, wr_buf[0], conn); //(0x40c INNODP_AUX_DATA1)
-		osal_write32(0x414, wr_buf[1], conn); //(0x410 INNODP_AUX_DATA2)
-		osal_write32(0x410, wr_buf[2], conn); //(0x414 INNODP_AUX_DATA3)
-		osal_write32(0x40c, wr_buf[3], conn); //(0x408 INNODP_AUX_DATA0)
+	if (format >= ARRAY_SIZE(format_info_table)) {
+		pr_warn("DP: Invalid color format index %d, defaulting to RGB888\n", format);
+		return 24;
 	}
+	return format_info_table[format].bpp;
+}
 
-	osal_write32(0x408, BIT(31) | osal_read32(0x408, conn), conn);//(0x408 INNODP_PHY_AUX_START)
+/*
+ * soc_dp_div64
+ * @n: Pointer to dividend (will be updated to quotient)
+ * @base: Divisor
+ * Return: Remainder
+ */
+static u32 soc_dp_div64(u64 *n, u32 base)
+{
+#if USED_ACTIVATE_DO_DIV
+	return do_div(*n, base);
+#else
+	u32 rem = *n % base;
+	*n = *n / base;
+	return rem;
+#endif
+}
+
+static int soc_dp_reg_write(struct soc_dp_dev *dp,
+			    u32 offset, u32 bit_wide, u32 mask, u32 val)
+{
+	u32 reg_val;
+
+	reg_val = (u32)readl((char *)dp->regs + offset);
+	reg_val &= ~mask;
+	reg_val |= val & mask;
+	// pr_info("[W] 0x%x 0x%x\n", offset, reg_val);
+	writel(reg_val, (char *)dp->regs + offset);
 
 	return 0;
 }
 
-static uint32_t inno_dp_aux_read(uint32_t read, uint32_t addr, uint32_t *rd_buf,
-				 struct inno_conn_t *conn)
+static int soc_dp_reg_write_range(struct soc_dp_dev *dp,
+				  u32 offset, u32 high, u32 low, u32 val)
 {
-	uint32_t ret = 0;
-	uint32_t retry = 0;
+	u32 mask;
 
-	//wait aux reply  event
-	while (retry++ <= INNODP_WAIT_AUX_REPLY_CNT) {
-		if (((osal_read32(0x400, conn) >> 22) & 0x3) == 0) {
+	mask = (u32)(((((u64)1) << (high - low + 1)) - 1) << low);
+	return soc_dp_reg_write(dp, offset, 32, mask, (val << low) & mask);
+}
+
+static int soc_dp_reg_read(struct soc_dp_dev *dp,
+			   u32 offset, u32 bit_wide, u32 mask, u32 *val)
+{
+	*val = ((u32)readl((char *)dp->regs + offset)) & mask;
+	// pr_info("[R] 0x%x 0x%x\n", offset, *val);
+	return 0;
+}
+
+static int soc_dp_reg_read_range(struct soc_dp_dev *dp,
+				 u32 offset, u32 high, u32 low, u32 *val)
+{
+	int ret;
+	u32 mask;
+
+	mask = (u32)(((((u64)1) << (high - low + 1)) - 1) << low);
+	ret = soc_dp_reg_read(dp, offset, 32, mask, val);
+	*val = *val >> low;
+
+	return ret;
+}
+
+/*
+ * Low-level AUX transfer function.
+ * Returns bytes transferred on success (>=0), or negative error code on failure.
+ */
+static int soc_dp_aux_transfer_raw(struct soc_dp_dev *dp, u32 request, u32 address, u8 *buf, int size)
+{
+	int ret, i;
+	unsigned long timeout_cnt = 0;
+
+	u32 cmd, len, val, status;
+	u32 data[4] = {0};
+	bool is_read = (request & DP_AUX_I2C_READ) || ((request & DP_AUX_NATIVE_READ) == DP_AUX_NATIVE_READ);
+
+	/* 1. Check message validity */
+	if (size > 16)
+		return -EINVAL;
+
+	ret = soc_dp_phy_power_on(&dp->phy);
+	if (ret)
+		return ret;
+
+	cmd = request;
+
+	/* 2. Prepare Data for Write (if applicable) */
+	if (!is_read) {
+		/* Pack bytes into 32-bit words (Little Endian packing) */
+		for (i = 0; i < size; i++) {
+			data[i / 4] |= buf[i] << ((i % 4) * 8);
+		}
+
+		/* Write data to registers: DATA1(LSB)..DATA4(MSB) */
+		soc_dp_reg_write_range(dp, SOC_DPTX_AUX_DATA1, data[0]);
+		soc_dp_reg_write_range(dp, SOC_DPTX_AUX_DATA2, data[1]);
+		soc_dp_reg_write_range(dp, SOC_DPTX_AUX_DATA3, data[2]);
+		soc_dp_reg_write_range(dp, SOC_DPTX_AUX_DATA4, data[3]);
+	}
+
+	/* 3. Configure Command, Address, Length */
+	/* HW expects Length - 1 */
+	len = size > 0 ? size - 1 : 0;
+
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_LENGTH, len);
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_ADDR, address);
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_CMD_TYPE, cmd);
+
+	/* 4. Trigger Transfer */
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_START, 0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_START, 1);
+
+	/* 5. Wait for Completion */
+	ret = -ETIMEDOUT;
+	while (1) {
+		soc_dp_reg_read_range(dp, SOC_DPTX_AUX_REPLY_EVENT_INT_STA, &val);
+		if (val) {
+			ret = 0;
 			break;
 		}
-		osal_msleep(1);
+
+		udelay(100);
+		timeout_cnt++;
+		if (timeout_cnt > 2000) /* Approx 200ms */
+			break;
 	}
 
-	if (read == 1) {
-		osal_msleep(2);
-		rd_buf[0] = osal_read32(0x418, conn);
-		rd_buf[1] = osal_read32(0x414, conn);
-		rd_buf[2] = osal_read32(0x410, conn);
-		rd_buf[3] = osal_read32(0x40c, conn);
+	if (ret) {
+		soc_dp_phy_power_off(&dp->phy);
+		dev_err(dp->dev, "AUX transfer timeout\n");
+		return ret;
 	}
 
-	ret = (osal_read32(0x400, conn) >> 28) & 0xf;
+	/* 6. Clear Interrupt Status (W1C) */
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_REPLY_EVENT_INT_STA, 1);
 
-	return ret;
+	/* 7. Read Status */
+	soc_dp_reg_read_range(dp, SOC_DPTX_AUX_STATUS, &status);
 
+	switch (status) {
+	case 0: /* ACK */
+		break;
+	case 1: /* NACK */
+		soc_dp_phy_power_off(&dp->phy);
+		dev_warn(dp->dev, "AUX NACK: addr 0x%x\n", address);
+		return -EIO; /* Return Error for NACK */
+	case 2: /* DEFER */
+		soc_dp_phy_power_off(&dp->phy);
+		dev_warn(dp->dev, "AUX DEFER: addr 0x%x\n", address);
+		return -EBUSY; /* Return Error for DEFER */
+	default:
+		/* Check error code if status is weird */
+		soc_dp_reg_read_range(dp, SOC_DPTX_AUX_REPLY_ERR_CODE, &val);
+		soc_dp_phy_power_off(&dp->phy);
+		dev_err(dp->dev, "AUX error, status: 0x%x, code: 0x%x\n", status, val);
+		return -EIO;
+	}
+
+	/* 8. Read Data (if Read operation and ACK) */
+	if (is_read && size > 0) {
+		soc_dp_reg_read_range(dp, SOC_DPTX_AUX_DATA1, &data[0]);
+		soc_dp_reg_read_range(dp, SOC_DPTX_AUX_DATA2, &data[1]);
+		soc_dp_reg_read_range(dp, SOC_DPTX_AUX_DATA3, &data[2]);
+		soc_dp_reg_read_range(dp, SOC_DPTX_AUX_DATA4, &data[3]);
+
+		/* Unpack 32-bit words back to bytes */
+		for (i = 0; i < size; i++) {
+			buf[i] = (data[i / 4] >> ((i % 4) * 8)) & 0xFF;
+		}
+	}
+
+	soc_dp_phy_power_off(&dp->phy);
+	return size;
 }
 
-static uint32_t inno_dp_aux_channel_run(struct aux_cfg *aux_get_rx, struct dp_chip_t *inno)
+/* * Wrapper for AUX transfer with retry mechanism
+ */
+static int soc_dp_aux_transfer_with_retry(struct soc_dp_dev *dp, u32 cmd, u32 address, u8 *data, int size)
 {
-	uint32_t ret = 0;
-	struct inno_conn_t *conn = (struct inno_conn_t *)inno->priv;
+	int retries = 0;
+	int ret;
+	const int max_retries = 7;
 
-	ret = inno_dp_aux_write(aux_get_rx->aux_cmd,
-			aux_get_rx->dpcd_addr, aux_get_rx->wr_buff,
-			aux_get_rx->length, conn);
-	if (ret == 1)
-		return 1;
+	while (retries < max_retries) {
+		ret = soc_dp_aux_transfer_raw(dp, cmd, address, data, size);
 
-	ret = inno_dp_aux_read(aux_get_rx->read,
-			aux_get_rx->dpcd_addr, aux_get_rx->rd_buff, conn);
+		if (ret >= 0)
+			return ret;
 
-	return ret;
+		/* If DEFER (Sink busy) or Timeout, wait and retry */
+		if (ret == -EBUSY || ret == -ETIMEDOUT) {
+			udelay(400);
+			retries++;
+			continue;
+		}
+
+		/* If NACK, retry briefly just in case */
+		if (ret == -EIO) {
+			udelay(100);
+			retries++;
+			continue;
+		}
+
+		return ret;
+	}
+
+	dev_err(dp->dev, "AUX transfer failed after %d retries (cmd 0x%x, addr 0x%x)\n", max_retries, cmd, address);
+	return -ETIMEDOUT;
 }
-static uint32_t inno_dp_get_transmit_enable(uint32_t lane_count)
+
+/* Native Write (For DPCD) */
+static int soc_dp_aux_native_write(struct soc_dp_dev *dp, u32 address, u8 *data, int size)
 {
-	if (lane_count == 1)
-		return 0x1;
-	else if (lane_count == 2)
-		return 0x3;
-	else if (lane_count == 3)
-		return 0x7;
-	else if (lane_count == 4)
-		return 0xf;
+	return soc_dp_aux_transfer_with_retry(dp, DP_AUX_NATIVE_WRITE, address, data, size);
+}
+
+/* Native Read (For DPCD) */
+static int soc_dp_aux_native_read(struct soc_dp_dev *dp, u32 address, u8 *data, int size)
+{
+	return soc_dp_aux_transfer_with_retry(dp, DP_AUX_NATIVE_READ, address, data, size);
+}
+
+/* DPCD Write: Updated to support burst writes (buffer + size) */
+static int soc_dp_dpcd_write(struct soc_dp_dev *dp, u32 address, u8 *buf, int size)
+{
+	return soc_dp_aux_native_write(dp, address, buf, size);
+}
+
+/* DPCD Write: Updated to support burst writes (u8) */
+static int soc_dp_dpcd_writeb(struct soc_dp_dev *dp, u32 address, u8 data)
+{
+	return soc_dp_dpcd_write(dp, address, &data, 1);
+}
+
+/* DPCD Read */
+static int soc_dp_dpcd_read(struct soc_dp_dev *dp, u32 address, u8 *buf, int size)
+{
+	return soc_dp_aux_native_read(dp, address, buf, size);
+}
+
+/* I2C Write (For EDID/DDC) */
+static int soc_dp_aux_i2c_write(struct soc_dp_dev *dp, u32 address, u8 *data, int size)
+{
+	return soc_dp_aux_transfer_with_retry(dp, DP_AUX_I2C_WRITE, address, data, size);
+}
+
+/* I2C Read (For EDID/DDC) */
+static int soc_dp_aux_i2c_read(struct soc_dp_dev *dp, u32 address, u8 *data, int size)
+{
+	return soc_dp_aux_transfer_with_retry(dp, DP_AUX_I2C_READ, address, data, size);
+}
+
+/*
+ * Read the Sink's DPCD capability information.
+ * Note: EDID is parsed separately. This function focuses solely on
+ * Link Layer capabilities (Rate, Lanes, etc.).
+ */
+int soc_dp_hw_read_sink_caps(struct soc_dp_dev *dp)
+{
+	int ret;
+	u8 max_bw;
+
+	ret = soc_dp_phy_power_on(&dp->phy);
+	if (ret)
+		return ret;
+
+	/* 1. Read DPCD Receiver Capability fields (0x00000 - 0x0000F) */
+	ret = soc_dp_dpcd_read(dp, DP_DPCD_REV, dp->dpcd, DP_RECEIVER_CAP_SIZE);
+	if (ret < 0) {
+		soc_dp_phy_power_off(&dp->phy);
+		dev_err(dp->dev, "Failed to read DPCD: %d\n", ret);
+		return ret;
+	}
+
+	/* 2. Parse DP Revision */
+	dp->link.revision = dp->dpcd[DP_DPCD_REV];
+
+	/*
+	 * 3. Parse and determine Link Rate.
+	 * Get the maximum link rate supported by the Sink.
+	 * Note: During link training, we usually start from min(Sink_Max, Source_Max).
+	 */
+	max_bw = dp->dpcd[DP_MAX_LINK_RATE];
+	switch (max_bw) {
+	case DP_LINK_BW_1_62:
+		dp->link.max_rate = SOC_DP_LINK_RATE_1_62;
+		break;
+	case DP_LINK_BW_2_7:
+		dp->link.max_rate = SOC_DP_LINK_RATE_2_70;
+		break;
+	case DP_LINK_BW_5_4:
+		dp->link.max_rate = SOC_DP_LINK_RATE_5_40;
+		break;
+	case DP_LINK_BW_8_1:
+		dp->link.max_rate = SOC_DP_LINK_RATE_8_10;
+		break;
+	default:
+		dev_warn(dp->dev, "Unknown DPCD Max Rate: 0x%x, defaulting to 1.62G\n", max_bw);
+		dp->link.max_rate = SOC_DP_LINK_RATE_1_62;
+		break;
+	}
+
+	/* 4. Parse and determine Lane Count */
+	dp->link.max_num_lanes = dp->dpcd[DP_MAX_LANE_COUNT] & DP_MAX_LANE_COUNT_MASK;
+
+	/* 5. Check for Enhanced Framing support */
+	dp->link.enhanced_framing = (dp->dpcd[DP_MAX_LANE_COUNT] & DP_ENHANCED_FRAME_CAP);
+
+	soc_dp_phy_power_off(&dp->phy);
+
+	dev_info(dp->dev, "DPCD: Rev %x.%x, MaxRate %d kHz, MaxLanes %d, EnhFrame %d\n",
+		 dp->link.revision >> 4, dp->link.revision & 0xF,
+	dp->link.max_rate,
+	dp->link.max_num_lanes,
+	dp->link.enhanced_framing);
+
+	return 0;
+}
+
+/*
+ * Check Hot Plug Detect (HPD) Status
+ */
+enum soc_dp_connector_status soc_dp_hw_detect_hpd(struct soc_dp_dev *dp)
+{
+	u32 plug_event, unplug_event;
+	u32 hpd_status;
+	enum soc_dp_connector_status connector_status = dp->connector_status;
+
+	soc_dp_reg_read_range(dp, SOC_DPTX_HOT_PLUG_EVENT, &plug_event);
+	soc_dp_reg_read_range(dp, SOC_DPTX_HOT_UNPLUG_EVENT, &unplug_event);
+
+	if (plug_event)
+	connector_status = connector_status_connected;
+
+	if (unplug_event)
+	connector_status = connector_status_disconnected;
+
+	soc_dp_reg_read_range(dp, SOC_DPTX_HPD_IN_STATUS, &hpd_status);
+
+	pr_info("%s plug_event %d unplug_event %d hpd_status %d\n", __func__, plug_event, unplug_event, hpd_status);
+
+	if (hpd_status)
+		connector_status = connector_status_connected;
 	else
-		return 0x1;
+		connector_status = connector_status_disconnected;
+
+#if USED_HPD_BYPASS
+	connector_status = connector_status_connected;
+#endif
+
+	return connector_status;
 }
 
-static void inno_dp_train_pattern_set(struct dp_chip_t *inno, uint32_t pattern)
+/*
+ * Clean Hot Plug Detect (HPD) Status
+ */
+void soc_dp_hw_clean_hpd(struct soc_dp_dev *dp)
 {
-	uint32_t temp = 0;
-	struct inno_conn_t *conn = (struct inno_conn_t *)inno->priv;
+	u32 plug_event, unplug_event;
 
-	/* (0x100 INNODP_LANE_CONFIG) */
-	temp = osal_read32(0x100, conn);
-	temp &= ~(0xf << 25);
-	temp |= pattern << 25; //pattern mode
-	temp |= inno_dp_get_transmit_enable(inno->lane_count) << 17;  //transmit lanes
-	temp |= BIT(8);
-	osal_write32(0x100, temp, conn);
+	soc_dp_reg_read_range(dp, SOC_DPTX_HOT_PLUG_EVENT, &plug_event);
+	soc_dp_reg_read_range(dp, SOC_DPTX_HOT_UNPLUG_EVENT, &unplug_event);
+
+	if (plug_event)
+		soc_dp_reg_write_range(dp, SOC_DPTX_HOT_PLUG_EVENT, 0x1);
+
+	if (unplug_event)
+		soc_dp_reg_write_range(dp, SOC_DPTX_HOT_UNPLUG_EVENT, 0x1);
 }
 
-static void inno_dp_set_enhance(struct dp_chip_t *inno)
+static int soc_dp_set_training_pattern(struct soc_dp_dev *dp, u8 pattern)
 {
-	struct inno_conn_t *conn = (struct inno_conn_t *)inno->priv;
+	u32 tps_sel = 0;
+	u8 dpcd_pattern = pattern;
+	int ret;
 
-	if (inno->enhance_mode) {
-		osal_write32(0x18, BIT(30) | osal_read32(0x18, conn), conn);
+	if (pattern != DP_TRAINING_PATTERN_DISABLE)
+	dpcd_pattern |= DP_LINK_SCRAMBLING_DISABLE;
+
+	/* Configure PHY Pattern */
+	switch (pattern) {
+	case DP_TRAINING_PATTERN_DISABLE:
+		tps_sel = 0;
+		soc_dp_reg_write_range(dp, SOC_DPTX_SCRAMBLER_DISABLE, 0);
+		break;
+	case DP_TRAINING_PATTERN_1:
+		tps_sel = 1;
+		soc_dp_reg_write_range(dp, SOC_DPTX_SCRAMBLER_DISABLE, 1);
+		break;
+	case DP_TRAINING_PATTERN_2:
+		tps_sel = 2;
+		soc_dp_reg_write_range(dp, SOC_DPTX_SCRAMBLER_DISABLE, 1);
+		break;
+	case DP_TRAINING_PATTERN_3:
+		tps_sel = 3;
+		soc_dp_reg_write_range(dp, SOC_DPTX_SCRAMBLER_DISABLE, 1);
+		break;
+	default:
+		dev_err(dp->dev, "Unsupported training pattern: 0x%x\n", pattern);
+		return -EINVAL;
+	}
+
+	soc_dp_reg_write_range(dp, SOC_DPTX_TPS_SEL, tps_sel);
+
+	/* Configure DPCD Pattern */
+	ret = soc_dp_dpcd_writeb(dp, DP_TRAINING_PATTERN_SET, dpcd_pattern);
+	if (ret < 0) {
+		dev_err(dp->dev, "Failed to set DPCD training pattern: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+/* Link Training Helper: Check Clock Recovery */
+static int soc_dp_link_status_cr_ok(u8 link_status[DP_LINK_STATUS_SIZE], int lane_count)
+{
+	int lane;
+	u8 lane_status;
+
+	for (lane = 0; lane < lane_count; lane++) {
+		lane_status = link_status[lane >> 1];
+		if (lane & 1) lane_status >>= 4;
+		if (!(lane_status & DP_LANE_CR_DONE)) return 0;
+	}
+	return 1;
+}
+
+/* Link Training Helper: Check Channel EQ */
+static int soc_dp_link_status_eq_ok(u8 link_status[DP_LINK_STATUS_SIZE], int lane_count)
+{
+	int lane;
+	u8 lane_status;
+	u8 align = link_status[2]; // DP_LANE_ALIGN_STATUS_UPDATED
+
+	if (!(align & 1)) return 0; // INTERLANE_ALIGN_DONE
+
+	for (lane = 0; lane < lane_count; lane++) {
+		lane_status = link_status[lane >> 1];
+		if (lane & 1) lane_status >>= 4;
+		if ((lane_status & (DP_LANE_CHANNEL_EQ_DONE | DP_LANE_SYMBOL_LOCKED)) !=
+		    (DP_LANE_CHANNEL_EQ_DONE | DP_LANE_SYMBOL_LOCKED))
+			return 0;
+	}
+	return 1;
+}
+
+static u8 soc_dp_get_adjust_req_v(u8 link_status[DP_LINK_STATUS_SIZE], int lane)
+{
+	u8 req = link_status[DP_ADJUST_REQUEST_LANE0_1 - DP_LANE0_1_STATUS + (lane >> 1)];
+
+	if (lane & 1) req >>= 4;
+	return req & DP_TRAIN_VOLTAGE_SWING_MASK;
+}
+
+static u8 soc_dp_get_adjust_req_p(u8 link_status[DP_LINK_STATUS_SIZE], int lane)
+{
+	u8 req = link_status[DP_ADJUST_REQUEST_LANE0_1 - DP_LANE0_1_STATUS + (lane >> 1)];
+
+	if (lane & 1) req >>= 4;
+	return (req & DP_TRAIN_PRE_EMPHASIS_MASK) >> DP_TRAIN_PRE_EMPHASIS_SHIFT;
+}
+
+static int soc_dp_link_train_clock_recovery(struct soc_dp_dev *dp, enum soc_dp_link_rate rate, enum soc_dp_lane_count lanes)
+{
+	u8 link_status[DP_LINK_STATUS_SIZE];
+	u8 training_set[4] = {0};
+	int retries = 0;
+	int i, ret;
+	struct soc_dp_phy_configure_opts phy_opts = {0};
+
+	phy_opts.lanes = lanes;
+	phy_opts.set_voltages = 1;
+
+	soc_dp_phy_configure(&dp->phy, &phy_opts);
+
+	ret = soc_dp_dpcd_write(dp, DP_TRAINING_LANE0_SET,
+				training_set, lanes);
+	if (ret < 0)
+		return ret;
+
+	ret = soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_1);
+	if (ret < 0) {
+		soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
+		return ret;
+	}
+
+	while (retries < 8) {
+		mdelay(5);
+
+		ret = soc_dp_dpcd_read(dp, DP_LANE0_1_STATUS, link_status, DP_LINK_STATUS_SIZE);
+		if (ret < 0) {
+			soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
+			return ret;
+		}
+
+		if (soc_dp_link_status_cr_ok(link_status, lanes))
+			return 0;
+
+		/* Update settings based on Sink request */
+		for (i = 0; i < lanes; i++) {
+			u8 v = soc_dp_get_adjust_req_v(link_status, i);
+			u8 p = soc_dp_get_adjust_req_p(link_status, i);
+
+			if (v >= SOC_DP_SWING_MAX) {
+			v = SOC_DP_SWING_MAX;
+			v |= DP_TRAIN_MAX_SWING_REACHED;
+			}
+
+			if (p >= SOC_DP_PREEMP_MAX) {
+			p = SOC_DP_PREEMP_MAX;
+			v |= DP_TRAIN_MAX_PRE_EMPHASIS_REACHED;
+			}
+
+			training_set[i] = v | (p << DP_TRAIN_PRE_EMPHASIS_SHIFT);
+
+			// Update PHY Config
+			phy_opts.voltage[i] = v & DP_TRAIN_VOLTAGE_SWING_MASK;
+			phy_opts.pre[i] = p & DP_TRAIN_PRE_EMPHASIS_MASK;
+		}
+
+		ret = soc_dp_phy_configure(&dp->phy, &phy_opts);
+		if (ret)
+			return ret;
+
+
+		ret = soc_dp_dpcd_write(dp, DP_TRAINING_LANE0_SET,
+					training_set, lanes);
+		if (ret < 0) {
+			soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
+			return ret;
+		}
+
+		retries++;
+	}
+
+	dev_err(dp->dev, "Link Training Clock Recovery Failed\n");
+	soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
+	return -ETIMEDOUT;
+}
+
+static int soc_dp_link_train_channel_eq(struct soc_dp_dev *dp, enum soc_dp_link_rate rate, enum soc_dp_lane_count lanes)
+{
+	u8 link_status[DP_LINK_STATUS_SIZE];
+	u8 training_set[4] = {0};
+	u8 training_pattern = DP_TRAINING_PATTERN_2;
+	int retries = 0;
+	int i, ret;
+	struct soc_dp_phy_configure_opts phy_opts = {0};
+
+	phy_opts.lanes = lanes;
+	phy_opts.set_voltages = 1;
+
+	if (dp->dpcd[DP_MAX_LANE_COUNT] & DP_TPS3_SUPPORTED) {
+		training_pattern = DP_TRAINING_PATTERN_3;
+		dev_info(dp->dev, "Link Training: Using TPS3\n");
 	} else {
-		osal_write32(0x18, ~(BIT(30)) & osal_read32(0x18, conn), conn);
-	}
-}
-
-
-static void inno_dp_phy_cfg(struct dp_chip_t *inno)
-{
-	struct inno_conn_t *conn = (struct inno_conn_t *)inno->priv;
-
-	osal_write32(0x100, (inno->phy_lanes << 5) |
-		     (inno->phy_rate) | osal_read32(0x100, conn), conn);
-	//phy power on
-	osal_write32(0x100, ~(0xf << 13) & osal_read32(0x100, conn), conn);
-}
-
-static void inno_dp_core_pll_cfg(struct dp_chip_t *inno)
-{
-#define pll_prediv     (0)
-#define pll_fbdiv      (1)
-#define pll_postdiv    (2)
-#define pll_clkdiv_16m (3)
-#define pll_postdiv_en (4)
-#define pll_vcoclk_div8_en (5)
-
-	//for reference clk 50mhz config
-	uint32_t pll_table[][6] = {
-		{2, 64, 0, 12, 1, 1},
-		{1, 54, 0, 21, 1, 1},
-		{1, 54, 0, 42, 0, 0},
-	};
-	struct inno_conn_t *conn = (struct inno_conn_t *)inno->priv;
-
-	if (inno->phy_rate >= ARRAY_SIZE(pll_table) || inno->phy_rate < 0)
-		inno->phy_rate = 1;
-
-	//power down core pll
-	osal_write32(0x180, BIT(0) | osal_read32(0x180, conn), conn);
-
-	osal_write32(0x188,//(0x188), INNODP_SPREAD_CFG
-				(osal_read32(0x188, conn) & ~(0x3 << 8)) |
-				(pll_table[inno->phy_rate][pll_postdiv] << 8) |
-				(pll_table[inno->phy_rate][pll_postdiv_en] << 11) |
-				(pll_table[inno->phy_rate][pll_vcoclk_div8_en] << 16), conn);
-
-	osal_write32(0x1a0, (osal_read32(0x1a0, conn) & ~(0x3f << 8)) |
-		     (pll_table[inno->phy_rate][pll_clkdiv_16m] << 8), conn);//(0x1a0), INNODP_CLKDIV_16M
-
-	//(0x180)
-	osal_write32(0x180, (osal_read32(0x180, conn) & ~(0x3f << 8) & ~(0xf << 16) & ~(0xff << 24)) |
-		     ((pll_table[inno->phy_rate][pll_fbdiv] >> 8) << 16) |
-		     ((pll_table[inno->phy_rate][pll_fbdiv] & 0xff) << 24) |
-		     (pll_table[inno->phy_rate][pll_prediv] << 8), conn);
-	//turn off frac ctr
-	osal_write32(0x180, (0x3 << 4) & osal_read32(0x180, conn), conn);
-
-	//power up core pll
-	osal_write32(0x180, ~(BIT(0)) & osal_read32(0x180, conn), conn);
-
-	osal_msleep(1);
-
-#undef pll_fbdiv
-#undef pll_prediv
-#undef pll_postdiv
-#undef pll_clkdiv_16m
-}
-
-static void inno_dp_phy_reset(struct inno_conn_t *conn)
-{
-	/* reset phy and controller, video, audio */
-	osal_write32(0x1c,  BIT(31) | BIT(30) | BIT(28) | BIT(0) | osal_read32(0x1c, conn), conn);
-	osal_msleep(5);
-
-	osal_write32(0x1c, (~(BIT(31) | BIT(30) | BIT(28) | BIT(0))) & osal_read32(0x1c, conn), conn);
-	osal_msleep(5);
-}
-
-static void inno_dp_phy_init(struct inno_conn_t *conn)
-{
-	/* core pll cfg */
-	osal_write32(0x180, 0xe1300231, conn);
-	osal_write32(0x184, 0x22000000, conn);
-	osal_write32(0x188, 0x1, conn);
-	osal_write32(0x1a0, 0x2a00, conn);
-	osal_write32(0x198, 0x2012a, conn);
-	osal_write32(0x180, 0xe1300230, conn);
-	osal_msleep(10);
-
-	/* check core pll lock */
-	osal_read32(0x180, conn);
-
-	/* enable hpd plug */
-	osal_write32(0x8c, 0x20000000, conn);
-}
-
-static void inno_dp_tu_init(struct dp_chip_t *inno, struct inno_mode *mode)
-{
-	struct inno_conn_t *conn = (struct inno_conn_t *)inno->priv;
-	uint16_t htotal = mode->htotal;
-	uint16_t hactive = mode->hdisplay;
-	uint32_t clock = mode->clock / 1000;
-	uint16_t hblank = htotal - hactive;
-	uint32_t hb_num = 0;
-	uint32_t tu;
-	uint32_t tu_frac;
-	uint32_t tu_int;
-	uint32_t rd_thres;
-	uint32_t link_rate = 0;
-	uint32_t lane = inno->lane_count;
-
-	if (!htotal)
-		return;
-
-	if (inno->phy_rate == 0x00) {
-		hb_num = hblank * (162 / 4) / clock;
-		link_rate = 162;
-	} else if (inno->phy_rate == 0x1) {
-		hb_num = hblank * (270 / 4) / clock;
-		link_rate = 270;
-	} else if (inno->phy_rate == 0x2) {
-		hb_num = hblank * (540 / 4) / clock;
-		link_rate = 540;
+		dev_info(dp->dev, "Link Training: Using TPS2\n");
 	}
 
-	uint32_t bpp = 24; //for rgb888
-	tu = clock * bpp * 640 / (8 * lane * link_rate);
+	ret = soc_dp_set_training_pattern(dp, training_pattern);
+	if (ret < 0) {
+		soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
+		return ret;
+	}
+
+	while (retries < 8) {
+		mdelay(5);
+
+		ret = soc_dp_dpcd_read(dp, DP_LANE0_1_STATUS, link_status, DP_LINK_STATUS_SIZE);
+		if (ret < 0) {
+			soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
+			return ret;
+		}
+
+		if (soc_dp_link_status_eq_ok(link_status, lanes)) {
+			soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
+			return 0;
+		}
+
+		/* Update settings based on Sink request */
+		for (i = 0; i < lanes; i++) {
+			u8 v = soc_dp_get_adjust_req_v(link_status, i);
+			u8 p = soc_dp_get_adjust_req_p(link_status, i);
+
+			if (v >= SOC_DP_SWING_MAX) {
+			v = SOC_DP_SWING_MAX;
+			v |= DP_TRAIN_MAX_SWING_REACHED;
+			}
+
+			if (p >= SOC_DP_PREEMP_MAX) {
+			p = SOC_DP_PREEMP_MAX;
+			v |= DP_TRAIN_MAX_PRE_EMPHASIS_REACHED;
+			}
+
+			training_set[i] = v | (p << DP_TRAIN_PRE_EMPHASIS_SHIFT);
+
+			// Update PHY Config
+			phy_opts.voltage[i] = v & DP_TRAIN_VOLTAGE_SWING_MASK;
+			phy_opts.pre[i] = p & DP_TRAIN_PRE_EMPHASIS_MASK;
+		}
+
+		ret = soc_dp_phy_configure(&dp->phy, &phy_opts);
+		if (ret)
+			return ret;
+
+		ret = soc_dp_dpcd_write(dp, DP_TRAINING_LANE0_SET,
+					training_set, lanes);
+		if (ret < 0) {
+			soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
+			return ret;
+		}
+
+		retries++;
+	}
+
+	dev_err(dp->dev, "Link Training Channel EQ Failed\n");
+	soc_dp_set_training_pattern(dp, DP_TRAINING_PATTERN_DISABLE);
+	return -ETIMEDOUT;
+}
+
+/*
+ * Main Link Training Function
+ */
+static int soc_dp_link_train(struct soc_dp_dev *dp, enum soc_dp_link_rate rate, enum soc_dp_lane_count lanes)
+{
+	int ret;
+	u8 link_config[2];
+	u8 bw_code;
+
+	/* Set Power to D0 (Wake up Sink) */
+	ret = soc_dp_dpcd_writeb(dp, DP_SET_POWER, DP_SET_POWER_D0);
+	if (ret < 0)
+		dev_warn(dp->dev, "Failed to power up sink\n");
+
+	mdelay(5);
+
+	/* Downspread Control (PHY SSC is disabled, explicitly set to 0) */
+	ret = soc_dp_dpcd_writeb(dp, DP_DOWNSPREAD_CTRL, 0);
+	if (ret < 0)
+		dev_warn(dp->dev, "Failed to disable downspread\n");
+
+	/* Main Link Channel Coding (ANSI 8B/10B) */
+	ret = soc_dp_dpcd_writeb(dp, DP_MAIN_LINK_CHANNEL_CODING_SET, DP_SET_ANSI_8B10B);
+	if (ret < 0)
+		dev_warn(dp->dev, "Failed to set channel coding\n");
+
+	/* Map Link Rate Enum to DPCD Bandwidth Code */
+	switch (rate) {
+	case SOC_DP_LINK_RATE_1_62:
+		bw_code = DP_LINK_BW_1_62;
+		break;
+	case SOC_DP_LINK_RATE_2_70:
+		bw_code = DP_LINK_BW_2_7;
+		break;
+	case SOC_DP_LINK_RATE_5_40:
+		bw_code = DP_LINK_BW_5_4;
+		break;
+	case SOC_DP_LINK_RATE_8_10:
+		bw_code = DP_LINK_BW_8_1;
+		break;
+	default:
+		bw_code = DP_LINK_BW_1_62;
+		break;
+	}
+
+	/* Configure DPCD Link Rate and Lane Count */
+	link_config[0] = bw_code;
+	link_config[1] = lanes;
+	if (dp->link.enhanced_framing)
+		link_config[1] |= DP_LANE_COUNT_ENHANCED_FRAME_EN;
+
+	ret = soc_dp_dpcd_write(dp, DP_LINK_BW_SET, link_config, 2);
+	if (ret < 0) {
+		dev_err(dp->dev, "Failed to configure DPCD\n");
+		return ret;
+	}
+
+	ret = soc_dp_link_train_clock_recovery(dp, rate, lanes);
+	if (ret)
+		return ret;
+
+	ret = soc_dp_link_train_channel_eq(dp, rate, lanes);
+	if (ret)
+		return ret;
+
+	mdelay(20);
+	return 0;
+}
+
+static void soc_dp_hw_set_msa(struct soc_dp_dev *dp, const struct soc_dp_video_mode *mode,
+			      enum soc_dp_link_rate rate, enum soc_dp_lane_count lanes)
+{
+	u64 hb_num;
+	u32 link_rate_khz;
+	u32 pixel_clk_khz;
+	u32 bpp, misc0;
+	u32 tu, tu_frac, tu_int, rd_thres;
+	u32 hsync_len;
+
+	// 1. Prepare basic parameters
+	pixel_clk_khz = mode->clock;
+	if (pixel_clk_khz == 0) pixel_clk_khz = 1; // Prevent division by zero
+
+	// Get BPP
+	bpp = soc_dp_get_bpp(dp->color_format);
+
+	// Calculate MISC0
+	// bit0: 0 (Sync Clock)
+	// bits1-7: Color Format (000=RGB, 001=YCbCr422, 010=YCbCr444)
+	// bits5-7: BPC (001=8bpc, 010=10bpc, etc)
+	switch (dp->color_format) {
+	case SOC_VIDEO_RGB_6BIT:      misc0 = 0x00; break;
+	case SOC_VIDEO_RGB_8BIT:      misc0 = 0x20; break;
+	case SOC_VIDEO_RGB_10BIT:     misc0 = 0x40; break;
+	case SOC_VIDEO_RGB_12BIT:     misc0 = 0x60; break;
+	case SOC_VIDEO_RGB_16BIT:     misc0 = 0x80; break;
+	case SOC_VIDEO_YUV422_8BIT:   misc0 = 0x22; break;
+	case SOC_VIDEO_YUV422_10BIT:  misc0 = 0x42; break;
+	case SOC_VIDEO_YUV422_12BIT:  misc0 = 0x62; break;
+	case SOC_VIDEO_YUV422_16BIT:  misc0 = 0x82; break;
+	case SOC_VIDEO_YUV444_8BIT:   misc0 = 0x24; break;
+	case SOC_VIDEO_YUV444_10BIT:  misc0 = 0x44; break;
+	case SOC_VIDEO_YUV444_12BIT:  misc0 = 0x64; break;
+	case SOC_VIDEO_YUV444_16BIT:  misc0 = 0x84; break;
+	default:                      misc0 = 0x20; break;
+	}
+
+	// 2. Calculate HBlank Interval (hb_num)
+	// hb_num = hblank * (LinkRate_kHz / 10000) / 4 / (PixelClock_kHz / 1000)
+	// Optimized Formula: hb_num = hblank * LinkRate_kHz / (40 * PixelClock_kHz)
+	link_rate_khz = rate; // e.g., 1620000
+
+	hb_num = (u64)(mode->htotal - mode->hdisplay) * link_rate_khz;
+	{
+		u32 den = 40 * pixel_clk_khz;
+
+		hb_num += (den / 2);
+		soc_dp_div64(&hb_num, den);
+	}
+
+	// 3. Calculate TU (Transfer Unit)
+	// tu = (PixelClock_kHz/1000) * bpp * 640 / (8 * lanes * (LinkRate_kHz/10000))
+	// Optimized Formula: tu = PixelClock_kHz * bpp * 800 / (lanes * LinkRate_kHz)
+	{
+	u64 temp_tu = (u64)pixel_clk_khz * bpp * 800;
+		u32 den = lanes * link_rate_khz;
+
+		// Note: TU is typically floored or carefully rounded.
+		// Adding rounding here to be safe.
+		temp_tu += (den / 2);
+
+		soc_dp_div64(&temp_tu, den);
+		tu = temp_tu;
+	}
 	tu_frac = tu % 10;
-	tu_int = tu / 10;
+	tu_int  = tu / 10;
 
+	// 4. Calculate FIFO read threshold
 	if (tu_int < 6) {
 		rd_thres = 32;
-	} else if (hblank < 80) {
+	} else if ((mode->htotal - mode->hdisplay) < 80) {
 		rd_thres = 12;
 	} else {
 		rd_thres = 16;
 	}
 
-	osal_write32(0x230,  (osal_read32(0x230, conn) & 0xffff) | (hb_num << 16), conn);
-	osal_write32(0x218, (tu_frac << 21) | (rd_thres << 10) | (tu_int << 25), conn);
+	dev_info(dp->dev, "MSA: %dx%d, Rate:%d kHz, Lanes:%d, BPP:%d, TU:%d.%d\n",
+		 mode->hdisplay, mode->vdisplay, rate, lanes, bpp, tu_int, tu_frac);
+
+	// 5. Video mapping format
+	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_MAPPING, dp->color_format);
+
+	// Polarity configuration
+	if (mode->flags & SOC_DP_MODE_FLAG_PHSYNC)
+		soc_dp_reg_write_range(dp, SOC_DPTX_HSYNC_IN_POLARITY, 1);
+	else
+		soc_dp_reg_write_range(dp, SOC_DPTX_HSYNC_IN_POLARITY, 0);
+
+	if (mode->flags & SOC_DP_MODE_FLAG_PVSYNC)
+		soc_dp_reg_write_range(dp, SOC_DPTX_VSYNC_IN_POLARITY, 1);
+	else
+		soc_dp_reg_write_range(dp, SOC_DPTX_VSYNC_IN_POLARITY, 0);
+
+	// Basic timing
+	soc_dp_reg_write_range(dp, SOC_DPTX_HACTIVE, mode->hdisplay);
+	soc_dp_reg_write_range(dp, SOC_DPTX_VACTIVE, mode->vdisplay);
+	soc_dp_reg_write_range(dp, SOC_DPTX_HBLANK, mode->htotal - mode->hdisplay);
+	soc_dp_reg_write_range(dp, SOC_DPTX_VBLANK, mode->vtotal - mode->vdisplay);
+
+	soc_dp_reg_write_range(dp, SOC_DPTX_HSTART, mode->htotal - mode->hsync_start);
+	soc_dp_reg_write_range(dp, SOC_DPTX_VSTART, mode->vtotal - mode->vsync_start);
+
+	hsync_len = mode->hsync_end - mode->hsync_start;
+
+	soc_dp_reg_write_range(dp, SOC_DPTX_H_SYNC_WIDTH, hsync_len);
+	soc_dp_reg_write_range(dp, SOC_DPTX_V_SYNC_WIDTH, mode->vsync_end - mode->vsync_start);
+	soc_dp_reg_write_range(dp, SOC_DPTX_H_FRONT_PORCH, mode->hsync_start - mode->hdisplay);
+	soc_dp_reg_write_range(dp, SOC_DPTX_V_FRONT_PORCH, mode->vsync_start - mode->vdisplay);
+
+	// MSA and MISC
+	soc_dp_reg_write_range(dp, SOC_DPTX_MISC0, misc0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_MISC1, 0);
+
+	// Link layer parameters
+	soc_dp_reg_write_range(dp, SOC_DPTX_HBLANK_INTERVAL, (u32)hb_num);
+	soc_dp_reg_write_range(dp, SOC_DPTX_AVERAGE_BYTES_PER_TU, tu_int);
+	soc_dp_reg_write_range(dp, SOC_DPTX_AVERAGE_BYTES_PER_TU_FRAC, tu_frac);
+	soc_dp_reg_write_range(dp, SOC_DPTX_INIT_THRESHOLD, rd_thres);
+
+	soc_dp_reg_write_range(dp, SOC_DPTX_REG_VID_CLK_SEL, 0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_VID_BIST_EN, 0);
 }
 
-static void inno_dp_video_cfg(struct inno_conn_t *conn, struct inno_mode *mode)
+void soc_dp_hw_enable(struct soc_dp_dev *dp)
 {
-	uint32_t value = 0;
-	uint16_t htotal = mode->htotal;
-	uint16_t hactive = mode->hdisplay;
-	uint16_t hsync_end = mode->hsync_end;
-	uint16_t hsync_start = mode->hsync_start;
-	uint16_t vactive = mode->vdisplay;
-	uint16_t vsync_end = mode->vsync_end;
-	uint16_t vsync_start = mode->vsync_start;
-	uint16_t vtotal = mode->vtotal;
-	uint32_t flags = mode->flags;
-	uint8_t msa_misc0 = 0x20;
-	uint8_t polarity = 0x0;
+	dev_info(dp->dev, "Enabling Video Stream\n");
+	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_STREAM_ENABLE, 1);
+}
 
-	uint16_t hblank = htotal - hactive;
-	uint16_t hsync = hsync_end - hsync_start;
-	uint16_t hoffset = htotal - hsync_start;
-	uint16_t vblank = vtotal - vactive;
-	uint16_t vsync = vsync_end - vsync_start;
-	uint16_t voffset = vtotal - vsync_start;
-	uint16_t video_map = 0;
+void soc_dp_hw_disable(struct soc_dp_dev *dp)
+{
+	dev_info(dp->dev, "Disabling Video Stream\n");
+	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_STREAM_ENABLE, 0);
+}
 
-	value |= flags & DRM_MODE_FLAG_PHSYNC ? BIT(1) : 0;
-	value |= flags & DRM_MODE_FLAG_PVSYNC ? BIT(0) : 0;
-	polarity = value;
+/* Calculate required bandwidth in kbps (Pixel Clock * Bits Per Pixel) */
+static u32 soc_dp_calc_required_bw(const struct soc_dp_video_mode *mode, int bpp)
+{
+	return mode->clock * bpp;
+}
 
-	// The parsing result of edid does not match
-	if (hactive == 1920 && vactive == 1200) {
-		polarity = 0x3;
+/* Calculate available link capacity in kbps (taking 8b/10b overhead into account) */
+static u32 soc_dp_calc_link_capacity(enum soc_dp_link_rate rate, enum soc_dp_lane_count lanes)
+{
+	/* Capacity = Rate(kHz) * Lanes * 0.8 */
+	return (rate * lanes * 8) / 10;
+}
+
+
+int soc_dp_conn_get_edid_block(struct soc_dp_dev *dp, u8 *buf, unsigned int block, size_t len)
+{
+	int ret, i;
+	u8 offset;
+
+	ret = soc_dp_phy_power_on(&dp->phy);
+	if (ret)
+		return ret;
+
+	offset = (block * EDID_LENGTH) & 0xFF;
+
+	ret = soc_dp_aux_i2c_write(dp, 0x50, &offset, 1);
+
+	if (ret < 0) {
+		soc_dp_phy_power_off(&dp->phy);
+		dev_err(dp->dev, "[EDID] AUX write offset failed: %d\n", ret);
+		return -EIO;
 	}
 
-	msa_misc0 = 0x20; //rgb888
-	video_map = 0x1; //rgb888
+	for (i = 0; i < len; i += 16) {
+		ret = soc_dp_aux_i2c_read(dp, 0x50, buf + i, 16);
 
-	osal_write32(0x200, (~(0x1f << 22) & osal_read32(0x200, conn)) |
-		     (video_map << 22), conn);//(0x200 INNODP_VDEIO_MAP_WIDTH)
-	osal_write32(0x224, (hoffset << 16) | voffset, conn);//(0x224 INNODP_VH_START)
-	osal_write32(0x20c, polarity << 28, conn); //(0x20c INNODP_TX_POLARITY)
-	osal_write32(0x228, msa_misc0 | osal_read32(0x228, conn), conn);//(0x228 INNODP_MAS_MISC0)
-	osal_write32(0x214, (hblank << 16) |
-		     (hactive), conn);	//(0x210 INNODP_TX_HACTIVE_HBALNK)
-	osal_write32(0x22c, 0, conn);//(0x22c INNODP_MAS_MISC1)
-	osal_write32(0x210, (vactive << 16) | (vblank), conn);	//(0x214 INNODP_TX_VACTIVE_VBALNK)
-	osal_write32(0x21c, (hsync) |
-		     ((htotal - hactive - hoffset) << 16), conn);//(0x218 INNODP_TX_HS_HFP)
-	osal_write32(0x220, (vsync) |
-		     ((vtotal - vactive - voffset) << 16), conn);//(0x21c INNODP_TX_VS_VFP)
+		if (ret < 0) {
+			soc_dp_phy_power_off(&dp->phy);
+			dev_err(dp->dev, "[EDID] AUX read data failed at offset %d: %d\n", i, ret);
+			return -EIO;
+		}
+	}
 
-	osal_write32(0x220, (vsync) |
-		     ((vtotal - vactive - voffset) << 16), conn);//(0x21c INNODP_TX_VS_VFP)
-
-	//osal_write32(0x23c, ~(BIT(1)) & osal_read32(0x23c, conn), conn);
-	osal_write32(0x23c, (BIT(1)) | osal_read32(0x23c, conn), conn);
-
-	inno_dp_tu_init(conn->priv, mode);
+	soc_dp_phy_power_off(&dp->phy);
+	return 0;
 }
 
-static void inno_dp_link_config(struct dp_chip_t *inno)
+static int update_edp_config(struct soc_dp_dev *dp, bool enable)
 {
-	inno_dp_core_pll_cfg(inno);
-	inno_dp_phy_cfg(inno);
-	inno_dp_set_enhance(inno);
+	u8 value;
+	int ret;
+
+	ret = soc_dp_dpcd_read(dp, DP_EDP_CONFIGURATION_SET, &value, 1);
+	if (ret < 0) {
+		dev_err(dp->dev, "Failed to read DP_EDP_CONFIGURATION_SET, ret: %d\n", ret);
+		return ret;
+	}
+
+	if (enable)
+		value |= 0x01;
+	else
+		value &= ~0x01;
+
+	ret = soc_dp_dpcd_write(dp, DP_EDP_CONFIGURATION_SET, &value, 1);
+	if (ret < 0) {
+		dev_err(dp->dev, "Failed to write DP_EDP_CONFIGURATION_SET, ret: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
 }
 
-static void inno_dp_swing_adjust(struct dp_chip_t *inno, int param)
+/*
+ * soc_dp_mode_set - Configure link and setup video timing
+ * Logic:
+ * 1. Read Sink Capabilities.
+ * 2. Iterate through link configurations (Rate/Lane combinations).
+ * 3. Strategy: Ascending Bandwidth Order (Upgrade Logic).
+ * - Start with the lowest config that satisfies bandwidth.
+ * - Priority: Maximize Lanes first, then increase Rate (Stability over raw speed).
+ * 4. Perform Link Training. If failed, upgrade to next config.
+ */
+int soc_dp_mode_set(struct soc_dp_dev *dp, const struct soc_dp_video_mode *mode)
 {
-	struct inno_conn_t *conn = (struct inno_conn_t *)inno->priv;
-#define inno_DP_MAX_SW_COMBI (0x9)
-	const uint8_t rates[] = {0x06, 0x0a, 0x14};
-	uint8_t combi_idx = 8;
-	uint32_t temp1 = 0;
-	uint8_t i = 0;
-	struct swing_adjust_item {
-		uint8_t vol_swing;
-		uint8_t pre_emphasis;
-	} swing[][inno_DP_MAX_SW_COMBI] = {
-		{
-			/* 1.62 Gbps */
-			{0x0a, 0x00}, /* swing:0, emphasis: 0 */
-			{0x0e, 0x02}, /* swing:0, emphasis: 1 */
-			{0x11, 0x04}, /* swing:0, emphasis: 2 */
-			{0x0c, 0x00}, /* swing:1, emphasis: 0 */
-			{0x0f, 0x02}, /* swing:1, emphasis: 1 */
-			{0x13, 0x05}, /* swing:1, emphasis: 2 */
-			{0x0f, 0x00}, /* swing:2, emphasis: 0 */
-			{0x12, 0x03}, /* swing:2, emphasis: 1 */
-			{0x18, 0x06}, /* swing:2, emphasis: 2 */
-		},
-		{
-			/* 2.7 Gbps */
-			{0x07, 0x00}, /* swing:0, emphasis: 0 */
-			{0x0a, 0x02}, /* swing:0, emphasis: 1 */
-			{0x0f, 0x05}, /* swing:0, emphasis: 2 */
-			{0x0d, 0x00}, /* swing:1, emphasis: 0 */
-			{0x10, 0x02}, /* swing:1, emphasis: 1 */
-			{0x14, 0x05}, /* swing:1, emphasis: 2 */
-			{0x12, 0x00}, /* swing:2, emphasis: 0 */
-			{0x16, 0x03}, /* swing:2, emphasis: 1 */
-			{0x19, 0x06}, /* swing:2, emphasis: 2 */
-		},
-		{
-			/* 5.4 Gbps */
-			{0x06, 0x00}, /* swing:0, emphasis: 0 */
-			{0x09, 0x01}, /* swing:0, emphasis: 1 */
-			{0x0d, 0x03}, /* swing:0, emphasis: 2 */
-			{0x0b, 0x00}, /* swing:1, emphasis: 0 */
-			{0x12, 0x03}, /* swing:1, emphasis: 1 */
-			{0x17, 0x05}, /* swing:1, emphasis: 2 */
-			{0x10, 0x00}, /* swing:2, emphasis: 0 */
-			{0x1d, 0x04}, /* swing:2, emphasis: 1 */
-			{0x1a, 0x06}, /* swing:2, emphasis: 2 */
-		},
-	};
+	int i;
+	u32 req_bw;
+	int bpp;
+	bool config_success = false;
+	const struct soc_dp_link_config *cfg;
+	struct soc_dp_phy_configure_opts phy_opts = {0};
 
-	combi_idx = inno->lane_swing[0] * 3 + (inno->lane_emphasis[0] >> DP_TRAIN_PRE_EMPHASIS_SHIFT);
+	dev_info(dp->dev, "DP: Mode Set %dx%d (PCLK: %d kHz)\n",
+		 mode->hdisplay, mode->vdisplay, mode->clock);
 
-	for (i = 0; i < ARRAY_SIZE(rates); i++)
-		if (inno->lane_rate == rates[i])
+	bpp = soc_dp_get_bpp(dp->color_format);
+	req_bw = soc_dp_calc_required_bw(mode, bpp);
+
+	for (i = 0; i < ARRAY_SIZE(soc_dp_link_priority_table); i++) {
+		u32 capacity;
+
+		cfg = &soc_dp_link_priority_table[i];
+
+		/* Filter 1: Check HW Capabilities (Source & Sink limits) */
+		if (cfg->rate > dp->link.max_rate || cfg->lanes > dp->link.max_num_lanes)
+			continue;
+
+		/* Filter 2: Check Bandwidth Requirement */
+		capacity = soc_dp_calc_link_capacity(cfg->rate, cfg->lanes);
+		if (capacity < req_bw)
+			continue;
+
+		dev_info(dp->dev, "DP: Attempting Config: R=%d, L=%d (Cap: %d > Req: %d)\n",
+			 cfg->rate, cfg->lanes, capacity, req_bw);
+
+		/* Configure PHY Link parameters */
+		phy_opts.lanes = cfg->lanes;
+		phy_opts.link_rate = cfg->rate / 1000;
+		phy_opts.set_lanes = 1;
+		phy_opts.set_rate = 1;
+
+		if (soc_dp_phy_configure(&dp->phy, &phy_opts))
+			continue;
+
+		if (soc_dp_phy_set_pixel_clk(&dp->phy, mode->clock))
+			continue;
+
+		if (soc_dp_phy_power_on(&dp->phy))
+			continue;
+
+		if (dp->edp_mode) {
+			pr_info("%s edp_mode\n", __func__);
+			soc_dp_reg_write_range(dp, SOC_DPTX_ENABLE_EDP, 0x1);
+			soc_dp_reg_write_range(dp, SOC_DPTX_STREAM_ENC_EN, 0x1);
+			update_edp_config(dp, true);
+		} else {
+			soc_dp_reg_write_range(dp, SOC_DPTX_ENABLE_EDP, 0x0);
+			soc_dp_reg_write_range(dp, SOC_DPTX_STREAM_ENC_EN, 0x0);
+			update_edp_config(dp, false);
+		}
+
+		/* Execute Link Training */
+		if (soc_dp_link_train(dp, cfg->rate, cfg->lanes) == 0) {
+			config_success = true;
+			dev_info(dp->dev, "DP: Training successful for R:%d L:%d\n",
+				 cfg->rate, cfg->lanes);
 			break;
-
-	if (i >= ARRAY_SIZE(rates) || combi_idx >= inno_DP_MAX_SW_COMBI) {
-		osal_printf_func( "invalid rate index:%d %d\n", i, combi_idx);
-		return;
-	}
-
-	osal_printf_func("configuration voltage swing:%d pre-emphasis:%d rate:%u KHZ\n",
-		swing[i][combi_idx].vol_swing,
-		swing[i][combi_idx].pre_emphasis,
-		inno->lane_rate * 27000);
-
-	temp1 = osal_read32(0x1a8, conn);/*(0x1a8)*/
-	temp1 &= ~((0x1f << 16) | (0x1f << 24));
-	temp1 |= ((swing[i][combi_idx].vol_swing << 16) | (swing[i][combi_idx].vol_swing << 24));
-	osal_write32(0x1a8, temp1, conn);
-
-	temp1 = osal_read32(0x1ac, conn);/*(0x1ac)*/
-	temp1 &= ~((0x1f) | (0x1f << 8) | (0xffff << 16));
-	temp1 |= (swing[i][combi_idx].vol_swing | (swing[i][combi_idx].vol_swing << 8) |
-		 (swing[i][combi_idx].pre_emphasis << 16) | (swing[i][combi_idx].pre_emphasis << 20) |
-		 (swing[i][combi_idx].pre_emphasis << 24) | (swing[i][combi_idx].pre_emphasis << 28));
-	osal_write32(0x1ac, temp1, conn);
-}
-
-static void inno_dp_phy_pattern_update(struct dp_chip_t *inno, uint8_t *pattern)
-{
-	struct inno_conn_t *conn = (struct inno_conn_t *)inno->priv;
-	const uint32_t pattern_item[][4] = {
-		/* pattern convert */
-		[0] = {0, 0, 0, 0},
-		[1] = {1, 0, 0, 0},
-		[2] = {5, 0, 0, 0},
-		[3] = {6, 0, 0, 0},
-		[4] = {7, 0x3e0f83e0, 0x3e0f83e0, 0x000f83e0},
-		[5] = {8, 0, 0, 0},
-		[6] = {0, 0, 0, 0},
-		[7] = {4, 0, 0, 0},
-	};
-
-	if (*pattern >= ARRAY_SIZE(pattern_item)) {
-		osal_printf_func("unsupport test pattern:%d\n", *pattern);
-		*pattern = 1;
-	}
-
-	osal_printf_func( "phy pattern test:%d convert:%d\n", *pattern, pattern_item[*pattern][0]);
-
-	osal_write32(0x108, pattern_item[*pattern][1], conn);
-	osal_write32(0x10c, pattern_item[*pattern][2], conn);
-	osal_write32(0x110, pattern_item[*pattern][3], conn);
-
-	*pattern = pattern_item[*pattern][0];
-}
-
-static void inno_dp_irq_enable(struct dp_chip_t *inno)
-{
-	uint32_t tmp = 0;
-	struct inno_conn_t *conn = (struct inno_conn_t *)inno->priv;
-
-	tmp = osal_read32(0x84, conn);
-	//tmp |= BIT(16); /* enable aux reply event, if interrupts are used to handle aux events, instead of polling the */
-	tmp |= BIT(17); /* enable hpd plug evnet */
-	osal_write32(0x84, tmp, conn);
-
-	tmp = osal_read32(0x8c, conn);
-	/* enable hpd event; hpd in irq; hpd out irq */
-	tmp = BIT(31) | BIT(29) | BIT(28);
-	osal_write32(0x8c, tmp, conn);
-
-	tmp = osal_read32(0x84, conn);
-	tmp = osal_read32(0x8c, conn);
-}
-
-static int inno_dp_irq_handle(struct dp_chip_t *inno)
-{
-	uint32_t value = 0;
-	uint32_t hpd_plug = 0;
-	int irq_status = 0;
-	struct inno_conn_t *conn = (struct inno_conn_t *)inno->priv;
-
-	value = osal_read32(0x80, conn);
-	hpd_plug = osal_read32(0x88, conn);
-
-#define CHIP_DP_HPD_EVENT       BIT(17)
-#define CHIP_DP_HPD_IRQ         BIT(31)
-#define CHIP_DP_HPD_PLUG_IN     BIT(29)
-#define CHIP_DP_HPD_PLUG_OUT    BIT(28)
-#define CHIP_DP_AUX_REPLY_EVENT BIT(16)
-
-	if (value & CHIP_DP_HPD_EVENT) {
-
-		osal_printf_func( "dp irq status %#.8x\n", value);
-		osal_printf_func( "dp hpd status %#.8x\n", hpd_plug);
-
-		if (hpd_plug & CHIP_DP_HPD_IRQ) {
-			osal_printf_func( "hpd irq event\n");
-			irq_status |= INNODP_HPD_IRQ;
 		}
 
-		if (hpd_plug & CHIP_DP_HPD_PLUG_IN) {
-			osal_printf_func("hpd in irq\n");
-			irq_status |= INNODP_HPD_IN;
-		}
-
-		if (hpd_plug & CHIP_DP_HPD_PLUG_OUT) {
-			osal_printf_func("hpd out irq\n");
-			irq_status |= INNODP_HPD_OUT;
-		}
-
-		osal_write32(0x88, irq_status, conn);
+		soc_dp_phy_power_off(&dp->phy);
+		dev_warn(dp->dev, "DP: Training failed for R:%d L:%d. Upgrading...\n",
+			 cfg->rate, cfg->lanes);
 	}
 
-	if (value & CHIP_DP_AUX_REPLY_EVENT) {
-		osal_write32(0x80, BIT(16) | //clear aux reply event
-			     osal_read32(0x80, conn), conn); //(0x80 INNODP_STA_AUX_HPD)
+	if (!config_success) {
+		dev_err(dp->dev, "DP: Critical Failure - No valid link config found\n");
+		return -ETIMEDOUT;
 	}
 
-	return irq_status;
-}
-
-static bool inno_dp_detect(struct inno_conn_t *conn)
-{
-	uint32_t reg_value = 0, reg_value1;
-
-	//need 500ms for long
-	osal_msleep(500);
-
-	reg_value = osal_read32(0x80, conn);
-	reg_value1 = osal_read32(0x88, conn);
-	if ((reg_value & BIT(17)) && (reg_value1 & BIT(29))) {
-		//clear interrupt
-		inno_dp_irq_handle(conn->priv);
-	}
-
-	if (reg_value1 & BIT(26)) {
-		osal_printf("%s() true\n", __func__);
-		return true;
-	} else {
-		osal_printf("%s() false\n", __func__);
-		return false;
-	}
-}
-
-static int inno_dp_init(struct inno_conn_t *conn)
-{
-	struct dp_chip_t *inno = NULL;
-	void __iomem *base;
-
-	inno = osal_malloc(sizeof(struct dp_chip_t));
-	osal_memset(inno, 0, sizeof(struct dp_chip_t));
-
-	conn->priv = inno;
-	inno->priv = conn;
-
-	base = (void __iomem *)ioremap(conn->regbase, conn->regsize);
-	conn->reg_mmap_addr = base;
-
-	inno->dp_training_pattern_set = inno_dp_train_pattern_set;
-	inno->dp_aux_channel_run = inno_dp_aux_channel_run;
-	inno->dp_link_config = inno_dp_link_config;
-
-	inno->dp_phy_pattern_update = inno_dp_phy_pattern_update;
-	inno->dp_source_swing_adjust = inno_dp_swing_adjust;
-
-	inno->irq_handle = inno_dp_irq_handle;
-
-	inno_dp_phy_reset(conn);
-	inno_dp_phy_init(conn);
-	inno_dp_irq_enable(inno);
-
+	soc_dp_hw_set_msa(dp, mode, cfg->rate, cfg->lanes);
 	return 0;
 }
 
-static void inno_dp_exit(struct inno_conn_t *conn)
+int soc_dp_init(struct soc_dp_dev *dp, uintptr_t base_addr,
+		enum soc_dp_ref_clk ref_clk_khz, enum soc_video_format color_format)
 {
-	//power down phy
-	osal_write32(0x100, (0xc << 13) | osal_read32(0x100, conn), conn);
-	//power down pll
-	osal_write32(0x180, BIT(0) | osal_read32(0x180, conn), conn);
-	osal_write32(0x190, BIT(0) | osal_read32(0x190, conn), conn);
-	osal_write32(0x1a4, ~(0xf) & osal_read32(0x1a4, conn), conn);
-	osal_write32(0x1a4, ~(0xf << 8) & osal_read32(0x1a4, conn), conn);
-	osal_write32(0x1b0, ~(0xf << 28) & osal_read32(0x1b0, conn), conn);
-	osal_write32(0x1c0, ~(BIT(27)) & osal_read32(0x1c0, conn), conn);
+	int ret;
 
-	iounmap(conn->reg_mmap_addr);
+	memset(dp, 0, sizeof(*dp));
+	dp->regs = base_addr;
+	dp->color_format = color_format;
+	dp->dev = NULL;
 
-	if (conn->priv) {
-		osal_free(conn->priv);
-		conn->priv = NULL;
+	// Reset Controller
+	soc_dp_reg_write_range(dp, SOC_DPTX_CONTROLLER_RESET, 0x1);
+	soc_dp_reg_write_range(dp, SOC_DPTX_HDCP_RESET, 0x1);
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_RESET, 0x1);
+	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_RESET, 0x1);
+	mdelay(5);
+
+	// Clear Video Reset
+	soc_dp_reg_write_range(dp, SOC_DPTX_CONTROLLER_RESET, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_HDCP_RESET, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_RESET, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_RESET, 0x0);
+	mdelay(2);
+
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_REPLY_EVENT_INT_STA, 1);
+
+	soc_dp_reg_write_range(dp, SOC_DPTX_DEFAULT_FAST_LINK_TRAIN_EN, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_SCRAMBLER_DISABLE, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_SCALE_DOWN_MODE, 0x0);
+
+	// Unmask Interrupts
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_REPLY_EVENT_INT_STA_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_HDCP_INT_STA_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_ILLEGAL_AUX_CMD_INT_STA_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_TYPE_C_EVENT_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_DSC_EVENT_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_SDP_INT_STA_S3_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_SDP_INT_STA_S2_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_SDP_INT_STA_S1_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_SDP_INT_STA_S0_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_FIFO_OVERFLOW_INT_STA_S3_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_FIFO_OVERFLOW_INT_STA_S2_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_FIFO_OVERFLOW_INT_STA_S1_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_FIFO_OVERFLOW_INT_STA_S0_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_SINK_IRQ_EVENT_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_HPD_INT_STA_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_HOT_PLUG_EVENT_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_HOT_UNPLUG_EVENT_MSK, 0x0);
+	soc_dp_reg_write_range(dp, SOC_DPTX_SINK_UNPLUG_ERROR_EVENT_MSK, 0x0);
+	mdelay(2);
+
+	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_STREAM_ENABLE, 0);
+
+	// Initial PHY Config
+	ret = soc_dp_phy_init(&dp->phy, base_addr, ref_clk_khz);
+	if (ret) {
+		dev_err(dp->dev, "Failed to init PHY\n");
+		return ret;
 	}
-}
 
-static int inno_dp_get_edid(struct inno_conn_t *conn, uint8_t *buff)
-{
-	int ret = -1;
-	struct dp_chip_t *inno = (struct dp_chip_t *)conn->priv;
-
-	if (inno_dp_detect(conn)) {
-		ret = inno_dp_read_edid(inno, buff);
-	}
-
-	return ret;
-}
-
-static int inno_dp_show_edid(struct inno_conn_t *conn, uint8_t *buff)
-{
-	struct edid *edid = (struct edid *)buff;
-
-	if (!inno_edid_is_valid(edid)) {
-		osal_printf_func("[%d]Edid Invalid\n", conn->conn_id);
-		return -1;
-	}
-
-	ParseEdidBlock0(buff);
-	if (edid->extensions)
-		ParseEdidBlock1(buff + EDID_LENGTH);
+	// Update connector status using hardware detection interface
+#if USED_HPD_BYPASS
+	soc_dp_reg_write_range(dp, SOC_DPTX_FORCE_HPD, 0x1);
+	mdelay(5);
+	dp->connector_status = connector_status_connected;
+#else
+	dp->connector_status = soc_dp_hw_detect_hpd(dp);
+#endif
 
 	return 0;
 }
-
-static int inno_dp_modeset(struct inno_conn_t *conn, struct inno_mode *mode)
-{
-	struct dp_chip_t *inno = (struct dp_chip_t *)conn->priv;
-
-	osal_printf("%s() hdisplay %d vdisplay %d\n", __func__, mode->hdisplay, mode->vdisplay);
-
-	osal_write32(0x18, osal_read32(0x18, conn) & ~BIT(29), conn);
-	osal_write32(0x18, osal_read32(0x18, conn) | BIT(30), conn);
-	osal_write32(0x100, osal_read32(0x100, conn) & ~0x1E0000, conn);
-
-	/* core pll config */
-	osal_printf("%s() core pll config\n", __func__);
-
-	osal_write32(0x180, 0xe13002b1, conn);
-	osal_write32(0x188, 0x10801, conn);
-	osal_write32(0x184, osal_read32(0x184, conn) & 0xFF000000, conn);
-	osal_write32(0x198, osal_read32(0x198, conn) | BIT(17), conn);
-	osal_write32(0x198, osal_read32(0x198, conn) | BIT(8), conn);
-	osal_write32(0x1a0, 0x1500, conn);
-	osal_write32(0x180, 0xe1300230, conn);
-	osal_msleep(100);
-
-	osal_read32(0x180, conn);
-
-	/* compliance config */
-	osal_printf("%s() compliance config\n", __func__);
-
-	inno_dp_compliance_config(inno);
-
-	/* pixel pll config*/
-	osal_printf("%s() pixel pll config\n", __func__);
-
-	osal_write32(0x190, 0x63300181, conn);
-	osal_write32(0x194, 0x01000801, conn);
-	osal_write32(0x198, 0x0102012a, conn);
-	osal_write32(0x190, 0x63300180, conn);
-	osal_msleep(2);
-
-	osal_write32(0x190, 0x63300182, conn);
-	osal_msleep(100);
-
-	osal_read32(0x190, conn);
-	osal_read32(0x180, conn);
-
-	// hpd config
-	osal_printf("%s() hpd config\n", __func__);
-
-	osal_write32(0x18, osal_read32(0x18, conn) | BIT(28), conn);
-	// osal_write32(0x84, osal_read32(0x84, conn) | BIT(16), conn);
-	osal_write32(0x84, osal_read32(0x84, conn) | BIT(17), conn);
-	osal_write32(0x8c, osal_read32(0x8c, conn) | BIT(28), conn);
-	osal_write32(0x8c, osal_read32(0x8c, conn) | BIT(29), conn);
-	osal_write32(0x8c, osal_read32(0x8c, conn) | BIT(31), conn);
-
-	osal_read32(0x80, conn);
-	osal_read32(0x88, conn);
-
-	if (osal_read32(0x88, conn) & BIT(29) )
-		osal_write32(0x88, osal_read32(0x88, conn) | BIT(29), conn);
-
-	osal_read32(0x88, conn);
-
-	// analog config
-	osal_printf("%s() analog config\n", __func__);
-	// output mode control of 4 data lanes
-	osal_write32(0x1B0, osal_read32(0x1B0, conn) & ~0xF000000, conn);
-	osal_write32(0x1c0, 0xf08000, conn);
-	osal_write32(0x1c4, 0x00, conn);
-	osal_write32(0x1c0, 0xf00000, conn);
-	osal_msleep(100);
-
-	osal_read32(0x1c0, conn);
-	osal_write32(0x1DC, (osal_read32(0x1DC, conn) & ~0xFF) | 0xFF, conn);
-	osal_write32(0x1DC, osal_read32(0x1DC, conn) & 0xFF0000FF, conn);
-
-	// output mode lane2 lane3 level value 0xf
-	osal_write32(0x1A4, (osal_read32(0x1A4, conn) & 0x00FFFFFF) | (0xff << 24), conn);
-	// output mode lane0 lane1 level value 0xf
-	osal_write32(0x1A8, (osal_read32(0x1A8, conn) & 0xFFFFFF00) | 0xff, conn);
-
-	osal_write32(0x1A8, (osal_read32(0x1A8, conn) & 0x0000FFFF) | (0x0B0B << 16), conn);
-	osal_write32(0x1AC, (osal_read32(0x1AC, conn) & 0xFFFF0000) | 0x0B0B, conn);
-	osal_write32(0x1AC, (osal_read32(0x1AC, conn) & 0x0000FFFF) | (0x2222 << 16), conn);
-	osal_write32(0x1B0, osal_read32(0x1B0, conn) & 0xFFFF0000, conn);
-	osal_write32(0x1B0, (osal_read32(0x1B0, conn) & ~(0xF << 24)) | (0xF << 24), conn);
-	osal_write32(0x1D0, (osal_read32(0x1D0, conn) & ~(0x3 << 12)) | (0x1 << 12), conn);
-	osal_write32(0x100, (osal_read32(0x100, conn) & ~(0x3 << 5)) | (0x2 << 5), conn);
-	osal_write32(0x100, (osal_read32(0x100, conn) & ~0x3) | 0x1, conn);
-
-	/* video stream config*/
-	osal_printf("%s()video stream config\n", __func__);
-
-	/* video stream disable */
-	osal_write32(0x200, 0x400000, conn);
-
-	osal_write32(0x224, 0xc00029, conn);
-	osal_write32(0x20c, 0x30000000, conn);
-	osal_write32(0x228, 0x20, conn);
-	osal_write32(0x22c, 0x00, conn);
-	osal_write32(0x214, 0x1180780, conn);
-	osal_write32(0x210, 0x438002d, conn);
-	osal_write32(0x21c, 0x58002c, conn);
-	osal_write32(0x220, 0x40005, conn);
-	osal_read32(0x220, conn);
-
-	//colorbar 148.5MZ
-	// osal_write32(0x230, 0x7f0000, conn);
-
-	// DPU 150MZ
-	osal_write32(0x230, 0x7e0000, conn);
-	osal_read32(0x230, conn);
-
-	// colorbar 148.5MZ
-	// osal_write32(0x218, 0x34804001, conn);
-
-	// DPU 150MZ
-	osal_write32(0x218, 0x34c04001, conn);
-	osal_read32(0x218, conn);
-
-	/* video stream enable */
-	osal_write32(0x200, 0x10400000, conn);
-
-	/* training config */
-	osal_printf("%s() training config\n", __func__);
-
-	// inno_dp_compliance_config(inno);
-	inno_dp_sink_power_ctrl(conn->priv, true);
-	inno_dp_link_train(conn->priv);
-
-	// PHY SSC disable
-	osal_write32(0x100, osal_read32(0x100, conn) | BIT(8), conn);
-
-	osal_write32(0x100, osal_read32(0x100, conn) & ~(0xF << 25), conn);
-	// osal_write32(0x28, osal_read32(0x28, conn) | BIT(0), conn);
-
-	// 1080P colorbar
-	// osal_printf("%s() colorbar mode\n", __func__);
-	// osal_write32(0x238, 0x1021, conn);
-
-	// DPU mode
-	osal_write32(0x238, 0x1020, conn);
-
-	return 0;
-}
-
-static void inno_dp_video_enable(struct inno_conn_t *conn)
-{
-	osal_write32(0x200, osal_read32(0x200, conn) | BIT(28), conn);
-}
-
-static void inno_dp_video_disable(struct inno_conn_t *conn)
-{
-	osal_write32(0x200, ~(BIT(28)) & osal_read32(0x200, conn), conn);
-}
-
-static void inno_dp_tx_bist(uint32_t vic, uint8_t bist_mode, struct inno_conn_t *conn)
-{
-#define BIST_MODE_CHECKERBOARD  0x10
-#define BIST_MODE_COLORBAR  0x8
-
-	uint32_t vid_bist_mode = BIST_MODE_CHECKERBOARD;
-
-	if (bist_mode) {
-		osal_write32(0x238,//dpureg(0x238), INNODP_BIST
-			     (osal_read32(0x238, conn) & 0x7fff00c0) |
-			     BIT(0) | (vic << 8) | (vid_bist_mode << 1), conn);
-		osal_write32(0x28,//dpureg(0x28), INNODP_PIXEL_CLK_SEL
-			     (osal_read32(0x28, conn) | BIT(0)), conn);
-	} else {
-		osal_write32(0x238,//dpureg(0x238), INNODP_BIST
-		osal_read32(0x238, conn) & ~(BIT(0)), conn);
-		osal_write32(0x28,//dpureg(0x28), INNODP_PIXEL_CLK_SEL
-		osal_read32(0x28, conn) & ~(BIT(0)), conn);
-	}
-}
-
-
-static int inno_dp_enable(struct inno_conn_t *conn)
-{
-	inno_dp_sink_power_ctrl(conn->priv, true);
-
-	inno_dp_link_train(conn->priv);
-
-	inno_dp_video_cfg(conn, &conn->out_mode);
-
-	inno_dp_video_enable(conn);
-
-	//inno_dp_link_start(conn->priv);
-
-	inno_dp_tx_bist(conn->vic, 1, conn);
-
-	conn->is_enable = true;
-
-	return 0;
-}
-
-static int inno_dp_disable(struct inno_conn_t *conn)
-{
-	inno_dp_video_disable(conn);
-	inno_dp_sink_power_ctrl(conn->priv, false);
-
-	conn->is_enable = false;
-
-	return 0;
-}
-
-struct inno_conn_func_t g_inno_dp_func = {
-	.init = inno_dp_init,
-	.exit = inno_dp_exit,
-	.fini = NULL,
-	.get_edid = inno_dp_get_edid,
-	.show_edid = inno_dp_show_edid,
-	.modeset = inno_dp_modeset,
-	.detect = inno_dp_detect,
-	.enable  = inno_dp_enable,
-	.disable = inno_dp_disable,
-};

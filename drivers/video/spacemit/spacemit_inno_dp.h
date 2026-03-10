@@ -9,19 +9,28 @@
 
 #include <clk.h>
 #include <reset.h>
-#include "./dp/inno_dp_api.h"
+#include "./dp/inno_dp.h"
 
 enum spacemit_inno_dp_types {
 	INNO_DP = 0,
-	INNO_EDP
+	INNO_EDP,
 };
 
 struct spacemit_inno_dp_priv {
 	void __iomem *base;
-	struct inno_conn_t *dp_conn;
+	struct soc_dp_dev dp_dev;
 	enum spacemit_inno_dp_types dp_type;
 
 	u32 dp_id;
+	u32 edp_id;
+
+	bool power_valid;
+	bool enable_valid;
+	bool bl_valid;
+
+	struct gpio_desc power;
+	struct gpio_desc enable;
+	struct gpio_desc bl;
 
 	struct clk pxclk;
 	struct clk mclk;
