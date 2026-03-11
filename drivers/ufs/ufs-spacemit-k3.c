@@ -19,6 +19,7 @@
 #include <linux/bug.h>
 #include <linux/iopoll.h>
 #include <asm/unaligned.h>
+#include <configs/k3.h>
 #include "ufs.h"
 
 struct spacemit_k3_ufs_priv {
@@ -769,6 +770,22 @@ out:
 	return ret;
 }
 
+#if !defined(CONFIG_SPL_BUILD)
+extern enum board_boot_mode get_boot_mode(void);
+
+static bool spacemit_k3_ufs_should_enforce_single_lun(void)
+{
+	enum board_boot_mode boot_mode = get_boot_mode();
+
+	/*
+	 * Normal UFS boots are expected to run on already provisioned media.
+	 * Skip the expensive descriptor walk in that path and keep the
+	 * single-LUN enforcement for recovery / flashing flows.
+	 */
+	return boot_mode != BOOT_MODE_UFS;
+}
+#endif
+
 static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 {
 	struct udevice *dev = hba->dev;
@@ -1310,36 +1327,38 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 #if !defined(CONFIG_SPL_BUILD)
 		int lun_cfg_ret;
 
-		/* Check and configure single LUN if needed - skip in SPL */
-		lun_cfg_ret = spacemit_k3_ufs_check_and_config_single_lun(dev);
-		if (lun_cfg_ret > 0) {
-			dev_info(
-				hba->dev,
-				"restarting UFS once to apply single-LUN layout\n");
-			hba->ops->device_reset(hba);
-			ret = ufshcd_probe(dev, hba_ops);
-			if (ret) {
-				spacemit_k3_ufs_phy_shutdown(hba, priv);
-				spacemit_k3_ufs_clk_disable(priv);
-				dev_err(hba->dev,
-					"ufs reprobe after LUN config failed: %d\n",
-					ret);
-				return ret;
+		if (spacemit_k3_ufs_should_enforce_single_lun()) {
+			/* Check and configure single LUN if needed - skip in SPL */
+			lun_cfg_ret = spacemit_k3_ufs_check_and_config_single_lun(dev);
+			if (lun_cfg_ret > 0) {
+				dev_info(
+					hba->dev,
+					"restarting UFS once to apply single-LUN layout\n");
+				hba->ops->device_reset(hba);
+				ret = ufshcd_probe(dev, hba_ops);
+				if (ret) {
+					spacemit_k3_ufs_phy_shutdown(hba, priv);
+					spacemit_k3_ufs_clk_disable(priv);
+					dev_err(hba->dev,
+						"ufs reprobe after LUN config failed: %d\n",
+						ret);
+					return ret;
+				}
+
+				lun_cfg_ret =
+					spacemit_k3_ufs_check_and_config_single_lun(
+						dev);
 			}
 
-			lun_cfg_ret =
-				spacemit_k3_ufs_check_and_config_single_lun(
-					dev);
-		}
-
-		if (lun_cfg_ret < 0) {
-			dev_warn(hba->dev,
-				 "failed to enforce single-LUN layout: %d\n",
-				 lun_cfg_ret);
-		} else if (lun_cfg_ret > 0) {
-			dev_warn(
-				hba->dev,
-				"single-LUN config pending, a cold power cycle may be required\n");
+			if (lun_cfg_ret < 0) {
+				dev_warn(hba->dev,
+					 "failed to enforce single-LUN layout: %d\n",
+					 lun_cfg_ret);
+			} else if (lun_cfg_ret > 0) {
+				dev_warn(
+					hba->dev,
+					"single-LUN config pending, a cold power cycle may be required\n");
+			}
 		}
 #endif
 		/* Limit to single LUN - use only the main user data partition */
