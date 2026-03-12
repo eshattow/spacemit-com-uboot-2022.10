@@ -109,6 +109,8 @@
 #define P1_NON_VOLATILE_REG_FASTBOOT	(0x1)
 #define P1_NON_VOLATILE_REG_MASK	(0x7)
 
+#define USB_BOOT_COMMAND 		"bootm 0x140000000"
+
 #ifndef __ASSEMBLY__
 enum board_boot_mode {
 	BOOT_MODE_NONE	= 0,
