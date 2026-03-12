@@ -190,6 +190,27 @@ static int spacemit_k3_ufs_set_ref_clk(struct ufs_hba *hba)
 	return 0;
 }
 
+static int spacemit_k3_ufs_parse_ref_clk_freq(u32 raw, u32 *ref_clk_freq)
+{
+	/* DTS must provide one of the UFS-spec reference clock frequencies in Hz. */
+	switch (raw) {
+	case 19200000:
+		*ref_clk_freq = UFS_REF_CLK_FREQ_19_2_MHZ;
+		return 0;
+	case 26000000:
+		*ref_clk_freq = UFS_REF_CLK_FREQ_26_MHZ;
+		return 0;
+	case 38400000:
+		*ref_clk_freq = UFS_REF_CLK_FREQ_38_4_MHZ;
+		return 0;
+	case 52000000:
+		*ref_clk_freq = UFS_REF_CLK_FREQ_52_MHZ;
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
 /**
  * spacemit_k3_ufs_set_power_mode - Configure UFS power mode
  * @hba: UFS host controller handle
@@ -1325,6 +1346,7 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 {
 	const char *compat;
+	const void *prop;
 	int compat_length;
 	int ret;
 	u32 ref_clk_freq;
@@ -1342,25 +1364,32 @@ static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 	}
 
 	/*
-	 * Read reference clock frequency from DTS.
-	 * Default to 19.2MHz (value 0) if not specified.
-	 * Valid values: 0=19.2MHz, 1=26MHz, 2=38.4MHz, 3=52MHz
+	 * Read reference clock frequency from DTS. It must be expressed in Hz
+	 * and match one of the UFS-spec reference clock frequencies.
 	 */
-	ret = dev_read_u32(dev, "ref-clk-freq", &ref_clk_freq);
-	if (ret) {
+	prop = dev_read_prop(dev, "ref-clk-freq", NULL);
+	if (!prop) {
 		/* Default to 19.2MHz if not specified in DTS */
 		priv->ref_clk_freq = UFS_REF_CLK_FREQ_19_2_MHZ;
 		dev_dbg(dev,
 			"ufs: ref-clk-freq not found in DTS, using default 19.2MHz\n");
 	} else {
-		if (ref_clk_freq > UFS_REF_CLK_FREQ_52_MHZ) {
-			dev_warn(
-				dev,
-				"ufs: invalid ref-clk-freq %u, using default 19.2MHz\n",
+		ret = dev_read_u32(dev, "ref-clk-freq", &ref_clk_freq);
+		if (ret) {
+			dev_err(dev,
+				"ufs: malformed ref-clk-freq property, ret=%d\n",
+				ret);
+			return ret;
+		}
+
+		ret = spacemit_k3_ufs_parse_ref_clk_freq(ref_clk_freq,
+								&priv->ref_clk_freq);
+		if (ret) {
+			dev_err(dev,
+				"ufs: invalid ref-clk-freq %u, expected "
+				"19200000/26000000/38400000/52000000 Hz\n",
 				ref_clk_freq);
-			priv->ref_clk_freq = UFS_REF_CLK_FREQ_19_2_MHZ;
-		} else {
-			priv->ref_clk_freq = ref_clk_freq;
+			return ret;
 		}
 	}
 

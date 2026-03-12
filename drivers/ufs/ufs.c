@@ -890,6 +890,8 @@ static int ufshcd_send_command(struct ufs_hba *hba, unsigned int task_tag)
 	u32 intr_status;
 	u32 enabled_intr_status;
 
+	/* Ensure descriptor writes are visible before ringing the doorbell. */
+	wmb();
 	ufshcd_writel(hba, 1 << task_tag, REG_UTP_TRANSFER_REQ_DOOR_BELL);
 
 	start = get_timer(0);

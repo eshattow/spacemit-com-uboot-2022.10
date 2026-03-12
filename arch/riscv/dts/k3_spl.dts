@@ -410,6 +410,7 @@
 			clock-names = "aclk";
 			resets = <&reset RESET_UFS_ACLK>;
 			reset-names = "aclk_reset";
+			ref-clk-freq = <19200000>;
 			status = "okay";
 			u-boot,dm-spl;
 		};
