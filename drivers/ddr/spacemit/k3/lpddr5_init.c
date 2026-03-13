@@ -690,7 +690,6 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 	REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
 	while (count--)
 		;
-	count = 0x100;
 	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
 
 	phyinit_lp5_training(DDRC_BASE, ddr_size_mbyte);
