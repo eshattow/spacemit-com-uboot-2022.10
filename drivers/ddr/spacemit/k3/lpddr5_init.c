@@ -751,9 +751,6 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 	REG32(DDRC_BASE + 0x00022090) = 0x00000001;
 	REG32(DDRC_BASE + 0x00023090) = 0x00000001;
 	REG32(DDRC_BASE + 0x00024090) = 0x00000001;
-
-	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
-	REG32(DPHY_BASE + 0xc0080 * 4) = 0x3;
 }
 
 static void init_ddr_clock(uint32_t DDRC_BASE, uint32_t data_rate_mtps)
