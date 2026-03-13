@@ -16,6 +16,8 @@
 // 2D training configuration
 #define DISABLE_DDR_2D_TRAINING	(0)
 
+#define MAX_MODIFIED_IO_PARA_ITEMS (256)
+
 #if (CONFIG_DDR_DATARATE != 6400) && (CONFIG_DDR_DATARATE != 6000) \
 	&& (CONFIG_DDR_DATARATE != 5500) && (CONFIG_DDR_DATARATE != 4266)
 #error "Unsupported DDR datarate"
@@ -69,10 +71,40 @@ typedef struct {
 typedef struct {
 	const char *part_number;
 	uint32_t crc32_value;
-	uint32_t type;
+	uint8_t type;
+	uint8_t ranks;
+	uint8_t x8_mode;
 	uint32_t size_mb;
 	uint32_t data_rate_mtps;
 } ddr_part_info;
+
+typedef enum {
+	PHY_R_OFF = 0,
+	PHY_R_120 = 0x08,
+	PHY_R_60 = 0x0C,
+	PHY_R_40 = 0x0E,
+	PHY_R_30 = 0x0F,
+} phy_odt_e;
+
+typedef enum {
+	R_OFF = 0,
+	R_240,
+	R_120,
+	R_80,
+	R_60,
+	R_48,
+	R_40,
+} ddr_odt_e;
+
+typedef struct {
+	uint8_t phy_write_ds;
+	uint8_t phy_rx_odt;
+	uint8_t dq_odt;
+	uint8_t ca_odt;
+	uint8_t nt_odt;
+	uint8_t soc_odt;
+	uint8_t pdds;
+} ddr_config_t;
 
 extern ddr_part_info* part_info;
 extern const phy_init_config *lp5_pre_train_table[];
@@ -89,7 +121,7 @@ extern void lpddr_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info)
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 
 extern uint32_t major_message_all(unsigned int dphy_base);
-extern void lpddr_training_table_init(unsigned int ddrc_base,
-	const phy_init_config* train_table[], const ddr_phy_reg_config* override_table);
+extern void lpddr_training_table_init(unsigned int ddrc_base, const phy_init_config* train_table[],
+	const ddr_phy_reg_config* override_table, ddr_phy_reg_config* io_table);
 extern void init_snps_lp4x_ddrc(unsigned DDRC_BASE, unsigned int rst_code, unsigned int ddr_size_mbyte);
 #endif /* _K3_DDR_H_ */
