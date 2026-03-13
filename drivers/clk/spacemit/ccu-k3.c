@@ -1586,7 +1586,7 @@ static SPACEMIT_CCU_MUX_GATE(ccic1phy_clk, "ccic1phy_clk", ccic1phy_parent_names
 	0);
 
 static const char * const sc2hclk_parents[] = {
-	 "pll1_d8_307p2", "pll1_d4_614p4", "pll1_d5_491p52", "pll2_d4"
+	 "pll1_d8_307p2", "pll1_d6_409p6", "pll1_d5_491p52", "pll2_d4"
 };
 static SPACEMIT_CCU_DIV_FC_MUX_GATE(sc2_hclk, "sc2_hclk", sc2hclk_parents,
 	BASE_TYPE_APMU, APMU_CCIC_CLK_RES_CTRL,
