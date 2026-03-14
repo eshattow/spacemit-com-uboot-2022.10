@@ -129,14 +129,29 @@ static struct blk_desc *k3_nor_get_nvme_desc(u32 devnum)
 #endif
 
 #ifdef CONFIG_SCSI
-static struct blk_desc *k3_nor_get_scsi_desc(u32 devnum)
+int board_scsi_scan_once(bool verbose)
 {
 	static bool scsi_scanned;
+	int ret;
 
-	if (!scsi_scanned) {
-		scsi_scan(false);
+	if (scsi_scanned)
+		return 0;
+
+	ret = scsi_scan(verbose);
+	if (!ret) {
 		scsi_scanned = true;
+#ifndef CONFIG_SPL_BUILD
+		env_set("scsi_scanned", "1");
+#endif
 	}
+
+	return ret;
+}
+
+static struct blk_desc *k3_nor_get_scsi_desc(u32 devnum)
+{
+	if (board_scsi_scan_once(false))
+		return NULL;
 
 	return blk_get_dev("scsi", devnum);
 }
@@ -1012,12 +1027,44 @@ void setenv_boot_mode(void)
 		break;
 	case BOOT_MODE_USB:
 		// for fastboot image download and run test
-		env_set("bootcmd", CONFIG_BOOTCOMMAND);
+		env_set("bootcmd", USB_BOOT_COMMAND);
 		break;
 	default:
 		env_set("boot_device", "");
 		break;
 	}
+}
+
+static bool k3_is_nfs_boot_path(void)
+{
+	const char *boot_device = env_get("boot_device");
+
+	return boot_device && !strcmp(boot_device, "nfs");
+}
+
+static bool k3_is_net_flash_path(void)
+{
+	const char *net_flash_mode = env_get("net_flash_protocol");
+
+	return net_flash_mode && !strcmp(net_flash_mode, "spacemit_tftp");
+}
+
+bool board_should_init_net(void)
+{
+	/*
+	 * Keep normal local boot path lean. Network can still be initialized
+	 * lazily by on-demand net commands.
+	 */
+	if (env_get_ulong("force_net_init", 10, 0))
+		return true;
+
+	if (k3_is_nfs_boot_path())
+		return true;
+
+	if (k3_is_net_flash_path())
+		return true;
+
+	return false;
 }
 
 /******************************************************************************
@@ -1272,7 +1319,7 @@ void import_env_from_bootfs(void)
 #ifdef CONFIG_SCSI
 		struct blk_desc *ufs_dev_desc;
 
-		scsi_scan(false);
+		board_scsi_scan_once(false);
 		ufs_dev_desc = blk_get_dev("scsi", 0);
 		if (ufs_dev_desc)
 			_load_env_from_blk(ufs_dev_desc, "scsi", 0);

@@ -169,6 +169,18 @@
 					K3_PADCONF(GPIO_98, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS8)) /* espi_alert */
 				>;
 			};
+			pinctrl_qspi: qspi_grp {
+				u-boot,dm-spl;
+				power-source = <1800>;
+				pinctrl-single,pins = <
+					K3_PADCONF(QSPI_DAT3, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d3 */
+					K3_PADCONF(QSPI_DAT2, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d2 */
+					K3_PADCONF(QSPI_DAT1, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d1 */
+					K3_PADCONF(QSPI_DAT0, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d1 */
+					K3_PADCONF(QSPI_CLK, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_clk */
+					K3_PADCONF(QSPI_CS1, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* qspi_cs */
+				>;
+			};
 		};
 
 		uart0: uart@d4017000 {
@@ -219,6 +231,8 @@
 			compatible = "spacemit,k3-qspi";
 			#address-cells = <1>;
 			#size-cells = <0>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_qspi>;
 			reg = <0x0 0xd420c000 0x0 0x1000>,
 			      <0x0 0xb8000000 0x0 0x4100000>;
 			reg-names = "qspi-base", "qspi-mmap";
@@ -237,13 +251,14 @@
 			resets = <&reset RESET_QSPI>,
 				<&reset RESET_QSPI_BUS>;
 			reset-names = "qspi_reset", "qspi_bus_reset";
+			spi-max-frequency = <81300000>;
 			status = "okay";
 
 			flash@0 {
 				u-boot,dm-spl;
 				compatible = "jedec,spi-nor";
 				reg = <0>;
-				spi-max-frequency = <26500000>;
+				spi-max-frequency = <81300000>;
 				m25p,fast-read;
 				broken-flash-reset;
 				status = "okay";
@@ -395,6 +410,7 @@
 			clock-names = "aclk";
 			resets = <&reset RESET_UFS_ACLK>;
 			reset-names = "aclk_reset";
+			ref-clk-freq = <19200000>;
 			status = "okay";
 			u-boot,dm-spl;
 		};

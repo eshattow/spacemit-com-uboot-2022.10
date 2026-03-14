@@ -6,63 +6,235 @@
 #include "k3_ddr.h"
 
 #include <linux/kernel.h>
+#include <string.h>
 
-void lpddr_training_table_init(uint32_t ddrc_base,
-	const phy_init_config* train_table[], const ddr_phy_reg_config* override_table)
+static const ddr_config_t lp5_ddr_io_para = {
+	// WDS     RX ODT   DQODT CAODT  NTODT SOCODT  PDDS
+	PHY_R_30, PHY_R_120, R_60, R_80, R_OFF, R_OFF, R_40
+};
+
+ddr_phy_reg_config io_override_table[MAX_MODIFIED_IO_PARA_ITEMS];
+
+void lpddr_training_table_init(uint32_t ddrc_base, const phy_init_config* train_table[],
+	const ddr_phy_reg_config* override_table, ddr_phy_reg_config* io_table)
 {
-	uint32_t reg_base, reg_offset;
+	uint32_t reg_base, reg_offset, phy_value;
 	unsigned long DPHY_BASE = ddrc_base + 0x800000;
 	volatile uint32_t* phy_reg = (uint32_t*)DPHY_BASE;
 	uint16_t* phy_data;
 	const phy_init_config* sub_table;
-	int i, j, k;
-	bool need_override = false;
+	int i, j, k0, k1;
+	bool need_table_check = false, need_io_check = false;
 
-	for (i = 0, k = 0; NULL != train_table[i]; i++) {
+	for (i = 0, k0 = 0, k1 = 0; NULL != train_table[i]; i++) {
 		sub_table = train_table[i];
 		reg_base = sub_table->base;
 
-		if ((NULL != override_table) && ((override_table[k].offset & ~0x7FFF) == reg_base)) {
-			need_override = true;
+		if ((NULL != override_table) && ((override_table[k0].offset & ~0x7FFF) == reg_base)) {
+			need_table_check = true;
 		} else {
-			need_override = false;
+			need_table_check = false;
+		}
+
+		if ((NULL != io_table) && ((io_table[k1].offset & ~0x7FFF) == reg_base)) {
+			need_io_check = true;
+		} else {
+			need_io_check = false;
 		}
 
 		if (sub_table->is_linear_increase) {
 			phy_data = (uint16_t*)sub_table->sequence;
 			for (j = 0; j < sub_table->count; j++) {
 				reg_offset = reg_base + j;
-				if (need_override && (override_table[k].offset == reg_offset)) {
+				phy_value = phy_data[j];
+
+				if (need_table_check && (override_table[k0].offset == reg_offset)) {
+					phy_value = override_table[k0++].value;
 					// skip the PHY setting when value is 0xdeadbeef
-					if (DDR_CONFIG_BYPASS_MAGIC != override_table[k].value) {
-						phy_reg[reg_offset] = override_table[k].value;
+					if (DDR_CONFIG_BYPASS_MAGIC == phy_value) {
+						continue;
 					}
-					k++;
-					if ((override_table[k].offset & ~0x7FFF) != reg_base) {
-						need_override = false;
+					if ((override_table[k0].offset & ~0x7FFF) != reg_base) {
+						need_table_check = false;
 					}
-				} else {
-					phy_reg[reg_offset] = phy_data[j];
 				}
+
+				// configuration in IO table has higher priority
+				if (need_io_check && (io_table[k1].offset == reg_offset)) {
+					phy_value = io_table[k1++].value;
+					if ((io_table[k1].offset & ~0x7FFF) != reg_base) {
+						need_io_check = false;
+					}
+				}
+
+				phy_reg[reg_offset] = phy_value;
 			}
 		} else {
 			for (j = 0; j < sub_table->count; j++) {
 				reg_offset = reg_base + sub_table->sequence[j].a.offset;
-				if (need_override && (override_table[k].offset == reg_offset)) {
+				phy_value = sub_table->sequence[j].a.value;
+				if (need_table_check && (override_table[k0].offset == reg_offset)) {
+					phy_value = override_table[k0++].value;
+					if ((override_table[k0].offset & ~0x7FFF) != reg_base) {
+						need_table_check = false;
+					}
 					// skip the PHY setting when value is 0xdeadbeef
-					if (DDR_CONFIG_BYPASS_MAGIC != override_table[k].value) {
-						phy_reg[reg_offset] = override_table[k].value;
+					if (DDR_CONFIG_BYPASS_MAGIC == phy_value) {
+						continue;
 					}
-					k++;
-					if ((override_table[k].offset & ~0x7FFF) != reg_base) {
-						need_override = false;
-					}
-				} else {
-					phy_reg[reg_offset] = sub_table->sequence[j].a.value;
 				}
+
+				// configuration in IO table has higher priority
+				if (need_io_check && (io_table[k1].offset == reg_offset)) {
+					phy_value = io_table[k1++].value;
+					if ((io_table[k1].offset & ~0x7FFF) != reg_base) {
+						need_io_check = false;
+					}
+				}
+
+				phy_reg[reg_offset] = phy_value;
 			}
 		}
 	}
+}
+
+const uint32_t tx_impedance_array[] = { 0x10040, 0x10042, 0x10043, 0x10044, 0x10045 };
+const uint32_t tx_impedance_array1[] = { 0x30040, 0x30041, 0x30042, 0x30043 };
+static int add_soc_phy_write_ds_config(ddr_phy_reg_config* reg_table,
+	uint32_t max_item, uint8_t phy_write_ds)
+{
+	int i, j, k;
+
+	for (i = 0, k = 0; i < 4; i++) {
+		for (j = 0; (j < ARRAY_SIZE(tx_impedance_array)) && (k < max_item); j++, k++) {
+			reg_table[k].offset = tx_impedance_array[j] + i * 0x1000;
+			reg_table[k].value = phy_write_ds + (phy_write_ds << 8);
+		}
+	}
+	for (i = 0; i < 2; i++) {
+		for (j = 0; (j < ARRAY_SIZE(tx_impedance_array1)) && (k < max_item); j++, k++) {
+			reg_table[k].offset = tx_impedance_array1[j] + i * 0x1000;
+			reg_table[k].value = phy_write_ds + (phy_write_ds << 8);
+		}
+	}
+	return k;
+}
+const uint32_t odt_impedance_array[] = { 0x10048, 0x1004a, 0x1004b, 0x1004c, 0x1004d };
+static int add_soc_phy_rx_odt_config(ddr_phy_reg_config* reg_table,
+	uint32_t max_item, uint8_t phy_rx_odt)
+{
+	int i, j, k;
+	for (i = 0, k = 0; i < 4; i++) {
+		for (j = 0; (j < ARRAY_SIZE(odt_impedance_array)) && (k < max_item); j++, k++) {
+			reg_table[k].offset = odt_impedance_array[j] + i * 0x1000;
+			reg_table[k].value = phy_rx_odt << 8;
+		}
+	}
+
+	return k;
+}
+
+static int add_ddr_pdds_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
+	uint8_t pdds)
+{
+	uint16_t value;
+
+	if (max_item < 2) {
+		pr_err("Must have at least 2 items for ddr pdds config");
+		return 0;
+	}
+
+	value = pdds | (pdds << 8);
+	reg_table[0].offset = 0x58031;
+	reg_table[0].value = value;
+	reg_table[1].offset = 0x58032;
+	reg_table[1].value = value;
+	return 2;
+}
+
+static int add_ddr_odt_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
+	uint8_t dq_odt, uint8_t ca_odt, uint8_t nt_odt)
+{
+	int enable = nt_odt == R_OFF ? 0 : 1;
+	uint16_t value;
+
+	if (max_item < 2) {
+		pr_err("Must have at least 2 items for ddr odt config");
+		return 0;
+	}
+
+	value = dq_odt | (ca_odt << 4) | (enable << 3);
+	value |= value << 8;
+	reg_table[0].offset = 0x58035;
+	reg_table[0].value = value;
+	reg_table[1].offset = 0x58036;
+	reg_table[1].value = value;
+
+	return 2;
+}
+
+static int add_ddr_socodt_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
+	uint8_t soc_odt, bool x8_mode)
+{
+	uint16_t value;
+
+	if (max_item < 2) {
+		pr_err("Must have at least 2 items for ddr soc odt config");
+		return 0;
+	}
+
+	value = BIT(3) | BIT(5);
+	value |= soc_odt | (soc_odt << 8);
+	value |= (x8_mode << 7) | (x8_mode << 15);
+	reg_table[0].offset = 0x58041;
+	reg_table[0].value = value;
+	reg_table[1].offset = 0x58042;
+	reg_table[1].value = value;
+
+	return 2;
+}
+
+static int add_ddr_ntodt_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
+	uint8_t nt_odt)
+{
+	uint16_t value;
+
+	if (max_item < 2) {
+		pr_err("Must have at least 2 items for ddr ntodt config");
+		return 0;
+	}
+
+	value = nt_odt << 5;
+	value |= value << 8;
+	reg_table[0].offset = 0x58065;
+	reg_table[0].value = value;
+	reg_table[1].offset = 0x58066;
+	reg_table[1].value = value;
+
+	return 2;
+}
+
+static void build_lpddr5_io_para(const ddr_config_t* io_para)
+{
+	int i = 0;
+
+	memset(io_override_table, 0, sizeof(io_override_table));
+
+	// MUST NOT change function sequence below
+	i += add_soc_phy_write_ds_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->phy_write_ds);
+	i += add_soc_phy_rx_odt_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->phy_rx_odt);
+	i += add_ddr_pdds_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->pdds);
+	i += add_ddr_odt_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->dq_odt, io_para->ca_odt, io_para->nt_odt);
+	i += add_ddr_socodt_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->soc_odt, part_info->x8_mode);
+	i += add_ddr_ntodt_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->nt_odt);
+
+	pr_info("build %d ddr io parameters complete\n", i);
 }
 
 static void phyinit_lp5_pre_training(uint32_t ddrc_base, uint32_t ddr_size_mbyte)
@@ -80,7 +252,7 @@ static void phyinit_lp5_pre_training(uint32_t ddrc_base, uint32_t ddr_size_mbyte
 		pr_info("Use default pre-training talbe\n");
 	}
 
-	lpddr_training_table_init(ddrc_base, lp5_pre_train_table, override_table);
+	lpddr_training_table_init(ddrc_base, lp5_pre_train_table, override_table, io_override_table);
 
 	for (offset = 0x584d2; offset < 0x60000; offset++)
 		REG32(DPHY_BASE + offset * 4) = 0x0;
@@ -91,14 +263,14 @@ static void phyinit_lp5_training(uint32_t ddrc_base, uint32_t ddr_size_mbyte)
 	const ddr_phy_reg_config* override_table;
 
 	if (4096 == ddr_size_mbyte) {
-		lpddr_training_table_init(ddrc_base, lp5_4g_train_table, NULL);
+		lpddr_training_table_init(ddrc_base, lp5_4g_train_table, NULL, NULL);
 	} else {
 		if (16384 == ddr_size_mbyte) {
 			override_table = phy_override_seq_lp5_16g;
 		} else {
 			override_table = NULL;
 		}
-		lpddr_training_table_init(ddrc_base, lp5_train_table, override_table);
+		lpddr_training_table_init(ddrc_base, lp5_train_table, override_table, NULL);
 	}
 }
 
@@ -518,7 +690,6 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 	REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
 	while (count--)
 		;
-	count = 0x100;
 	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
 
 	phyinit_lp5_training(DDRC_BASE, ddr_size_mbyte);
@@ -580,9 +751,6 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 	REG32(DDRC_BASE + 0x00022090) = 0x00000001;
 	REG32(DDRC_BASE + 0x00023090) = 0x00000001;
 	REG32(DDRC_BASE + 0x00024090) = 0x00000001;
-
-	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
-	REG32(DPHY_BASE + 0xc0080 * 4) = 0x3;
 }
 
 static void init_ddr_clock(uint32_t DDRC_BASE, uint32_t data_rate_mtps)
@@ -643,6 +811,7 @@ void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info)
 	init_ddr_clock(DDRC_BASE, part_info->data_rate_mtps);
 
 	if (DDR_TYPE_LPDDR5 == part_info->type) {
+		build_lpddr5_io_para(&lp5_ddr_io_para);
 		init_snps_lp5_ddrc(DDRC_BASE, rst_code, part_info->size_mb);
 	} else if (DDR_TYPE_LPDDR4X == part_info->type) {
 		init_snps_lp4x_ddrc(DDRC_BASE, rst_code, part_info->size_mb);

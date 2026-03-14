@@ -198,8 +198,18 @@ static inline bool ufshcd_is_device_present(struct ufs_hba *hba)
 static int ufshcd_send_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 {
 	unsigned long start = 0;
+	unsigned long timeout_ms = UFS_UIC_CMD_TIMEOUT;
 	u32 intr_status;
 	u32 enabled_intr_status;
+
+	/*
+	 * In K3 SPL, first DME_LINK_STARTUP can fail from warm residual state.
+	 * Use a tighter timeout here to avoid burning a full 1s before outer
+	 * reset+reprobe retry kicks in.
+	 */
+	if (IS_ENABLED(CONFIG_SPACEMIT_K3_UFS) && IS_ENABLED(CONFIG_SPL_BUILD) &&
+	    uic_cmd->command == UIC_CMD_DME_LINK_STARTUP)
+		timeout_ms = 300;
 
 	if (!ufshcd_ready_for_uic_cmd(hba)) {
 		dev_err(hba->dev,
@@ -224,7 +234,7 @@ static int ufshcd_send_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 		enabled_intr_status = intr_status & hba->intr_mask;
 		ufshcd_writel(hba, intr_status, REG_INTERRUPT_STATUS);
 
-		if (get_timer(start) > UFS_UIC_CMD_TIMEOUT) {
+		if (get_timer(start) > timeout_ms) {
 			dev_err(hba->dev,
 				"Timedout waiting for UIC response\n");
 
@@ -485,6 +495,13 @@ static int ufshcd_link_startup(struct ufs_hba *hba)
 	int retries = DME_LINKSTARTUP_RETRIES;
 	bool link_startup_again = true;
 
+	/*
+	 * K3 already has an outer probe+reset retry path in platform probe.
+	 * Keep only a single in-function attempt to avoid retry amplification.
+	 */
+	if (IS_ENABLED(CONFIG_SPACEMIT_K3_UFS))
+		retries = 0;
+
 link_startup:
 	do {
 		ufshcd_ops_link_startup_notify(hba, PRE_CHANGE);
@@ -511,7 +528,7 @@ link_startup:
 		/* failed to get the link up... retire */
 		goto out;
 
-	if (link_startup_again) {
+	if (link_startup_again && !IS_ENABLED(CONFIG_SPACEMIT_K3_UFS)) {
 		link_startup_again = false;
 		retries = DME_LINKSTARTUP_RETRIES;
 		goto link_startup;
@@ -884,12 +901,18 @@ static int ufshcd_comp_devman_upiu(struct ufs_hba *hba,
 	return ret;
 }
 
-static int ufshcd_send_command(struct ufs_hba *hba, unsigned int task_tag)
+static int ufshcd_send_command(struct ufs_hba *hba, unsigned int task_tag,
+			       int timeout_ms)
 {
 	unsigned long start;
 	u32 intr_status;
 	u32 enabled_intr_status;
 
+	if (timeout_ms <= 0)
+		timeout_ms = QUERY_REQ_TIMEOUT;
+
+	/* Ensure descriptor writes are visible before ringing the doorbell. */
+	wmb();
 	ufshcd_writel(hba, 1 << task_tag, REG_UTP_TRANSFER_REQ_DOOR_BELL);
 
 	start = get_timer(0);
@@ -898,7 +921,7 @@ static int ufshcd_send_command(struct ufs_hba *hba, unsigned int task_tag)
 		enabled_intr_status = intr_status & hba->intr_mask;
 		ufshcd_writel(hba, intr_status, REG_INTERRUPT_STATUS);
 
-		if (get_timer(start) > QUERY_REQ_TIMEOUT) {
+		if (get_timer(start) > timeout_ms) {
 			dev_err(hba->dev,
 				"Timedout waiting for UTP response\n");
 
@@ -999,7 +1022,7 @@ static int ufshcd_exec_dev_cmd(struct ufs_hba *hba, enum dev_cmd_type cmd_type,
 	if (err)
 		return err;
 
-	err = ufshcd_send_command(hba, TASK_TAG);
+	err = ufshcd_send_command(hba, TASK_TAG, timeout);
 	if (err)
 		return err;
 
@@ -1726,7 +1749,7 @@ static int ufs_scsi_exec(struct udevice *scsi_dev, struct scsi_cmd *pccb)
 	ufshcd_prepare_utp_scsi_cmd_upiu(hba, pccb, upiu_flags);
 	prepare_prdt_table(hba, pccb);
 
-	result = ufshcd_send_command(hba, TASK_TAG);
+	result = ufshcd_send_command(hba, TASK_TAG, QUERY_REQ_TIMEOUT);
 	if (result) {
 		goto out;
 	}
@@ -2001,6 +2024,7 @@ static __maybe_unused  int ufshcd_change_power_mode(struct ufs_hba *hba,
 #endif
 {
 	int ret;
+	unsigned int post_pwr_mode_delay_ms = 50;
 
 	/* if already configured to the requested pwr_mode */
 	if (pwr_mode->gear_rx == hba->pwr_info.gear_rx &&
@@ -2098,8 +2122,12 @@ static __maybe_unused  int ufshcd_change_power_mode(struct ufs_hba *hba,
 		return ret;
 	}
 
+	/* K3 uses a shorter guard delay to reduce init latency. */
+	if (IS_ENABLED(CONFIG_SPACEMIT_K3_UFS))
+		post_pwr_mode_delay_ms = 10;
+
 	/* Add stabilization delay after power mode change */
-	mdelay(50);
+	mdelay(post_pwr_mode_delay_ms);
 
 #ifdef CONFIG_SPACEMIT_K3_UFS
 	/* K3: Wait for MPHY PLL to re-lock after HS mode switch */
@@ -2129,7 +2157,7 @@ static __maybe_unused  int ufshcd_change_power_mode(struct ufs_hba *hba,
 		 */
 
 		/* Final stabilization delay - reduced since no extra tuning */
-		mdelay(20);
+		mdelay(5);
 	}
 #endif
 

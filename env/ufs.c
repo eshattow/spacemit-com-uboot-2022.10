@@ -36,6 +36,11 @@ __weak int ufs_get_env_addr(struct blk_desc *desc, u32 *env_addr)
 	return 0;
 }
 
+__weak int board_scsi_scan_once(bool verbose)
+{
+	return scsi_scan(verbose);
+}
+
 static struct blk_desc *init_ufs_for_env(void)
 {
 	struct blk_desc *desc;
@@ -49,11 +54,11 @@ static struct blk_desc *init_ufs_for_env(void)
 	 * existing SCSI enumeration once it is available.
 	 */
 	if (!scsi_scanned) {
-		scsi_scan(false);
+		board_scsi_scan_once(false);
 		scsi_scanned = true;
 	}
 #else
-	scsi_scan(false);
+	board_scsi_scan_once(false);
 #endif
 
 	desc = blk_get_dev("scsi", dev);

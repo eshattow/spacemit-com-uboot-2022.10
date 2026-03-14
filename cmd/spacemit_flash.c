@@ -1096,6 +1096,16 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
 	case BOOT_MODE_UFS:
+		fdev->dev_desc = blk_get_dev("scsi", K3_NOR_UFS_DEVNUM_DEFAULT);
+		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
+			printf("get blk faild\n");
+			return -1;
+		}
+
+		if (flash_image(cmdtp, fdev)) {
+			return RESULT_FAIL;
+		}
+		break;
 	case BOOT_MODE_NOR:
 #ifdef CONFIG_TARGET_SPACEMIT_K3
 		if (k3_select_nor_flash_blk_dev(&blk_dev, &blk_index)) {
@@ -1199,6 +1209,10 @@ void get_blk_partition_file(char *file_name)
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
 	case BOOT_MODE_UFS:
+		dev_desc = blk_get_devnum_by_typename("scsi", K3_NOR_UFS_DEVNUM_DEFAULT);
+		if (dev_desc != NULL)
+			strcpy(file_name, FLASH_CONFIG_FILE_NAME);
+		return;
 	case BOOT_MODE_NOR:
 #ifdef CONFIG_TARGET_SPACEMIT_K3
 		if (k3_select_nor_flash_blk_dev(&blk_name, &blk_index)) {

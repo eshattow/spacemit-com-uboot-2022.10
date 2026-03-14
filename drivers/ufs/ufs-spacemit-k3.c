@@ -19,6 +19,7 @@
 #include <linux/bug.h>
 #include <linux/iopoll.h>
 #include <asm/unaligned.h>
+#include <configs/k3.h>
 #include "ufs.h"
 
 struct spacemit_k3_ufs_priv {
@@ -167,7 +168,7 @@ static int spacemit_k3_ufs_set_ref_clk(struct ufs_hba *hba)
 		return err;
 	}
 
-	printf("ufs: bRefClkFreq current=%u expected=%u\n", cur_clk, ref_clk);
+	pr_info("ufs: bRefClkFreq current=%u expected=%u\n", cur_clk, ref_clk);
 
 	if (cur_clk != ref_clk) {
 		err = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_WRITE_ATTR,
@@ -183,11 +184,32 @@ static int spacemit_k3_ufs_set_ref_clk(struct ufs_hba *hba)
 	}
 
 	if (updated) {
-		printf("ufs: bRefClkFreq updated, reinit required\n");
+		pr_info("ufs: bRefClkFreq updated, reinit required\n");
 		return -EAGAIN;
 	}
 
 	return 0;
+}
+
+static int spacemit_k3_ufs_parse_ref_clk_freq(u32 raw, u32 *ref_clk_freq)
+{
+	/* DTS must provide one of the UFS-spec reference clock frequencies in Hz. */
+	switch (raw) {
+	case 19200000:
+		*ref_clk_freq = UFS_REF_CLK_FREQ_19_2_MHZ;
+		return 0;
+	case 26000000:
+		*ref_clk_freq = UFS_REF_CLK_FREQ_26_MHZ;
+		return 0;
+	case 38400000:
+		*ref_clk_freq = UFS_REF_CLK_FREQ_38_4_MHZ;
+		return 0;
+	case 52000000:
+		*ref_clk_freq = UFS_REF_CLK_FREQ_52_MHZ;
+		return 0;
+	default:
+		return -EINVAL;
+	}
 }
 
 /**
@@ -748,6 +770,22 @@ out:
 	return ret;
 }
 
+#if !defined(CONFIG_SPL_BUILD)
+extern enum board_boot_mode get_boot_mode(void);
+
+static bool spacemit_k3_ufs_should_enforce_single_lun(void)
+{
+	enum board_boot_mode boot_mode = get_boot_mode();
+
+	/*
+	 * Normal UFS boots are expected to run on already provisioned media.
+	 * Skip the expensive descriptor walk in that path and keep the
+	 * single-LUN enforcement for recovery / flashing flows.
+	 */
+	return boot_mode != BOOT_MODE_UFS;
+}
+#endif
+
 static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 {
 	struct udevice *dev = hba->dev;
@@ -1260,6 +1298,19 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 	/* Bring clocks/reset up as early as possible */
 	spacemit_k3_ufs_clk_enable(priv);
 
+#if defined(CONFIG_SPL_BUILD)
+	/*
+	 * SPL often starts from a warm hardware state. Pre-shutdown once so the
+	 * first ufshcd_probe starts from the same clean state as retry path.
+	 */
+	hba->dev = dev;
+	hba->ops = hba_ops;
+	hba->mmio_base = (void *)dev_read_addr(dev);
+	if (hba->ops && hba->ops->device_reset) {
+		hba->ops->device_reset(hba);
+	}
+#endif
+
 	for (retries = 3; retries > 0; retries--) {
 		ret = ufshcd_probe(dev, hba_ops);
 		if (!ret) {
@@ -1276,36 +1327,38 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 #if !defined(CONFIG_SPL_BUILD)
 		int lun_cfg_ret;
 
-		/* Check and configure single LUN if needed - skip in SPL */
-		lun_cfg_ret = spacemit_k3_ufs_check_and_config_single_lun(dev);
-		if (lun_cfg_ret > 0) {
-			dev_info(
-				hba->dev,
-				"restarting UFS once to apply single-LUN layout\n");
-			hba->ops->device_reset(hba);
-			ret = ufshcd_probe(dev, hba_ops);
-			if (ret) {
-				spacemit_k3_ufs_phy_shutdown(hba, priv);
-				spacemit_k3_ufs_clk_disable(priv);
-				dev_err(hba->dev,
-					"ufs reprobe after LUN config failed: %d\n",
-					ret);
-				return ret;
+		if (spacemit_k3_ufs_should_enforce_single_lun()) {
+			/* Check and configure single LUN if needed - skip in SPL */
+			lun_cfg_ret = spacemit_k3_ufs_check_and_config_single_lun(dev);
+			if (lun_cfg_ret > 0) {
+				dev_info(
+					hba->dev,
+					"restarting UFS once to apply single-LUN layout\n");
+				hba->ops->device_reset(hba);
+				ret = ufshcd_probe(dev, hba_ops);
+				if (ret) {
+					spacemit_k3_ufs_phy_shutdown(hba, priv);
+					spacemit_k3_ufs_clk_disable(priv);
+					dev_err(hba->dev,
+						"ufs reprobe after LUN config failed: %d\n",
+						ret);
+					return ret;
+				}
+
+				lun_cfg_ret =
+					spacemit_k3_ufs_check_and_config_single_lun(
+						dev);
 			}
 
-			lun_cfg_ret =
-				spacemit_k3_ufs_check_and_config_single_lun(
-					dev);
-		}
-
-		if (lun_cfg_ret < 0) {
-			dev_warn(hba->dev,
-				 "failed to enforce single-LUN layout: %d\n",
-				 lun_cfg_ret);
-		} else if (lun_cfg_ret > 0) {
-			dev_warn(
-				hba->dev,
-				"single-LUN config pending, a cold power cycle may be required\n");
+			if (lun_cfg_ret < 0) {
+				dev_warn(hba->dev,
+					 "failed to enforce single-LUN layout: %d\n",
+					 lun_cfg_ret);
+			} else if (lun_cfg_ret > 0) {
+				dev_warn(
+					hba->dev,
+					"single-LUN config pending, a cold power cycle may be required\n");
+			}
 		}
 #endif
 		/* Limit to single LUN - use only the main user data partition */
@@ -1325,6 +1378,7 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 {
 	const char *compat;
+	const void *prop;
 	int compat_length;
 	int ret;
 	u32 ref_clk_freq;
@@ -1342,25 +1396,32 @@ static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 	}
 
 	/*
-	 * Read reference clock frequency from DTS.
-	 * Default to 19.2MHz (value 0) if not specified.
-	 * Valid values: 0=19.2MHz, 1=26MHz, 2=38.4MHz, 3=52MHz
+	 * Read reference clock frequency from DTS. It must be expressed in Hz
+	 * and match one of the UFS-spec reference clock frequencies.
 	 */
-	ret = dev_read_u32(dev, "ref-clk-freq", &ref_clk_freq);
-	if (ret) {
+	prop = dev_read_prop(dev, "ref-clk-freq", NULL);
+	if (!prop) {
 		/* Default to 19.2MHz if not specified in DTS */
 		priv->ref_clk_freq = UFS_REF_CLK_FREQ_19_2_MHZ;
 		dev_dbg(dev,
 			"ufs: ref-clk-freq not found in DTS, using default 19.2MHz\n");
 	} else {
-		if (ref_clk_freq > UFS_REF_CLK_FREQ_52_MHZ) {
-			dev_warn(
-				dev,
-				"ufs: invalid ref-clk-freq %u, using default 19.2MHz\n",
+		ret = dev_read_u32(dev, "ref-clk-freq", &ref_clk_freq);
+		if (ret) {
+			dev_err(dev,
+				"ufs: malformed ref-clk-freq property, ret=%d\n",
+				ret);
+			return ret;
+		}
+
+		ret = spacemit_k3_ufs_parse_ref_clk_freq(ref_clk_freq,
+								&priv->ref_clk_freq);
+		if (ret) {
+			dev_err(dev,
+				"ufs: invalid ref-clk-freq %u, expected "
+				"19200000/26000000/38400000/52000000 Hz\n",
 				ref_clk_freq);
-			priv->ref_clk_freq = UFS_REF_CLK_FREQ_19_2_MHZ;
-		} else {
-			priv->ref_clk_freq = ref_clk_freq;
+			return ret;
 		}
 	}
 
