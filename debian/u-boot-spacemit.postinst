@@ -188,27 +188,40 @@ configure)
             else
                 BOOTINFO_FILE=bootinfo_spinor.bin
             fi
-            BOOTINFO=/dev/mtdblock0
-            BOOTINFO_SEEK=0
-            FSBL=/dev/mtdblock0
-            FSBL_SEEK=$((128 * 1024))
-            ENV=/dev/mtdblock0
-            ENV_SEEK=$((640 * 1024))
-            UBOOT=/dev/mtdblock0
-            # 以KB为单位
-            UBOOT_SEEK=2112
+
+            if [ -e "/dev/mtdblock5" ]; then
+                BOOTINFO=/dev/mtdblock0
+                BOOTINFO_SEEK=0
+                FSBL=/dev/mtdblock1
+                FSBL_SEEK=0
+                ENV=/dev/mtdblock2
+                ENV_SEEK=0
+                UBOOT=/dev/mtdblock5
+                # 以KB为单位
+                UBOOT_SEEK=0
+            elif [ -e "/dev/mtdblock0" ]; then
+                BOOTINFO=/dev/mtdblock0
+                BOOTINFO_SEEK=0
+                FSBL=/dev/mtdblock0
+                FSBL_SEEK=$((128 * 1024))
+                ENV=/dev/mtdblock0
+                ENV_SEEK=$((640 * 1024))
+                UBOOT=/dev/mtdblock0
+                # 以KB为单位
+                UBOOT_SEEK=2112
+            fi
             ;;
         "/dev/nvme0n1")
             # 兼容无bootmode的情况
-            if [ -e "/dev/mtdblock6" ]; then
+            if [ -e "/dev/mtdblock5" ]; then
                 BOOTINFO_FILE=bootinfo_spinor.bin
-                BOOTINFO=/dev/mtdblock1
+                BOOTINFO=/dev/mtdblock0
                 BOOTINFO_SEEK=0
-                FSBL=/dev/mtdblock2
+                FSBL=/dev/mtdblock1
                 FSBL_SEEK=0
-                ENV=/dev/mtdblock3
+                ENV=/dev/mtdblock2
                 ENV_SEEK=0
-                UBOOT=/dev/mtdblock6
+                UBOOT=/dev/mtdblock5
                 # 以KB为单位
                 UBOOT_SEEK=0
             elif [ -e "/dev/mtdblock0" ]; then
