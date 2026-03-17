@@ -94,6 +94,7 @@ static u32 env_get_u32_default(const char *name, u32 default_value)
 	return (u32)parsed;
 }
 
+extern char usb_started;
 #if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
 static struct blk_desc *k3_nor_get_usb_desc(u32 devnum)
 {
@@ -105,7 +106,9 @@ static struct blk_desc *k3_nor_get_usb_desc(u32 devnum)
 	}
 
 	if (!usb_scanned) {
-		usb_init();
+		if (!usb_started) {
+			usb_init();
+		}
 		usb_stor_scan(1);
 		usb_scanned = true;
 	}
