@@ -1008,11 +1008,6 @@ void setenv_boot_mode(void)
 				break;
 			}
 		}
-
-		if (!env_get("boot_devname"))
-			env_set("boot_devname", "mmc");
-		if (!env_get("boot_devnum"))
-			env_set("boot_devnum", simple_itoa(MMC_DEV_EMMC));
 		break;
 	}
 	case BOOT_MODE_EMMC:
