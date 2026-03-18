@@ -86,9 +86,9 @@ ERR_HANDLE:
 		}
 	}
 	if (err == 0)
-		printf("memory verify pass\n");
+		pr_info("memory verify pass\n");
 	else
-		pr_err("memory verify fail!\n");
+		printf("memory verify fail!\n");
 
 	free(ddr_data);
 
