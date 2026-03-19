@@ -75,6 +75,9 @@ static const char *board_pmic_tlv_compatible(void)
 #define RTC_IRQ_ENABLE	(1 << 4)
 #define INT_STA_EN_BIT	(1 << 2)
 #define PWRKEY_IRQ_ENABLE	(0x3)
+#define EXT2_SLP_SD	(1 << 2)
+#define EXT1_SLP_SD	(1 << 1)
+#define EXT3_SLP_SD	(1 << 3)
 
 void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck_desc,
 		const struct pm8xx_buck_desc **ldo_desc, int *num_buck, int *num_ldo)
@@ -335,6 +338,13 @@ static int __board_pmic_init(const char *name)
 		i2c_read(saddr, 0x9e, 1, &regval, 1);
 		regval |= PWRKEY_IRQ_ENABLE;
 		i2c_write(saddr, 0x9e, 1, &regval, 1);
+
+		/*
+		 * don't power down x100 & a100 when system standby
+		 * */
+		i2c_read(saddr, 0x90, 1, &regval, 1);
+		regval &= ~(EXT2_SLP_SD | EXT1_SLP_SD | EXT3_SLP_SD);
+		i2c_write(saddr, 0x90, 1, &regval, 1);
 	}
 #endif
 
