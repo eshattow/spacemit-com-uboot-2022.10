@@ -644,12 +644,13 @@ void try_flash_image_from_card(void)
 #ifdef CONFIG_BOOT_FROM_USB_DISK
 #define USB_BOOT_DEV 0
 
+static int part_num;
+
 static void try_boot_from_udisk(void)
 {
 	char bootfs_part[16] = "";
 	struct blk_desc *dev_desc;
 	struct disk_partition info;
-	int part_num;
 	printf("Try varifying if USB dev 0 is a boot disk\n");
 
 	if (run_command("usb start", 0) != 0) {
@@ -1252,6 +1253,28 @@ void import_env_from_bootfs(void)
 	 */
 	pr_info("Secure boot enabled, skip loading environment from bootfs\n");
 	return;
+#endif
+
+#ifdef CONFIG_BOOT_FROM_USB_DISK
+	char *boot_device = env_get("boot_device");
+	char cmd[128];
+
+	if (boot_device && !strncmp(boot_device, "udisk", 5)) {
+		memset(cmd, 0, 128);
+		sprintf(cmd, "load usb %d:%d ${kernel_addr_r} env_k3.txt",
+			USB_BOOT_DEV, part_num);
+		if (run_command(cmd, 0)) {
+			pr_info("run command: %s failed\n", cmd);
+			return;
+		}
+		memset(cmd, 0, 128);
+		sprintf(cmd, "env import -t ${kernel_addr_r} ${filesize}");
+		if (run_command(cmd, 0))
+			pr_info("run command: %s failed\n", cmd);
+
+		pr_info("successfully imported env from udisk's bootfs\n");
+		return;
+	}
 #endif
 
 #ifdef CONFIG_ENV_IS_IN_NFS
