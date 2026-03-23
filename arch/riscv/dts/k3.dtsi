@@ -429,8 +429,8 @@
 			reg-names = "qspi-base", "qspi-mmap";
 			qspi-sfa1ad = <0x800000>;
 			qspi-sfa2ad = <0x1000000>;
-			qspi-sfb1ad = <0x100000>;
-			qspi-sfb2ad = <0x100000>;
+			qspi-sfb1ad = <0x1800000>;
+			qspi-sfb2ad = <0x2000000>;
 			qspi-pmuap-reg = <0xd4282860>;
 			qspi-mpmu-acgr-reg = <0xd4051024>;
 			qspi-ahbread = <0>;
