@@ -90,11 +90,11 @@
 	mmc-hs400-enhanced-strobe;
 	clock-frequency = <375000000>;
 	sdh-phy-module = <1>;
-	status = "disabled";
+	status = "okay";
 };
 
 &qspi {
-	status = "disabled";
+	status = "okay";
 
 	flash@0 {
 		compatible = "jedec,spi-nor";
@@ -233,23 +233,23 @@
 };
 
 &usb2_host_u2phy {
-	status = "disabled";
+	status = "okay";
 };
 
 &usb2_host {
-	status = "disabled";
+	status = "okay";
 };
 
 &usb3_porta_u2phy {
-	status = "disabled";
+	status = "okay";
 };
 
 &usb3_porta_u3phy {
-	status = "disabled";
+	status = "okay";
 };
 
 &usb3_porta {
-	status = "disabled";
+	status = "okay";
 	u-boot,dm-spl;
 	dwc3@cad00000 {
 		dr_mode = "peripheral";

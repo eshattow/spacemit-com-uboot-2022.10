@@ -1624,7 +1624,7 @@ static SPACEMIT_CCU_DIV_FC_MUX_GATE(sdh2_clk, "sdh2_clk", sdh2_parent_names,
 
 static SPACEMIT_CCU_GATE(usb2_bus_clk, "usb2_bus_clk", "axi_clk",
 	BASE_TYPE_APMU, APMU_USB_CLK_RES_CTRL,
-	BIT(0), BIT(0), 0x0,
+	BIT(1), BIT(1), 0x0,
 	0);
 static SPACEMIT_CCU_GATE(usb3_porta_bus_clk, "usb3_porta_bus_clk", "axi_clk",
 	BASE_TYPE_APMU, APMU_USB_CLK_RES_CTRL,

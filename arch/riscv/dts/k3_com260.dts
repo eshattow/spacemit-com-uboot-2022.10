@@ -290,7 +290,7 @@
 	phys = <&pcie_phy5>;
 	phy-names = "pcie-phy0";
 
-	status = "okay";
+	status = "disabled";
 };
 
 &i2c6 {

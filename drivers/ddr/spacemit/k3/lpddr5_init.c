@@ -9,8 +9,8 @@
 #include <string.h>
 
 static const ddr_config_t lp5_ddr_io_para = {
-	// WDS     RX ODT   DQODT CAODT  NTODT SOCODT  PDDS
-	PHY_R_30, PHY_R_120, R_60, R_80, R_OFF, R_OFF, R_40
+	// WDS     RX ODT   DQODT CAODT NTODT  SOCODT PDDS
+	PHY_R_30, PHY_R_40, R_60, R_80, R_OFF, R_OFF, R_40
 };
 
 ddr_phy_reg_config io_override_table[MAX_MODIFIED_IO_PARA_ITEMS];
@@ -743,7 +743,7 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 		read_data = REG32(DDRC_BASE + 0x00010c84);
 	}
 	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010180) = 0x00000011;
+	REG32(DDRC_BASE + 0x00010180) = 0x00000010;
 	REG32(DDRC_BASE + 0x000005b4) = 0xe000012c;
 	REG32(DDRC_BASE + 0x00010b84) = 0x00000000;
 	REG32(DDRC_BASE + 0x00020090) = 0x00000001;
