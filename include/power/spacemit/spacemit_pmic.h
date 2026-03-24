@@ -74,5 +74,8 @@ struct regulator_match_data {
 #include "pm853.h"
 #include "sy8810l.h"
 #include "mpq8655.h"
+#include <tlv_eeprom.h>
+
+extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 
 #endif /* __SPACEMIT_PMIC_H__ */
