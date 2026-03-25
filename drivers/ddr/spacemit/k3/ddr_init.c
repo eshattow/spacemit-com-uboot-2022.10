@@ -121,6 +121,14 @@ static ddr_part_info* find_ddr_info(const char *part_number)
 	return (ddr_part_info*)&ddr_parts_info[0];
 }
 
+uint32_t ddr_get_density(void)
+{
+	// there are two ddr parts
+	if (NULL != part_info)
+		return part_info->size_mb * 2;
+	return 0;
+}
+
 static int spacemit_ddr_probe(struct udevice *dev)
 {
 	int ret;

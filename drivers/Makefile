@@ -50,6 +50,7 @@ obj-$(CONFIG_$(SPL_)ALTERA_SDRAM) += ddr/altera/
 obj-$(CONFIG_ARCH_IMX8M) += ddr/imx/imx8m/
 obj-$(CONFIG_IMX8ULP_DRAM) += ddr/imx/imx8ulp/
 obj-$(CONFIG_ARCH_IMX9) += ddr/imx/imx9/
+obj-$(CONFIG_TARGET_SPACEMIT_K3) += ddr/spacemit/k3/
 obj-$(CONFIG_SPL_DM_RESET) += reset/
 obj-$(CONFIG_SPL_MUSB_NEW) += usb/musb-new/
 obj-$(CONFIG_SPL_USB_GADGET) += usb/gadget/
@@ -128,5 +129,4 @@ endif
 obj-$(CONFIG_$(SPL_)ESPI) += espi/
 
 obj-$(CONFIG_TARGET_SPACEMIT_K1X) += ddr/spacemit/k1x/
-obj-$(CONFIG_TARGET_SPACEMIT_K3) += ddr/spacemit/k3/
 obj-y += soc/
