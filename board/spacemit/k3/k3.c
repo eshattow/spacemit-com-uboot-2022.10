@@ -1063,6 +1063,8 @@ bool board_should_init_net(void)
 	if (k3_is_net_flash_path())
 		return true;
 
+	// clear active ethernet device when do NOT init net
+	env_set("ethact", NULL);
 	return false;
 }
 
