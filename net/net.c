@@ -396,6 +396,19 @@ int net_init(void)
  *	Main network processing loop.
  */
 
+static void net_lazy_eth_init(void)
+{
+	if (eth_is_initialized())
+		return;
+
+	printf("Net:   ");
+	eth_initialize();
+#if defined(CONFIG_RESET_PHY_R)
+	debug("Reset Ethernet PHY\n");
+	reset_phy();
+#endif
+}
+
 int net_loop(enum proto_t protocol)
 {
 	int ret = -EINVAL;
@@ -410,6 +423,7 @@ int net_loop(enum proto_t protocol)
 	net_try_count = 1;
 	debug_cond(DEBUG_INT_STATE, "--- net_loop Entry\n");
 
+	net_lazy_eth_init();
 	bootstage_mark_name(BOOTSTAGE_ID_ETH_START, "eth_start");
 	net_init();
 	if (eth_is_on_demand_init() && !eth_is_running()) {

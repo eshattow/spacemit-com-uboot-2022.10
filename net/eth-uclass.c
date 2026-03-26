@@ -438,6 +438,7 @@ int eth_initialize(void)
 	struct udevice *dev;
 
 	eth_common_init();
+	eth_set_initialized(true);
 
 	/*
 	 * Devices need to write the hwaddr even if not started so that Linux
