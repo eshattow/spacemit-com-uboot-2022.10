@@ -107,10 +107,14 @@ int do_bdinfo(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	bdinfo_print_num_l("relocaddr", gd->relocaddr);
 	bdinfo_print_num_l("reloc off", gd->reloc_off);
 	printf("%-12s= %u-bit\n", "Build", (uint)sizeof(void *) * 8);
-	if (IS_ENABLED(CONFIG_CMD_NET) && (NULL != env_get("ethact"))) {
-		printf("current eth = %s\n", eth_get_name());
+	if (IS_ENABLED(CONFIG_CMD_NET)) {
+		const char *ethact = env_get("ethact");
+		const char *ipaddr = env_get("ipaddr");
+
+		if (ethact)
+			printf("current eth = %s\n", ethact);
 		print_eth(0);
-		printf("IP addr     = %s\n", env_get("ipaddr"));
+		printf("IP addr     = %s\n", ipaddr ? ipaddr : "(not set)");
 	}
 	bdinfo_print_num_l("fdt_blob", (ulong)gd->fdt_blob);
 	bdinfo_print_num_l("new_fdt", (ulong)gd->new_fdt);

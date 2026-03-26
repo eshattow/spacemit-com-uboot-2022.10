@@ -13,6 +13,19 @@
 #include <net.h>
 #include "eth_internal.h"
 
+static bool eth_initialized;
+
+bool eth_is_initialized(void)
+{
+	return eth_initialized;
+}
+
+void eth_set_initialized(bool initialized)
+{
+	eth_initialized = initialized;
+}
+
+
 int eth_env_get_enetaddr_by_index(const char *base_name, int index,
 				 uchar *enetaddr)
 {

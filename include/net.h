@@ -258,6 +258,8 @@ int usb_eth_initialize(struct bd_info *bi);
 #endif
 
 int eth_initialize(void);		/* Initialize network subsystem */
+bool eth_is_initialized(void);		/* Network subsystem initialized */
+void eth_set_initialized(bool initialized);
 void eth_try_another(int first_restart);	/* Change the device */
 void eth_set_current(void);		/* set nterface to ethcur var */
 
