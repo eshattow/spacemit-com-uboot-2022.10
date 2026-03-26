@@ -152,13 +152,17 @@ static int splash_select_fs_dev(struct splash_location *location)
 }
 
 #ifdef CONFIG_USB_STORAGE
+extern char usb_started;
 static int splash_init_usb(void)
 {
 	int err;
 
-	err = usb_init();
-	if (err)
-		return err;
+	if (!usb_started) {
+		err = usb_init();
+		if (err)
+			return err;
+	} else
+		err = 0;
 
 #ifndef CONFIG_DM_USB
 	err = usb_stor_scan(1) < 0 ? -ENODEV : 0;

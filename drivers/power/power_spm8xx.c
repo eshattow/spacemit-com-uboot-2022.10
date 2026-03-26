@@ -30,18 +30,54 @@ MPQ8655_BUCK_LINER_RANGE;MPQ8655_REGULATOR_DESC;
 
 static const char *global_compatible[] = {
 	"spacemit,spm8821",
-	"spacemit,mpq8655",
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
 	"spacemit,pm853",
 	"spacemit,sy8810l",
 #endif
 };
 
+struct tlv_pmic_info {
+	const char *name;
+	const char *compatible;
+};
+
+static const struct tlv_pmic_info tlv_pmic_infos[] = {
+	{
+		.name = "mpq8655",
+		.compatible = "spacemit,mpq8655",
+	},
+};
+
+#define TLV_PMIC_TYPE_MAX_LEN	32
+
+static const char *board_pmic_tlv_compatible(void)
+{
+	uint8_t pmic_name[TLV_PMIC_TYPE_MAX_LEN] = { 0 };
+	int i;
+	int ret;
+
+	ret = get_tlvinfo(TLV_CODE_PMIC_TYPE, pmic_name, sizeof(pmic_name) - 1);
+	if (ret > 0) {
+		pmic_name[sizeof(pmic_name) - 1] = '\0';
+
+		for (i = 0; i < ARRAY_SIZE(tlv_pmic_infos); ++i) {
+			if (!strcmp((const char *)pmic_name, tlv_pmic_infos[i].name) ||
+			    !strcmp((const char *)pmic_name, tlv_pmic_infos[i].compatible))
+				return tlv_pmic_infos[i].compatible;
+		}
+	}
+
+	return tlv_pmic_infos[0].compatible;
+}
+
 #define NRESET_BIT	(1 << 6)
 #define RTC_ENABLE	(0xf)
 #define RTC_IRQ_ENABLE	(1 << 4)
 #define INT_STA_EN_BIT	(1 << 2)
 #define PWRKEY_IRQ_ENABLE	(0x3)
+#define EXT2_SLP_SD	(1 << 2)
+#define EXT1_SLP_SD	(1 << 1)
+#define EXT3_SLP_SD	(1 << 3)
 
 void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck_desc,
 		const struct pm8xx_buck_desc **ldo_desc, int *num_buck, int *num_ldo)
@@ -51,7 +87,7 @@ void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck
 		*num_buck = sizeof(spm8821_buck_desc) / sizeof(spm8821_buck_desc[0]);
 		*ldo_desc = spm8821_ldo_desc;
 		*num_ldo = sizeof(spm8821_ldo_desc) / sizeof(spm8821_ldo_desc[0]);
-	} else if (strcmp(name, global_compatible[1]) == 0) {
+	} else if (strcmp(name, "spacemit,mpq8655") == 0) {
 		*buck_desc = mpq8655_buck_desc;
 		*num_buck = sizeof(mpq8655_buck_desc) / sizeof(mpq8655_buck_desc[0]);
 		*ldo_desc = NULL;
@@ -302,6 +338,13 @@ static int __board_pmic_init(const char *name)
 		i2c_read(saddr, 0x9e, 1, &regval, 1);
 		regval |= PWRKEY_IRQ_ENABLE;
 		i2c_write(saddr, 0x9e, 1, &regval, 1);
+
+		/*
+		 * don't power down x100 & a100 when system standby
+		 * */
+		i2c_read(saddr, 0x90, 1, &regval, 1);
+		regval &= ~(EXT2_SLP_SD | EXT1_SLP_SD | EXT3_SLP_SD);
+		i2c_write(saddr, 0x90, 1, &regval, 1);
 	}
 #endif
 
@@ -413,10 +456,14 @@ static int __board_pmic_init(const char *name)
 
 int board_pmic_init(void)
 {
+	const char *pmic_compatible;
 	int i;
 
 	for (i = 0; i < sizeof(global_compatible) / sizeof(global_compatible[0]); ++i)
 		__board_pmic_init(global_compatible[i]);
+
+	pmic_compatible = board_pmic_tlv_compatible();
+	__board_pmic_init(pmic_compatible);
 
 	return 0;
 }

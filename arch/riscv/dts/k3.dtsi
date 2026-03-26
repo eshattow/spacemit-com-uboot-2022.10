@@ -433,7 +433,7 @@
 			qspi-sfb2ad = <0x2000000>;
 			qspi-pmuap-reg = <0xd4282860>;
 			qspi-mpmu-acgr-reg = <0xd4051024>;
-			qspi-ahbread = <0>;
+			qspi-ahbread = <1>;
 			qspi-freq = <26500000>;
 			qspi-id = <4>;
 			clocks = <&ccu CLK_QSPI>,

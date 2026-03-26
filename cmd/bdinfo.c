@@ -107,7 +107,7 @@ int do_bdinfo(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	bdinfo_print_num_l("relocaddr", gd->relocaddr);
 	bdinfo_print_num_l("reloc off", gd->reloc_off);
 	printf("%-12s= %u-bit\n", "Build", (uint)sizeof(void *) * 8);
-	if (IS_ENABLED(CONFIG_CMD_NET)) {
+	if (IS_ENABLED(CONFIG_CMD_NET) && (NULL != env_get("ethact"))) {
 		printf("current eth = %s\n", eth_get_name());
 		print_eth(0);
 		printf("IP addr     = %s\n", env_get("ipaddr"));

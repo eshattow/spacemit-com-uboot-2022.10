@@ -35,6 +35,7 @@
 #define AUDIO_APMU_RST_OFFSET		(3)
 #define AUDIO_CLK_EN_OFFSET		(12)
 #define AUIO_FORCE_PWR_ON_OFFSET	(13)
+#define AUDIO_CTRL_BY_AP_OFFSET		(28)
 
 #define RT24_CORE0_SW_WAKEUP_REG	(0xc088c0d4)
 #define RT24_CORE1_SW_WAKEUP_REG	(0xc088c0d8)
@@ -48,47 +49,12 @@ struct k3_rproc_privdata {
 	unsigned int mem_heap_size;
 };
 
-static void k3_enable_pwrswitch(void)
-{
-	int loop;
-	unsigned int value;
-
-	value = readl((void __iomem *)RCPU_PWR_DOMAIN_REG);
-	value |= (1 << RCPU_PWR_SLEEP1_BITOFF);
-	writel(value, (void __iomem *)RCPU_PWR_DOMAIN_REG);
-
-	udelay(25);
-
-	value = readl((void __iomem *)RCPU_PWR_DOMAIN_REG);
-	value |= (1 << RCPU_PWR_SLEEP1_BITOFF) | (1 << RCPU_PWR_SLEEP2_BITOFF);
-	writel(value, (void __iomem *)RCPU_PWR_DOMAIN_REG);
-
-	udelay(25);
-
-	value = readl((void __iomem *)RCPU_PWR_DOMAIN_REG);
-	value |= (1 << RCPU_PWR_ISOL_BITOFF);
-	writel(value, (void __iomem *)RCPU_PWR_DOMAIN_REG);
-
-	udelay(15);
-
-	for (loop = 1000; loop >= 0 ; --loop) {
-		value = readl((void __iomem *)RCPU_PWR_DOMAIN_STAT_REG);
-		if (value & (1 << RCPU_PWR_STAT_BITOFF))
-			break;
-		udelay(6);
-	}
-
-	return;
-}
-
 static int k3_rproc_load(struct udevice *dev, ulong addr, ulong size)
 {
 	unsigned int val;
 	struct k3_rproc_privdata *priv;
 
 	priv = dev_get_priv(dev);
-
-	k3_enable_pwrswitch();
 
 	/* deassert the rcpu */
 	val = readl((void __iomem *)PMU_AUDIO_CLK_CTRL);
@@ -102,10 +68,27 @@ static int k3_rproc_load(struct udevice *dev, ulong addr, ulong size)
 	}
 
 	val = readl((void __iomem *)PMU_AUDIO_CLK_CTRL);
-	val |= (1 << AUDIO_MCU_CORE_RST_OFFSET);
+	val |= (1 << AUDIO_IS_SYS_RST_OFFSET);
 	writel(val, (void __iomem *)PMU_AUDIO_CLK_CTRL);
 
 	writel(1, (void __iomem *)RCPU_EXECUTION_CTRL);
+
+	switch (priv->coreid) {
+	case 0:
+		/* reset core0 sw reset */
+		writel(0, (void __iomem *)RT24_CORE0_SW_RESET_REG);
+
+		/* keep core0 sleep */
+		writel(0, (void __iomem *)RT24_CORE0_SW_WAKEUP_REG);
+		break;
+	case 1:
+		/* reset core0 sw reset */
+		writel(0, (void __iomem *)RT24_CORE1_SW_RESET_REG);
+
+		/* keep core0 sleep */
+		writel(0, (void __iomem *)RT24_CORE1_SW_WAKEUP_REG);
+		break;
+	}
 
 	return rproc_elf_load_image(dev, addr, size);
 }
@@ -141,8 +124,10 @@ static int k3_rproc_start(struct udevice *dev)
 				break;
 			mdelay(1);
 		}
+
 		if (try_count <= 0)
 			dev_err(dev, "try start rproc-0 failed\n");
+
 		break;
 
 	case 1:
@@ -168,6 +153,7 @@ static int k3_rproc_start(struct udevice *dev)
 				break;
 			mdelay(1);
 		}
+
 		if (try_count <= 0)
 			dev_err(dev, "try start rproc-1 failed\n");
 		break;
