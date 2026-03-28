@@ -839,53 +839,66 @@ void try_flash_image_from_card(void)
 }
 
 #ifdef CONFIG_BOOT_FROM_USB_DISK
-#define USB_BOOT_DEV 0
 
 static int part_num;
-
+static int udisk_dev_num;
 static void try_boot_from_udisk(void)
 {
 	char bootfs_part[16] = "";
+	char dev_num_str[4] = "";
 	struct blk_desc *dev_desc;
 	struct disk_partition info;
-	printf("Try varifying if USB dev 0 is a boot disk\n");
+	int found = 0;
+
+	printf("Try verifying if any USB dev is a boot disk\n");
 
 	if (run_command("usb start", 0) != 0) {
-	    printf("usb start failed");
-	    return;
-	}
-
-	dev_desc = blk_get_dev("usb", USB_BOOT_DEV);
-	if (!dev_desc) {
-		printf("Could not find usb device %d\n", USB_BOOT_DEV);
-		return;
-	}
-	part_num = part_get_info_by_name(dev_desc, "bootfs", &info);
-	if (part_num < 0) {
-		printf("Partition 'bootfs' not found on usb %d\n", USB_BOOT_DEV);
+		printf("usb start failed\n");
 		return;
 	}
 
-	printf("Found 'bootfs' at partition %d\n", part_num);
+	/* search all udisk devices */
+	for (udisk_dev_num = 0; ; udisk_dev_num++) {
+		dev_desc = blk_get_dev("usb", udisk_dev_num);
 
-	sprintf(bootfs_part, "%d:%d", USB_BOOT_DEV, part_num);
-	if (fs_set_blk_dev("usb", bootfs_part, FS_TYPE_ANY) != 0) {
-		printf("set blk dev fail\n");
+		if (!dev_desc) {
+			break;
+		}
+
+		part_num = part_get_info_by_name(dev_desc, "bootfs", &info);
+		if (part_num < 0) {
+			printf("Partition 'bootfs' not found on usb %d\n", udisk_dev_num);
+			continue;
+		}
+
+		printf("Found 'bootfs' at usb %d, partition %d\n", udisk_dev_num, part_num);
+
+		sprintf(bootfs_part, "%d:%d", udisk_dev_num, part_num);
+		if (fs_set_blk_dev("usb", bootfs_part, FS_TYPE_ANY) != 0) {
+			printf("set blk dev fail on usb %d\n", udisk_dev_num);
+			continue;
+		}
+		if (!fs_exists("env_k3.txt")) {
+			printf("file env_k3.txt not found on usb %d\n", udisk_dev_num);
+			continue;
+		}
+
+		printf("found env_k3.txt on usb %d! setting environment value...\n", udisk_dev_num);
+		found = 1;
+		break;
+	}
+
+	if (!found) {
+		printf("Could not find a valid bootable USB drive\n");
 		return;
 	}
 
-	if (!fs_exists("env_k3.txt")) {
-		printf("file %s not found\n", "env_k3.txt");
-		return;
-	}
-
-	printf("found %s! setting environment value...\n", "env_k3.txt");
-
-	/* Ask setenv_boot_mode() to keep USB boot despite strap boot mode. */
 	env_set("boot_override", "udisk");
 	env_set("boot_device", "udisk");
 	env_set("boot_devname", "usb");
-	env_set("boot_devnum", "0");
+
+	sprintf(dev_num_str, "%d", udisk_dev_num);
+	env_set("boot_devnum", dev_num_str);
 }
 #endif
 
@@ -1461,7 +1474,7 @@ void import_env_from_bootfs(void)
 	if (boot_device && !strncmp(boot_device, "udisk", 5)) {
 		memset(cmd, 0, 128);
 		sprintf(cmd, "load usb %d:%d ${kernel_addr_r} env_k3.txt",
-			USB_BOOT_DEV, part_num);
+			udisk_dev_num, part_num);
 		if (run_command(cmd, 0)) {
 			pr_info("run command: %s failed\n", cmd);
 			return;
