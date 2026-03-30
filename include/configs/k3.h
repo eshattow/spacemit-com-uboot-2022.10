@@ -112,6 +112,8 @@
 #define USB_BOOT_COMMAND 		"bootm 0x140000000"
 
 #ifndef __ASSEMBLY__
+#include "linux/types.h"
+
 enum board_boot_mode {
 	BOOT_MODE_NONE	= 0,
 	BOOT_MODE_USB	= 0x55a,
@@ -137,6 +139,20 @@ struct k3_nor_boot_target {
 	const char *blk_name;
 	const char *devnum_env;
 	unsigned int devnum_default;
+};
+
+struct ddr_info_t {
+	uint32_t magic;
+	uint32_t crc32;
+	uint64_t chipid;
+	uint64_t mac_addr;
+	uint32_t version;
+	uint32_t type;
+	uint32_t cs_num;
+	uint32_t data_rate;
+	uint8_t reserved[128 - 40];
+
+	uint8_t training_info[0x9800 - 128];
 };
 
 const struct k3_nor_boot_target *k3_nor_get_boot_prio(unsigned int *count);

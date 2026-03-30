@@ -5,9 +5,6 @@
 
 #include "k3_ddr.h"
 
-#include <linux/kernel.h>
-#include <string.h>
-
 static const ddr_config_t lp5_ddr_io_para = {
 	// WDS     RX ODT   DQODT CAODT NTODT  SOCODT PDDS
 	PHY_R_30, PHY_R_40, R_60, R_80, R_OFF, R_OFF, R_40
@@ -371,12 +368,14 @@ uint32_t major_message_all(uint32_t dphy_base)
 	return 0;
 }
 
-void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size_mbyte)
+void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
+	ddr_boot_mode ddr_mode, ddr_training_info_t* training_info)
 {
 	uint32_t read_data;
 	uint32_t CFG_BASE = DDRC_BASE + 0x600000;
 	uint32_t DPHY_BASE = DDRC_BASE + 0x800000;
 	uint32_t count = 0x100;
+	uint32_t rst_code = 22;
 
 	if (8192 == ddr_size_mbyte || 16384 == ddr_size_mbyte) {
 		REG32(DDRC_BASE + 0x00010000) = 0x03080008;
@@ -675,24 +674,30 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 	}
 
 	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
+	if (DDR_QUICKBOOT_MODE != ddr_mode) {
+		phyinit_lp5_pre_training(DDRC_BASE, ddr_size_mbyte);
 
-	phyinit_lp5_pre_training(DDRC_BASE, ddr_size_mbyte);
+		REG32(DDRC_BASE + 0x00010180) |= (0x1 << 11);
 
-	REG32(DDRC_BASE + 0x00010180) |= (0x1 << 11);
+		REG32(DPHY_BASE + 0xd0000 * 4) = 0x1;
+		REG32(DPHY_BASE + 0xd0099 * 4) = 0x9;
+		REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
+		REG32(DPHY_BASE + 0xd0099 * 4) = 0x0;
+		read_data = major_message_all(DPHY_BASE);
+		if (read_data == 0xff)
+			return;
+		REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
+		while (count--)
+			;
+		REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
 
-	REG32(DPHY_BASE + 0xd0000 * 4) = 0x1;
-	REG32(DPHY_BASE + 0xd0099 * 4) = 0x9;
-	REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
-	REG32(DPHY_BASE + 0xd0099 * 4) = 0x0;
-	read_data = major_message_all(DPHY_BASE);
-	if (read_data == 0xff)
-		return;
-	REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
-	while (count--)
-		;
-	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
+		phyinit_lp5_training(DDRC_BASE, ddr_size_mbyte);
 
-	phyinit_lp5_training(DDRC_BASE, ddr_size_mbyte);
+		// save DDR training info
+		save_lpddr5_training_result(DDRC_BASE, training_info);
+	} else {
+		init_snps_lp5_ddrc_quick(DDRC_BASE, training_info);
+	}
 
 	if (16384 != ddr_size_mbyte) {
 		REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
@@ -715,6 +720,7 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t rst_code, uint32_t ddr_size
 	while ((read_data & 0x00000001) != 0x00000001) {
 		read_data = REG32(DDRC_BASE + 0x00010514);
 	}
+
 	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
 	REG32(DDRC_BASE + 0x00010510) = 0x00010015;
 	REG32(DDRC_BASE + 0x00010c80) = 0x00000001;
@@ -804,33 +810,39 @@ static void init_ddr_clock(uint32_t DDRC_BASE, uint32_t data_rate_mtps)
 	REG32(CFG_BASE + 0x18) |= 0x1;
 }
 
-static void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info)
+static void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info,
+	ddr_boot_mode ddr_mode, ddr_training_info_t* training_info)
 {
-	uint32_t rst_code = 22;
-
 	init_ddr_clock(DDRC_BASE, part_info->data_rate_mtps);
 
 	if (DDR_TYPE_LPDDR5 == part_info->type) {
-		init_snps_lp5_ddrc(DDRC_BASE, rst_code, part_info->size_mb);
+		init_snps_lp5_ddrc(DDRC_BASE, part_info->size_mb, ddr_mode, training_info);
 	} else if (DDR_TYPE_LPDDR4X == part_info->type) {
-		init_snps_lp4x_ddrc(DDRC_BASE, rst_code, part_info->size_mb);
+		init_snps_lp4x_ddrc(DDRC_BASE, part_info->size_mb, ddr_mode, training_info);
 	}
 }
 
-void lpddr_init_prepare(ddr_part_info* part_info)
+void lpddr_init_prepare(ddr_part_info* part_info, ddr_boot_mode ddr_mode)
 {
 	// ddr para and training firmware need to be initialized before training
 	if (DDR_TYPE_LPDDR5 == part_info->type) {
 		build_lpddr5_io_para(&lp5_ddr_io_para);
-		lp5_training_prepare();
+		if (DDR_QUICKBOOT_MODE != ddr_mode) {
+			// during first boot, MUST do fully training
+			lp5_training_prepare();
+		}
 	} else if (DDR_TYPE_LPDDR4X == part_info->type) {
-		lp4x_training_prepare();
+		if (DDR_QUICKBOOT_MODE != ddr_mode) {
+			// during first boot, MUST do fully training
+			lp4x_training_prepare();
+		}
 	}
 }
 
-void lpddr_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info)
+void lpddr_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info,
+	ddr_boot_mode ddr_mode, ddr_training_info_t* training_info)
 {
 	LogMsg(0, "=== start init_lpddr() ===\n");
-	init_snps_lp45(ddrc_reg_base, part_info);
+	init_snps_lp45(ddrc_reg_base, part_info, ddr_mode, training_info);
 	LogMsg(0, "=== finish init_lpddr() ===\n");
 }

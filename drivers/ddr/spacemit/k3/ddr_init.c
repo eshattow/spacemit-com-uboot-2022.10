@@ -138,6 +138,10 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	char ddr_part_number[32];
 	const char *temp;
 	uint64_t ddrc0, ddrc1;
+	unsigned long timestamp;
+	struct ddr_info_t *ddr_info;
+	ddr_boot_mode ddr_mode;
+	ddr_training_info_t *ddr0_training_info, *ddr1_training_info;
 
 	ddrc0 = dev_read_addr_index(dev, 0);
 	ddrc1 = dev_read_addr_index(dev, 1);
@@ -166,10 +170,66 @@ static int spacemit_ddr_probe(struct udevice *dev)
 		return 1;
 	}
 
-	lpddr_init_prepare(part_info);
+	/* DDR training info may save and restore from differents space:
+	1. write to private partition during uboot stage, restore it during spl stage
+	2. update to SPL rodata space and write to FSBL partition during fastboot flash,
+		load with spl during bootrom.
+	*/
+	ddr_info = (struct ddr_info_t*)DDR_TRAINING_INFO_BUFF;
+	if ((DDR_TRAINING_INFO_MAGIC == ddr_info->magic)
+		&& (ddr_info->type == part_info->type)
+		&& (ddr_info->cs_num == part_info->ranks)
+		&& (ddr_info->data_rate == part_info->data_rate_mtps)
+		&& (ddr_info->crc32
+			== crc32(0, (const uint8_t*)&ddr_info->chipid, sizeof(struct ddr_info_t) - 8))) {
+		ddr_mode = DDR_QUICKBOOT_MODE;
+	} else {
+		if (DDR_TYPE_LPDDR5 == part_info->type) {
+			ddr_info = (struct ddr_info_t*)lp4x_training_fw;
+		} else {
+			ddr_info = (struct ddr_info_t*)lp5_training_fw;
+		}
 
-	lpddr_silicon_init(ddrc0, part_info);
-	lpddr_silicon_init(ddrc1, part_info);
+		if ((DDR_TRAINING_INFO_MAGIC == ddr_info->magic)
+			&& (ddr_info->type == part_info->type)
+			&& (ddr_info->cs_num == part_info->ranks)
+			&& (ddr_info->data_rate == part_info->data_rate_mtps)
+			&& (ddr_info->crc32
+				== crc32(0, (const uint8_t*)&ddr_info->chipid, sizeof(struct ddr_info_t) - 8))) {
+			ddr_mode = DDR_QUICKBOOT_MODE;
+		} else {
+			/* reuse memory space of training firmware(compressed) to save training results
+			Use it only after firmware has been decompressed to DDR_TRAINING_FIRMWARE_TABLE_ADDR
+			*/
+			ddr_mode = DDR_TRAINING_MODE;
+		}
+	}
+
+	ddr0_training_info = (ddr_training_info_t*)&ddr_info->training_info[0];
+	ddr1_training_info = (ddr_training_info_t*)&ddr_info->training_info[sizeof(ddr_training_info_t)];
+
+	lpddr_init_prepare(part_info, ddr_mode);
+
+	timestamp = get_timer(0);
+	lpddr_silicon_init(ddrc0, part_info, ddr_mode, ddr0_training_info);
+	lpddr_silicon_init(ddrc1, part_info, ddr_mode, ddr1_training_info);
+	timestamp = get_timer(timestamp);
+
+	// clear DDR training flag
+	memset(ddr_info, 0, 128);
+	if (DDR_TRAINING_MODE == ddr_mode) {
+		ddr_info->magic = DDR_TRAINING_INFO_MAGIC;
+		ddr_info->type = part_info->type;
+		ddr_info->cs_num = part_info->ranks;
+		ddr_info->data_rate = part_info->data_rate_mtps;
+		ddr_info->crc32 =
+			crc32(0, (const uint8_t*)&ddr_info->chipid, sizeof(struct ddr_info_t) - 8);
+		printf("DDR training consume %ldms\n", timestamp);
+		// in case need to write training info to local storage
+		memcpy((void*)DDR_TRAINING_INFO_BUFF, ddr_info, sizeof(struct ddr_info_t));
+	} else {
+		printf("DDR quick boot consume %ldms\n", timestamp);
+	}
 #endif
 	ret = test_pattern(CONFIG_SYS_SDRAM_BASE, DDR_CHECK_SIZE);
 	if (ret < 0) {
