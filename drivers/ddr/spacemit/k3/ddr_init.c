@@ -166,6 +166,8 @@ static int spacemit_ddr_probe(struct udevice *dev)
 		return 1;
 	}
 
+	lpddr_init_prepare(part_info);
+
 	lpddr_silicon_init(ddrc0, part_info);
 	lpddr_silicon_init(ddrc1, part_info);
 #endif

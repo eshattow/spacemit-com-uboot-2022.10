@@ -41,7 +41,7 @@
 #endif
 
 // sram buffer address that save the DDR software training result
-#define DDR_TRAINING_INFO_BUFF		(0xC0800000)
+#define DDR_TRAINING_INFO_BUFF		(0xC08D0000)
 #define DDR_TRAINING_INFO_SAVE_ADDR	(0)
 // magic string: "DDRT"
 #define DDR_TRAINING_INFO_MAGIC		(0x54524444)

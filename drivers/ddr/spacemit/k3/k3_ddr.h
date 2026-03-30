@@ -6,7 +6,9 @@
 #ifndef _K3_DDR_H_
 #define _K3_DDR_H_
 
-#include <stdio.h>
+#include <common.h>
+#include <linux/delay.h>
+#include <linux/lzo.h>
 
 #define DDR_CONFIG_BYPASS_MAGIC	(0xdeadbeef)
 
@@ -17,6 +19,8 @@
 #define DISABLE_DDR_2D_TRAINING	(0)
 
 #define MAX_MODIFIED_IO_PARA_ITEMS (256)
+
+#define DDR_TRAINING_FIRMWARE_TABLE_ADDR (DDR_TRAINING_INFO_BUFF)
 
 #if (CONFIG_DDR_DATARATE != 6400) && (CONFIG_DDR_DATARATE != 6000) \
 	&& (CONFIG_DDR_DATARATE != 5500) && (CONFIG_DDR_DATARATE != 4266)
@@ -115,6 +119,10 @@ extern const ddr_phy_reg_config phy_override_seq_lp5_16g[];
 extern const phy_init_config *lp4x_pre_train_table[];
 extern const phy_init_config *lp4x_4g_train_table[], *lp4x_8g_train_table[], *lp4x_16g_train_table[];
 extern const ddr_phy_reg_config phy_override_seq_lp4x_8g[], phy_override_seq_lp4x_16g[];
+
+extern void lpddr_init_prepare(ddr_part_info* part_info);
+extern int lp5_training_prepare(void);
+extern int lp4x_training_prepare(void);
 
 extern void fpga_ddr_init(void);
 extern void lpddr_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info);

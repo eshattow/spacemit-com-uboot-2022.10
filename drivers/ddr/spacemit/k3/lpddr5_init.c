@@ -804,17 +804,27 @@ static void init_ddr_clock(uint32_t DDRC_BASE, uint32_t data_rate_mtps)
 	REG32(CFG_BASE + 0x18) |= 0x1;
 }
 
-void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info)
+static void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info)
 {
 	uint32_t rst_code = 22;
 
 	init_ddr_clock(DDRC_BASE, part_info->data_rate_mtps);
 
 	if (DDR_TYPE_LPDDR5 == part_info->type) {
-		build_lpddr5_io_para(&lp5_ddr_io_para);
 		init_snps_lp5_ddrc(DDRC_BASE, rst_code, part_info->size_mb);
 	} else if (DDR_TYPE_LPDDR4X == part_info->type) {
 		init_snps_lp4x_ddrc(DDRC_BASE, rst_code, part_info->size_mb);
+	}
+}
+
+void lpddr_init_prepare(ddr_part_info* part_info)
+{
+	// ddr para and training firmware need to be initialized before training
+	if (DDR_TYPE_LPDDR5 == part_info->type) {
+		build_lpddr5_io_para(&lp5_ddr_io_para);
+		lp5_training_prepare();
+	} else if (DDR_TYPE_LPDDR4X == part_info->type) {
+		lp4x_training_prepare();
 	}
 }
 
