@@ -96,6 +96,17 @@ void restore_ddr_pma_attribute(void)
 	asm("sfence.vma zero, zero");
 }
 
+void set_audio_buffer_cacheable(void)
+{
+	/* Audio buffer was set to IO attribute in boot rom,
+	Need to restore it to cachable attribute, so it can
+	be used as data buffer or instruction buffer.
+	*/
+	csr_clear(CSR_PMACFG0, 0xFFUL << 48);
+	csr_set(CSR_PMACFG0, 0x20UL << 48);
+	asm("sfence.vma zero, zero");
+}
+
 int get_product_name(char *name, int max_size)
 {
 	if (NULL == name)
@@ -121,6 +132,9 @@ int spl_board_init_f(void)
 	/* init i2c */
 	i2c_init_board();
 #endif
+
+	// use audio buffer as temp data buffer during DDR initialization
+	set_audio_buffer_cacheable();
 
 	/* DDR init */
 	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
