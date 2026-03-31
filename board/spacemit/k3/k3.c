@@ -848,12 +848,12 @@ static void try_boot_from_udisk(void)
 	char dev_num_str[4] = "";
 	struct blk_desc *dev_desc;
 	struct disk_partition info;
-	int found = 0;
+	bool env_found = false, perform_flash = false;
 
-	printf("Try verifying if any USB dev is a boot disk\n");
+	pr_info("udisk boot: Try verifying if any USB dev is a boot disk\n");
 
 	if (run_command("usb start", 0) != 0) {
-		printf("usb start failed\n");
+		pr_info("udisk boot: usb start failed\n");
 		return;
 	}
 
@@ -867,29 +867,46 @@ static void try_boot_from_udisk(void)
 
 		part_num = part_get_info_by_name(dev_desc, "bootfs", &info);
 		if (part_num < 0) {
-			printf("Partition 'bootfs' not found on usb %d\n", udisk_dev_num);
+			pr_info("udisk boot: Partition 'bootfs' not found on usb %d\n", udisk_dev_num);
 			continue;
 		}
 
-		printf("Found 'bootfs' at usb %d, partition %d\n", udisk_dev_num, part_num);
+		pr_info("udisk boot: Found 'bootfs' at usb %d, partition %d %s %s\n",
+			udisk_dev_num, part_num, dev_desc->vendor, dev_desc->product);
 
 		sprintf(bootfs_part, "%d:%d", udisk_dev_num, part_num);
 		if (fs_set_blk_dev("usb", bootfs_part, FS_TYPE_ANY) != 0) {
-			printf("set blk dev fail on usb %d\n", udisk_dev_num);
-			continue;
-		}
-		if (!fs_exists("env_k3.txt")) {
-			printf("file env_k3.txt not found on usb %d\n", udisk_dev_num);
+			pr_info("udisk boot: set blk dev fail on usb %d\n", udisk_dev_num);
 			continue;
 		}
 
-		printf("found env_k3.txt on usb %d! setting environment value...\n", udisk_dev_num);
-		found = 1;
-		break;
+		if (fs_exists("partition_flash.json")) {
+			pr_info("udisk boot: found partition_flash.json on usb %d! starting to flash...\n",
+			       udisk_dev_num);
+			perform_flash = true;
+			break;
+		}
+
+		// reset related state, or env_k3.txt may not be detected even if this file exist
+		fs_set_blk_dev("usb", bootfs_part, FS_TYPE_ANY);
+
+		if (fs_exists("env_k3.txt")) {
+			pr_info("udisk boot: found env_k3.txt on usb %d! setting environment value...\n",
+			       udisk_dev_num);
+			env_found = true;
+			break;
+		}
+
+		pr_info("udisk boot: file env_k3.txt or partition_flash.json not found on usb %d\n", udisk_dev_num);
 	}
 
-	if (!found) {
-		printf("Could not find a valid bootable USB drive\n");
+	if (perform_flash) {
+		run_command("flash_image usb", 0);
+		return;
+	}
+
+	if (!env_found) {
+		pr_info("udisk boot: Could not find a valid bootable USB drive\n");
 		return;
 	}
 
