@@ -19,6 +19,7 @@
 #include <espi.h>
 #include <tlv_eeprom.h>
 #include <dt-bindings/pinctrl/k3-pinctrl.h>
+#include <asm/sections.h>
 
 #if defined(CONFIG_K3_BOARD_FPGA)
 #define GDB_DOWNLOAD_DEBUG
@@ -127,6 +128,9 @@ int spl_board_init_f(void)
 {
 	int ret;
 	struct udevice *dev;
+
+	/* Clear the BSS. */
+	memset(__bss_start, 0, (char *)&__bss_end - __bss_start);
 
 #if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
 	/* init i2c */
