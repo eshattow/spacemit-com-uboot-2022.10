@@ -58,12 +58,14 @@ static u32 env_get_u32_default(const char *name, u32 default_value)
 }
 
 #if defined(CONFIG_USB) && defined(CONFIG_USB_STORAGE)
+extern char usb_started;
 static void k3_nor_usb_scan_once(void)
 {
 	static bool usb_scanned;
 
 	if (!usb_scanned) {
-		usb_init();
+		if (!usb_started)
+			usb_init();
 		usb_stor_scan(1);
 		usb_scanned = true;
 	}
@@ -395,7 +397,8 @@ static int load_from_device(struct cmd_tbl *cmdtp, char *load_str,
 	case DEVICE_USB:
 		static bool usb_init_flag = false;
 		if (!usb_init_flag){
-			usb_init();
+			if (!usb_started)
+				usb_init();
 			int device_number = usb_stor_scan(1);
 			if (device_number < 0){
 				printf("No USB storage devices found.\n");
