@@ -32,10 +32,18 @@
 #include <mmc.h>
 #include "nfs_env.h"
 #include <power/pmic.h>
+#include <u-boot/crc.h>
+#include <spi_flash.h>
 
 #ifdef CONFIG_ESPI
 extern bool spacemit_espi_is_ready(void);
 #endif
+
+extern u32 ddr_get_density(void);
+extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
+extern int set_tlvinfo(int tcode, char* val);
+extern int flush_tlvinfo(void);
+extern int update_tlvinfo(void);
 
 bool is_video_connected = false;
 static char found_partition[64] = {0};
@@ -45,6 +53,15 @@ static uint32_t reboot_config;
 #define K3_SRAM_CLEAR_SIZE	(512 * 1024)
 
 DECLARE_GLOBAL_DATA_PTR;
+
+struct boot_storage_op
+{
+	uint32_t boot_storage_type;
+	// private partition byte offset
+	uint32_t priv_partition_offset;
+	ulong (*read)(ulong byte_addr, ulong byte_size, void *buff);
+	bool (*write)(ulong byte_addr, ulong byte_size, void *buff);
+};
 
 static const struct k3_nor_boot_target k3_nor_boot_prio[] = {
 #ifdef CONFIG_NVME
@@ -207,11 +224,194 @@ static bool k3_nor_has_bootfs(struct blk_desc *desc)
 	return part_get_info_by_name(desc, BOOTFS_NAME, &info) >= 0;
 }
 
-extern u32 ddr_get_density(void);
-extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
-extern int set_tlvinfo(int tcode, char* val);
-extern int flush_tlvinfo(void);
-extern int update_tlvinfo(void);
+#if defined(CONFIG_MMC) || defined(CONFIG_SCSI)
+static ulong read_block_device(struct blk_desc *dev_desc, ulong byte_addr, ulong byte_size, void *buff)
+{
+	ulong ret, tail_bytes, total_bytes;
+	void *temp;
+
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+		pr_err("invalid block device\n");
+		return 0;
+	}
+
+	tail_bytes = byte_size - round_down(byte_size, dev_desc->blksz);
+
+	ret = blk_dread(dev_desc, byte_addr / dev_desc->blksz, byte_size / dev_desc->blksz, buff);
+	total_bytes = ret * dev_desc->blksz;
+	if (tail_bytes) {
+		temp = malloc(dev_desc->blksz);
+		blk_dread(dev_desc, byte_addr / dev_desc->blksz + ret, 1, temp);
+		memcpy((char *)buff + total_bytes, temp, tail_bytes);
+		free(temp);
+
+		total_bytes += tail_bytes;
+	}
+	return total_bytes;
+}
+#endif
+
+#ifdef CONFIG_MMC
+static ulong read_boot_storage_emmc(ulong byte_addr, ulong byte_size, void* buff)
+{
+	return read_block_device(blk_get_dev("mmc", MMC_DEV_EMMC),
+		byte_addr, byte_size, buff);
+}
+#endif
+
+static ulong read_boot_storage_spinor(ulong byte_addr, ulong byte_size, void* buff)
+{
+	struct udevice *dev;
+
+	mtd_probe_devices();
+	uclass_get_device(UCLASS_SPI_FLASH, 0, &dev);
+
+	if ((NULL != dev) && (0 == spi_flash_read_dm(dev, byte_addr, byte_size, buff))) {
+		return byte_size;
+	} else {
+		return 0;
+	}
+}
+
+#ifdef CONFIG_SCSI
+static ulong read_boot_storage_ufs(ulong byte_addr, ulong byte_size, void* buff)
+{
+	return read_block_device(k3_nor_get_scsi_desc(K3_NOR_UFS_DEVNUM_DEFAULT),
+		byte_addr, byte_size, buff);
+}
+#endif
+
+#if defined(CONFIG_SPL_BUILD)
+
+// NOT support write operation in SPL stage
+static const struct boot_storage_op storage_op[] = {
+#ifdef CONFIG_MMC
+	{ BOOT_MODE_EMMC, 0x140000, read_boot_storage_emmc, NULL },
+#endif
+	{ BOOT_MODE_NOR, 0x10000, read_boot_storage_spinor, NULL },
+#ifdef CONFIG_SCSI
+	{ BOOT_MODE_UFS, 0x140000, read_boot_storage_ufs, NULL },
+#endif
+};
+
+#else
+
+#if defined(CONFIG_MMC) || defined(CONFIG_SCSI)
+static bool write_block_device(struct blk_desc *dev_desc, ulong byte_addr, ulong byte_size, void *buff)
+{
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+		pr_err("invalid block device\n");
+		return 0;
+	}
+
+	pr_info("write %ldbyte to block device(%d) @address %ld\n",
+		byte_size, dev_desc->if_type, byte_addr);
+	blk_dwrite(dev_desc, byte_addr / dev_desc->blksz,
+		round_up(byte_size, dev_desc->blksz) / dev_desc->blksz, buff);
+	return true;
+}
+#endif
+
+#ifdef CONFIG_MMC
+static bool write_boot_storage_emmc(ulong byte_addr, ulong byte_size, void* buff)
+{
+	return write_block_device(blk_get_dev("mmc", MMC_DEV_EMMC),
+		byte_addr, byte_size, buff);
+}
+#endif
+
+static bool write_boot_storage_spinor(ulong byte_addr, ulong byte_size, void* buff)
+{
+	struct udevice *dev;
+
+	/* Probe MTD devices first */
+	mtd_probe_devices();
+	uclass_get_device(UCLASS_SPI_FLASH, 0, &dev);
+
+	if ((NULL != dev) && (0 == spi_flash_erase_dm(dev, byte_addr, round_up(byte_size, 0x1000)))
+		&& (0 == spi_flash_write_dm(dev, byte_addr, byte_size, buff))) {
+		pr_info("write %ldbyte to spinor @offset %ld\n", byte_size, byte_addr);
+		return true;
+	} else
+		return false;
+}
+
+#ifdef CONFIG_SCSI
+static bool write_boot_storage_ufs(ulong byte_addr, ulong byte_size, void* buff)
+{
+	return write_block_device(k3_nor_get_scsi_desc(K3_NOR_UFS_DEVNUM_DEFAULT),
+		byte_addr, byte_size, buff);
+}
+#endif
+
+static const struct boot_storage_op storage_op[] = {
+#ifdef CONFIG_MMC
+	{ BOOT_MODE_EMMC, 0x140000, read_boot_storage_emmc, write_boot_storage_emmc },
+#endif
+	{ BOOT_MODE_NOR, 0x10000, read_boot_storage_spinor, write_boot_storage_spinor },
+#ifdef CONFIG_SCSI
+	{ BOOT_MODE_UFS, 0x140000, read_boot_storage_ufs, write_boot_storage_ufs },
+#endif
+};
+#endif
+
+static ulong read_boot_priv_partition(void* buff, ulong offset, ulong byte_size)
+{
+	int i;
+	// read data from boot storage
+	enum board_boot_mode boot_storage = get_boot_pin_select();
+
+	for (i = 0; i < ARRAY_SIZE(storage_op); i++) {
+		if (boot_storage == storage_op[i].boot_storage_type) {
+			offset += storage_op[i].priv_partition_offset;
+			return storage_op[i].read(offset, byte_size, buff);
+		}
+	}
+
+	return 0;
+}
+
+static bool write_boot_priv_partition(void* buff, ulong offset, ulong byte_size)
+{
+	int i;
+	// save data to boot storage
+	enum board_boot_mode boot_storage = get_boot_pin_select();
+
+	for (i = 0; i < ARRAY_SIZE(storage_op); i++) {
+		if (boot_storage == storage_op[i].boot_storage_type) {
+			offset += storage_op[i].priv_partition_offset;
+			return storage_op[i].write(offset, byte_size, buff);
+		}
+	}
+
+	return false;
+}
+
+ulong read_ddr_training_info(struct ddr_info_t* info)
+{
+	return read_boot_priv_partition(info, 0, sizeof(*info));
+}
+
+bool save_ddr_training_info(void)
+{
+	struct ddr_info_t* info = (struct ddr_info_t*)DDR_TRAINING_INFO_BUFF;
+
+	// this only happened during first boot
+	if ((DDR_TRAINING_INFO_MAGIC == info->magic)
+		&& (info->crc32 == crc32(0, (const uchar*)&info->chipid, sizeof(*info) - 8))) {
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+		uint64_t chipid = 0;
+		if (0 == get_chipid_from_efuse(&chipid)) {
+			info->chipid = chipid;
+			info->crc32 = crc32(0, (const uint8_t*)&info->chipid, sizeof(*info) - 8);
+		}
+#endif
+		pr_info("save DDR training info\n");
+		return write_boot_priv_partition(info, 0, sizeof(*info));
+	}
+
+	return false;
+}
 
 #if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
 int get_chipid_from_efuse(uint64_t *chipid)
@@ -743,6 +943,9 @@ int board_late_init(void)
 	set_env_ethaddr();
 	set_dev_serial_no();
 	refresh_config_info();
+#ifdef CONFIG_DDR_TRAINING_SAVE_RESTORE
+	save_ddr_training_info();
+#endif
 
 	get_reboot_config();
 	run_fastboot_command();

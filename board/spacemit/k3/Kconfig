@@ -59,5 +59,11 @@ config BOOT_FROM_USB_DISK
 	help
 		use USB disk to boot
 
+config DDR_TRAINING_SAVE_RESTORE
+	default n
+	bool "save DDR training info to local storage"
+	help
+		In order to support quick boot, need save DDR training info during
+		fisrt boot, and restore it during next boot.
 
 endif
