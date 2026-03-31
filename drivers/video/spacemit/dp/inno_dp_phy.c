@@ -13,6 +13,8 @@
 	pr_info("[DP PHY INFO] " fmt, ##__VA_ARGS__)
 #define dev_warn(dev, fmt, ...) \
 	pr_info("[DP PHY INFO] " fmt, ##__VA_ARGS__)
+#define dev_dbg(dev, fmt, ...) \
+	pr_debug("[DP PHY DEBUG] " fmt, ##__VA_ARGS__)
 
 #define EINVAL					-22
 
@@ -587,18 +589,14 @@ static int soc_dp_check_pll_lock(struct soc_dp_phy *phy)
 
 	soc_dp_reg_read_range(phy, SOC_DPTX_AD_LOCK_PIXELPLL, &pll_locked);
 
-	if (pll_locked) {
-		dev_info(phy->dev, "Pre_pll locked\n");
-	} else {
+	if (!pll_locked) {
 		dev_err(phy->dev, "Pre_pll unlocked\n");
 		return -EINVAL;
 	}
 
 	soc_dp_reg_read_range(phy, SOC_DPTX_AD_LOCK_COREPLL, &pll_locked);
 
-	if (pll_locked) {
-		dev_info(phy->dev, "Post_pll locked\n");
-	} else {
+	if (!pll_locked) {
 		dev_err(phy->dev, "Post_pll unlocked\n");
 		return -EINVAL;
 	}
@@ -621,8 +619,6 @@ int soc_dp_phy_exit(struct soc_dp_phy *phy)
 int soc_dp_phy_power_off(struct soc_dp_phy *phy)
 {
 	if (phy->power_count == 1) {
-		dev_info(phy->dev, "Disabling PHY Transmitters and Power Down\n");
-
 		soc_dp_reg_write_range(phy, SOC_DPTX_XMIT_ENABLE, 0);
 		mdelay(2);
 
@@ -651,8 +647,6 @@ int soc_dp_phy_power_on(struct soc_dp_phy *phy)
 			lane_en = 0xF; break;
 		}
 
-		dev_info(phy->dev, "PHY Power On: Mask 0x%x\n", lane_en);
-
 		soc_dp_reg_write_range(phy, SOC_DPTX_ANA_MPLL_PD, 0);
 		soc_dp_reg_write_range(phy, SOC_DPTX_ANA_PREPLL_PD, 0);
 		mdelay(2);
@@ -673,7 +667,7 @@ static void soc_dp_phy_config_lanes(struct soc_dp_phy *phy, int lane_count)
 {
 	u32 phy_lanes_val;
 
-	pr_info("%s() lane_count %d \n", __func__, lane_count);
+	pr_debug("%s() lane_count %d \n", __func__, lane_count);
 
 	switch (lane_count) {
 	case SOC_DP_LANE_1:
@@ -685,7 +679,7 @@ static void soc_dp_phy_config_lanes(struct soc_dp_phy *phy, int lane_count)
 		phy_lanes_val = 2; break;
 	}
 
-	dev_info(phy->dev, "Configuring PHY Lane Count: %d (Reg: %d)\n",
+	dev_dbg(phy->dev, "Configuring PHY Lane Count: %d (Reg: %d)\n",
 		 lane_count, phy_lanes_val);
 
 	soc_dp_reg_write_range(phy, SOC_DPTX_PHY_NUM_LANES, phy_lanes_val);
@@ -713,7 +707,7 @@ static int soc_dp_phy_config_rate(struct soc_dp_phy *phy, int rate_khz)
 	soc_dp_reg_write_range(phy, SOC_DPTX_PHY_RATE, rate_val);
 
 	/* Recalculate and set Core PLL */
-	dev_info(phy->dev, "Setting Core PLL to Rate %d kHz\n", rate_khz);
+	dev_dbg(phy->dev, "Setting Core PLL to Rate %d kHz\n", rate_khz);
 
 	ret = soc_dp_calc_core_pll(rate_khz, phy->ref_clk_khz, &core_pll_cfg);
 	if (ret) {
@@ -819,7 +813,7 @@ int soc_dp_phy_set_pixel_clk(struct soc_dp_phy *phy, u32 pixel_clk_khz)
 	struct soc_dp_pixel_pll_cfg pixel_pll_cfg = {0};
 	int ret;
 
-	dev_info(phy->dev, "Setting Pixel PLL to %d kHz\n", pixel_clk_khz);
+	dev_dbg(phy->dev, "Setting Pixel PLL to %d kHz\n", pixel_clk_khz);
 
 	soc_dp_reg_write_range(phy, SOC_DPTX_ANA_PREPLL_DP_EN, 1);
 	soc_dp_reg_write_range(phy, SOC_DPTX_ANA_PREPLL_HDMI_EN, 0);
@@ -838,10 +832,10 @@ int soc_dp_phy_init(struct soc_dp_phy *phy, uintptr_t base_addr,
 {
 	int ret;
 	u32 clk_div;
-	u32 m_isel = 0x5, m_mainsel = 0xb;
+	u32 m_isel = 0x5, m_mainsel = 0x19;
 	u32 m_pre = 0x0, m_post = 0x2;
 	u32 tx_mode = 0x1, tx_pre = 0x0;
-	struct soc_dp_phy_configure_opts phy_opts = {0};
+	struct soc_dp_phy_configure_opts phy_opts;
 
 	memset(phy, 0, sizeof(*phy));
 	phy->regs = base_addr;
@@ -859,7 +853,7 @@ int soc_dp_phy_init(struct soc_dp_phy *phy, uintptr_t base_addr,
 	mdelay(2);
 
 	// Disable PHY SSC (Spread Spectrum Clocking)
-	soc_dp_reg_write_range(phy, SOC_DPTX_ANA_MPLL_DISABLE_SSCG, 0x1);
+	// soc_dp_reg_write_range(phy, SOC_DPTX_ANA_MPLL_DISABLE_SSCG, 0x1);
 
 	// Bypass PHY busy state
 	soc_dp_reg_write_range(phy, SOC_DPTX_PHY_BUSY_BYP, 0x1);
@@ -867,11 +861,11 @@ int soc_dp_phy_init(struct soc_dp_phy *phy, uintptr_t base_addr,
 	// Enable Enhance Framing and Scale Down Mode
 	soc_dp_reg_write_range(phy, SOC_DPTX_ENHANCE_FRAMING_EN, 0x1);
 
+	memset(&phy_opts, 0, sizeof(phy_opts));
 	phy_opts.lanes = SOC_DP_LANE_2;
 	phy_opts.link_rate = SOC_DP_LINK_RATE_2_70 / 1000;
 	phy_opts.set_lanes = 1;
 	phy_opts.set_rate = 1;
-	phy_opts.set_voltages = 1;
 
 	ret = soc_dp_phy_configure(phy, &phy_opts);
 	if (ret)

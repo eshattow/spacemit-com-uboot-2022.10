@@ -35,8 +35,8 @@ static int dp_enable(struct udevice *dev, int panel_bpp,
 	if (soc_dp_hw_read_sink_caps(&priv->dp_dev)) {
 		pr_info("Failed to read sink caps\n");
 		priv->dp_dev.link.revision = 0x14;
-		priv->dp_dev.link.max_rate = SOC_DP_LINK_RATE_5_40;
-		priv->dp_dev.link.max_num_lanes = SOC_DP_LANE_4;
+		priv->dp_dev.link.max_rate = SOC_DP_LINK_RATE_2_70;
+		priv->dp_dev.link.max_num_lanes = SOC_DP_LANE_2;
 		priv->dp_dev.link.enhanced_framing = 1;
 	}
 
@@ -72,10 +72,6 @@ static int dp_enable(struct udevice *dev, int panel_bpp,
 	mode->vsync_end = (uint16_t)(mode->vsync_start + edid->vsync_len.typ);
 	mode->vtotal = (uint16_t)(mode->vsync_end + edid->vback_porch.typ);
 
-	pr_info("%s() lock %d flag 0x%x\n", __func__, mode->clock, edid->flags);
-	pr_info("%s() hdisplay %d hsync_start 0x%d hsync_end %d htotal %d\n", __func__, mode->hdisplay, mode->hsync_start, mode->hsync_end, mode->htotal);
-	pr_info("%s() vdisplay %d vsync_start 0x%d vsync_end %d vtotal %d\n", __func__, mode->vdisplay, mode->vsync_start, mode->vsync_end, mode->vtotal);
-
 	mode->flags = 0;
 	if (edid->flags & DISPLAY_FLAGS_HSYNC_HIGH)
 		mode->flags |= SOC_DP_MODE_FLAG_PHSYNC;
@@ -85,12 +81,8 @@ static int dp_enable(struct udevice *dev, int panel_bpp,
 	mode->flags |= SOC_DP_MODE_FLAG_PHSYNC;
 	mode->flags |= SOC_DP_MODE_FLAG_PVSYNC;
 
-	soc_dp_phy_power_off(&priv->dp_dev.phy);
-
-	if (soc_dp_mode_set(&priv->dp_dev, mode) == 0) {
+	if (soc_dp_mode_set(&priv->dp_dev, mode) == 0)
 		soc_dp_hw_enable(&priv->dp_dev);
-		pr_info("%s() successful\n", __func__);
-	}
 
 	return 0;
 }
