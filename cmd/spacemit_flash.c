@@ -33,6 +33,8 @@
 #endif
 #include <watchdog.h>
 
+extern void flash_pre_process(char *partition, void *data_buffer);
+
 static int dev_emmc_num = -1;
 static int dev_sdio_num = -1;
 static u32 bootfs_part_index = 0;
@@ -835,6 +837,8 @@ int load_and_flash_file(struct cmd_tbl *cmdtp, struct flash_dev *fdev, char *fil
 			}
 			image_size = download_bytes = env_get_hex("filesize", 0);
 		}
+
+		flash_pre_process(partition, load_addr);
 
 		// compare_value = crc32_wd(compare_value, (const uchar *)load_addr, download_bytes, CHUNKSZ_CRC32);
 		compare_value += checksum64(load_addr, download_bytes);

@@ -59,11 +59,24 @@ config BOOT_FROM_USB_DISK
 	help
 		use USB disk to boot
 
+choice
+	prompt "DDR quick boot framework"
+	default DDR_TRAINING_UPDATE_FSBL
+
 config DDR_TRAINING_SAVE_RESTORE
-	default n
 	bool "save DDR training info to local storage"
 	help
 		In order to support quick boot, need save DDR training info during
 		fisrt boot, and restore it during next boot.
+
+config DDR_TRAINING_UPDATE_FSBL
+	depends on !CONFIG_RSA_VERIFY
+	bool "write DDR training info back to fsbl image"
+	help
+		In order to support quick boot, update DDR training info to fsbl
+		image during image flash process, then training info is available
+		during normal boot.
+
+endchoice
 
 endif

@@ -464,6 +464,18 @@ static bool is_bootloader_hidden_partition(const char *part_name)
 	return fastboot_spacemit_is_hidden_partition(part_name);
 }
 
+/*
+ * Pre-process flash operation.
+ *
+ * @partition: Pointer to partition name
+ * @fb_buffer: Pointer to fastboot data buffer
+ *
+ * User can add custom logic here before the flash operation proceeds.
+ */
+__weak void flash_pre_process(char *partition, void *fb_buffer)
+{
+}
+
 /**
  * flash() - write the downloaded image to the indicated partition.
  *
@@ -481,6 +493,8 @@ static void flash(char *cmd_parameter, char *response)
 	char *saved_esos_offset = NULL;
 	char *saved_uboot_offset = NULL;
 	int is_env_partition = 0;
+
+	flash_pre_process(cmd_parameter, fastboot_buf_addr);
 
 	/* Check if this is env partition and save offsets before flashing */
 	if (!strcmp(cmd_parameter, "env")) {

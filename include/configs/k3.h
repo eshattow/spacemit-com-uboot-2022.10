@@ -40,6 +40,9 @@
 #define CONFIG_FASTBOOT_FLASH_MMC_DEV	0
 #endif
 
+#define SRAM_BASE_ADDR		0xC0800000UL
+#define SRAM_TOTAL_SIZE		(512 * 1024)
+
 // sram buffer address that save the DDR software training result
 #define DDR_TRAINING_INFO_BUFF		(0xC08D0000)
 #define DDR_TRAINING_INFO_SAVE_ADDR	(0)
@@ -153,6 +156,20 @@ struct ddr_info_t {
 	uint8_t reserved[128 - 40];
 
 	uint8_t training_info[0x9800 - 128];
+};
+
+#define FSBL_PAYLOAD_OFFSET		(0x1000 - 32)
+struct fsbl_payload_t {
+	uint32_t magic;
+	uint8_t version;
+	uint8_t secure;
+	uint8_t reserved[2];
+	uint64_t imgsize;
+	uint64_t load_addr;
+	uint32_t header_crc;
+	uint32_t code_crc;
+
+	uint8_t code[0];
 };
 
 const struct k3_nor_boot_target *k3_nor_get_boot_prio(unsigned int *count);

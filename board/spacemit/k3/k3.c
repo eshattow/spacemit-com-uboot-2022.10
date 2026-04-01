@@ -49,9 +49,6 @@ bool is_video_connected = false;
 static char found_partition[64] = {0};
 static uint32_t reboot_config;
 
-#define K3_SRAM_CLEAR_ADDR	0xC0800000UL
-#define K3_SRAM_CLEAR_SIZE	(512 * 1024)
-
 DECLARE_GLOBAL_DATA_PTR;
 
 struct boot_storage_op
@@ -895,15 +892,19 @@ static void try_boot_from_udisk(void)
 static int k3_clear_sram(void)
 {
 	uint64_t *buf64;
-	ulong addr = K3_SRAM_CLEAR_ADDR;
-	size_t size = K3_SRAM_CLEAR_SIZE;
+	ulong addr = SRAM_BASE_ADDR;
+	size_t size = SRAM_TOTAL_SIZE;
 
-	if (!size || (size % sizeof(*buf64)))
+	if (!size || (size % sizeof(*buf64))) {
+		pr_warn("Failed to clear SRAM 0x%08lx (size=0x%lx)\n", addr, size);
 		return -EINVAL;
+	}
 
 	buf64 = (uint64_t *)map_sysmem(addr, size);
 	memset(buf64, 0, size);
 	unmap_sysmem(buf64);
+
+	pr_info("SRAM cleared: addr=0x%08lx size=0x%lx\n", addr, size);
 	return 0;
 }
 
@@ -915,14 +916,6 @@ int board_late_init(void)
 	ulong kernel_start;
 	ofnode chosen_node;
 	int ret;
-
-	ret = k3_clear_sram();
-	if (ret)
-		pr_warn("Failed to clear SRAM 0x%08lx (size=0x%x), err=%d\n",
-			(ulong)K3_SRAM_CLEAR_ADDR, K3_SRAM_CLEAR_SIZE, ret);
-	else
-		pr_info("SRAM cleared: addr=0x%08lx size=0x%x\n",
-			(ulong)K3_SRAM_CLEAR_ADDR, K3_SRAM_CLEAR_SIZE);
 
 #if CONFIG_IS_ENABLED(HWMON_SENSORS_CTF2301)
 	ret = uclass_get_device_by_driver(UCLASS_MISC,
@@ -957,6 +950,9 @@ int board_late_init(void)
 #ifdef CONFIG_BOOT_FROM_USB_DISK
 	try_boot_from_udisk();
 #endif
+
+	// MUST NOT clear SRAM before any image operation, it contain critical info inside
+	k3_clear_sram();
 
 	import_env_from_bootfs();
 
@@ -1860,3 +1856,44 @@ char *board_fdt_chosen_bootargs(void)
 
 	return merged;
 }
+
+#ifdef CONFIG_DDR_TRAINING_UPDATE_FSBL
+static int find_first_diff_offset(const uint64_t *buf1, const uint64_t *buf2, size_t len)
+{
+	int i;
+
+	for (i = 0; i < len / sizeof(uint64_t); i++) {
+		if (buf1[i] != buf2[i]) {
+			return i * sizeof(uint64_t);
+		}
+	}
+
+	return len;
+}
+
+void flash_pre_process(char *partition, void *data_buffer)
+{
+	int i;
+	struct fsbl_payload_t *payload;
+
+	/* Check if this is FSBL partition and update its data before flash:
+	1. update training info data to image
+	2. update crc of the image payload
+	*/
+	if (0 == strcmp(partition, "fsbl")) {
+		i = find_first_diff_offset((const uint64_t *)SRAM_BASE_ADDR,
+			(const uint64_t *)data_buffer, SRAM_TOTAL_SIZE);
+		// check if is the same version of fsbl, fsbl has 0x1000 byte at least
+		if (i > 0x1000) {
+			payload = (struct fsbl_payload_t *)(data_buffer + FSBL_PAYLOAD_OFFSET);
+			if ((i + sizeof(struct ddr_info_t)) <= payload->imgsize) {
+				pr_info("update ddr training info to fsbl @0x%x\n", i);
+				memcpy(data_buffer + i, (const void *)SRAM_BASE_ADDR + i,
+					sizeof(struct ddr_info_t));
+				// update crc32
+				payload->code_crc = crc32(0, payload->code, payload->imgsize);
+			}
+		}
+	}
+}
+#endif
