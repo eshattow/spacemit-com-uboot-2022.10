@@ -5640,20 +5640,20 @@ static const ddrphy_reg_group_t ddrphy_reg_groups[] = {
 	},
 };
 
-static uint32_t get_lpddr5_training_message(uint32_t dphy_base, PMU_SMB_LPDDR5_1D_t* msg)
+static uint32_t get_lpddr_training_message(uint32_t dphy_base, uint16_t* training_msg,
+	uint32_t msg_size)
 {
 	int i;
 	volatile uint32_t* phy_reg = (uint32_t*)(size_t)dphy_base;
-	uint16_t* training_msg = (uint16_t*)msg;
 
-	for (i = 0; i < sizeof(PMU_SMB_LPDDR5_1D_t) / sizeof(uint16_t); i++) {
+	for (i = 0; i < msg_size / sizeof(uint16_t); i++) {
 		training_msg[i] = phy_reg[DDRPHY_DMEM_BASE_ADDR + i];
 	}
 
 	return i;
 }
 
-static uint32_t get_lpddr5_training_param(uint32_t dphy_base, uint16_t* phy_param)
+static uint32_t get_lpddr_training_param(uint32_t dphy_base, uint16_t* phy_param)
 {
 	int i, j, k;
 	volatile uint32_t* phy_reg = (uint32_t*)(size_t)dphy_base;
@@ -5668,12 +5668,12 @@ static uint32_t get_lpddr5_training_param(uint32_t dphy_base, uint16_t* phy_para
 		}
 	}
 
-	if (k != LP5_TRAINING_PHYPARA_HWORDS) {
-		pr_err("Training data size mismatch %d != %d\n", k, LP5_TRAINING_PHYPARA_HWORDS);
+	if (k != DDR_TRAINING_PHYPARA_HWORDS) {
+		pr_err("Training data size mismatch %d != %d\n", k, DDR_TRAINING_PHYPARA_HWORDS);
 		return k;
 	}
 
-	return LP5_TRAINING_PHYPARA_HWORDS;
+	return DDR_TRAINING_PHYPARA_HWORDS;
 }
 
 static uint32_t get_acsm_sram_training_data(uint32_t dphy_base, uint16_t* training_data)
@@ -5681,14 +5681,14 @@ static uint32_t get_acsm_sram_training_data(uint32_t dphy_base, uint16_t* traini
 	int i;
 	volatile uint32_t* phy_reg = (uint32_t*)(size_t)dphy_base;
 
-	for (i = 0; i < LP5_TRAINING_ACSMSRAM_HWORDS; i++) {
+	for (i = 0; i < DDR_TRAINING_ACSMSRAM_HWORDS; i++) {
 		training_data[i] = phy_reg[ACSM_SRAM_BASE_ADDR + i];
 	}
 
 	return i;
 }
 
-void save_lpddr5_training_result(uint32_t ddrc_base, ddr_training_info_t* training_info)
+void save_snps_ddrc_training_result(uint32_t ddrc_base, ddr_training_info_t* training_info)
 {
 	uint32_t count;
 	unsigned long dphy_base = ddrc_base + 0x800000;
@@ -5700,9 +5700,10 @@ void save_lpddr5_training_result(uint32_t ddrc_base, ddr_training_info_t* traini
 	phy_reg[MICRO_CONT_MUX_SEL] = 0;
 	phy_reg[UCCLK_HCLK_ENABLES] = 3;
 
-	count = get_lpddr5_training_message(dphy_base, &training_info->msg);
+	count = get_lpddr_training_message(dphy_base, (uint16_t*)&training_info->msg,
+		sizeof(training_info->msg));
 	pr_info("LPDDR5 Training message: %ld bytes\n", count * sizeof(uint16_t));
-	count = get_lpddr5_training_param(dphy_base, training_info->phypara);
+	count = get_lpddr_training_param(dphy_base, training_info->phypara);
 	pr_info("LPDDR5 Training param: %ld bytes\n", count * sizeof(uint16_t));
 	count = get_acsm_sram_training_data(dphy_base, training_info->acsm);
 	pr_info("LPDDR5 acsm sram: %ld bytes\n", count * sizeof(uint16_t));

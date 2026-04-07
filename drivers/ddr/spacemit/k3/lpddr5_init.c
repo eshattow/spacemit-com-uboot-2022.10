@@ -694,9 +694,9 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 		phyinit_lp5_training(DDRC_BASE, ddr_size_mbyte);
 
 		// save DDR training info
-		save_lpddr5_training_result(DDRC_BASE, training_info);
+		save_snps_ddrc_training_result(DDRC_BASE, training_info);
 	} else {
-		init_snps_lp5_ddrc_quick(DDRC_BASE, training_info);
+		init_snps_ddrc_quick(DDRC_BASE, DDR_TYPE_LPDDR5, training_info);
 	}
 
 	if (16384 != ddr_size_mbyte) {
