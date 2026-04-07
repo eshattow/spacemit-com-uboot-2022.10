@@ -279,16 +279,37 @@ static void qspi_reset_ctrl(struct k1x_qspi *qspi)
 }
 
 #ifndef CONFIG_K3_BOARD_FPGA
-static void qspi_set_func_clk(struct k1x_qspi *qspi)
+static int qspi_set_func_clk(struct k1x_qspi *qspi)
 {
-	clk_disable(&qspi->bus_clk);
-	clk_disable(&qspi->clk);
+	int ret;
 
-	clk_set_rate(&qspi->clk, qspi->max_hz);
-	clk_enable(&qspi->clk);
-	clk_enable(&qspi->bus_clk);
+	ret = clk_disable(&qspi->bus_clk);
+	if (ret < 0)
+		goto clk_err;
+
+	ret = clk_disable(&qspi->clk);
+	if (ret < 0)
+		goto clk_err;
+
+	ret = clk_set_rate(&qspi->clk, qspi->max_hz);
+	if (ret < 0)
+		goto clk_err;
+
+	ret = clk_enable(&qspi->clk);
+	if (ret < 0)
+		goto clk_err;
+
+	ret = clk_enable(&qspi->bus_clk);
+	if (ret < 0)
+		goto clk_err;
+
 	dev_dbg(qspi->dev, "bus clock: %dHz, PMUap reg[0x%08x]:0x%08x\n",
 			qspi->max_hz, qspi->pmuap_reg, readl((void __iomem *)((unsigned long)qspi->pmuap_reg)));
+	return 0;
+
+clk_err:
+	dev_err(qspi->dev, "set func clk failed, error code: %d\n", ret);
+	return ret;
 }
 #else
 static void qspi_set_func_clk(struct k1x_qspi *qspi)
@@ -958,7 +979,22 @@ static int k1x_qspi_claim_bus(struct udevice *dev)
 
 static int k1x_qspi_set_speed(struct udevice *bus, uint speed)
 {
-	/* TODO: if need */
+	struct k1x_qspi *qspi = dev_get_priv(bus);
+	uint old_speed = qspi->max_hz;
+	int ret;
+
+	if ((speed == 0) || (old_speed == speed))
+		return 0;
+
+	qspi->max_hz = speed;
+	ret = qspi_set_func_clk(qspi);
+	if (ret < 0) {
+		qspi->max_hz = old_speed;
+		return ret;
+	}
+
+	dev_info(qspi->dev, "Speed Change: %d Hz -> %d Hz\n", old_speed, speed);
+
 	return 0;
 }
 
