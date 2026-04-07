@@ -202,8 +202,12 @@ struct eqos_config __maybe_unused eqos_spacemit_k1pro_config = {
 	.ops = &eqos_spacemit_k1pro_ops
 };
 
-#define PHY_INTF_RGMII			BIT(3)
-#define PHY_INTF_MII			BIT(4)
+#define PHY_INTF_MODE_OFFSET		(3)
+#define PHY_INTF_MODE_MASK		GENMASK(4, 3)
+
+#define PHY_INTF_RMII			(0x0 << PHY_INTF_MODE_OFFSET)
+#define PHY_INTF_RGMII			(0x1 << PHY_INTF_MODE_OFFSET)
+#define PHY_INTF_MII			(0x3 << PHY_INTF_MODE_OFFSET)
 
 /* only valid for rmii, invert tx clk */
 #define RMII_TX_CLK_SEL			BIT(6)
@@ -343,20 +347,18 @@ static void k3_delayline_init(struct spacemit_plat_data *pdata)
 static void k3_eqos_iface_config(struct spacemit_plat_data *pdata)
 {
 	phy_interface_t iface = pdata->phy_iface;
-	u32 val, mask;
+	u32 val;
 
 	val = readl(pdata->ctrl_reg);
-	mask = PHY_INTF_MII | PHY_INTF_RGMII;
-	val &= ~mask;
+	val &= ~PHY_INTF_MODE_MASK;
 
 	switch (iface) {
 	case PHY_INTERFACE_MODE_MII:
 		val |= PHY_INTF_MII;
 		break;
-
 	case PHY_INTERFACE_MODE_RMII:
+		val |= PHY_INTF_RMII;
 		break;
-
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_RGMII_ID:
 	case PHY_INTERFACE_MODE_RGMII_RXID:

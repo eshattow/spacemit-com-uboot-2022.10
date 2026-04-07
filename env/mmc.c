@@ -391,7 +391,7 @@ err:
 static int env_mmc_load(void)
 {
 #if !defined(ENV_IS_EMBEDDED)
-	ALLOC_CACHE_ALIGN_BUFFER(char, buf, CONFIG_ENV_SIZE);
+	char *buf = malloc_cache_aligned(CONFIG_ENV_SIZE);
 	struct mmc *mmc;
 	u32 offset;
 	int ret;
@@ -434,6 +434,9 @@ fini:
 err:
 	if (ret)
 		env_set_default(errmsg, 0);
+#endif
+#if !defined(ENV_IS_EMBEDDED)
+	free(buf);
 #endif
 	return ret;
 }

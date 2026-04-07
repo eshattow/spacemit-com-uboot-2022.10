@@ -32,19 +32,33 @@
 #include <mmc.h>
 #include "nfs_env.h"
 #include <power/pmic.h>
+#include <u-boot/crc.h>
+#include <spi_flash.h>
 
 #ifdef CONFIG_ESPI
 extern bool spacemit_espi_is_ready(void);
 #endif
 
+extern u32 ddr_get_density(void);
+extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
+extern int set_tlvinfo(int tcode, char* val);
+extern int flush_tlvinfo(void);
+extern int update_tlvinfo(void);
+
 bool is_video_connected = false;
 static char found_partition[64] = {0};
 static uint32_t reboot_config;
 
-#define K3_SRAM_CLEAR_ADDR	0xC0800000UL
-#define K3_SRAM_CLEAR_SIZE	(512 * 1024)
-
 DECLARE_GLOBAL_DATA_PTR;
+
+struct boot_storage_op
+{
+	uint32_t boot_storage_type;
+	// private partition byte offset
+	uint32_t priv_partition_offset;
+	ulong (*read)(ulong byte_addr, ulong byte_size, void *buff);
+	bool (*write)(ulong byte_addr, ulong byte_size, void *buff);
+};
 
 static const struct k3_nor_boot_target k3_nor_boot_prio[] = {
 #ifdef CONFIG_NVME
@@ -207,11 +221,194 @@ static bool k3_nor_has_bootfs(struct blk_desc *desc)
 	return part_get_info_by_name(desc, BOOTFS_NAME, &info) >= 0;
 }
 
-extern u32 ddr_get_density(void);
-extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
-extern int set_tlvinfo(int tcode, char* val);
-extern int flush_tlvinfo(void);
-extern int update_tlvinfo(void);
+#if defined(CONFIG_MMC) || defined(CONFIG_SCSI)
+static ulong read_block_device(struct blk_desc *dev_desc, ulong byte_addr, ulong byte_size, void *buff)
+{
+	ulong ret, tail_bytes, total_bytes;
+	void *temp;
+
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+		pr_err("invalid block device\n");
+		return 0;
+	}
+
+	tail_bytes = byte_size - round_down(byte_size, dev_desc->blksz);
+
+	ret = blk_dread(dev_desc, byte_addr / dev_desc->blksz, byte_size / dev_desc->blksz, buff);
+	total_bytes = ret * dev_desc->blksz;
+	if (tail_bytes) {
+		temp = malloc(dev_desc->blksz);
+		blk_dread(dev_desc, byte_addr / dev_desc->blksz + ret, 1, temp);
+		memcpy((char *)buff + total_bytes, temp, tail_bytes);
+		free(temp);
+
+		total_bytes += tail_bytes;
+	}
+	return total_bytes;
+}
+#endif
+
+#ifdef CONFIG_MMC
+static ulong read_boot_storage_emmc(ulong byte_addr, ulong byte_size, void* buff)
+{
+	return read_block_device(blk_get_dev("mmc", MMC_DEV_EMMC),
+		byte_addr, byte_size, buff);
+}
+#endif
+
+static ulong read_boot_storage_spinor(ulong byte_addr, ulong byte_size, void* buff)
+{
+	struct udevice *dev;
+
+	mtd_probe_devices();
+	uclass_get_device(UCLASS_SPI_FLASH, 0, &dev);
+
+	if ((NULL != dev) && (0 == spi_flash_read_dm(dev, byte_addr, byte_size, buff))) {
+		return byte_size;
+	} else {
+		return 0;
+	}
+}
+
+#ifdef CONFIG_SCSI
+static ulong read_boot_storage_ufs(ulong byte_addr, ulong byte_size, void* buff)
+{
+	return read_block_device(k3_nor_get_scsi_desc(K3_NOR_UFS_DEVNUM_DEFAULT),
+		byte_addr, byte_size, buff);
+}
+#endif
+
+#if defined(CONFIG_SPL_BUILD)
+
+// NOT support write operation in SPL stage
+static const struct boot_storage_op storage_op[] = {
+#ifdef CONFIG_MMC
+	{ BOOT_MODE_EMMC, 0x140000, read_boot_storage_emmc, NULL },
+#endif
+	{ BOOT_MODE_NOR, 0x10000, read_boot_storage_spinor, NULL },
+#ifdef CONFIG_SCSI
+	{ BOOT_MODE_UFS, 0x140000, read_boot_storage_ufs, NULL },
+#endif
+};
+
+#else
+
+#if defined(CONFIG_MMC) || defined(CONFIG_SCSI)
+static bool write_block_device(struct blk_desc *dev_desc, ulong byte_addr, ulong byte_size, void *buff)
+{
+	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
+		pr_err("invalid block device\n");
+		return 0;
+	}
+
+	pr_info("write %ldbyte to block device(%d) @address %ld\n",
+		byte_size, dev_desc->if_type, byte_addr);
+	blk_dwrite(dev_desc, byte_addr / dev_desc->blksz,
+		round_up(byte_size, dev_desc->blksz) / dev_desc->blksz, buff);
+	return true;
+}
+#endif
+
+#ifdef CONFIG_MMC
+static bool write_boot_storage_emmc(ulong byte_addr, ulong byte_size, void* buff)
+{
+	return write_block_device(blk_get_dev("mmc", MMC_DEV_EMMC),
+		byte_addr, byte_size, buff);
+}
+#endif
+
+static bool write_boot_storage_spinor(ulong byte_addr, ulong byte_size, void* buff)
+{
+	struct udevice *dev;
+
+	/* Probe MTD devices first */
+	mtd_probe_devices();
+	uclass_get_device(UCLASS_SPI_FLASH, 0, &dev);
+
+	if ((NULL != dev) && (0 == spi_flash_erase_dm(dev, byte_addr, round_up(byte_size, 0x1000)))
+		&& (0 == spi_flash_write_dm(dev, byte_addr, byte_size, buff))) {
+		pr_info("write %ldbyte to spinor @offset %ld\n", byte_size, byte_addr);
+		return true;
+	} else
+		return false;
+}
+
+#ifdef CONFIG_SCSI
+static bool write_boot_storage_ufs(ulong byte_addr, ulong byte_size, void* buff)
+{
+	return write_block_device(k3_nor_get_scsi_desc(K3_NOR_UFS_DEVNUM_DEFAULT),
+		byte_addr, byte_size, buff);
+}
+#endif
+
+static const struct boot_storage_op storage_op[] = {
+#ifdef CONFIG_MMC
+	{ BOOT_MODE_EMMC, 0x140000, read_boot_storage_emmc, write_boot_storage_emmc },
+#endif
+	{ BOOT_MODE_NOR, 0x10000, read_boot_storage_spinor, write_boot_storage_spinor },
+#ifdef CONFIG_SCSI
+	{ BOOT_MODE_UFS, 0x140000, read_boot_storage_ufs, write_boot_storage_ufs },
+#endif
+};
+#endif
+
+static ulong read_boot_priv_partition(void* buff, ulong offset, ulong byte_size)
+{
+	int i;
+	// read data from boot storage
+	enum board_boot_mode boot_storage = get_boot_pin_select();
+
+	for (i = 0; i < ARRAY_SIZE(storage_op); i++) {
+		if (boot_storage == storage_op[i].boot_storage_type) {
+			offset += storage_op[i].priv_partition_offset;
+			return storage_op[i].read(offset, byte_size, buff);
+		}
+	}
+
+	return 0;
+}
+
+static bool write_boot_priv_partition(void* buff, ulong offset, ulong byte_size)
+{
+	int i;
+	// save data to boot storage
+	enum board_boot_mode boot_storage = get_boot_pin_select();
+
+	for (i = 0; i < ARRAY_SIZE(storage_op); i++) {
+		if (boot_storage == storage_op[i].boot_storage_type) {
+			offset += storage_op[i].priv_partition_offset;
+			return storage_op[i].write(offset, byte_size, buff);
+		}
+	}
+
+	return false;
+}
+
+ulong read_ddr_training_info(struct ddr_info_t* info)
+{
+	return read_boot_priv_partition(info, 0, sizeof(*info));
+}
+
+bool save_ddr_training_info(void)
+{
+	struct ddr_info_t* info = (struct ddr_info_t*)DDR_TRAINING_INFO_BUFF;
+
+	// this only happened during first boot
+	if ((DDR_TRAINING_INFO_MAGIC == info->magic)
+		&& (info->crc32 == crc32(0, (const uchar*)&info->chipid, sizeof(*info) - 8))) {
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+		uint64_t chipid = 0;
+		if (0 == get_chipid_from_efuse(&chipid)) {
+			info->chipid = chipid;
+			info->crc32 = crc32(0, (const uint8_t*)&info->chipid, sizeof(*info) - 8);
+		}
+#endif
+		pr_info("save DDR training info\n");
+		return write_boot_priv_partition(info, 0, sizeof(*info));
+	}
+
+	return false;
+}
 
 #if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
 int get_chipid_from_efuse(uint64_t *chipid)
@@ -642,68 +839,102 @@ void try_flash_image_from_card(void)
 }
 
 #ifdef CONFIG_BOOT_FROM_USB_DISK
-#define USB_BOOT_DEV 0
 
 static int part_num;
-
+static int udisk_dev_num;
 static void try_boot_from_udisk(void)
 {
 	char bootfs_part[16] = "";
+	char dev_num_str[4] = "";
 	struct blk_desc *dev_desc;
 	struct disk_partition info;
-	printf("Try varifying if USB dev 0 is a boot disk\n");
+	bool env_found = false, perform_flash = false;
+
+	pr_info("udisk boot: Try verifying if any USB dev is a boot disk\n");
 
 	if (run_command("usb start", 0) != 0) {
-	    printf("usb start failed");
-	    return;
-	}
-
-	dev_desc = blk_get_dev("usb", USB_BOOT_DEV);
-	if (!dev_desc) {
-		printf("Could not find usb device %d\n", USB_BOOT_DEV);
-		return;
-	}
-	part_num = part_get_info_by_name(dev_desc, "bootfs", &info);
-	if (part_num < 0) {
-		printf("Partition 'bootfs' not found on usb %d\n", USB_BOOT_DEV);
+		pr_info("udisk boot: usb start failed\n");
 		return;
 	}
 
-	printf("Found 'bootfs' at partition %d\n", part_num);
+	/* search all udisk devices */
+	for (udisk_dev_num = 0; ; udisk_dev_num++) {
+		dev_desc = blk_get_dev("usb", udisk_dev_num);
 
-	sprintf(bootfs_part, "%d:%d", USB_BOOT_DEV, part_num);
-	if (fs_set_blk_dev("usb", bootfs_part, FS_TYPE_ANY) != 0) {
-		printf("set blk dev fail\n");
+		if (!dev_desc) {
+			break;
+		}
+
+		part_num = part_get_info_by_name(dev_desc, "bootfs", &info);
+		if (part_num < 0) {
+			pr_info("udisk boot: Partition 'bootfs' not found on usb %d\n", udisk_dev_num);
+			continue;
+		}
+
+		pr_info("udisk boot: Found 'bootfs' at usb %d, partition %d %s %s\n",
+			udisk_dev_num, part_num, dev_desc->vendor, dev_desc->product);
+
+		sprintf(bootfs_part, "%d:%d", udisk_dev_num, part_num);
+		if (fs_set_blk_dev("usb", bootfs_part, FS_TYPE_ANY) != 0) {
+			pr_info("udisk boot: set blk dev fail on usb %d\n", udisk_dev_num);
+			continue;
+		}
+
+		if (fs_exists("partition_flash.json")) {
+			pr_info("udisk boot: found partition_flash.json on usb %d! starting to flash...\n",
+			       udisk_dev_num);
+			perform_flash = true;
+			break;
+		}
+
+		// reset related state, or env_k3.txt may not be detected even if this file exist
+		fs_set_blk_dev("usb", bootfs_part, FS_TYPE_ANY);
+
+		if (fs_exists("env_k3.txt")) {
+			pr_info("udisk boot: found env_k3.txt on usb %d! setting environment value...\n",
+			       udisk_dev_num);
+			env_found = true;
+			break;
+		}
+
+		pr_info("udisk boot: file env_k3.txt or partition_flash.json not found on usb %d\n", udisk_dev_num);
+	}
+
+	if (perform_flash) {
+		run_command("flash_image usb", 0);
 		return;
 	}
 
-	if (!fs_exists("env_k3.txt")) {
-		printf("file %s not found\n", "env_k3.txt");
+	if (!env_found) {
+		pr_info("udisk boot: Could not find a valid bootable USB drive\n");
 		return;
 	}
 
-	printf("found %s! setting environment value...\n", "env_k3.txt");
-
-	/* Ask setenv_boot_mode() to keep USB boot despite strap boot mode. */
 	env_set("boot_override", "udisk");
 	env_set("boot_device", "udisk");
 	env_set("boot_devname", "usb");
-	env_set("boot_devnum", "0");
+
+	sprintf(dev_num_str, "%d", udisk_dev_num);
+	env_set("boot_devnum", dev_num_str);
 }
 #endif
 
 static int k3_clear_sram(void)
 {
 	uint64_t *buf64;
-	ulong addr = K3_SRAM_CLEAR_ADDR;
-	size_t size = K3_SRAM_CLEAR_SIZE;
+	ulong addr = SRAM_BASE_ADDR;
+	size_t size = SRAM_TOTAL_SIZE;
 
-	if (!size || (size % sizeof(*buf64)))
+	if (!size || (size % sizeof(*buf64))) {
+		pr_warn("Failed to clear SRAM 0x%08lx (size=0x%lx)\n", addr, size);
 		return -EINVAL;
+	}
 
 	buf64 = (uint64_t *)map_sysmem(addr, size);
 	memset(buf64, 0, size);
 	unmap_sysmem(buf64);
+
+	pr_info("SRAM cleared: addr=0x%08lx size=0x%lx\n", addr, size);
 	return 0;
 }
 
@@ -715,14 +946,6 @@ int board_late_init(void)
 	ulong kernel_start;
 	ofnode chosen_node;
 	int ret;
-
-	ret = k3_clear_sram();
-	if (ret)
-		pr_warn("Failed to clear SRAM 0x%08lx (size=0x%x), err=%d\n",
-			(ulong)K3_SRAM_CLEAR_ADDR, K3_SRAM_CLEAR_SIZE, ret);
-	else
-		pr_info("SRAM cleared: addr=0x%08lx size=0x%x\n",
-			(ulong)K3_SRAM_CLEAR_ADDR, K3_SRAM_CLEAR_SIZE);
 
 #if CONFIG_IS_ENABLED(HWMON_SENSORS_CTF2301)
 	ret = uclass_get_device_by_driver(UCLASS_MISC,
@@ -743,6 +966,9 @@ int board_late_init(void)
 	set_env_ethaddr();
 	set_dev_serial_no();
 	refresh_config_info();
+#ifdef CONFIG_DDR_TRAINING_SAVE_RESTORE
+	save_ddr_training_info();
+#endif
 
 	get_reboot_config();
 	run_fastboot_command();
@@ -754,6 +980,9 @@ int board_late_init(void)
 #ifdef CONFIG_BOOT_FROM_USB_DISK
 	try_boot_from_udisk();
 #endif
+
+	// MUST NOT clear SRAM before any image operation, it contain critical info inside
+	k3_clear_sram();
 
 	import_env_from_bootfs();
 
@@ -1262,7 +1491,7 @@ void import_env_from_bootfs(void)
 	if (boot_device && !strncmp(boot_device, "udisk", 5)) {
 		memset(cmd, 0, 128);
 		sprintf(cmd, "load usb %d:%d ${kernel_addr_r} env_k3.txt",
-			USB_BOOT_DEV, part_num);
+			udisk_dev_num, part_num);
 		if (run_command(cmd, 0)) {
 			pr_info("run command: %s failed\n", cmd);
 			return;
@@ -1657,3 +1886,44 @@ char *board_fdt_chosen_bootargs(void)
 
 	return merged;
 }
+
+#ifdef CONFIG_DDR_TRAINING_UPDATE_FSBL
+static int find_first_diff_offset(const uint64_t *buf1, const uint64_t *buf2, size_t len)
+{
+	int i;
+
+	for (i = 0; i < len / sizeof(uint64_t); i++) {
+		if (buf1[i] != buf2[i]) {
+			return i * sizeof(uint64_t);
+		}
+	}
+
+	return len;
+}
+
+void flash_pre_process(char *partition, void *data_buffer)
+{
+	int i;
+	struct fsbl_payload_t *payload;
+
+	/* Check if this is FSBL partition and update its data before flash:
+	1. update training info data to image
+	2. update crc of the image payload
+	*/
+	if (0 == strcmp(partition, "fsbl")) {
+		i = find_first_diff_offset((const uint64_t *)SRAM_BASE_ADDR,
+			(const uint64_t *)data_buffer, SRAM_TOTAL_SIZE);
+		// check if is the same version of fsbl, fsbl has 0x1000 byte at least
+		if (i > 0x1000) {
+			payload = (struct fsbl_payload_t *)(data_buffer + FSBL_PAYLOAD_OFFSET);
+			if ((i + sizeof(struct ddr_info_t)) <= payload->imgsize) {
+				pr_info("update ddr training info to fsbl @0x%x\n", i);
+				memcpy(data_buffer + i, (const void *)SRAM_BASE_ADDR + i,
+					sizeof(struct ddr_info_t));
+				// update crc32
+				payload->code_crc = crc32(0, payload->code, payload->imgsize);
+			}
+		}
+	}
+}
+#endif

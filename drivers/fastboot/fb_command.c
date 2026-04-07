@@ -43,6 +43,24 @@ static void download(char *, char *);
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void flash(char *, char *);
 static void erase(char *, char *);
+
+static int import_downloaded_env(void)
+{
+	char cmdbuf[64];
+
+	snprintf(cmdbuf, sizeof(cmdbuf), "env import -c 0x%lx 0x%x",
+		 (ulong)fastboot_buf_addr, CONFIG_ENV_SIZE);
+	if (!run_command(cmdbuf, 0))
+		return 0;
+
+	printf("flash env: binary import failed, trying text import\n");
+	snprintf(cmdbuf, sizeof(cmdbuf), "env import -t 0x%lx",
+		 (ulong)fastboot_buf_addr);
+	if (!run_command(cmdbuf, 0))
+		return 0;
+
+	return -EINVAL;
+}
 #endif
 
 #if !defined(CONFIG_SPL_BUILD)
@@ -464,6 +482,18 @@ static bool is_bootloader_hidden_partition(const char *part_name)
 	return fastboot_spacemit_is_hidden_partition(part_name);
 }
 
+/*
+ * Pre-process flash operation.
+ *
+ * @partition: Pointer to partition name
+ * @fb_buffer: Pointer to fastboot data buffer
+ *
+ * User can add custom logic here before the flash operation proceeds.
+ */
+__weak void flash_pre_process(char *partition, void *fb_buffer)
+{
+}
+
 /**
  * flash() - write the downloaded image to the indicated partition.
  *
@@ -481,6 +511,8 @@ static void flash(char *cmd_parameter, char *response)
 	char *saved_esos_offset = NULL;
 	char *saved_uboot_offset = NULL;
 	int is_env_partition = 0;
+
+	flash_pre_process(cmd_parameter, fastboot_buf_addr);
 
 	/* Check if this is env partition and save offsets before flashing */
 	if (!strcmp(cmd_parameter, "env")) {
@@ -566,17 +598,20 @@ done:
 	/* Restore offsets after flashing env partition */
 	if (is_env_partition) {
 		/*
-		 * After flashing env.bin, we need to merge the new env with
-		 * the offsets calculated from the partition table.
+		 * After flashing env.bin, re-import the downloaded env from the
+		 * fastboot buffer so env_save() persists the exact content the
+		 * host sent, then restore the offsets calculated from the
+		 * partition table.
 		 *
-		 * Strategy:
-		 * 1. Reset to default environment (from compiled-in k3.env)
-		 *    This is equivalent to "env default -a" and matches env.bin content
-		 * 2. Restore offsets (skip mtdparts to avoid MTD re-initialization)
-		 * 3. Save the combined environment
+		 * If the download cannot be imported, fall back to the compiled-in
+		 * default environment to avoid saving a partially updated runtime
+		 * environment.
 		 */
-		printf("flash env: resetting to default environment\n");
-		env_set_default(NULL, 0);
+		printf("flash env: importing downloaded environment\n");
+		if (import_downloaded_env()) {
+			printf("flash env: import failed, falling back to default environment\n");
+			env_set_default(NULL, 0);
+		}
 
 		printf("flash env: restoring offsets\n");
 		if (saved_opensbi_offset) {
@@ -592,7 +627,8 @@ done:
 			free(saved_uboot_offset);
 		}
 		printf("flash env: saving environment\n");
-		env_save();
+		if (env_save())
+			printf("flash env: failed to save environment\n");
 	}
 }
 

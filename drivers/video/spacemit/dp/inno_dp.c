@@ -13,6 +13,8 @@
 	pr_info("[DP PHY INFO] " fmt, ##__VA_ARGS__)
 #define dev_warn(dev, fmt, ...) \
 	pr_info("[DP PHY INFO] " fmt, ##__VA_ARGS__)
+#define dev_dbg(dev, fmt, ...) \
+	pr_debug("[DP PHY DEBUG] " fmt, ##__VA_ARGS__)
 
 /* Error Codes */
 #define EINVAL					-22
@@ -65,6 +67,9 @@
 #define DP_MAIN_LINK_CHANNEL_CODING_SET		0x108
 #define DP_SET_ANSI_8B10B			BIT(0)
 
+#define DP_TRAINING_AUX_RD_INTERVAL		0x00e
+#define DP_TRAINING_AUX_RD_MASK			0x7f
+
 #define DP_LANE0_1_STATUS			0x202
 #define DP_LANE_CR_DONE				BIT(0)
 #define DP_LANE_CHANNEL_EQ_DONE			BIT(1)
@@ -91,13 +96,12 @@ static const struct soc_dp_link_config {
 } soc_dp_link_priority_table[] = {
 	/* --- Tier 1: Low Bandwidth (< 4 Gbps) --- */
 	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_1},	/* 1.62 Gbps */
-	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_2},	/* 3.24 Gbps */
 	{SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_1},	/* 2.70 Gbps */
+	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_2},	/* 3.24 Gbps */
 
 	/* --- Tier 2: Medium Bandwidth (~5-6 Gbps) --- */
-	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_4},	/* 6.48 Gbps */
 	{SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_2},	/* 5.40 Gbps */
-	{SOC_DP_LINK_RATE_5_40, SOC_DP_LANE_1},	/* 5.40 Gbps */
+	{SOC_DP_LINK_RATE_1_62, SOC_DP_LANE_4},	/* 6.48 Gbps */
 
 	/* --- Tier 3: High Bandwidth (~10 Gbps) --- */
 	{SOC_DP_LINK_RATE_2_70, SOC_DP_LANE_4},	/* 10.8 Gbps */
@@ -176,6 +180,16 @@ static int soc_dp_reg_write_range(struct soc_dp_dev *dp,
 	return soc_dp_reg_write(dp, offset, 32, mask, (val << low) & mask);
 }
 
+static int soc_dp_reg_only_write_range(struct soc_dp_dev *dp,
+				       u32 offset, u32 high, u32 low, u32 val)
+{
+	u32 mask;
+
+	mask = (u32)(((((u64)1) << (high - low + 1)) - 1) << low);
+	writel((val << low) & mask, (char *)dp->regs + offset);
+	return 0;
+}
+
 static int soc_dp_reg_read(struct soc_dp_dev *dp,
 			   u32 offset, u32 bit_wide, u32 mask, u32 *val)
 {
@@ -247,7 +261,7 @@ static int soc_dp_aux_transfer_raw(struct soc_dp_dev *dp, u32 request, u32 addre
 	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_START, 1);
 
 	/* 5. Wait for Completion */
-	ret = -ETIMEDOUT;
+	ret = ETIMEDOUT;
 	while (1) {
 		soc_dp_reg_read_range(dp, SOC_DPTX_AUX_REPLY_EVENT_INT_STA, &val);
 		if (val) {
@@ -267,11 +281,11 @@ static int soc_dp_aux_transfer_raw(struct soc_dp_dev *dp, u32 request, u32 addre
 		return ret;
 	}
 
-	/* 6. Clear Interrupt Status (W1C) */
-	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_REPLY_EVENT_INT_STA, 1);
-
-	/* 7. Read Status */
+	/* 6. Read Status */
 	soc_dp_reg_read_range(dp, SOC_DPTX_AUX_STATUS, &status);
+
+	/* 7. Clear Interrupt Status (W1C) */
+	soc_dp_reg_write_range(dp, SOC_DPTX_AUX_REPLY_EVENT_INT_STA, 1);
 
 	switch (status) {
 	case 0: /* ACK */
@@ -283,13 +297,14 @@ static int soc_dp_aux_transfer_raw(struct soc_dp_dev *dp, u32 request, u32 addre
 	case 2: /* DEFER */
 		soc_dp_phy_power_off(&dp->phy);
 		dev_warn(dp->dev, "AUX DEFER: addr 0x%x\n", address);
-		return -EBUSY; /* Return Error for DEFER */
+		return EBUSY; /* Return Error for DEFER */
 	default:
 		/* Check error code if status is weird */
 		soc_dp_reg_read_range(dp, SOC_DPTX_AUX_REPLY_ERR_CODE, &val);
 		soc_dp_phy_power_off(&dp->phy);
-		dev_err(dp->dev, "AUX error, status: 0x%x, code: 0x%x\n", status, val);
-		return -EIO;
+		dev_dbg(dp->dev, "AUX info, cmd: 0x%x, address: 0x%x, size: %d, status: 0x%x, code: 0x%x\n",
+				 cmd, address, size, status, val);
+		return EIO;
 	}
 
 	/* 8. Read Data (if Read operation and ACK) */
@@ -315,7 +330,7 @@ static int soc_dp_aux_transfer_with_retry(struct soc_dp_dev *dp, u32 cmd, u32 ad
 {
 	int retries = 0;
 	int ret;
-	const int max_retries = 7;
+	const int max_retries = 8;
 
 	while (retries < max_retries) {
 		ret = soc_dp_aux_transfer_raw(dp, cmd, address, data, size);
@@ -324,14 +339,14 @@ static int soc_dp_aux_transfer_with_retry(struct soc_dp_dev *dp, u32 cmd, u32 ad
 			return ret;
 
 		/* If DEFER (Sink busy) or Timeout, wait and retry */
-		if (ret == -EBUSY || ret == -ETIMEDOUT) {
+		if (ret == EBUSY || ret == ETIMEDOUT) {
 			udelay(400);
 			retries++;
 			continue;
 		}
 
 		/* If NACK, retry briefly just in case */
-		if (ret == -EIO) {
+		if (ret == EIO) {
 			udelay(100);
 			retries++;
 			continue;
@@ -431,9 +446,13 @@ int soc_dp_hw_read_sink_caps(struct soc_dp_dev *dp)
 		dp->link.max_rate = SOC_DP_LINK_RATE_8_10;
 		break;
 	default:
-		dev_warn(dp->dev, "Unknown DPCD Max Rate: 0x%x, defaulting to 1.62G\n", max_bw);
-		dp->link.max_rate = SOC_DP_LINK_RATE_1_62;
-		break;
+		dev_warn(dp->dev, "Unknown DPCD Max Rate: 0x%x, defaulting to 2.70G\n", max_bw);
+		dp->link.revision = 0x14;
+		dp->link.max_rate = SOC_DP_LINK_RATE_2_70;
+		dp->link.max_num_lanes = SOC_DP_LANE_2;
+		dp->link.enhanced_framing = 1;
+		soc_dp_phy_power_off(&dp->phy);
+		return 0;
 	}
 
 	/* 4. Parse and determine Lane Count */
@@ -445,10 +464,8 @@ int soc_dp_hw_read_sink_caps(struct soc_dp_dev *dp)
 	soc_dp_phy_power_off(&dp->phy);
 
 	dev_info(dp->dev, "DPCD: Rev %x.%x, MaxRate %d kHz, MaxLanes %d, EnhFrame %d\n",
-		 dp->link.revision >> 4, dp->link.revision & 0xF,
-	dp->link.max_rate,
-	dp->link.max_num_lanes,
-	dp->link.enhanced_framing);
+			 dp->link.revision >> 4, dp->link.revision & 0xF, dp->link.max_rate,
+			 dp->link.max_num_lanes, dp->link.enhanced_framing);
 
 	return 0;
 }
@@ -473,7 +490,7 @@ enum soc_dp_connector_status soc_dp_hw_detect_hpd(struct soc_dp_dev *dp)
 
 	soc_dp_reg_read_range(dp, SOC_DPTX_HPD_IN_STATUS, &hpd_status);
 
-	pr_info("%s plug_event %d unplug_event %d hpd_status %d\n", __func__, plug_event, unplug_event, hpd_status);
+	pr_debug("%s plug_event %d unplug_event %d hpd_status %d\n", __func__, plug_event, unplug_event, hpd_status);
 
 	if (hpd_status)
 		connector_status = connector_status_connected;
@@ -498,10 +515,10 @@ void soc_dp_hw_clean_hpd(struct soc_dp_dev *dp)
 	soc_dp_reg_read_range(dp, SOC_DPTX_HOT_UNPLUG_EVENT, &unplug_event);
 
 	if (plug_event)
-		soc_dp_reg_write_range(dp, SOC_DPTX_HOT_PLUG_EVENT, 0x1);
+		soc_dp_reg_only_write_range(dp, SOC_DPTX_HOT_PLUG_EVENT, 0x1);
 
 	if (unplug_event)
-		soc_dp_reg_write_range(dp, SOC_DPTX_HOT_UNPLUG_EVENT, 0x1);
+		soc_dp_reg_only_write_range(dp, SOC_DPTX_HOT_UNPLUG_EVENT, 0x1);
 }
 
 static int soc_dp_set_training_pattern(struct soc_dp_dev *dp, u8 pattern)
@@ -597,16 +614,42 @@ static u8 soc_dp_get_adjust_req_p(u8 link_status[DP_LINK_STATUS_SIZE], int lane)
 	return (req & DP_TRAIN_PRE_EMPHASIS_MASK) >> DP_TRAIN_PRE_EMPHASIS_SHIFT;
 }
 
+enum soc_dp_link_train_delay {
+	SOC_DP_TRAIN_DELAY_CLOCK_RECOVERY,
+	SOC_DP_TRAIN_DELAY_CHANNEL_EQ,
+};
+
+static void soc_dp_link_train_delay(struct soc_dp_dev *dp,
+				    enum soc_dp_link_train_delay delay_type)
+{
+	u8 interval = dp->dpcd[DP_TRAINING_AUX_RD_INTERVAL] & DP_TRAINING_AUX_RD_MASK;
+	u16 delay_us = delay_type == SOC_DP_TRAIN_DELAY_CLOCK_RECOVERY ? 100 : 400;
+
+	if (!interval) {
+		udelay(delay_us);
+		return;
+	}
+
+	if (interval <= 4) {
+		udelay(interval * 4000);
+		return;
+	}
+
+	dev_warn(dp->dev, "Invalid TRAINING_AUX_RD_INTERVAL 0x%x, fallback to %uus\n",
+		 interval, delay_us);
+	udelay(delay_us);
+}
+
 static int soc_dp_link_train_clock_recovery(struct soc_dp_dev *dp, enum soc_dp_link_rate rate, enum soc_dp_lane_count lanes)
 {
 	u8 link_status[DP_LINK_STATUS_SIZE];
 	u8 training_set[4] = {0};
 	int retries = 0;
 	int i, ret;
-	struct soc_dp_phy_configure_opts phy_opts = {0};
+	struct soc_dp_phy_configure_opts phy_opts;
 
+	memset(&phy_opts, 0, sizeof(phy_opts));
 	phy_opts.lanes = lanes;
-	phy_opts.set_voltages = 1;
 
 	soc_dp_phy_configure(&dp->phy, &phy_opts);
 
@@ -622,7 +665,7 @@ static int soc_dp_link_train_clock_recovery(struct soc_dp_dev *dp, enum soc_dp_l
 	}
 
 	while (retries < 8) {
-		mdelay(5);
+		soc_dp_link_train_delay(dp, SOC_DP_TRAIN_DELAY_CLOCK_RECOVERY);
 
 		ret = soc_dp_dpcd_read(dp, DP_LANE0_1_STATUS, link_status, DP_LINK_STATUS_SIZE);
 		if (ret < 0) {
@@ -682,10 +725,10 @@ static int soc_dp_link_train_channel_eq(struct soc_dp_dev *dp, enum soc_dp_link_
 	u8 training_pattern = DP_TRAINING_PATTERN_2;
 	int retries = 0;
 	int i, ret;
-	struct soc_dp_phy_configure_opts phy_opts = {0};
+	struct soc_dp_phy_configure_opts phy_opts;
 
+	memset(&phy_opts, 0, sizeof(phy_opts));
 	phy_opts.lanes = lanes;
-	phy_opts.set_voltages = 1;
 
 	if (dp->dpcd[DP_MAX_LANE_COUNT] & DP_TPS3_SUPPORTED) {
 		training_pattern = DP_TRAINING_PATTERN_3;
@@ -701,7 +744,7 @@ static int soc_dp_link_train_channel_eq(struct soc_dp_dev *dp, enum soc_dp_link_
 	}
 
 	while (retries < 8) {
-		mdelay(5);
+		soc_dp_link_train_delay(dp, SOC_DP_TRAIN_DELAY_CHANNEL_EQ);
 
 		ret = soc_dp_dpcd_read(dp, DP_LANE0_1_STATUS, link_status, DP_LINK_STATUS_SIZE);
 		if (ret < 0) {
@@ -763,23 +806,6 @@ static int soc_dp_link_train(struct soc_dp_dev *dp, enum soc_dp_link_rate rate, 
 	int ret;
 	u8 link_config[2];
 	u8 bw_code;
-
-	/* Set Power to D0 (Wake up Sink) */
-	ret = soc_dp_dpcd_writeb(dp, DP_SET_POWER, DP_SET_POWER_D0);
-	if (ret < 0)
-		dev_warn(dp->dev, "Failed to power up sink\n");
-
-	mdelay(5);
-
-	/* Downspread Control (PHY SSC is disabled, explicitly set to 0) */
-	ret = soc_dp_dpcd_writeb(dp, DP_DOWNSPREAD_CTRL, 0);
-	if (ret < 0)
-		dev_warn(dp->dev, "Failed to disable downspread\n");
-
-	/* Main Link Channel Coding (ANSI 8B/10B) */
-	ret = soc_dp_dpcd_writeb(dp, DP_MAIN_LINK_CHANNEL_CODING_SET, DP_SET_ANSI_8B10B);
-	if (ret < 0)
-		dev_warn(dp->dev, "Failed to set channel coding\n");
 
 	/* Map Link Rate Enum to DPCD Bandwidth Code */
 	switch (rate) {
@@ -950,13 +976,13 @@ static void soc_dp_hw_set_msa(struct soc_dp_dev *dp, const struct soc_dp_video_m
 
 void soc_dp_hw_enable(struct soc_dp_dev *dp)
 {
-	dev_info(dp->dev, "Enabling Video Stream\n");
+	dev_dbg(dp->dev, "Enabling Video Stream\n");
 	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_STREAM_ENABLE, 1);
 }
 
 void soc_dp_hw_disable(struct soc_dp_dev *dp)
 {
-	dev_info(dp->dev, "Disabling Video Stream\n");
+	dev_dbg(dp->dev, "Disabling Video Stream\n");
 	soc_dp_reg_write_range(dp, SOC_DPTX_VIDEO_STREAM_ENABLE, 0);
 }
 
@@ -977,11 +1003,22 @@ static u32 soc_dp_calc_link_capacity(enum soc_dp_link_rate rate, enum soc_dp_lan
 int soc_dp_conn_get_edid_block(struct soc_dp_dev *dp, u8 *buf, unsigned int block, size_t len)
 {
 	int ret, i;
+	int retries;
 	u8 offset;
 
 	ret = soc_dp_phy_power_on(&dp->phy);
 	if (ret)
 		return ret;
+
+	/*  Wake up Sink */
+	for (retries = 0; retries < 5; retries++) {
+		ret = soc_dp_dpcd_writeb(dp, DP_SET_POWER, DP_SET_POWER_D0);
+		if (ret >= 0) {
+			mdelay(2);
+			break;
+		}
+		mdelay(1);
+	}
 
 	offset = (block * EDID_LENGTH) & 0xFF;
 
@@ -1047,12 +1084,12 @@ int soc_dp_mode_set(struct soc_dp_dev *dp, const struct soc_dp_video_mode *mode)
 	int i;
 	u32 req_bw;
 	int bpp;
-	bool config_success = false;
 	const struct soc_dp_link_config *cfg;
-	struct soc_dp_phy_configure_opts phy_opts = {0};
+	struct soc_dp_phy_configure_opts phy_opts;
 
 	dev_info(dp->dev, "DP: Mode Set %dx%d (PCLK: %d kHz)\n",
 		 mode->hdisplay, mode->vdisplay, mode->clock);
+	memset(&phy_opts, 0, sizeof(phy_opts));
 
 	bpp = soc_dp_get_bpp(dp->color_format);
 	req_bw = soc_dp_calc_required_bw(mode, bpp);
@@ -1071,7 +1108,7 @@ int soc_dp_mode_set(struct soc_dp_dev *dp, const struct soc_dp_video_mode *mode)
 		if (capacity < req_bw)
 			continue;
 
-		dev_info(dp->dev, "DP: Attempting Config: R=%d, L=%d (Cap: %d > Req: %d)\n",
+		dev_dbg(dp->dev, "DP: Attempting Config: R=%d, L=%d (Cap: %d > Req: %d)\n",
 			 cfg->rate, cfg->lanes, capacity, req_bw);
 
 		/* Configure PHY Link parameters */
@@ -1079,6 +1116,8 @@ int soc_dp_mode_set(struct soc_dp_dev *dp, const struct soc_dp_video_mode *mode)
 		phy_opts.link_rate = cfg->rate / 1000;
 		phy_opts.set_lanes = 1;
 		phy_opts.set_rate = 1;
+
+		soc_dp_phy_power_off(&dp->phy);
 
 		if (soc_dp_phy_configure(&dp->phy, &phy_opts))
 			continue;
@@ -1094,31 +1133,21 @@ int soc_dp_mode_set(struct soc_dp_dev *dp, const struct soc_dp_video_mode *mode)
 			soc_dp_reg_write_range(dp, SOC_DPTX_ENABLE_EDP, 0x1);
 			soc_dp_reg_write_range(dp, SOC_DPTX_STREAM_ENC_EN, 0x1);
 			update_edp_config(dp, true);
-		} else {
-			soc_dp_reg_write_range(dp, SOC_DPTX_ENABLE_EDP, 0x0);
-			soc_dp_reg_write_range(dp, SOC_DPTX_STREAM_ENC_EN, 0x0);
-			update_edp_config(dp, false);
 		}
 
 		/* Execute Link Training */
 		if (soc_dp_link_train(dp, cfg->rate, cfg->lanes) == 0) {
-			config_success = true;
 			dev_info(dp->dev, "DP: Training successful for R:%d L:%d\n",
 				 cfg->rate, cfg->lanes);
 			break;
 		}
 
-		soc_dp_phy_power_off(&dp->phy);
 		dev_warn(dp->dev, "DP: Training failed for R:%d L:%d. Upgrading...\n",
 			 cfg->rate, cfg->lanes);
 	}
 
-	if (!config_success) {
-		dev_err(dp->dev, "DP: Critical Failure - No valid link config found\n");
-		return -ETIMEDOUT;
-	}
-
 	soc_dp_hw_set_msa(dp, mode, cfg->rate, cfg->lanes);
+
 	return 0;
 }
 

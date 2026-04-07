@@ -6,7 +6,12 @@
 #ifndef _K3_DDR_H_
 #define _K3_DDR_H_
 
-#include <stdio.h>
+#include <common.h>
+#include <u-boot/crc.h>
+#include <linux/delay.h>
+#include <linux/lzo.h>
+
+#include "lpddr5_msg_block.h"
 
 #define DDR_CONFIG_BYPASS_MAGIC	(0xdeadbeef)
 
@@ -16,7 +21,12 @@
 // 2D training configuration
 #define DISABLE_DDR_2D_TRAINING	(0)
 
-#define MAX_MODIFIED_IO_PARA_ITEMS (256)
+#define MAX_MODIFIED_IO_PARA_ITEMS	(256)
+
+#define DDR_TRAINING_FIRMWARE_TABLE_ADDR	(DDR_TRAINING_INFO_BUFF)
+
+#define DDR_QUICKBOOT_FIRMWARE_FW_ADDR		(DDR_TRAINING_INFO_BUFF + sizeof(struct ddr_info_t))
+#define DDR_QUICKBOOT_FIRMWARE_FW_MAX_SIZE	(0x10000 - sizeof(struct ddr_info_t))
 
 #if (CONFIG_DDR_DATARATE != 6400) && (CONFIG_DDR_DATARATE != 6000) \
 	&& (CONFIG_DDR_DATARATE != 5500) && (CONFIG_DDR_DATARATE != 4266)
@@ -30,6 +40,27 @@
 #define TRAINING_DEBUG	0
 #define LOGLEVEL	0
 
+#define UCT_WRITE_ONLY 			(0xC0032)
+#define UCT_WRITE_PROT 			(0xC0033)
+#define UCCLK_HCLK_ENABLES 		(0xC0080)
+#define MICRO_CONT_MUX_SEL 		(0xD0000)
+#define UCT_SHADOW 			(0xD0004)
+#define DCT_WRITE_ONLY 			(0xD0030)
+#define DCT_WRITE_PROT 			(0xD0031)
+#define UCT_WRITE_ONLY_SHADOW 		(0xD0032)
+#define UCT_DATA_WRITE_ONLY_SHADOW 	(0xD0034)
+#define MICRO_RESET 			(0xD0099)
+
+#define DDRPHY_IMEM_BASE_ADDR 		(0x50000)
+#define DDRPHY_DMEM_BASE_ADDR 		(0x58000)
+#define ACSM_SRAM_BASE_ADDR 		(0x41000)
+#define PSTATE_SRAM_BASE_ADDR 		(0xA0000)
+
+#define LP5_TRAINING_MESSAGE_HWORDS 	(0x200)
+#define LP5_TRAINING_PHYPARA_HWORDS 	(5170)
+#define LP5_TRAINING_ACSMSRAM_HWORDS 	(4096)
+#define LP5_TRAINING_PSSRAM_HWORDS 	(1 << 14)
+
 #define LogMsg(level, format, args...)		\
 	do {					\
 		if (level < LOGLEVEL)		\
@@ -41,6 +72,11 @@ typedef enum {
 	DDR_TYPE_LPDDR5,
 	DDR_TYPE_UNKNOWN
 } ddr_part_type;
+
+typedef enum {
+	DDR_TRAINING_MODE = 0,
+	DDR_QUICKBOOT_MODE
+} ddr_boot_mode;
 
 typedef struct {
 	uint16_t offset;
@@ -106,7 +142,14 @@ typedef struct {
 	uint8_t pdds;
 } ddr_config_t;
 
+typedef struct {
+	PMU_SMB_LPDDR5_1D_t msg;
+	uint16_t phypara[LP5_TRAINING_PHYPARA_HWORDS];
+	uint16_t acsm[LP5_TRAINING_ACSMSRAM_HWORDS];
+} ddr_training_info_t;
+
 extern ddr_part_info* part_info;
+extern const uint8_t lp5_training_fw[], lp4x_training_fw[];
 extern const phy_init_config *lp5_pre_train_table[];
 extern const phy_init_config *lp5_4g_train_table[], *lp5_train_table[];
 extern const ddr_phy_reg_config phy_override_pre_seq_lp5_4g[], phy_override_pre_seq_lp5_16g[];
@@ -116,12 +159,23 @@ extern const phy_init_config *lp4x_pre_train_table[];
 extern const phy_init_config *lp4x_4g_train_table[], *lp4x_8g_train_table[], *lp4x_16g_train_table[];
 extern const ddr_phy_reg_config phy_override_seq_lp4x_8g[], phy_override_seq_lp4x_16g[];
 
+extern void lpddr_init_prepare(ddr_part_info* part_info, ddr_boot_mode ddr_mode);
+extern int lp5_training_prepare(void);
+extern int lp4x_training_prepare(void);
+
 extern void fpga_ddr_init(void);
-extern void lpddr_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info);
+extern void lpddr_silicon_init(uint64_t ddrc_reg_base, ddr_part_info* part_info,
+	ddr_boot_mode ddr_mode, ddr_training_info_t* training_info);
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 
 extern uint32_t major_message_all(unsigned int dphy_base);
 extern void lpddr_training_table_init(unsigned int ddrc_base, const phy_init_config* train_table[],
 	const ddr_phy_reg_config* override_table, ddr_phy_reg_config* io_table);
-extern void init_snps_lp4x_ddrc(unsigned DDRC_BASE, unsigned int rst_code, unsigned int ddr_size_mbyte);
+extern void init_snps_lp4x_ddrc(unsigned DDRC_BASE, unsigned int ddr_size_mbyte,
+	ddr_boot_mode ddr_mode, ddr_training_info_t* training_info);
+
+extern void save_lpddr5_training_result(uint32_t ddrc_base, ddr_training_info_t* training_info);
+extern void init_snps_lp5_ddrc_quick(uint32_t ddrc_base, ddr_training_info_t* training_info);
+extern void load_lp5_quickboot_firmware(uint32_t dphy_base);
+extern void load_lp5_quickboot_dmem(uint32_t dphy_base);
 #endif /* _K3_DDR_H_ */

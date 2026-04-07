@@ -19,6 +19,8 @@
 #include <espi.h>
 #include <tlv_eeprom.h>
 #include <dt-bindings/pinctrl/k3-pinctrl.h>
+#include <asm/sections.h>
+#include <u-boot/crc.h>
 
 #if defined(CONFIG_K3_BOARD_FPGA)
 #define GDB_DOWNLOAD_DEBUG
@@ -40,6 +42,7 @@ extern int board_pmic_init(void);
 extern enum board_boot_mode get_boot_mode(void);
 extern void update_usb_serial_number(void);
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
+extern ulong read_ddr_training_info(struct ddr_info_t *info);
 
 static void spl_load_env(void);
 
@@ -96,6 +99,17 @@ void restore_ddr_pma_attribute(void)
 	asm("sfence.vma zero, zero");
 }
 
+void set_audio_buffer_cacheable(void)
+{
+	/* Audio buffer was set to IO attribute in boot rom,
+	Need to restore it to cachable attribute, so it can
+	be used as data buffer or instruction buffer.
+	*/
+	csr_clear(CSR_PMACFG0, 0xFFUL << 48);
+	csr_set(CSR_PMACFG0, 0x20UL << 48);
+	asm("sfence.vma zero, zero");
+}
+
 int get_product_name(char *name, int max_size)
 {
 	if (NULL == name)
@@ -112,16 +126,47 @@ int get_product_name(char *name, int max_size)
 	return 0;
 }
 
+bool restore_ddr_training_info(void)
+{
+	struct ddr_info_t* info;
+
+	info = (struct ddr_info_t*)DDR_TRAINING_INFO_BUFF;
+	/* Force to do DDR fully training as any condition is met:
+	  USB download mode
+	  SD card boot mode
+	  training info is invalid
+	*/
+	if ((BOOT_MODE_USB == get_boot_mode())
+		|| (BOOT_MODE_SD == get_boot_mode())
+		|| (sizeof(*info) != read_ddr_training_info(info))
+		|| (DDR_TRAINING_INFO_MAGIC != info->magic)
+		|| (info->crc32 != crc32(0, (const uint8_t*)&info->chipid, sizeof(*info) - 8))) {
+		// clear magic, set invalid
+		memset(info, 0, 128);
+		return false;
+	}
+
+	return true;
+}
+
 int spl_board_init_f(void)
 {
 	int ret;
 	struct udevice *dev;
+
+	/* Clear the BSS. */
+	memset(__bss_start, 0, (char *)&__bss_end - __bss_start);
 
 #if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
 	/* init i2c */
 	i2c_init_board();
 #endif
 
+	// use audio buffer as temp data buffer during DDR initialization
+	set_audio_buffer_cacheable();
+#ifdef CONFIG_DDR_TRAINING_SAVE_RESTORE
+	restore_ddr_training_info();
+#endif
 	/* DDR init */
 	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
 	if (ret) {

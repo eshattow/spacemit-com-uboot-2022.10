@@ -203,15 +203,15 @@ wait_for_gd_init:
 	la	t5, board_init_f
 	jalr	t5			/* jump to board_init_f() */
 #ifdef CONFIG_SPL_BUILD
-spl_clear_bss:
-	la	t0, __bss_start
-	la	t1, __bss_end
-	beq	t0, t1, spl_stack_gd_setup
+#spl_clear_bss:
+#	la	t0, __bss_start
+#	la	t1, __bss_end
+#	beq	t0, t1, spl_stack_gd_setup
 
-spl_clear_bss_loop:
-	SREG	zero, 0(t0)
-	addi	t0, t0, REGBYTES
-	blt	t0, t1, spl_clear_bss_loop
+#spl_clear_bss_loop:
+#	SREG	zero, 0(t0)
+#	addi	t0, t0, REGBYTES
+#	blt	t0, t1, spl_clear_bss_loop
 
 spl_stack_gd_setup:
 	jal	spl_relocate_stack_gd

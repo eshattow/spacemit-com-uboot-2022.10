@@ -5,8 +5,6 @@
 
 #include "k3_ddr.h"
 
-#include <linux/kernel.h>
-
 static void phyinit_lp4x_pre_training(unsigned int ddrc_base, unsigned int ddr_size_mbyte)
 {
 	unsigned int offset = 0;
@@ -40,12 +38,14 @@ static void phyinit_lp4x_training(unsigned int ddrc_base, unsigned int ddr_size_
 	}
 }
 
-void init_snps_lp4x_ddrc(unsigned DDRC_BASE, unsigned int rst_code, unsigned int ddr_size_mbyte)
+void init_snps_lp4x_ddrc(unsigned DDRC_BASE, unsigned int ddr_size_mbyte,
+	ddr_boot_mode ddr_mode, ddr_training_info_t* training_info)
 {
 	unsigned int read_data;
 	unsigned int CFG_BASE = DDRC_BASE + 0x600000;
 	unsigned int DPHY_BASE = DDRC_BASE + 0x800000;
 	unsigned int count = 0x100;
+	unsigned int rst_code = 22;
 
 	REG32(DDRC_BASE + 0x00010b84) = 0x00000001;
 	if (4096 == ddr_size_mbyte)
