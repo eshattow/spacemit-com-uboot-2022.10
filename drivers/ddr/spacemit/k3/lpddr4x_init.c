@@ -375,22 +375,28 @@ void init_snps_lp4x_ddrc(unsigned DDRC_BASE, unsigned int ddr_size_mbyte,
 	}
 	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
 
-	phyinit_lp4x_pre_training(DDRC_BASE, ddr_size_mbyte);
+	if (DDR_QUICKBOOT_MODE != ddr_mode) {
+		phyinit_lp4x_pre_training(DDRC_BASE, ddr_size_mbyte);
 
-	REG32(DDRC_BASE + 0x00010180) |= (0x1 << 11);
+		REG32(DDRC_BASE + 0x00010180) |= (0x1 << 11);
 
-	// #include "streaming_message.c"
-	REG32(DPHY_BASE + 0xd0000 * 4) = 0x1;
-	REG32(DPHY_BASE + 0xd0099 * 4) = 0x9;
-	REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
-	REG32(DPHY_BASE + 0xd0099 * 4) = 0x0;
-	major_message_all(DPHY_BASE);
-	REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
-	while (count--)
-		;
-	REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
+		REG32(DPHY_BASE + 0xd0000 * 4) = 0x1;
+		REG32(DPHY_BASE + 0xd0099 * 4) = 0x9;
+		REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
+		REG32(DPHY_BASE + 0xd0099 * 4) = 0x0;
+		major_message_all(DPHY_BASE);
+		REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
+		while (count--)
+			;
+		REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
 
-	phyinit_lp4x_training(DDRC_BASE, ddr_size_mbyte);
+		phyinit_lp4x_training(DDRC_BASE, ddr_size_mbyte);
+
+		// save DDR training info
+		save_snps_ddrc_training_result(DDRC_BASE, training_info);
+	} else {
+		init_snps_ddrc_quick(DDRC_BASE, DDR_TYPE_LPDDR4X, training_info);
+	}
 
 	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
 	REG32(DDRC_BASE + 0x00010510) = 0x00010034;

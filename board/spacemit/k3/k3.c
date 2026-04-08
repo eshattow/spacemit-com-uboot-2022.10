@@ -61,13 +61,13 @@ struct boot_storage_op
 };
 
 static const struct k3_nor_boot_target k3_nor_boot_prio[] = {
-#ifdef CONFIG_NVME
-	{ K3_NOR_BOOT_TARGET_NVME, "nvme", "ssd_devnum",
-	  K3_NOR_SSD_DEVNUM_DEFAULT },
-#endif
 #ifdef CONFIG_SCSI
 	{ K3_NOR_BOOT_TARGET_SCSI, "scsi", "ufs_devnum",
 	  K3_NOR_UFS_DEVNUM_DEFAULT },
+#endif
+#ifdef CONFIG_NVME
+	{ K3_NOR_BOOT_TARGET_NVME, "nvme", "ssd_devnum",
+	  K3_NOR_SSD_DEVNUM_DEFAULT },
 #endif
 #ifdef CONFIG_MMC
 	{ K3_NOR_BOOT_TARGET_MMC, "mmc", "emmc_devnum",
@@ -1222,7 +1222,7 @@ void setenv_boot_mode(void)
 		env_set("boot_device", "nor");
 		/*
 		 * NOR-boot: select external boot device by bootfs presence, with
-		 * priority SSD(NVMe) -> UFS(SCSI) -> eMMC(MMC) -> USB(UMS).
+		 * priority UFS(SCSI) -> SSD(NVMe) -> eMMC(MMC) -> USB(UMS).
 		 */
 		boot_prio = k3_nor_get_boot_prio(&prio_count);
 		for (i = 0; i < prio_count; i++) {
@@ -1530,7 +1530,7 @@ void import_env_from_bootfs(void)
 
 		/*
 		 * NOR-boot boards: prefer loading env from external bootfs with
-		 * explicit priority: SSD(NVMe) -> UFS -> eMMC -> USB.
+		 * explicit priority: UFS -> SSD(NVMe) -> eMMC -> USB.
 		 */
 		boot_prio = k3_nor_get_boot_prio(&prio_count);
 		for (i = 0; i < prio_count; i++) {

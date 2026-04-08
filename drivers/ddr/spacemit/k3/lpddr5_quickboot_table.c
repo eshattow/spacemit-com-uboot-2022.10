@@ -5,7 +5,7 @@
 
 #include "k3_ddr.h"
 
-const uint8_t lp5_quickboot_fw[] = {
+static const uint8_t lp5_quickboot_fw[] = {
 	0x89, 0x4C, 0x5A, 0x4F, 0x00, 0x0D, 0x0A, 0x1A, 0x0A, 0x10, 0x30, 0x20, 0x40, 0x09, 0x40, 0x03,
 	0x09, 0x0E, 0x30, 0x00, 0x31, 0x00, 0x00, 0x81, 0xB6, 0x67, 0x84, 0x9B, 0x19, 0x67, 0x84, 0x9B,
 	0x19, 0x19, 0x6C, 0x70, 0x64, 0x64, 0x72, 0x35, 0x5F, 0x71, 0x75, 0x69, 0x63, 0x6B, 0x62, 0x6F,
@@ -1212,7 +1212,7 @@ const uint8_t lp5_quickboot_fw[] = {
 	0x84, 0x20, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-const uint8_t lp5_quickboot_dmem[] = {
+static const uint8_t lp5_quickboot_dmem[] = {
 	0x89, 0x4C, 0x5A, 0x4F, 0x00, 0x0D, 0x0A, 0x1A, 0x0A, 0x10, 0x30, 0x20, 0x40, 0x09, 0x40, 0x03,
 	0x09, 0x0E, 0x30, 0x00, 0x31, 0x00, 0x00, 0x81, 0xB6, 0x69, 0xC6, 0x3B, 0x1D, 0x69, 0xC6, 0x3B,
 	0x1D, 0x10, 0x64, 0x6D, 0x65, 0x6D, 0x5F, 0x30, 0x78, 0x35, 0x61, 0x61, 0x30, 0x30, 0x2E, 0x62,
@@ -1262,53 +1262,10 @@ const uint8_t lp5_quickboot_dmem[] = {
 
 void load_lp5_quickboot_firmware(uint32_t dphy_base)
 {
-	int i, j, ret;
-	size_t decompress_size;
-	uint16_t* fw_ptr;
-	volatile uint32_t* phy_reg = (uint32_t*)(size_t)dphy_base;
-
-	fw_ptr = (uint16_t*)DDR_QUICKBOOT_FIRMWARE_FW_ADDR;
-	decompress_size = DDR_QUICKBOOT_FIRMWARE_FW_MAX_SIZE;
-	ret = lzop_decompress((uint8_t*)lp5_quickboot_fw, sizeof(lp5_quickboot_fw),
-		(uint8_t*)fw_ptr, &decompress_size);
-
-	if (0 != ret) {
-		pr_err("Failed to decompress LPDDR5 quickboot firmware\n");
-		return;
-	}
-
-	for (i = DDRPHY_IMEM_BASE_ADDR, j = 0; j < decompress_size / sizeof(uint16_t); i++, j++) {
-		phy_reg[i] = fw_ptr[j];
-	}
+	load_decompressed_quickboot_firmware(dphy_base, lp5_quickboot_fw, sizeof(lp5_quickboot_fw));
 }
 
 void load_lp5_quickboot_dmem(uint32_t dphy_base)
 {
-	int i, j, ret;
-	size_t decompress_size;
-	uint16_t* dmem_ptr;
-	volatile uint32_t* phy_reg = (uint32_t*)(size_t)dphy_base;
-
-	dmem_ptr = (uint16_t*)DDR_QUICKBOOT_FIRMWARE_FW_ADDR;
-	decompress_size = DDR_QUICKBOOT_FIRMWARE_FW_MAX_SIZE;
-	ret = lzop_decompress((uint8_t*)lp5_quickboot_dmem, sizeof(lp5_quickboot_dmem),
-		(uint8_t*)dmem_ptr, &decompress_size);
-
-	if (0 != ret) {
-		pr_err("Failed to decompress LPDDR5 quickboot dmem\n");
-		return;
-	}
-
-	for (i = DDRPHY_DMEM_BASE_ADDR + LP5_TRAINING_MESSAGE_HWORDS + LP5_TRAINING_PHYPARA_HWORDS;
-		 i < 0x5aa00; i++) {
-		phy_reg[i] = 0;
-	}
-
-	for (j = 0; j < decompress_size / sizeof(uint16_t); i++, j++) {
-		phy_reg[i] = dmem_ptr[j];
-	}
-
-	for (; i < 0x60000; i++) {
-		phy_reg[i] = 0;
-	}
+	load_decompressed_quickboot_dmem(dphy_base, lp5_quickboot_dmem, sizeof(lp5_quickboot_dmem));
 }
