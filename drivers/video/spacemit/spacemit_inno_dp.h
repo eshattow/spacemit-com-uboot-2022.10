@@ -31,6 +31,7 @@ struct spacemit_inno_dp_priv {
 	struct gpio_desc power;
 	struct gpio_desc enable;
 	struct gpio_desc bl;
+	struct udevice *backlight;
 
 	struct clk pxclk;
 	struct clk mclk;
