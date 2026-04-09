@@ -67,6 +67,12 @@
 	status = "okay";
 };
 
+&pwm18 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm18_2>;
+	status = "okay";
+};
+
 &i2c1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c1_3>;
@@ -457,6 +463,12 @@
 	};
 };
 
+&backlight {
+	pwms = <&pwm18 0 2000>;
+	default-brightness-level = <7>;
+	status = "okay";
+};
+
 &dpu {
 	status = "okay";
 
@@ -476,7 +488,7 @@
 	pinctrl-0 = <&pinctrl_dp0_1>;
 	power-gpios = <&gpio 101 0>;
 	enable-gpios = <&gpio 118 0>;
-	bl-gpios = <&gpio 106 0>;
+	backlight = <&backlight>;
 	status = "okay";
 
 	ports {

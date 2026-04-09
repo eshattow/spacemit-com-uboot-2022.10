@@ -19,6 +19,7 @@
 #include <power/regulator.h>
 #include <linux/delay.h>
 #include <linux/io.h>
+#include <backlight.h>
 
 #include "spacemit_inno_dp.h"
 
@@ -407,10 +408,12 @@ static int spacemit_dp_probe(struct udevice *dev)
 		priv->enable_valid = true;
 	}
 
-	ret = gpio_request_by_name(dev, "bl-gpios", 0, &priv->bl,
-				   GPIOD_IS_OUT);
+
+	ret = uclass_get_device_by_phandle(UCLASS_PANEL_BACKLIGHT, dev,
+					   "backlight", &priv->backlight);
 	if (ret) {
-		pr_debug("%s: Warning: cannot get bl GPIO: ret=%d\n", __func__, ret);
+		pr_info("%s: Warning: cannot get backlight pwm: ret = %d\n",
+			__func__, ret);
 		priv->bl_valid = false;
 	} else {
 		priv->bl_valid = true;
@@ -427,8 +430,14 @@ static int spacemit_dp_probe(struct udevice *dev)
 	}
 
 	if (priv->bl_valid) {
-		dm_gpio_set_value(&priv->bl, 1);
-		mdelay(2);
+			ret = backlight_set_brightness(priv->backlight, BACKLIGHT_DEFAULT);
+			pr_debug("%s: set brightness, ret = %d\n", __func__, ret);
+			if (ret)
+				return ret;
+			ret = backlight_enable(priv->backlight);
+			pr_debug("%s: enable backlight, ret = %d\n", __func__, ret);
+			if (ret)
+				return ret;
 	}
 
 	if ((priv->edp_id == 0) || (priv->edp_id == 1)) {

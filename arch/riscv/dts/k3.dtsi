@@ -481,6 +481,22 @@
 			status = "disabled";
 		};
 
+		pwm18: pwm@d4022800 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xd4022800 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_PWM18>;
+			resets = <&reset RESET_PWM18>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		backlight: backlight {
+			compatible = "pwm-backlight";
+			brightness-levels = <0 4 8 16 32 64 100 128 255>;
+			status = "disabled";
+		};
+
 		pcie_phy0: pcie-phy0@81d00000 {
 			compatible = "spacemit,k3-pcie-phy";
 			reg = <0x0 0x81d00000 0x0 0x1000>,
