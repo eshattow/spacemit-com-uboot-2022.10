@@ -18,6 +18,7 @@
 #include <linux/err.h>
 #include <linux/bug.h>
 #include <linux/iopoll.h>
+#include <linux/kernel.h>
 #include <asm/unaligned.h>
 #include <configs/k3.h>
 #include "ufs.h"
@@ -27,43 +28,10 @@ struct spacemit_k3_ufs_priv {
 	struct reset_ctl reset;
 	u32 phy_mng_base;
 	u32 atop_base;
-	u32 ref_clk_freq; /* Reference clock frequency from DTS */
+	u32 ref_clk_freq;
+	u32 clock_freq_hz;
+	ulong aclk_rate_hz; 
 };
-
-/*UFS PMUAP_REG*/
-#define PMU_MAIN_BASE 0xD4050000
-#define APMU_BASE 0xD4282800
-#define APB_SPARE_BASE 0xD4090000
-
-#define ACGR_REG 0x1024
-#define APB_SPARE8_REG 0x11c
-#define APB_SPARE2_REG 0x104
-#define PMU_UFS_CLK_RES_CTRL_REG 0x268
-
-#define PLAT_EMU_UFS_ACLK_RST_SHIFT 9
-#define PLAT_EMU_UFS_ACLK_EN_SHIFT 10
-#define PLAT_EMU_UFS_ACLK_SEL_SHIFT 11
-#define PLAT_EMU_UFS_ACLK_DIV_SHIFT 14
-#define PLAT_EMU_UFS_ACLK_FC_SHIFT 17
-
-#define PLAT_UFS_ACLK_RST_SHIFT 0
-#define PLAT_UFS_ACLK_EN_SHIFT 1
-#define PLAT_UFS_ACLK_SEL_SHIFT 2
-#define PLAT_UFS_ACLK_DIV_SHIFT 5
-#define PLAT_UFS_ACLK_FC_SHIFT 8
-
-#define PLAT_UFS_ACLK_SEL_WIDTH 3
-#define PLAT_UFS_ACLK_DIV_WIDTH 3
-
-/* ufs_aclk parents in `uboot-2022.10/drivers/clk/spacemit/ccu-k3.c` */
-#define PLAT_UFS_ACLK_SEL_PLL1_D5_491P52 0
-#define PLAT_UFS_ACLK_SEL_PLL1_D6_409P6 1
-
-#define UFS_CLK_SEL 0
-#define UFS_CLK_DIV 1
-
-#define UFS_CLK_SEL_SHIFT 2
-#define UFS_CLK_DIV_SHIFT 5
 /*UFS HOST PHY REGISTER*/
 #define UFS_ARASAN_TOP_BASE 0x1C00
 #define UFS_ARASAN_PHY_MNG_BASE 0x1B00
@@ -127,12 +95,6 @@ struct spacemit_k3_ufs_priv {
 
 /* UFS_MPHY_PU_CTRL bit definitions */
 #define UFS_MPHY_PU_PLL_LOCK BIT(31)
-
-/* UFS controller timing constants for 409MHz SYS1CLK */
-#define UFS_SYS1CLK_1US_409MHZ 409 /* 1us worth of SYS1CLK cycles at ~409MHz */
-#define UFS_TX_SYMBOL_CLK_NS_US_409MHZ \
-	0x800 /* TX symbol clock ns/us ratio for 409MHz */
-#define UFS_PA_LINK_STARTUP_TIMER_MAX 0xffffffff /* Max PA link startup timer */
 #define UFS_DL_AFC0REQTIMEOUTVAL_MAX 0xFFFF
 
 extern int ufshcd_query_descriptor_retry(struct ufs_hba *hba,
@@ -251,54 +213,107 @@ static int spacemit_k3_ufs_set_power_mode(struct ufs_hba *hba)
 	return 0;
 }
 
-static void spacemit_k3_ufs_set_aclk_low_freq(void)
+static int spacemit_k3_ufs_init_aclk(struct udevice *dev)
 {
-	void __iomem *ufs_clk_res_ctrl =
-		(void __iomem *)(ulong)(APMU_BASE + PMU_UFS_CLK_RES_CTRL_REG);
-	u32 reg_val;
+	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
+	ulong rate_hz = 0;
 
-	/*
-	 * Select pll1_d6_409p6 (index 1) as ufs_aclk parent, matching the
-	 * "ufs-low-aclk-freq" init change from the other environment.
-	 */
-	reg_val = readl(ufs_clk_res_ctrl);
-	reg_val &=
-		~GENMASK(PLAT_UFS_ACLK_SEL_SHIFT + PLAT_UFS_ACLK_SEL_WIDTH - 1,
-			 PLAT_UFS_ACLK_SEL_SHIFT);
-	reg_val |= (PLAT_UFS_ACLK_SEL_PLL1_D6_409P6 << PLAT_UFS_ACLK_SEL_SHIFT);
+	if (priv->clock_freq_hz) {
+		rate_hz = clk_set_rate(&priv->aclk, priv->clock_freq_hz);
+		if (IS_ERR_VALUE(rate_hz)) {
+			dev_warn(dev,
+				 "ufs: failed to set aclk to %uHz: %ld, using current rate\n",
+				 priv->clock_freq_hz, (long)rate_hz);
+			rate_hz = 0;
+		}
+	}
 
-	/* aclk = clk_src / (div field + 1) */
-	reg_val &=
-		~GENMASK(PLAT_UFS_ACLK_DIV_SHIFT + PLAT_UFS_ACLK_DIV_WIDTH - 1,
-			 PLAT_UFS_ACLK_DIV_SHIFT);
-	reg_val |= (0 << PLAT_UFS_ACLK_DIV_SHIFT);
+	if (!rate_hz)
+		rate_hz = clk_get_rate(&priv->aclk);
 
-	writel(reg_val, ufs_clk_res_ctrl);
-	pr_debug("ufs: APMU_UFS_CLK_RES_CTRL=0x%x\n", readl(ufs_clk_res_ctrl));
+	if (IS_ERR_VALUE(rate_hz) || !rate_hz) {
+		long err = IS_ERR_VALUE(rate_hz) ? (long)rate_hz : -EINVAL;
+
+		dev_err(dev, "ufs: failed to get aclk rate: %ld\n", err);
+		return err;
+	}
+
+	priv->aclk_rate_hz = rate_hz;
+	return 0;
 }
 
-static void spacemit_k3_ufs_clk_enable(struct spacemit_k3_ufs_priv *priv)
+static int spacemit_k3_ufs_get_aclk_rate(struct ufs_hba *hba, ulong *rate_hz)
 {
+	struct spacemit_k3_ufs_priv *priv = dev_get_priv(hba->dev);
+	ulong rate;
+
+	rate = clk_get_rate(&priv->aclk);
+	if (IS_ERR_VALUE(rate) || !rate)
+		rate = priv->aclk_rate_hz;
+
+	if (!rate) {
+		dev_err(hba->dev, "ufs: invalid aclk rate\n");
+		return -EINVAL;
+	}
+
+	priv->aclk_rate_hz = rate;
+	*rate_hz = rate;
+	return 0;
+}
+
+static int spacemit_k3_ufs_get_sys1clk_1us(struct ufs_hba *hba,
+					   u32 *sys1clk_1us)
+{
+	ulong rate_hz;
+	u32 cycles_per_us;
+	int ret;
+
+	ret = spacemit_k3_ufs_get_aclk_rate(hba, &rate_hz);
+	if (ret)
+		return ret;
+
+	/*
+	 * Bias upward so controller timing derived from SYS1CLK is never
+	 * programmed shorter than the real ACLK period.
+	 */
+	cycles_per_us = DIV_ROUND_UP(rate_hz, 1000000UL);
+	if (!cycles_per_us)
+		return -ERANGE;
+
+	*sys1clk_1us = cycles_per_us;
+	return 0;
+}
+
+static int spacemit_k3_ufs_clk_enable(struct udevice *dev)
+{
+	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
 	int ret;
 
 	/* First deassert reset */
 	ret = reset_deassert(&priv->reset);
 	if (ret) {
-		pr_err("ufs: fail to deassert reset, ret=%d\n", ret);
-		return;
+		dev_err(dev, "ufs: fail to deassert reset, ret=%d\n", ret);
+		return ret;
 	}
 
-	spacemit_k3_ufs_set_aclk_low_freq();
+	ret = spacemit_k3_ufs_init_aclk(dev);
+	if (ret)
+		goto err_assert_reset;
 
 	/* Then enable clock */
 	ret = clk_enable(&priv->aclk);
 	if (ret) {
-		pr_err("ufs: fail to enable ufs aclk, ret=%d\n", ret);
-		return;
+		dev_err(dev, "ufs: fail to enable ufs aclk, ret=%d\n", ret);
+		goto err_assert_reset;
 	}
 
 	/* HYNIX1 phone need delay */
 	mdelay(5);
+	return 0;
+
+err_assert_reset:
+	reset_assert(&priv->reset);
+	return ret;
 }
 
 static void spacemit_k3_ufs_clk_disable(struct spacemit_k3_ufs_priv *priv)
@@ -786,11 +801,31 @@ static bool spacemit_k3_ufs_should_enforce_single_lun(void)
 }
 #endif
 
+static int spacemit_k3_ufs_wait_mphy_pll_lock(struct ufs_hba *hba,
+					      const char *where)
+{
+	struct spacemit_k3_ufs_priv *priv = dev_get_priv(hba->dev);
+	u32 reg_val = 0;
+	int timeout = 10000;
+
+	while (timeout-- > 0) {
+		reg_val = ufshcd_readl(hba, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
+		if (reg_val & UFS_MPHY_PU_PLL_LOCK)
+			return 0;
+		udelay(1);
+	}
+
+	dev_err(hba->dev,
+		"%s: M-PHY PLL lock timeout, UFS_MPHY_PU_CTRL=0x%08x\n",
+		where, reg_val);
+	return -ETIMEDOUT;
+}
+
 static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 {
 	struct udevice *dev = hba->dev;
 	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
-	u32 reg_val;
+	int ret;
 
 	/* reset all mphy logical */
 	ufshcd_writel(hba, 0x003, priv->phy_mng_base + UFS_MPHY_RST_CTRL);
@@ -801,7 +836,8 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 	mdelay(1);
 
 	/* asserted ana_rx_hb8_reset */
-	ufshcd_writel(hba, 0xB7f, priv->phy_mng_base + UFS_MPHY_PU_CTRL);
+	ufshcd_writel(hba, 0xb7f,
+		      priv->phy_mng_base + UFS_MPHY_PU_CTRL);
 	mdelay(1);
 
 	/* deasserted ana_rx_hb8_reset */
@@ -809,39 +845,23 @@ static int spacemit_k3_ufs_mphy_init(struct ufs_hba *hba)
 	mdelay(1);
 
 	/* deasserted ufs device reset & refer clk output enable */
-	ufshcd_writel(hba, 0x101, priv->phy_mng_base + UFS_DEVICE_IO_CTRL);
+	ufshcd_writel(hba, 0x101,
+		      priv->phy_mng_base + UFS_DEVICE_IO_CTRL);
 	mdelay(1);
 
-	/* wait PLL_lock here, bit31 at 0x0104 */
-	{
-		u32 timeout = 100000;
-		do {
-			reg_val = ufshcd_readl(hba, priv->phy_mng_base +
-							    UFS_MPHY_PU_CTRL);
-			pr_debug("ufs: UFS_MPHY_PU_CTRL:0x%x\n", reg_val);
-			if (reg_val & UFS_MPHY_PU_PLL_LOCK)
-				break;
-			udelay(10);
-		} while (--timeout);
+	ret = spacemit_k3_ufs_wait_mphy_pll_lock(hba, __func__);
+	if (ret)
+		return ret;
 
-		if (!(reg_val & UFS_MPHY_PU_PLL_LOCK))
-			pr_err("ufs: MPHY PLL lock timeout in mphy_init, UFS_MPHY_PU_CTRL=0x%x\n",
-			       reg_val);
-		else
-			pr_debug("ufs: MPHY Pll was locked\n");
-	}
-
-	/* force cdr_pi_on, always enable rx_pck20 - commented out per patch */
-#if 0
-	ufshcd_writel(hba, 0x1, priv->phy_mng_base + 0x08);
+	ufshcd_writel(hba, 0x1, priv->phy_mng_base + UFS_MPHY_BKDR_CTRL);
 	udelay(20);
 
-	ufshcd_writel(hba, 0x40, priv->atop_base + (0xC2 << 2));
+	ufshcd_writel(hba, 0x00, priv->atop_base + (ANA_HSGEAR_CTRL_ATTR << 2));
+	ufshcd_writel(hba, 0x00, priv->atop_base + (0xC2 << 2));
 	udelay(20);
 
-	ufshcd_writel(hba, 0x0, priv->phy_mng_base + 0x08);
+	ufshcd_writel(hba, 0x0, priv->phy_mng_base + UFS_MPHY_BKDR_CTRL);
 	udelay(20);
-#endif
 
 	/* HYNIX1 phone: extra settle time after MPHY tuning */
 	mdelay(5);
@@ -868,6 +888,7 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 {
 	int err;
 	u32 real_sysclk, reg_val;
+	u32 tx_symbol_clk_ns_us;
 
 	/* PA_TXHSG1SYNCLENGTH */
 	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TXHSG1SYNCLENGTH), 0x4f);
@@ -909,7 +930,7 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 	}
 
 	/* PA_PEERSCRAMBLING */
-	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_PEERSCRAMBLING), 0x0);
+	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_PEERSCRAMBLING), 0x1);
 	if (err) {
 		pr_err("Writing PA_PEERSCRAMBLING error \n");
 	}
@@ -936,14 +957,14 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 		pr_err("Writing PA_PEER_TX_LCC_ENABLE error \n");
 	}
 
-	/* PA_SCRAMBLING - keep 0x1 for silicon platform (only PA_PEERSCRAMBLING was changed to 0x0) */
+	/* PA_SCRAMBLING */
 	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_SCRAMBLING), 0x1);
 	if (err) {
 		pr_err("Writing PA_SCRAMBLING error \n");
 	}
 
 	/* PA_GRANULARITY */
-	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_GRANULARITY), 0x6);
+	err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_GRANULARITY), 0x1);
 	if (err) {
 		pr_err("Writing PA_GRANULARITY error \n");
 	}
@@ -1082,14 +1103,24 @@ static int spacemit_k3_ufs_unipro_init(struct ufs_hba *hba)
 
 	pr_debug("ufs: ufs_spacemit_k3_uniprov1p6_init done.\n");
 
-	/* program controller timing registers for 409MHz SYS1CLK */
-	real_sysclk = UFS_SYS1CLK_1US_409MHZ;
+	err = spacemit_k3_ufs_get_sys1clk_1us(hba, &real_sysclk);
+	if (err) {
+		dev_err(hba->dev, "ufs: failed to derive SYS1CLK_1US: %d\n",
+			err);
+		return err;
+	}
+
 	ufshcd_writel(hba, real_sysclk, UFS_SYS1CLK_1US_REG);
 
-	reg_val = UFS_TX_SYMBOL_CLK_NS_US_409MHZ;
+	tx_symbol_clk_ns_us = DIV_ROUND_CLOSEST(1000U, real_sysclk);
+	if (!tx_symbol_clk_ns_us)
+		tx_symbol_clk_ns_us = 1;
+
+	reg_val = tx_symbol_clk_ns_us << 10;
 	ufshcd_writel(hba, reg_val, UFS_TX_SYMBOL_CLK_NS_US_REG);
 
-	reg_val = UFS_PA_LINK_STARTUP_TIMER_MAX;
+	reg_val = real_sysclk * 100000;
+	reg_val &= ~0xfU;
 	ufshcd_writel(hba, reg_val, UFS_PA_LINK_STARTUP_TIMER_REG);
 
 	/* HYNIX1 phone need delay*/
@@ -1119,9 +1150,6 @@ static int
 spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 				    enum ufs_notify_change_status status)
 {
-	struct udevice *dev = hba->dev;
-	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
-
 	uint32_t reg_val;
 
 	pr_debug("ufs: spacemit_k3_ufs_link_startup_notify, status:%d\n",
@@ -1215,22 +1243,8 @@ spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 		ufshcd_dme_set(hba, UIC_ARG_MIB(ANA_HSGEAR_CTRL_ATTR), 0x25);
 		mdelay(10);
 
-		/* wait PLL_lock here, bit31 at UFS_MPHY_PU_CTRL */
-		{
-			u32 timeout = 100000;
-			do {
-				reg_val = ufshcd_readl(
-					hba,
-					priv->phy_mng_base + UFS_MPHY_PU_CTRL);
-				if (reg_val & UFS_MPHY_PU_PLL_LOCK)
-					break;
-				udelay(10);
-			} while (--timeout);
-
-			if (!(reg_val & UFS_MPHY_PU_PLL_LOCK))
-				pr_err("ufs: MPHY PLL lock timeout, UFS_MPHY_PU_CTRL=0x%x\n",
-				       reg_val);
-		}
+		if (spacemit_k3_ufs_wait_mphy_pll_lock(hba, __func__))
+			return -ETIMEDOUT;
 	}
 
 	return 0;
@@ -1240,6 +1254,8 @@ static int
 spacemit_k3_ufs_hce_enable_notify(struct ufs_hba *hba,
 				  enum ufs_notify_change_status status)
 {
+	int ret;
+
 	pr_debug("ufs: spacemit_k3_ufs_hce_enable_notify, status:%d\n", status);
 
 	if (status == PRE_CHANGE) {
@@ -1247,8 +1263,13 @@ spacemit_k3_ufs_hce_enable_notify(struct ufs_hba *hba,
 	}
 
 	if (status == POST_CHANGE) {
-		spacemit_k3_ufs_mphy_init(hba);
-		spacemit_k3_ufs_unipro_init(hba);
+		ret = spacemit_k3_ufs_mphy_init(hba);
+		if (ret)
+			return ret;
+
+		ret = spacemit_k3_ufs_unipro_init(hba);
+		if (ret)
+			return ret;
 
 		/* Disable auto-hibern8 during bringup */
 		ufshcd_writel(hba, 0, REG_AUTO_HIBERNATE_IDLE_TIMER);
@@ -1296,7 +1317,9 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 	int retries;
 
 	/* Bring clocks/reset up as early as possible */
-	spacemit_k3_ufs_clk_enable(priv);
+	ret = spacemit_k3_ufs_clk_enable(dev);
+	if (ret)
+		return ret;
 
 #if defined(CONFIG_SPL_BUILD)
 	/*
@@ -1425,13 +1448,29 @@ static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 		}
 	}
 
-	ret = clk_get_by_index(dev, 0, &priv->aclk);
+	ret = dev_read_u32(dev, "clock-freq", &priv->clock_freq_hz);
+	if (ret)
+		priv->clock_freq_hz = 0;
+
+	ret = clk_get_by_name(dev, "aclk", &priv->aclk);
+	if (ret) {
+		dev_warn(dev,
+			 "ufs: failed to get aclk by name, fallback to index 0, ret=%d\n",
+			 ret);
+		ret = clk_get_by_index(dev, 0, &priv->aclk);
+	}
 	if (ret) {
 		dev_err(dev, "ufs: failed to get aclk, ret=%d\n", ret);
 		return ret;
 	}
 
-	ret = reset_get_by_index(dev, 0, &priv->reset);
+	ret = reset_get_by_name(dev, "aclk_reset", &priv->reset);
+	if (ret) {
+		dev_warn(dev,
+			 "ufs: failed to get reset by name, fallback to index 0, ret=%d\n",
+			 ret);
+		ret = reset_get_by_index(dev, 0, &priv->reset);
+	}
 	if (ret) {
 		dev_err(dev, "ufs: failed to get reset, ret=%d\n", ret);
 		return ret;
