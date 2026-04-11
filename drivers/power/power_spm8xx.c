@@ -27,6 +27,7 @@ SY8810L_BUCK_LINER_RANGE;SY8810L_REGULATOR_DESC;
 #endif
 
 MPQ8655_BUCK_LINER_RANGE;MPQ8655_REGULATOR_DESC;
+IS6615A_BUCK_LINER_RANGE;IS6615A_REGULATOR_DESC;
 
 static const char *global_compatible[] = {
 	"spacemit,spm8821",
@@ -38,22 +39,33 @@ static const char *global_compatible[] = {
 
 struct tlv_pmic_info {
 	const char *name;
-	const char *compatible;
+	const char *compatibles[2];
 };
 
 static const struct tlv_pmic_info tlv_pmic_infos[] = {
 	{
 		.name = "mpq8655",
-		.compatible = "spacemit,mpq8655",
+		.compatibles = {
+			"spacemit,mpq8655",
+		},
+	},
+	{
+		.name = "is6615a",
+		.compatibles = {
+			"spacemit,is6615a-1",
+			"spacemit,is6615a-2",
+		},
 	},
 };
 
 #define TLV_PMIC_TYPE_MAX_LEN	32
+#define RCPU_CORE1_BOOT_ENTRY_HI	0xc0880090
 
-static const char *board_pmic_tlv_compatible(void)
+static const struct tlv_pmic_info *board_pmic_tlv_info(void)
 {
 	uint8_t pmic_name[TLV_PMIC_TYPE_MAX_LEN] = { 0 };
 	int i;
+	int j;
 	int ret;
 
 	ret = get_tlvinfo(TLV_CODE_PMIC_TYPE, pmic_name, sizeof(pmic_name) - 1);
@@ -61,13 +73,21 @@ static const char *board_pmic_tlv_compatible(void)
 		pmic_name[sizeof(pmic_name) - 1] = '\0';
 
 		for (i = 0; i < ARRAY_SIZE(tlv_pmic_infos); ++i) {
-			if (!strcmp((const char *)pmic_name, tlv_pmic_infos[i].name) ||
-			    !strcmp((const char *)pmic_name, tlv_pmic_infos[i].compatible))
-				return tlv_pmic_infos[i].compatible;
+			if (!strcmp((const char *)pmic_name, tlv_pmic_infos[i].name)) {
+				writel(i, (void __iomem *)RCPU_CORE1_BOOT_ENTRY_HI);
+				return &tlv_pmic_infos[i];
+			}
+
+			for (j = 0; j < ARRAY_SIZE(tlv_pmic_infos[i].compatibles); ++j) {
+				if (!tlv_pmic_infos[i].compatibles[j])
+					continue;
+				if (!strcmp((const char *)pmic_name, tlv_pmic_infos[i].compatibles[j]))
+					return &tlv_pmic_infos[i];
+			}
 		}
 	}
 
-	return tlv_pmic_infos[0].compatible;
+	return &tlv_pmic_infos[0];
 }
 
 #define NRESET_BIT	(1 << 6)
@@ -79,6 +99,14 @@ static const char *board_pmic_tlv_compatible(void)
 #define EXT1_SLP_SD	(1 << 1)
 #define EXT3_SLP_SD	(1 << 3)
 
+#define MPQ8655_COMPAT_PREFIX	"spacemit,mpq8655"
+#define IS6615A_COMPAT_PREFIX	"spacemit,is6615a"
+
+static bool pmic_name_match(const char *name, const char *prefix)
+{
+	return !strncmp(name, prefix, strlen(prefix));
+}
+
 void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck_desc,
 		const struct pm8xx_buck_desc **ldo_desc, int *num_buck, int *num_ldo)
 {
@@ -87,9 +115,14 @@ void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck
 		*num_buck = sizeof(spm8821_buck_desc) / sizeof(spm8821_buck_desc[0]);
 		*ldo_desc = spm8821_ldo_desc;
 		*num_ldo = sizeof(spm8821_ldo_desc) / sizeof(spm8821_ldo_desc[0]);
-	} else if (strcmp(name, "spacemit,mpq8655") == 0) {
+	} else if (pmic_name_match(name, MPQ8655_COMPAT_PREFIX)) {
 		*buck_desc = mpq8655_buck_desc;
 		*num_buck = sizeof(mpq8655_buck_desc) / sizeof(mpq8655_buck_desc[0]);
+		*ldo_desc = NULL;
+		*num_ldo = 0;
+	} else if (pmic_name_match(name, IS6615A_COMPAT_PREFIX)) {
+		*buck_desc = is6615a_buck_desc;
+		*num_buck = sizeof(is6615a_buck_desc) / sizeof(is6615a_buck_desc[0]);
 		*ldo_desc = NULL;
 		*num_ldo = 0;
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
@@ -132,108 +165,6 @@ static int linear_range_get_value(const struct pm8xx_linear_range *r, unsigned i
 }
 
 /**
- * linear_range_get_value_array - fetch a value from array of ranges
- * @r:	  pointer to array of linear ranges where value is looked from
- * @ranges:     amount of ranges in an array
- * @selector:   selector for which the value is searched
- * @val:	address where found value is updated
- *
- * Search through an array of ranges for value which matches given selector.
- *
- * Return: 0 on success, -EINVAL given selector is not found from any of the
- * ranges.
- */
-static int linear_range_get_value_array(const struct pm8xx_linear_range *r, int ranges,
-				 unsigned int selector, unsigned int *val)
-{
-	int i;
-
-	for (i = 0; i < ranges; i++)
-		if (r[i].min_sel <= selector && r[i].max_sel >= selector)
-			return linear_range_get_value(&r[i], selector, val);
-
-	return -EINVAL;
-}
-
-/**
- * regulator_desc_list_voltage_linear_range - List voltages for linear ranges
- *
- * @desc: Regulator desc for regulator which volatges are to be listed
- * @selector: Selector to convert into a voltage
- *
- * Regulators with a series of simple linear mappings between voltages
- * and selectors who have set linear_ranges in the regulator descriptor
- * can use this function prior regulator registration to list voltages.
- * This is useful when voltages need to be listed during device-tree
- * parsing.
- */
-static int regulator_desc_list_voltage_linear_range(const struct pm8xx_buck_desc *desc,
-					     unsigned int selector)
-{
-	unsigned int val;
-	int ret;
-
-	BUG_ON(!desc->n_linear_ranges);
-
-	ret = linear_range_get_value_array(desc->linear_ranges,
-					   desc->n_linear_ranges, selector,
-					   &val);
-	if (ret)
-		return ret;
-
-	return val;
-}
-
-/**
- * linear_range_get_max_value - return the largest value in a range
- * @r:	  pointer to linear range where value is looked from
- *
- * Return: the largest value in the given range
- */
-static unsigned int linear_range_get_max_value(const struct pm8xx_linear_range *r)
-{
-	return r->min + (r->max_sel - r->min_sel) * r->step;
-}
-
-/**
- * linear_range_get_selector_high - return linear range selector for value
- * @r:	  pointer to linear range where selector is looked from
- * @val:	value for which the selector is searched
- * @selector:   address where found selector value is updated
- * @found:      flag to indicate that given value was in the range
- *
- * Return selector for which range value is closest match for given
- * input value. Value is matching if it is equal or higher than given
- * value. If given value is in the range, then @found is set true.
- *
- * Return: 0 on success, -EINVAL if range is invalid or does not contain
- * value greater or equal to given value
- */
-static int linear_range_get_selector_high(const struct pm8xx_linear_range *r,
-				   unsigned int val, unsigned int *selector,
-				   bool *found)
-{
-	*found = false;
-
-	if (linear_range_get_max_value(r) < val)
-		return -EINVAL;
-
-	if (r->min > val) {
-		*selector = r->min_sel;
-		return 0;
-	}
-
-	*found = true;
-
-	if (r->step == 0)
-		*selector = r->max_sel;
-	else
-		*selector = DIV_ROUND_UP(val - r->min, r->step) + r->min_sel;
-
-	return 0;
-}
-
-/**
  * regulator_map_voltage_linear_range - map_voltage() for multiple linear ranges
  *
  * @rdev: Regulator to operate on
@@ -246,39 +177,66 @@ static int linear_range_get_selector_high(const struct pm8xx_linear_range *r,
 static int regulator_map_voltage_linear_range(const struct pm8xx_buck_desc *desc,
 				       int min_uV, int max_uV)
 {
-	const struct pm8xx_linear_range *range;
-	int ret = -EINVAL;
-	unsigned int sel;
-	bool found;
-	int voltage, i;
+	int best_sel = -EINVAL;
+	int best_voltage = 0;
+	int best_diff = INT_MAX;
+	int best_below_sel = -EINVAL;
+	int best_below_voltage = 0;
+	int best_below_diff = INT_MAX;
+	unsigned int value;
+	int target_uV;
+	int i;
+	bool used_fallback = false;
 
 	if (!desc->n_linear_ranges) {
 		BUG_ON(!desc->n_linear_ranges);
 		return -EINVAL;
 	}
 
+	target_uV = min_uV;
+
 	for (i = 0; i < desc->n_linear_ranges; i++) {
-		range = &desc->linear_ranges[i];
+		const struct pm8xx_linear_range *range = &desc->linear_ranges[i];
+		unsigned int sel;
 
-		ret = linear_range_get_selector_high(range, min_uV, &sel,
-						     &found);
-		if (ret)
-			continue;
-		ret = sel;
+		for (sel = range->min_sel; sel <= range->max_sel; sel++) {
+			int voltage;
+			int diff;
 
-		/*
-		 * Map back into a voltage to verify we're still in bounds.
-		 * If we are not, then continue checking rest of the ranges.
-		 */
-		voltage = regulator_desc_list_voltage_linear_range(desc, sel);
-		if (voltage >= min_uV && voltage <= max_uV)
-			break;
+			if (linear_range_get_value(range, sel, &value))
+				continue;
+
+			voltage = value;
+			diff = abs(voltage - target_uV);
+
+			if (voltage >= min_uV && voltage <= max_uV) {
+				if (diff < best_diff ||
+				    (diff == best_diff && voltage > best_voltage)) {
+					best_diff = diff;
+					best_sel = sel;
+					best_voltage = voltage;
+				}
+			} else if (voltage <= max_uV) {
+				if (diff < best_below_diff ||
+				    (diff == best_below_diff && voltage > best_below_voltage)) {
+					best_below_diff = diff;
+					best_below_sel = sel;
+					best_below_voltage = voltage;
+				}
+			}
+		}
 	}
 
-	if (i == desc->n_linear_ranges)
+	if (best_sel < 0 && best_below_sel >= 0) {
+		used_fallback = true;
+		best_sel = best_below_sel;
+		best_voltage = best_below_voltage;
+	}
+
+	if (best_sel < 0)
 		return -EINVAL;
 
-	return ret;
+	return best_sel;
 }
 
 static int __board_pmic_init(const char *name)
@@ -286,7 +244,7 @@ static int __board_pmic_init(const char *name)
 	unsigned char regval;
 	unsigned char regvals[2];
 	const char *s;
-	u32 value, min, max;
+	u32 value, min, max, req_value;
 	const struct pm8xx_buck_desc *buck_desc, *ldo_desc;
 	int offset, ret, sub_offset, len, saddr, i, num_buck, num_ldo, sel;
 
@@ -369,15 +327,21 @@ static int __board_pmic_init(const char *name)
 			continue;
 
 		value = fdtdec_get_uint(gd->fdt_blob, sub_offset, "regulator-init-microvolt", 0);
+		req_value = value;
 
 		/* find wich dcdc or ldo */
 		s = fdt_get_name(gd->fdt_blob, sub_offset, &len);
 
-		if (strncmp(name, "spacemit,mpq8655", 15) == 0) {
+		if (pmic_name_match(name, MPQ8655_COMPAT_PREFIX)) {
 			if ((strncmp(s, "EDCDC_REG", 9) == 0)) {
 				/* set the regulator */
 				if (value) {
 					sel = regulator_map_voltage_linear_range(buck_desc, value, value);
+					if (sel >= 0) {
+						unsigned int rounded_uV;
+
+						linear_range_get_value(&buck_desc[0].linear_ranges[0], sel, &rounded_uV);
+					}
 
 					/* default:0.9v */
 					regvals[0] = 0x9b;
@@ -393,15 +357,38 @@ static int __board_pmic_init(const char *name)
 
 						regvals[0] = value & 0xff;
 						regvals[1] = (value >> 8) & 0xff;
-						i2c_write(saddr, buck_desc[i].vsel_reg, 1, regvals, 2);
+						i2c_write(saddr, buck_desc[0].vsel_reg, 1, regvals, 2);
 					}
+				}
+			}
+		} else if (pmic_name_match(name, IS6615A_COMPAT_PREFIX)) {
+			if ((strncmp(s, "EDCDC_REG", 9) == 0)) {
+				for (i = 0; i < num_buck; ++i) {
+					if (strcmp(buck_desc[i].name, s) != 0)
+						continue;
+
+					/* set the regulator */
+					if (value) {
+						sel = regulator_map_voltage_linear_range(buck_desc + i, value, max);
+						i2c_read(saddr, 0x20, 1, regvals, 1);
+						if (sel >= 0) {
+							sel <<= ffs(buck_desc[i].vsel_msk) - 1;
+							i2c_read(saddr, buck_desc[i].vsel_reg, 1, regvals, 2);
+							value = regvals[0] | ((unsigned short)regvals[1] << 8);
+							value = (value & ~buck_desc[i].vsel_msk) | sel;
+
+							regvals[0] = value & 0xff;
+							regvals[1] = (value >> 8) & 0xff;
+							i2c_write(saddr, buck_desc[i].vsel_reg, 1, regvals, 2);
+						}
+					}
+					break;
 				}
 			}
 		} else {
 			if ((strncmp(s, "DCDC_REG", 8) == 0) || (strncmp(s, "EDCDC_REG", 9) == 0)) {
 				for (i = 0; i < num_buck; ++i) {
 					if (strcmp(buck_desc[i].name, s) == 0) {
-
 						/* enable the regulator */
 						i2c_read(saddr, buck_desc[i].enable_reg, 1, &regval, 1);
 						regval |= (1 << (ffs(buck_desc[i].enable_msk) - 1));
@@ -410,7 +397,6 @@ static int __board_pmic_init(const char *name)
 						/* set the regulator */
 						if (value) {
 							sel = regulator_map_voltage_linear_range(buck_desc + i, value, value);
-
 							if (sel >= 0) {
 								sel <<= ffs(buck_desc[i].vsel_msk) - 1;
 								i2c_read(saddr, buck_desc[i].vsel_reg, 1, &regval, 1);
@@ -456,14 +442,18 @@ static int __board_pmic_init(const char *name)
 
 int board_pmic_init(void)
 {
-	const char *pmic_compatible;
-	int i;
+	const struct tlv_pmic_info *pmic_info;
+	int i, j;
 
 	for (i = 0; i < sizeof(global_compatible) / sizeof(global_compatible[0]); ++i)
 		__board_pmic_init(global_compatible[i]);
 
-	pmic_compatible = board_pmic_tlv_compatible();
-	__board_pmic_init(pmic_compatible);
+	pmic_info = board_pmic_tlv_info();
+	for (j = 0; j < ARRAY_SIZE(pmic_info->compatibles); ++j) {
+		if (!pmic_info->compatibles[j])
+			continue;
+		__board_pmic_init(pmic_info->compatibles[j]);
+	}
 
 	return 0;
 }
