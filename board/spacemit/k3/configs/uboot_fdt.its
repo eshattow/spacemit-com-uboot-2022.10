@@ -97,6 +97,16 @@
 				algo = "crc32";
 			};
 		};
+
+		fdt_9 {
+			description = "k3_evb2-2.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3_evb2-2.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -147,6 +157,12 @@
 			description = "k3_gemini_c1";
 			loadables = "uboot";
 			fdt = "fdt_8";
+		};
+
+		conf_9 {
+			description = "k3_evb2-2";
+			loadables = "uboot";
+			fdt = "fdt_9";
 		};
 	};
 };
