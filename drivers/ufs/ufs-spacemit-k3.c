@@ -407,6 +407,16 @@ out:
 
 #define SPACEMIT_UFS_CONFIG_LUN_SLOTS 8
 #define SPACEMIT_UFS_UNIT_DESC_PARAM_LU_ENABLE 0x03
+#define SPACEMIT_UFS_UNIT_DESC_PARAM_BOOT_LU_ID 0x04
+#define SPACEMIT_UFS_UNIT_DESC_PARAM_LU_WRI_PRO 0x05
+#define SPACEMIT_UFS_UNIT_DESC_PARAM_MEM_TYPE 0x08
+#define SPACEMIT_UFS_UNIT_DESC_PARAM_DATA_RELY 0x09
+#define SPACEMIT_UFS_UNIT_DESC_PARAM_LOGIC_BLK_SIZE 0x0A
+#define SPACEMIT_UFS_UNIT_DESC_PARAM_PROVIS_TYPE 0x17
+#define SPACEMIT_UFS_UNIT_DESC_PARAM_CON_CAP 0x20
+#define SPACEMIT_UFS_UNIT_DESC_PARAM_LUN_WB_BUF_ALLOC_UNIT 0x29
+#define SPACEMIT_K3_UFS_RECONF_SETTLE_MS 300
+#define SPACEMIT_UFS_DEFAULT_LOGICAL_BLK_SIZE 12
 
 static __maybe_unused int
 spacemit_k3_ufs_get_conf_desc_layout(struct ufs_hba *hba, int *head_desc_size,
@@ -457,6 +467,36 @@ static bool spacemit_k3_ufs_is_conf_desc_layout_valid(struct ufs_hba *hba,
 	       hba->desc_size.conf_desc;
 }
 
+static int spacemit_k3_ufs_get_conf_desc_layout_from_dev_desc(
+	struct ufs_hba *hba, int *head_desc_size, int *unit_desc_size)
+{
+	u8 desc_buf[QUERY_DESC_MAX_SIZE];
+	int desc_size = hba->desc_size.dev_desc;
+	int ret;
+
+	if (desc_size <= DEVICE_DESC_PARAM_UD_LEN ||
+	    desc_size > QUERY_DESC_MAX_SIZE)
+		desc_size = QUERY_DESC_DEVICE_DEF_SIZE;
+
+	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
+					    QUERY_DESC_IDN_DEVICE, 0, 0,
+					    desc_buf, &desc_size);
+	if (ret)
+		return ret;
+
+	if (desc_size <= DEVICE_DESC_PARAM_UD_LEN)
+		return -EINVAL;
+
+	*head_desc_size = desc_buf[DEVICE_DESC_PARAM_UD_OFFSET];
+	*unit_desc_size = desc_buf[DEVICE_DESC_PARAM_UD_LEN];
+
+	if (!spacemit_k3_ufs_is_conf_desc_layout_valid(
+		    hba, *head_desc_size, *unit_desc_size))
+		return -EINVAL;
+
+	return 0;
+}
+
 static int spacemit_k3_ufs_read_unit_lu_state(struct ufs_hba *hba,
 					      u8 *unit_lu_enabled,
 					      int *enabled_lun_count)
@@ -499,6 +539,284 @@ static int spacemit_k3_ufs_read_unit_lu_state(struct ufs_hba *hba,
 	return any_read_ok ? 0 : -EIO;
 }
 
+static int spacemit_k3_ufs_map_query_error(int ret)
+{
+	if (ret <= 0)
+		return ret;
+
+	switch (ret) {
+	case QUERY_RESULT_INVALID_LENGTH:
+	case QUERY_RESULT_INVALID_VALUE:
+	case QUERY_RESULT_INVALID_SELECTOR:
+	case QUERY_RESULT_INVALID_INDEX:
+	case QUERY_RESULT_INVALID_IDN:
+	case QUERY_RESULT_INVALID_OPCODE:
+		return -EINVAL;
+	case QUERY_RESULT_NOT_WRITEABLE:
+		return -EROFS;
+	case QUERY_RESULT_ALREADY_WRITTEN:
+		return -EALREADY;
+	case QUERY_RESULT_NOT_READABLE:
+		return -EACCES;
+	default:
+		return -EIO;
+	}
+}
+
+static void spacemit_k3_ufs_log_unrecoverable_query_error(struct ufs_hba *hba,
+							  int query_ret)
+{
+	switch (query_ret) {
+	case QUERY_RESULT_NOT_WRITEABLE:
+		dev_err(hba->dev,
+			"ufs: configuration descriptor is not writable; cannot move capacity to LU0 (unrecoverable)\n");
+		break;
+	case QUERY_RESULT_ALREADY_WRITTEN:
+		dev_err(hba->dev,
+			"ufs: configuration descriptor was already written by the device and cannot be changed again (unrecoverable)\n");
+		break;
+	default:
+		break;
+	}
+}
+
+static bool spacemit_k3_ufs_conf_unit_has_template(const u8 *desc_buf,
+						   int head_desc_size,
+						   int unit_desc_size, int lun)
+{
+	int offset;
+
+	if (lun < 0 || lun >= SPACEMIT_UFS_CONFIG_LUN_SLOTS)
+		return false;
+
+	if (unit_desc_size <= CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE)
+		return false;
+
+	offset = head_desc_size + unit_desc_size * lun;
+	return desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE] != 0;
+}
+
+static void spacemit_k3_ufs_copy_conf_unit(struct ufs_hba *hba, u8 *desc_buf,
+					   int head_desc_size, int unit_desc_size,
+					   int src_lun, int dst_lun)
+{
+	int src_offset;
+	int dst_offset;
+
+	if (src_lun == dst_lun ||
+	    src_lun < 0 || src_lun >= SPACEMIT_UFS_CONFIG_LUN_SLOTS ||
+	    dst_lun < 0 || dst_lun >= SPACEMIT_UFS_CONFIG_LUN_SLOTS)
+		return;
+
+	src_offset = head_desc_size + unit_desc_size * src_lun;
+	dst_offset = head_desc_size + unit_desc_size * dst_lun;
+	memcpy(&desc_buf[dst_offset], &desc_buf[src_offset], unit_desc_size);
+	dev_dbg(hba->dev, "ufs: copied config template LU%d -> LU%d\n",
+		src_lun, dst_lun);
+}
+
+static bool spacemit_k3_ufs_no_template_error(int ret)
+{
+	return ret == -ENODATA || ret == -EINVAL || ret == -EACCES;
+}
+
+static int spacemit_k3_ufs_read_unit_desc(struct ufs_hba *hba, int lun,
+					  u8 *unit_desc, int *desc_size)
+{
+	int size = hba->desc_size.unit_desc;
+	int ret;
+
+	if (size <= SPACEMIT_UFS_UNIT_DESC_PARAM_LOGIC_BLK_SIZE ||
+	    size > QUERY_DESC_MAX_SIZE)
+		size = QUERY_DESC_UNIT_DEF_SIZE;
+
+	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
+					    QUERY_DESC_IDN_UNIT, lun, 0,
+					    unit_desc, &size);
+	if (ret)
+		return spacemit_k3_ufs_map_query_error(ret);
+
+	*desc_size = size;
+	return 0;
+}
+
+static int spacemit_k3_ufs_apply_unit_desc_to_conf_unit(struct ufs_hba *hba,
+							 u8 *desc_buf,
+							 int unit_offset,
+							 int conf_unit_desc,
+							 int lun,
+							 bool require_enabled)
+{
+	u8 unit_desc[QUERY_DESC_MAX_SIZE];
+	int desc_size;
+	int ret;
+
+	ret = spacemit_k3_ufs_read_unit_desc(hba, lun, unit_desc, &desc_size);
+	if (ret)
+		return ret;
+
+	if (desc_size <= SPACEMIT_UFS_UNIT_DESC_PARAM_LU_ENABLE)
+		return -ENODATA;
+
+	if (require_enabled &&
+	    unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_LU_ENABLE] != 0x1)
+		return -ENODATA;
+
+	if (desc_size <= SPACEMIT_UFS_UNIT_DESC_PARAM_LOGIC_BLK_SIZE ||
+	    !unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_LOGIC_BLK_SIZE])
+		return -ENODATA;
+
+	if (conf_unit_desc > CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID &&
+	    desc_size > SPACEMIT_UFS_UNIT_DESC_PARAM_BOOT_LU_ID)
+		desc_buf[unit_offset + CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID] =
+			unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_BOOT_LU_ID];
+
+	if (conf_unit_desc > CONFIG_DESC_UNIT_PARAM_LU_WRI_PRO &&
+	    desc_size > SPACEMIT_UFS_UNIT_DESC_PARAM_LU_WRI_PRO)
+		desc_buf[unit_offset + CONFIG_DESC_UNIT_PARAM_LU_WRI_PRO] =
+			unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_LU_WRI_PRO];
+
+	if (conf_unit_desc > CONFIG_DESC_UNIT_PARAM_MEM_TYPE &&
+	    desc_size > SPACEMIT_UFS_UNIT_DESC_PARAM_MEM_TYPE)
+		desc_buf[unit_offset + CONFIG_DESC_UNIT_PARAM_MEM_TYPE] =
+			unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_MEM_TYPE];
+
+	if (conf_unit_desc > CONFIG_DESC_UNIT_PARAM_DATA_RELY &&
+	    desc_size > SPACEMIT_UFS_UNIT_DESC_PARAM_DATA_RELY)
+		desc_buf[unit_offset + CONFIG_DESC_UNIT_PARAM_DATA_RELY] =
+			unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_DATA_RELY];
+
+	if (conf_unit_desc > CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE &&
+	    desc_size > SPACEMIT_UFS_UNIT_DESC_PARAM_LOGIC_BLK_SIZE)
+		desc_buf[unit_offset + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE] =
+			unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_LOGIC_BLK_SIZE];
+
+	if (conf_unit_desc > CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE &&
+	    desc_size > SPACEMIT_UFS_UNIT_DESC_PARAM_PROVIS_TYPE)
+		desc_buf[unit_offset + CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE] =
+			unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_PROVIS_TYPE];
+
+	if (conf_unit_desc >= CONFIG_DESC_UNIT_PARAM_CON_CAP + 2 &&
+	    desc_size >= SPACEMIT_UFS_UNIT_DESC_PARAM_CON_CAP + 2)
+		put_unaligned_be16(
+			get_unaligned_be16(
+				&unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_CON_CAP]),
+			&desc_buf[unit_offset + CONFIG_DESC_UNIT_PARAM_CON_CAP]);
+
+	if (conf_unit_desc >= CONFIG_DESC_UNIT_PARAM_LUN_WB_BUF_ALLOC_UNIT + 4 &&
+	    desc_size >= SPACEMIT_UFS_UNIT_DESC_PARAM_LUN_WB_BUF_ALLOC_UNIT + 4)
+		put_unaligned_be32(
+			get_unaligned_be32(
+				&unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_LUN_WB_BUF_ALLOC_UNIT]),
+			&desc_buf[unit_offset +
+				  CONFIG_DESC_UNIT_PARAM_LUN_WB_BUF_ALLOC_UNIT]);
+
+	dev_dbg(hba->dev,
+		"ufs: populated LU0 config template from UNIT descriptor LU%d\n",
+		lun);
+	return 0;
+}
+
+static int spacemit_k3_ufs_find_conf_template_lun(const u8 *desc_buf,
+						  int head_desc_size,
+						  int unit_desc_size,
+						  const u8 *unit_lu_enabled,
+						  bool have_unit_state,
+						  int preferred_lun)
+{
+	int i;
+
+	if (preferred_lun >= 0 &&
+	    preferred_lun < SPACEMIT_UFS_CONFIG_LUN_SLOTS &&
+	    spacemit_k3_ufs_conf_unit_has_template(desc_buf, head_desc_size,
+						   unit_desc_size,
+						   preferred_lun))
+		return preferred_lun;
+
+	if (have_unit_state) {
+		for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+			if (!unit_lu_enabled[i])
+				continue;
+			if (spacemit_k3_ufs_conf_unit_has_template(
+				    desc_buf, head_desc_size, unit_desc_size, i))
+				return i;
+		}
+	}
+
+	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+		if (spacemit_k3_ufs_conf_unit_has_template(desc_buf,
+							    head_desc_size,
+							    unit_desc_size, i))
+			return i;
+	}
+
+	return -1;
+}
+
+static int
+spacemit_k3_ufs_apply_any_unit_desc_template(struct ufs_hba *hba, u8 *desc_buf,
+					     int head_desc_size, int conf_unit_desc,
+					     const u8 *unit_lu_enabled,
+					     bool have_unit_state,
+					     int preferred_lun, int *template_lun)
+{
+	int i;
+	int ret;
+
+	if (preferred_lun >= 0 && preferred_lun < SPACEMIT_UFS_CONFIG_LUN_SLOTS) {
+		ret = spacemit_k3_ufs_apply_unit_desc_to_conf_unit(
+			hba, desc_buf, head_desc_size, conf_unit_desc,
+			preferred_lun, false);
+		if (!ret) {
+			*template_lun = preferred_lun;
+			return 0;
+		}
+		if (!spacemit_k3_ufs_no_template_error(ret))
+			dev_warn(hba->dev,
+				 "ufs: failed to use UNIT descriptor LU%d as LU0 template: %d\n",
+				 preferred_lun, ret);
+	}
+
+	if (have_unit_state) {
+		for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+			if (i == preferred_lun || !unit_lu_enabled[i])
+				continue;
+
+			ret = spacemit_k3_ufs_apply_unit_desc_to_conf_unit(
+				hba, desc_buf, head_desc_size, conf_unit_desc, i,
+				false);
+			if (!ret) {
+				*template_lun = i;
+				return 0;
+			}
+			if (!spacemit_k3_ufs_no_template_error(ret))
+				dev_warn(hba->dev,
+					 "ufs: failed to use enabled UNIT descriptor LU%d as LU0 template: %d\n",
+					 i, ret);
+		}
+	}
+
+	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+		if (i == preferred_lun)
+			continue;
+		if (have_unit_state && unit_lu_enabled[i])
+			continue;
+
+		ret = spacemit_k3_ufs_apply_unit_desc_to_conf_unit(
+			hba, desc_buf, head_desc_size, conf_unit_desc, i, false);
+		if (!ret) {
+			*template_lun = i;
+			return 0;
+		}
+		if (!spacemit_k3_ufs_no_template_error(ret))
+			dev_warn(hba->dev,
+				 "ufs: failed to use UNIT descriptor LU%d as fallback LU0 template: %d\n",
+				 i, ret);
+	}
+
+	return -ENODATA;
+}
+
 static int spacemit_k3_ufs_score_conf_layout(const u8 *desc_buf,
 					     int head_desc_size,
 					     int unit_desc_size,
@@ -519,41 +837,63 @@ static int spacemit_k3_ufs_score_conf_layout(const u8 *desc_buf,
 	return score;
 }
 
+static void spacemit_k3_ufs_add_conf_layout_candidate(
+	struct ufs_hba *hba, int *candidate_head, int *candidate_unit,
+	int *candidate_count, int head_desc_size, int unit_desc_size)
+{
+	int i;
+
+	if (!spacemit_k3_ufs_is_conf_desc_layout_valid(hba, head_desc_size,
+						       unit_desc_size))
+		return;
+
+	for (i = 0; i < *candidate_count; i++) {
+		if (candidate_head[i] == head_desc_size &&
+		    candidate_unit[i] == unit_desc_size)
+			return;
+	}
+
+	candidate_head[*candidate_count] = head_desc_size;
+	candidate_unit[*candidate_count] = unit_desc_size;
+	(*candidate_count)++;
+}
+
 static int spacemit_k3_ufs_select_conf_desc_layout(struct ufs_hba *hba,
 						   const u8 *desc_buf,
 						   const u8 *unit_lu_enabled,
 						   int *head_desc_size,
 						   int *unit_desc_size)
 {
-	int candidate_head[3];
-	int candidate_unit[3];
+	int candidate_head[4];
+	int candidate_unit[4];
 	int candidate_count = 0;
+	int dev_head_desc;
+	int dev_unit_desc;
 	int i;
 	int best = -1;
 	int best_score = -1;
+	int ret;
 
-	candidate_head[candidate_count] = hba->desc_size.conf_head_desc;
-	candidate_unit[candidate_count++] = hba->desc_size.conf_unit_desc;
+	ret = spacemit_k3_ufs_get_conf_desc_layout_from_dev_desc(
+		hba, &dev_head_desc, &dev_unit_desc);
+	if (!ret)
+		spacemit_k3_ufs_add_conf_layout_candidate(
+			hba, candidate_head, candidate_unit, &candidate_count,
+			dev_head_desc, dev_unit_desc);
 
-	if (QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_HEAD !=
-		    hba->desc_size.conf_head_desc ||
-	    QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_UNIT !=
-		    hba->desc_size.conf_unit_desc) {
-		candidate_head[candidate_count] =
-			QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_HEAD;
-		candidate_unit[candidate_count++] =
-			QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_UNIT;
-	}
+	spacemit_k3_ufs_add_conf_layout_candidate(
+		hba, candidate_head, candidate_unit, &candidate_count,
+		hba->desc_size.conf_head_desc, hba->desc_size.conf_unit_desc);
 
-	if (QUERY_DESC_CONFIGURATION_DEF_SIZE_HEAD !=
-		    hba->desc_size.conf_head_desc ||
-	    QUERY_DESC_CONFIGURATION_DEF_SIZE_UNIT !=
-		    hba->desc_size.conf_unit_desc) {
-		candidate_head[candidate_count] =
-			QUERY_DESC_CONFIGURATION_DEF_SIZE_HEAD;
-		candidate_unit[candidate_count++] =
-			QUERY_DESC_CONFIGURATION_DEF_SIZE_UNIT;
-	}
+	spacemit_k3_ufs_add_conf_layout_candidate(
+		hba, candidate_head, candidate_unit, &candidate_count,
+		QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_HEAD,
+		QUERY_DESC_CONFIGURATION_DEF_SIZE_NEW_UNIT);
+
+	spacemit_k3_ufs_add_conf_layout_candidate(
+		hba, candidate_head, candidate_unit, &candidate_count,
+		QUERY_DESC_CONFIGURATION_DEF_SIZE_HEAD,
+		QUERY_DESC_CONFIGURATION_DEF_SIZE_UNIT);
 
 	for (i = 0; i < candidate_count; i++) {
 		int score;
@@ -584,9 +924,156 @@ static int spacemit_k3_ufs_select_conf_desc_layout(struct ufs_hba *hba,
 	return 0;
 }
 
+static __maybe_unused void
+spacemit_k3_ufs_dump_conf_header(struct ufs_hba *hba, const char *tag,
+				 const u8 *desc_buf, int head_desc_size)
+{
+	u32 shared_wb_alloc = 0;
+
+	if (head_desc_size <= CONFIG_DESC_HEADER_PARAM_INIT_ACT_ICC_LEV)
+		return;
+
+	if (head_desc_size >= CONFIG_DESC_HEADER_PARAM_NUM_SHA_WB + 4)
+		shared_wb_alloc = get_unaligned_be32(
+			&desc_buf[CONFIG_DESC_HEADER_PARAM_NUM_SHA_WB]);
+
+	dev_dbg(hba->dev,
+		"ufs: %s cfg len=0x%x id=0x%x cont=%u boot_en=%u desc_acc=%u init_pwr=%u high_lun=%u sec_rm=%u icc=%u rpmb_en=%u wb_pres=%u wb_type=%u shared_wb=%u\n",
+		tag, desc_buf[CONFIG_DESC_HEADER_PARAM_LEN],
+		desc_buf[CONFIG_DESC_HEADER_PARAM_DES_IDN],
+		desc_buf[CONFIG_DESC_HEADER_PARAM_CONF_DESC_CONT],
+		desc_buf[CONFIG_DESC_HEADER_PARAM_BOOT_EN],
+		desc_buf[CONFIG_DESC_HEADER_PARAM_DES_ACC_EN],
+		desc_buf[CONFIG_DESC_HEADER_PARAM_INIT_POWER_MODE],
+		desc_buf[CONFIG_DESC_HEADER_PARAM_HIGH_PRI_LUN],
+		desc_buf[CONFIG_DESC_HEADER_PARAM_SEC_REM_TYPE],
+		desc_buf[CONFIG_DESC_HEADER_PARAM_INIT_ACT_ICC_LEV],
+		head_desc_size > CONFIG_DESC_HEADER_PARAM_RPMB_REG_EN ?
+			desc_buf[CONFIG_DESC_HEADER_PARAM_RPMB_REG_EN] :
+			0,
+		head_desc_size > CONFIG_DESC_HEADER_PARAM_WB_BUF_PRE ?
+			desc_buf[CONFIG_DESC_HEADER_PARAM_WB_BUF_PRE] :
+			0,
+		head_desc_size > CONFIG_DESC_HEADER_PARAM_WB_BUF_TYP ?
+			desc_buf[CONFIG_DESC_HEADER_PARAM_WB_BUF_TYP] :
+			0,
+		shared_wb_alloc);
+}
+
+static __maybe_unused void
+spacemit_k3_ufs_dump_conf_unit(struct ufs_hba *hba, const char *tag,
+			       const u8 *desc_buf, int head_desc_size,
+			       int unit_desc_size, int lun)
+{
+	int offset = head_desc_size + unit_desc_size * lun;
+	u32 alloc_units = 0;
+	u16 context_cap = 0;
+	u32 wb_alloc_units = 0;
+
+	if (unit_desc_size <= CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE)
+		return;
+
+	if (unit_desc_size >= CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT + 4)
+		alloc_units = get_unaligned_be32(
+			&desc_buf[offset + CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+
+	if (unit_desc_size >= CONFIG_DESC_UNIT_PARAM_CON_CAP + 2)
+		context_cap = get_unaligned_be16(
+			&desc_buf[offset + CONFIG_DESC_UNIT_PARAM_CON_CAP]);
+
+	if (unit_desc_size >= CONFIG_DESC_UNIT_PARAM_LUN_WB_BUF_ALLOC_UNIT + 4)
+		wb_alloc_units = get_unaligned_be32(
+			&desc_buf[offset +
+				  CONFIG_DESC_UNIT_PARAM_LUN_WB_BUF_ALLOC_UNIT]);
+
+	dev_dbg(hba->dev,
+		"ufs: %s LU%d en=%u boot=%u wp=%u mem=%u alloc=%u data_rel=%u blk_size=%u provis=%u ctx=0x%04x wb_alloc=%u\n",
+		tag, lun, desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN],
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID],
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_WRI_PRO],
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_MEM_TYPE], alloc_units,
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_DATA_RELY],
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE],
+		unit_desc_size > CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE ?
+			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE] :
+			0,
+		context_cap, wb_alloc_units);
+}
+
+static void spacemit_k3_ufs_dump_conf_state_err(struct ufs_hba *hba,
+						const char *tag,
+						const u8 *desc_buf,
+						int head_desc_size,
+						int unit_desc_size,
+						int source_lun)
+{
+	int offset0 = head_desc_size;
+	u32 alloc0 = 0;
+	u32 src_alloc = 0;
+
+	if (head_desc_size >= CONFIG_DESC_HEADER_PARAM_NUM_SHA_WB + 4) {
+		/* Keep output compact but include the header fields that can block writes. */
+		dev_err(hba->dev,
+			"ufs: %s cfg boot_en=%u desc_acc=%u init_pwr=%u high_lun=%u rpmb_en=%u wb_type=%u shared_wb=%u\n",
+			tag, desc_buf[CONFIG_DESC_HEADER_PARAM_BOOT_EN],
+			desc_buf[CONFIG_DESC_HEADER_PARAM_DES_ACC_EN],
+			desc_buf[CONFIG_DESC_HEADER_PARAM_INIT_POWER_MODE],
+			desc_buf[CONFIG_DESC_HEADER_PARAM_HIGH_PRI_LUN],
+			desc_buf[CONFIG_DESC_HEADER_PARAM_RPMB_REG_EN],
+			desc_buf[CONFIG_DESC_HEADER_PARAM_WB_BUF_TYP],
+			get_unaligned_be32(&desc_buf[CONFIG_DESC_HEADER_PARAM_NUM_SHA_WB]));
+	}
+
+	if (unit_desc_size >= CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT + 4)
+		alloc0 = get_unaligned_be32(&desc_buf[offset0 +
+						    CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+
+	dev_err(hba->dev,
+		"ufs: %s LU0 en=%u boot=%u wp=%u mem=%u alloc=%u blk_size=%u provis=%u ctx=0x%04x wb_alloc=%u\n",
+		tag, desc_buf[offset0 + CONFIG_DESC_UNIT_PARAM_LU_EN],
+		desc_buf[offset0 + CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID],
+		desc_buf[offset0 + CONFIG_DESC_UNIT_PARAM_LU_WRI_PRO],
+		desc_buf[offset0 + CONFIG_DESC_UNIT_PARAM_MEM_TYPE], alloc0,
+		desc_buf[offset0 + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE],
+		desc_buf[offset0 + CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE],
+		get_unaligned_be16(&desc_buf[offset0 +
+					     CONFIG_DESC_UNIT_PARAM_CON_CAP]),
+		unit_desc_size >= CONFIG_DESC_UNIT_PARAM_LUN_WB_BUF_ALLOC_UNIT + 4 ?
+			get_unaligned_be32(&desc_buf[offset0 +
+						    CONFIG_DESC_UNIT_PARAM_LUN_WB_BUF_ALLOC_UNIT]) :
+			0);
+
+	if (source_lun > 0) {
+		int src_offset = head_desc_size + unit_desc_size * source_lun;
+
+		if (unit_desc_size >= CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT + 4)
+			src_alloc = get_unaligned_be32(
+				&desc_buf[src_offset +
+					  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+
+		dev_err(hba->dev,
+			"ufs: %s LU%d en=%u boot=%u wp=%u mem=%u alloc=%u blk_size=%u provis=%u ctx=0x%04x wb_alloc=%u\n",
+			tag, source_lun,
+			desc_buf[src_offset + CONFIG_DESC_UNIT_PARAM_LU_EN],
+			desc_buf[src_offset + CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID],
+			desc_buf[src_offset + CONFIG_DESC_UNIT_PARAM_LU_WRI_PRO],
+			desc_buf[src_offset + CONFIG_DESC_UNIT_PARAM_MEM_TYPE],
+			src_alloc,
+			desc_buf[src_offset + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE],
+			desc_buf[src_offset + CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE],
+			get_unaligned_be16(&desc_buf[src_offset +
+						     CONFIG_DESC_UNIT_PARAM_CON_CAP]),
+			unit_desc_size >= CONFIG_DESC_UNIT_PARAM_LUN_WB_BUF_ALLOC_UNIT + 4 ?
+				get_unaligned_be32(&desc_buf[src_offset +
+							    CONFIG_DESC_UNIT_PARAM_LUN_WB_BUF_ALLOC_UNIT]) :
+				0);
+	}
+}
+
 static int
 spacemit_k3_ufs_get_total_alloc_units_from_geometry(struct ufs_hba *hba,
-						    u64 *total_alloc_units)
+						    u64 *total_alloc_units,
+						    u8 *logical_blk_size)
 {
 	u8 *desc_buf;
 	u64 qTotalRawDeviceCapacity;
@@ -628,9 +1115,113 @@ spacemit_k3_ufs_get_total_alloc_units_from_geometry(struct ufs_hba *hba,
 	if (!*total_alloc_units || *total_alloc_units > 0xFFFFFFFFULL)
 		ret = -ERANGE;
 
+	if (!ret && logical_blk_size) {
+		u8 blk_size = desc_buf[GEO_DESC_PARAM_OPT_LOGIC_BLK_SIZE];
+
+		if (!blk_size)
+			blk_size = desc_buf[GEO_DESC_PARAM_MIN_ADDR_BLK_SIZE];
+		if (!blk_size)
+			blk_size = SPACEMIT_UFS_DEFAULT_LOGICAL_BLK_SIZE;
+		*logical_blk_size = blk_size;
+	}
+
 out:
 	kfree(desc_buf);
 	return ret;
+}
+
+static int
+spacemit_k3_ufs_complete_synth_lu0_template(struct ufs_hba *hba, u8 *desc_buf,
+					    int head_desc_size, int conf_unit_desc,
+					    u8 logical_blk_size)
+{
+	int offset = head_desc_size;
+
+	if (conf_unit_desc <= CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE)
+		return -EINVAL;
+
+	if (!logical_blk_size)
+		logical_blk_size = SPACEMIT_UFS_DEFAULT_LOGICAL_BLK_SIZE;
+
+	if (!desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE]) {
+		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE] =
+			logical_blk_size;
+		dev_warn(hba->dev,
+			 "ufs: synthesizing LU0 template with logical block size %u\n",
+			 logical_blk_size);
+	}
+
+	return desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE] ?
+		0 : -EINVAL;
+}
+
+static void
+spacemit_k3_ufs_warn_multi_lun_merge_mismatch(struct ufs_hba *hba,
+					      const u8 *desc_buf,
+					      int head_desc_size,
+					      int conf_unit_desc,
+					      const u8 *unit_lu_enabled,
+					      bool have_unit_state,
+					      int template_lun)
+{
+	u8 unit_desc[QUERY_DESC_MAX_SIZE];
+	int desc_size;
+	int offset0 = head_desc_size;
+	int i;
+
+	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+		bool enabled;
+		int ret;
+		bool mismatch = false;
+
+		enabled = have_unit_state ? !!unit_lu_enabled[i] :
+			 desc_buf[head_desc_size + conf_unit_desc * i +
+				  CONFIG_DESC_UNIT_PARAM_LU_EN] == 0x1;
+		if (!enabled || i == template_lun)
+			continue;
+
+		ret = spacemit_k3_ufs_read_unit_desc(hba, i, unit_desc, &desc_size);
+		if (ret) {
+			dev_warn(hba->dev,
+				 "ufs: failed to inspect LU%d before merge, keeping LU0 template: %d\n",
+				 i, ret);
+			continue;
+		}
+
+		if (conf_unit_desc > CONFIG_DESC_UNIT_PARAM_MEM_TYPE &&
+		    desc_size > SPACEMIT_UFS_UNIT_DESC_PARAM_MEM_TYPE &&
+		    unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_MEM_TYPE] !=
+			    desc_buf[offset0 + CONFIG_DESC_UNIT_PARAM_MEM_TYPE])
+			mismatch = true;
+		if (conf_unit_desc > CONFIG_DESC_UNIT_PARAM_DATA_RELY &&
+		    desc_size > SPACEMIT_UFS_UNIT_DESC_PARAM_DATA_RELY &&
+		    unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_DATA_RELY] !=
+			    desc_buf[offset0 + CONFIG_DESC_UNIT_PARAM_DATA_RELY])
+			mismatch = true;
+		if (conf_unit_desc > CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE &&
+		    desc_size > SPACEMIT_UFS_UNIT_DESC_PARAM_LOGIC_BLK_SIZE &&
+		    unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_LOGIC_BLK_SIZE] !=
+			    desc_buf[offset0 + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE])
+			mismatch = true;
+		if (conf_unit_desc > CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE &&
+		    desc_size > SPACEMIT_UFS_UNIT_DESC_PARAM_PROVIS_TYPE &&
+		    unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_PROVIS_TYPE] !=
+			    desc_buf[offset0 + CONFIG_DESC_UNIT_PARAM_PROVIS_TYPE])
+			mismatch = true;
+		if (conf_unit_desc >= CONFIG_DESC_UNIT_PARAM_CON_CAP + 2 &&
+		    desc_size >= SPACEMIT_UFS_UNIT_DESC_PARAM_CON_CAP + 2 &&
+		    get_unaligned_be16(
+			    &unit_desc[SPACEMIT_UFS_UNIT_DESC_PARAM_CON_CAP]) !=
+			    get_unaligned_be16(
+				    &desc_buf[offset0 +
+					      CONFIG_DESC_UNIT_PARAM_CON_CAP]))
+			mismatch = true;
+
+		if (mismatch)
+			dev_warn(hba->dev,
+				 "ufs: LU%d attributes differ from LU0 template; merging capacity into LU0 with template values\n",
+				 i);
+	}
 }
 
 /*
@@ -643,16 +1234,24 @@ static __maybe_unused int
 spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 {
 	u8 *desc_buf;
+	u8 *orig_desc_buf = NULL;
 	u8 unit_lu_enabled[SPACEMIT_UFS_CONFIG_LUN_SLOTS];
 	u32 conf_desc_lock = 0;
 	u64 total_alloc_units = 0;
+	u64 configured_alloc_units = 0;
+	u64 geometry_alloc_units = 0;
+	u8 geometry_logical_blk_size = 0;
 	int ret;
 	int unit_state_ret;
 	int unit_enabled_lun_count = 0;
 	int conf_enabled_lun_count = 0;
 	int conf_head_desc;
 	int conf_unit_desc;
+	int source_lun = -1;
+	int template_lun = -1;
+	int conf_template_lun = -1;
 	int i;
+	bool have_unit_state;
 	bool need_reconfigure;
 	struct ufs_hba *hba = dev_get_uclass_priv(dev);
 
@@ -670,14 +1269,24 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 		goto out;
 	}
 
+	orig_desc_buf = kmalloc(hba->desc_size.conf_desc, GFP_KERNEL);
+	if (!orig_desc_buf) {
+		ret = -ENOMEM;
+		goto out;
+	}
+	memcpy(orig_desc_buf, desc_buf, hba->desc_size.conf_desc);
+
 	unit_state_ret = spacemit_k3_ufs_read_unit_lu_state(
 		hba, unit_lu_enabled, &unit_enabled_lun_count);
-	if (unit_state_ret) {
-		dev_dbg(hba->dev, "%s: unit descriptor state unavailable: %d\n",
-			__func__, unit_state_ret);
+	ret = spacemit_k3_ufs_get_conf_desc_layout_from_dev_desc(
+		hba, &conf_head_desc, &conf_unit_desc);
+	if (ret && unit_state_ret) {
+		dev_dbg(hba->dev,
+			"%s: device/unit descriptor state unavailable: layout=%d unit=%d\n",
+			__func__, ret, unit_state_ret);
 		ret = spacemit_k3_ufs_get_conf_desc_layout(hba, &conf_head_desc,
 							   &conf_unit_desc);
-	} else {
+	} else if (ret) {
 		ret = spacemit_k3_ufs_select_conf_desc_layout(hba, desc_buf,
 							      unit_lu_enabled,
 							      &conf_head_desc,
@@ -693,20 +1302,54 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 
 	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
 		int offset = conf_head_desc + conf_unit_desc * i;
+		bool conf_enabled =
+			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] == 0x1;
+		bool enabled = unit_state_ret ? conf_enabled : unit_lu_enabled[i];
 
-		if (desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] == 0x1)
+		if (conf_enabled)
 			conf_enabled_lun_count++;
 
-		total_alloc_units += get_unaligned_be32(
-			&desc_buf[offset +
-				  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+		if (enabled) {
+			if (source_lun < 0)
+				source_lun = i;
+			total_alloc_units += get_unaligned_be32(
+				&desc_buf[offset +
+					  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+		}
 	}
 
-	if (!unit_state_ret)
+	dev_dbg(hba->dev,
+		"ufs: config layout len=0x%x head=0x%x unit=0x%x conf_luns=%d unit_luns=%d source=%d total_alloc_units=%llu\n",
+		hba->desc_size.conf_desc, conf_head_desc, conf_unit_desc,
+		conf_enabled_lun_count, unit_enabled_lun_count, source_lun,
+		total_alloc_units);
+
+	have_unit_state = !unit_state_ret;
+	configured_alloc_units = total_alloc_units;
+	ret = spacemit_k3_ufs_get_total_alloc_units_from_geometry(
+		hba, &geometry_alloc_units, &geometry_logical_blk_size);
+	if (ret) {
+		dev_warn(hba->dev,
+			 "%s: failed to get geometry defaults: %d\n",
+			 __func__, ret);
+		geometry_alloc_units = 0;
+		geometry_logical_blk_size = 0;
+		ret = 0;
+	} else if (geometry_alloc_units &&
+		   geometry_alloc_units >= total_alloc_units) {
+		total_alloc_units = geometry_alloc_units;
+	}
+
+	if (have_unit_state)
 		need_reconfigure =
 			(unit_enabled_lun_count != 1 || !unit_lu_enabled[0]);
 	else
-		need_reconfigure = (conf_enabled_lun_count != 1);
+		need_reconfigure =
+			(conf_enabled_lun_count != 1 ||
+				 desc_buf[conf_head_desc + CONFIG_DESC_UNIT_PARAM_LU_EN] != 0x1);
+
+	if (configured_alloc_units != total_alloc_units)
+		need_reconfigure = true;
 
 	debug("ufs: conf_lun_count=%d unit_lun_count=%d total_alloc_units=%llu need_recfg=%d\n",
 	      conf_enabled_lun_count, unit_enabled_lun_count, total_alloc_units,
@@ -718,14 +1361,11 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 	}
 
 	if (!total_alloc_units || total_alloc_units > 0xFFFFFFFFULL) {
-		ret = spacemit_k3_ufs_get_total_alloc_units_from_geometry(
-			hba, &total_alloc_units);
-		if (ret) {
-			dev_err(hba->dev,
-				"%s: failed to get total alloc units from geometry: %d\n",
-				__func__, ret);
-			goto out;
-		}
+		dev_err(hba->dev,
+			"%s: no valid alloc-unit target for LU0 reprovision\n",
+			__func__);
+		ret = -EINVAL;
+		goto out;
 	}
 
 	ret = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_READ_ATTR,
@@ -733,18 +1373,69 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 				      &conf_desc_lock);
 	if (ret) {
 		dev_warn(hba->dev,
-			 "%s: failed to read bConfigDescrLock (%d), continue\n",
-			 __func__, ret);
+				 "%s: failed to read bConfigDescrLock (%d), continue\n",
+				 __func__, ret);
 	} else if (conf_desc_lock) {
 		dev_err(hba->dev,
-			"%s: bConfigDescrLock is set, cannot reconfigure LUNs\n",
+			"%s: bConfigDescrLock is set, cannot reconfigure LUNs (unrecoverable)\n",
 			__func__);
-		ret = -EPERM;
+		ret = -EROFS;
 		goto out;
 	}
 
-	/* Keep only LU0 enabled and move all allocated units into LU0. */
-	desc_buf[CONFIG_DESC_HEADER_PARAM_BOOT_EN] = 0x0;
+	/*
+	 * Keep only LU0 enabled and move all capacity into LU0. Prefer an
+	 * enabled LU as the template source. If none exists, fall back to any
+	 * usable disabled LU template and finally synthesize the minimal LU0
+	 * fields from geometry information.
+	 */
+	spacemit_k3_ufs_dump_conf_header(hba, "current", desc_buf,
+					 conf_head_desc);
+	spacemit_k3_ufs_dump_conf_unit(hba, "current", desc_buf,
+				       conf_head_desc, conf_unit_desc, 0);
+	if (source_lun > 0)
+		spacemit_k3_ufs_dump_conf_unit(hba, "current", desc_buf,
+					       conf_head_desc, conf_unit_desc,
+					       source_lun);
+
+	conf_template_lun = spacemit_k3_ufs_find_conf_template_lun(
+		desc_buf, conf_head_desc, conf_unit_desc, unit_lu_enabled,
+		have_unit_state, source_lun);
+	if (conf_template_lun > 0)
+		spacemit_k3_ufs_copy_conf_unit(hba, desc_buf, conf_head_desc,
+					       conf_unit_desc, conf_template_lun,
+					       0);
+
+	ret = spacemit_k3_ufs_apply_any_unit_desc_template(
+		hba, desc_buf, conf_head_desc, conf_unit_desc, unit_lu_enabled,
+		have_unit_state, source_lun, &template_lun);
+	if (ret && ret != -ENODATA) {
+		dev_warn(hba->dev,
+			 "%s: failed to build LU0 template from UNIT descriptors: %d, falling back to config/geometry\n",
+			 __func__, ret);
+		ret = 0;
+	}
+
+	ret = spacemit_k3_ufs_complete_synth_lu0_template(
+		hba, desc_buf, conf_head_desc, conf_unit_desc,
+		geometry_logical_blk_size);
+	if (ret) {
+		dev_err(hba->dev,
+			"%s: failed to synthesize a valid LU0 template: %d\n",
+			__func__, ret);
+		goto out;
+	}
+
+	if ((have_unit_state ? unit_enabled_lun_count : conf_enabled_lun_count) > 1)
+		spacemit_k3_ufs_warn_multi_lun_merge_mismatch(
+			hba, desc_buf, conf_head_desc, conf_unit_desc,
+			unit_lu_enabled, have_unit_state, template_lun);
+
+	dev_dbg(hba->dev,
+		"ufs: reconfig single-LUN source=%d template=%d alloc(current=%llu target=%llu)\n",
+		source_lun, template_lun, configured_alloc_units,
+		total_alloc_units);
+
 	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
 		int offset = conf_head_desc + conf_unit_desc * i;
 
@@ -756,22 +1447,87 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 					  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
 		} else {
 			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] = 0x0;
+			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID] = 0x0;
+			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_WRI_PRO] = 0x0;
 			put_unaligned_be32(
 				0,
 				&desc_buf[offset +
 					  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+			if (conf_unit_desc >=
+			    CONFIG_DESC_UNIT_PARAM_LUN_WB_BUF_ALLOC_UNIT + 4)
+				put_unaligned_be32(
+					0,
+					&desc_buf[offset +
+						  CONFIG_DESC_UNIT_PARAM_LUN_WB_BUF_ALLOC_UNIT]);
 		}
-
-		desc_buf[offset + CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID] = 0x0;
 	}
+
+	if (conf_head_desc > CONFIG_DESC_HEADER_PARAM_HIGH_PRI_LUN) {
+		u8 high_pri_lun =
+			desc_buf[CONFIG_DESC_HEADER_PARAM_HIGH_PRI_LUN];
+
+		if (high_pri_lun < SPACEMIT_UFS_CONFIG_LUN_SLOTS &&
+		    high_pri_lun != 0) {
+			dev_dbg(hba->dev,
+				"ufs: moving HighPriorityLUN %u to LU0\n",
+				high_pri_lun);
+			desc_buf[CONFIG_DESC_HEADER_PARAM_HIGH_PRI_LUN] = 0;
+		}
+	}
+
+	if (conf_head_desc > CONFIG_DESC_HEADER_PARAM_BOOT_EN &&
+	    desc_buf[CONFIG_DESC_HEADER_PARAM_BOOT_EN] &&
+	    !desc_buf[conf_head_desc + CONFIG_DESC_UNIT_PARAM_BOOT_LU_ID]) {
+		dev_dbg(hba->dev,
+			"ufs: clearing BootEnable because requested LU0 is not a boot LU\n");
+		desc_buf[CONFIG_DESC_HEADER_PARAM_BOOT_EN] = 0;
+	}
+
+	spacemit_k3_ufs_dump_conf_header(hba, "requested", desc_buf,
+					 conf_head_desc);
+	spacemit_k3_ufs_dump_conf_unit(hba, "requested", desc_buf,
+					       conf_head_desc, conf_unit_desc, 0);
+	if (source_lun > 0)
+		spacemit_k3_ufs_dump_conf_unit(hba, "requested", desc_buf,
+					       conf_head_desc, conf_unit_desc,
+					       source_lun);
+
+	if (!desc_buf[conf_head_desc + CONFIG_DESC_UNIT_PARAM_LOGIC_BLK_SIZE]) {
+		dev_err(hba->dev,
+			"%s: refusing to write invalid LU0 template with logical block size 0\n",
+			__func__);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Some devices need extra settle time after link/power-mode bring-up
+	 * before accepting CONFIGURATION descriptor writes. Earlier debug logs
+	 * accidentally provided this delay and hid the timing issue.
+	 */
+	mdelay(SPACEMIT_K3_UFS_RECONF_SETTLE_MS);
 
 	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_WRITE_DESC,
 					    QUERY_DESC_IDN_CONFIGURATION, 0, 0,
 					    desc_buf,
 					    &hba->desc_size.conf_desc);
-	if (ret) {
+
+		if (ret) {
+			int mapped_ret = spacemit_k3_ufs_map_query_error(ret);
+
+			spacemit_k3_ufs_log_unrecoverable_query_error(hba, ret);
+			if (orig_desc_buf) {
+				spacemit_k3_ufs_dump_conf_state_err(
+					hba, "current", orig_desc_buf, conf_head_desc,
+				conf_unit_desc, source_lun);
+			spacemit_k3_ufs_dump_conf_state_err(
+				hba, "requested", desc_buf, conf_head_desc,
+				conf_unit_desc, source_lun);
+		}
+
 		dev_err(hba->dev, "%s: failed to write config descriptor: %d\n",
 			__func__, ret);
+		ret = mapped_ret;
 		goto out;
 	}
 
@@ -781,6 +1537,7 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 	ret = 1;
 
 out:
+	kfree(orig_desc_buf);
 	kfree(desc_buf);
 	return ret;
 }
@@ -800,6 +1557,63 @@ static bool spacemit_k3_ufs_should_enforce_single_lun(void)
 	return boot_mode != BOOT_MODE_UFS;
 }
 #endif
+
+static void spacemit_k3_ufs_config_scsi_scan_luns(struct udevice *dev)
+{
+	struct udevice *scsi_dev;
+	struct scsi_plat *scsi_plat;
+	struct ufs_hba *hba = dev_get_uclass_priv(dev);
+	u8 unit_lu_enabled[SPACEMIT_UFS_CONFIG_LUN_SLOTS];
+	unsigned long long lun_mask = 0;
+	unsigned long scan_luns = SPACEMIT_UFS_CONFIG_LUN_SLOTS;
+	int enabled_lun_count = 0;
+	int highest_enabled_lun = -1;
+	int ret;
+	int i;
+
+	device_find_first_child(dev, &scsi_dev);
+	if (!scsi_dev) {
+		dev_err(hba->dev, "ufs: scsi_dev child not found!\n");
+		return;
+	}
+
+	scsi_plat = dev_get_uclass_plat(scsi_dev);
+	scsi_plat->max_id = 1; /* UFS has a single target */
+	scsi_plat->lun_mask = 0;
+	scsi_plat->lun_mask_valid = 1;
+
+	ret = spacemit_k3_ufs_read_unit_lu_state(hba, unit_lu_enabled,
+						 &enabled_lun_count);
+	if (ret) {
+		for (i = 0; i < scan_luns && i < 64; i++)
+			lun_mask |= 1ULL << i;
+
+		scsi_plat->lun_mask = lun_mask;
+		dev_warn(hba->dev,
+			 "ufs: failed to read unit LU state (%d), scanning first %lu LUNs\n",
+			 ret, scan_luns);
+		scsi_plat->max_lun = scan_luns;
+		return;
+	}
+
+	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+		if (unit_lu_enabled[i]) {
+			highest_enabled_lun = i;
+			lun_mask |= 1ULL << i;
+		}
+	}
+
+	if (highest_enabled_lun >= 0)
+		scan_luns = highest_enabled_lun + 1;
+	else
+		lun_mask = 1ULL;
+
+	scsi_plat->lun_mask = lun_mask;
+	scsi_plat->max_lun = scan_luns;
+	dev_dbg(hba->dev,
+		"ufs: scanning %lu LUN slot(s), enabled user LUN count=%d highest=%d mask=0x%llx\n",
+		scan_luns, enabled_lun_count, highest_enabled_lun, lun_mask);
+}
 
 static int spacemit_k3_ufs_wait_mphy_pll_lock(struct ufs_hba *hba,
 					      const char *where)
@@ -1311,8 +2125,6 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
 	struct ufs_hba *hba = dev_get_uclass_priv(dev);
 	struct ufs_hba_ops *hba_ops = (struct ufs_hba_ops *)dev->driver_data;
-	struct udevice *scsi_dev;
-	struct scsi_plat *scsi_plat;
 	int ret;
 	int retries;
 
@@ -1349,6 +2161,7 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 	} else {
 #if !defined(CONFIG_SPL_BUILD)
 		int lun_cfg_ret;
+		bool recover_after_lun_cfg = false;
 
 		if (spacemit_k3_ufs_should_enforce_single_lun()) {
 			/* Check and configure single LUN if needed - skip in SPL */
@@ -1373,26 +2186,48 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 						dev);
 			}
 
-			if (lun_cfg_ret < 0) {
-				dev_warn(hba->dev,
-					 "failed to enforce single-LUN layout: %d\n",
-					 lun_cfg_ret);
-			} else if (lun_cfg_ret > 0) {
-				dev_warn(
-					hba->dev,
+				if (lun_cfg_ret < 0) {
+					recover_after_lun_cfg =
+						(lun_cfg_ret == -ETIMEDOUT ||
+						 lun_cfg_ret == -EIO);
+					if (lun_cfg_ret == -EROFS ||
+					    lun_cfg_ret == -EALREADY ||
+					    lun_cfg_ret == -EPERM)
+						dev_err(hba->dev,
+							"failed to enforce single-LUN layout: %d (unrecoverable)\n",
+							lun_cfg_ret);
+					else
+						dev_warn(hba->dev,
+							 "failed to enforce single-LUN layout: %d\n",
+							 lun_cfg_ret);
+				} else if (lun_cfg_ret > 0) {
+					dev_warn(
+						hba->dev,
 					"single-LUN config pending, a cold power cycle may be required\n");
+			}
+
+			if (recover_after_lun_cfg) {
+				dev_warn(hba->dev,
+					 "ufs: recovering controller after failed LUN reconfiguration\n");
+				hba->ops->device_reset(hba);
+				ret = ufshcd_probe(dev, hba_ops);
+				if (ret) {
+					spacemit_k3_ufs_phy_shutdown(hba, priv);
+					spacemit_k3_ufs_clk_disable(priv);
+					dev_err(hba->dev,
+						"ufs reprobe after failed LUN config recovery failed: %d\n",
+						ret);
+					return ret;
+				}
 			}
 		}
 #endif
-		/* Limit to single LUN - use only the main user data partition */
-		device_find_first_child(dev, &scsi_dev);
-		if (scsi_dev) {
-			scsi_plat = dev_get_uclass_plat(scsi_dev);
-			scsi_plat->max_id = 1; /* UFS has single target */
-			scsi_plat->max_lun = 1; /* Use only main LUN */
-		} else {
-			pr_err("ufs: scsi_dev child not found!\n");
-		}
+		/*
+		 * Scan the LUNs that are actually enabled on the device.
+		 * If single-LUN reconfiguration failed, do not get stuck
+		 * probing only LUN0 on a multi-LUN provisioned device.
+		 */
+		spacemit_k3_ufs_config_scsi_scan_luns(dev);
 	}
 
 	return ret;

@@ -607,6 +607,17 @@ static int do_scsi_scan_one(struct udevice *dev, int id, int lun, bool verbose)
 	return 0;
 }
 
+static bool scsi_scan_lun_enabled(const struct scsi_plat *uc_plat, int lun)
+{
+	if (!uc_plat->lun_mask_valid)
+		return true;
+
+	if (lun < 0 || lun >= 64)
+		return false;
+
+	return !!(uc_plat->lun_mask & (1ULL << lun));
+}
+
 int scsi_scan_dev(struct udevice *dev, bool verbose)
 {
 	struct scsi_plat *uc_plat; /* scsi controller plat */
@@ -623,8 +634,11 @@ int scsi_scan_dev(struct udevice *dev, bool verbose)
 	uc_plat = dev_get_uclass_plat(dev);
 
 	for (i = 0; i < uc_plat->max_id; i++)
-		for (lun = 0; lun < uc_plat->max_lun; lun++)
+		for (lun = 0; lun < uc_plat->max_lun; lun++) {
+			if (!scsi_scan_lun_enabled(uc_plat, lun))
+				continue;
 			do_scsi_scan_one(dev, i, lun, verbose);
+		}
 
 	return 0;
 }

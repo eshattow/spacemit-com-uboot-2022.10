@@ -174,12 +174,16 @@ struct scsi_cmd {
  * @max_lun: Maximum number of logical units
  * @max_id: Maximum number of target ids
  * @max_bytes_per_req: Maximum number of bytes per read/write request
+ * @lun_mask: Optional bitmap of logical units to scan
+ * @lun_mask_valid: Whether @lun_mask should be honored by the scan loop
  */
 struct scsi_plat {
 	unsigned long base;
 	unsigned long max_lun;
 	unsigned long max_id;
 	unsigned long max_bytes_per_req;
+	unsigned long long lun_mask;
+	unsigned int lun_mask_valid;
 };
 
 /* Operations for SCSI */
