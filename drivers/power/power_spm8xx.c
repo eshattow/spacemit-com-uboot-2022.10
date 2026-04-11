@@ -27,6 +27,7 @@ SY8810L_BUCK_LINER_RANGE;SY8810L_REGULATOR_DESC;
 #endif
 
 MPQ8655_BUCK_LINER_RANGE;MPQ8655_REGULATOR_DESC;
+TDA38740_BUCK_LINER_RANGE;TDA38740_REGULATOR_DESC;
 IS6615A_BUCK_LINER_RANGE;IS6615A_REGULATOR_DESC;
 
 static const char *global_compatible[] = {
@@ -47,6 +48,13 @@ static const struct tlv_pmic_info tlv_pmic_infos[] = {
 		.name = "mpq8655",
 		.compatibles = {
 			"spacemit,mpq8655",
+		},
+	},
+	{
+		.name = "tda38740",
+		.compatibles = {
+			"spacemit,tda38740-1",
+			"spacemit,tda38740-2",
 		},
 	},
 	{
@@ -100,6 +108,7 @@ static const struct tlv_pmic_info *board_pmic_tlv_info(void)
 #define EXT3_SLP_SD	(1 << 3)
 
 #define MPQ8655_COMPAT_PREFIX	"spacemit,mpq8655"
+#define TDA38740_COMPAT_PREFIX	"spacemit,tda38740"
 #define IS6615A_COMPAT_PREFIX	"spacemit,is6615a"
 
 static bool pmic_name_match(const char *name, const char *prefix)
@@ -118,6 +127,11 @@ void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck
 	} else if (pmic_name_match(name, MPQ8655_COMPAT_PREFIX)) {
 		*buck_desc = mpq8655_buck_desc;
 		*num_buck = sizeof(mpq8655_buck_desc) / sizeof(mpq8655_buck_desc[0]);
+		*ldo_desc = NULL;
+		*num_ldo = 0;
+	} else if (pmic_name_match(name, TDA38740_COMPAT_PREFIX)) {
+		*buck_desc = tda38740_buck_desc;
+		*num_buck = sizeof(tda38740_buck_desc) / sizeof(tda38740_buck_desc[0]);
 		*ldo_desc = NULL;
 		*num_ldo = 0;
 	} else if (pmic_name_match(name, IS6615A_COMPAT_PREFIX)) {
@@ -331,7 +345,6 @@ static int __board_pmic_init(const char *name)
 
 		/* find wich dcdc or ldo */
 		s = fdt_get_name(gd->fdt_blob, sub_offset, &len);
-
 		if (pmic_name_match(name, MPQ8655_COMPAT_PREFIX)) {
 			if ((strncmp(s, "EDCDC_REG", 9) == 0)) {
 				/* set the regulator */
@@ -361,7 +374,7 @@ static int __board_pmic_init(const char *name)
 					}
 				}
 			}
-		} else if (pmic_name_match(name, IS6615A_COMPAT_PREFIX)) {
+		} else if (pmic_name_match(name, IS6615A_COMPAT_PREFIX) || pmic_name_match(name, TDA38740_COMPAT_PREFIX)) {
 			if ((strncmp(s, "EDCDC_REG", 9) == 0)) {
 				for (i = 0; i < num_buck; ++i) {
 					if (strcmp(buck_desc[i].name, s) != 0)

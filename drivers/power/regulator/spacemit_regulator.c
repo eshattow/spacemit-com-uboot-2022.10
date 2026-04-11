@@ -20,6 +20,7 @@ SPM8821_REGULATOR_BUCK_DESC; SPM8821_REGULATOR_LDO_DESC; SPM8821_REGULATOR_SWITC
 SPM8821_REGULATOR_MATCH_DATA;
 
 MPQ8655_BUCK_LINER_RANGE; MPQ8655_REGULATOR_DESC; MPQ8655_REGULATOR_MATCH_DATA;
+TDA38740_BUCK_LINER_RANGE; TDA38740_REGULATOR_DESC; TDA38740_REGULATOR_MATCH_DATA;
 IS6615A_BUCK_LINER_RANGE; IS6615A_REGULATOR_DESC; IS6615A_REGULATOR_MATCH_DATA;
 
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
@@ -284,7 +285,8 @@ static int get_buck_reg_index(struct udevice *dev)
 	int buck = dev->driver_data - 1;
 
 	if (priv && priv->match &&
-	    strcmp(priv->match->name, "is6615a") == 0)
+	    strcmp(priv->match->name, "mpq8655") != 0 &&
+	    strcmp(priv->match->name, "spm8821") != 0)
 		buck = dev->driver_data - 2;
 
 	return buck;
@@ -302,7 +304,7 @@ static int buck_get_value(struct udevice *dev)
 	if (info == NULL)
 		return -ENOSYS;
 
-	if ((strcmp(priv->match->name, "mpq8655") == 0) || (strcmp(priv->match->name, "is6615a") == 0)) {
+	if (strcmp(priv->match->name, "spm8821") != 0) {
 		unsigned char vals[2];
 
 		pmic_read(dev->parent, info->vsel_reg, vals, 2);
@@ -337,7 +339,7 @@ static int buck_set_value(struct udevice *dev, int uvolt)
 	if (sel >=0) {
 		/* has get the selctor */
 		sel <<= ffs(info->vsel_msk) - 1;
-		if ((strcmp(priv->match->name, "mpq8655") == 0) || (strcmp(priv->match->name, "is6615a") == 0)) {
+		if (strcmp(priv->match->name, "spm8821") != 0) {
 			unsigned char vals[2];
 			unsigned int val;
 
@@ -371,7 +373,7 @@ static int buck_set_suspend_value(struct udevice *dev, int uvolt)
 	if (info == NULL)
 		return -ENOSYS;
 
-	if ((strcmp(priv->match->name, "mpq8655") == 0) || (strcmp(priv->match->name, "is6615a") == 0))
+	if (strcmp(priv->match->name, "spm8821") != 0)
 		return -ENOSYS;
 
 	sel = regulator_map_voltage_linear_range(info, uvolt, uvolt);
@@ -397,7 +399,7 @@ static int buck_get_suspend_value(struct udevice *dev)
 	if (info == NULL)
 		return -ENOSYS;
 
-	if ((strcmp(priv->match->name, "mpq8655") == 0) || (strcmp(priv->match->name, "is6615a") == 0))
+	if (strcmp(priv->match->name, "spm8821") != 0)
 		return -ENOSYS;
 
 	ret = pmic_reg_read(dev->parent, info->vsel_sleep_reg);
@@ -422,7 +424,7 @@ static int buck_get_enable(struct udevice *dev)
 		return -ENOSYS;
 
 	/* enabled by default, controled by p1 */
-	if ((strcmp(priv->match->name, "mpq8655") == 0) || (strcmp(priv->match->name, "is6615a") == 0))
+	if (strcmp(priv->match->name, "spm8821") != 0)
 		return 1;
 
 	ret = pmic_reg_read(dev->parent, info->enable_reg);
@@ -446,7 +448,7 @@ static int buck_set_enable(struct udevice *dev, bool enable)
 	int mask = info->enable_msk;
 
 	/* uboot can't disable it */
-	if ((strcmp(priv->match->name, "mpq8655") == 0) || (strcmp(priv->match->name, "is6615a") == 0)) {
+	if (strcmp(priv->match->name, "spm8821") != 0) {
 		if (enable == false)
 			return -EPERM;
 		else
