@@ -20,6 +20,8 @@ SPM8821_REGULATOR_BUCK_DESC; SPM8821_REGULATOR_LDO_DESC; SPM8821_REGULATOR_SWITC
 SPM8821_REGULATOR_MATCH_DATA;
 
 MPQ8655_BUCK_LINER_RANGE; MPQ8655_REGULATOR_DESC; MPQ8655_REGULATOR_MATCH_DATA;
+TDA38740_BUCK_LINER_RANGE; TDA38740_REGULATOR_DESC; TDA38740_REGULATOR_MATCH_DATA;
+IS6615A_BUCK_LINER_RANGE; IS6615A_REGULATOR_DESC; IS6615A_REGULATOR_MATCH_DATA;
 
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
 PM853_BUCK_LINER_RANGE1; PM853_BUCK_LINER_RANGE2; PM853_LDO_LINER_RANGE1; PM853_LDO_LINER_RANGE2;
@@ -116,6 +118,30 @@ static unsigned int linear_range_get_max_value(const struct pm8xx_linear_range *
         return r->min + (r->max_sel - r->min_sel) * r->step;
 }
 
+static int linear_range_get_selector_low(const struct pm8xx_linear_range *r,
+				  unsigned int val, unsigned int *selector)
+{
+	if (r->min > val)
+		return -EINVAL;
+
+	if (linear_range_get_max_value(r) <= val) {
+		*selector = r->max_sel;
+		return 0;
+	}
+
+	if (r->step == 0) {
+		*selector = r->min_sel;
+		return 0;
+	}
+
+	*selector = (val - r->min) / r->step + r->min_sel;
+
+	if (*selector > r->max_sel)
+		*selector = r->max_sel;
+
+	return 0;
+}
+
 /**
  * linear_range_get_selector_high - return linear range selector for value
  * @r:          pointer to linear range where selector is looked from
@@ -168,10 +194,13 @@ static int regulator_map_voltage_linear_range(const struct pm8xx_buck_desc *desc
                                        int min_uV, int max_uV)
 {
         const struct pm8xx_linear_range *range;
-        int ret = -EINVAL;
-        unsigned int sel;
-        bool found;
-        int voltage, i;
+	int ret = -EINVAL;
+	unsigned int sel, low_sel;
+	bool found;
+	int voltage, i;
+	unsigned int best_sel = 0, best_below_sel = 0;
+	int best_voltage = 0, best_below_voltage = 0;
+	int best_diff = INT_MAX, best_below_diff = INT_MAX;
 
         if (!desc->n_linear_ranges) {
                 BUG_ON(!desc->n_linear_ranges);
@@ -183,21 +212,49 @@ static int regulator_map_voltage_linear_range(const struct pm8xx_buck_desc *desc
 
                 ret = linear_range_get_selector_high(range, min_uV, &sel,
                                                      &found);
-                if (ret)
+			if (ret)
                         continue;
-                ret = sel;
 
                 /*
                  * Map back into a voltage to verify we're still in bounds.
                  * If we are not, then continue checking rest of the ranges.
                  */
 		voltage = regulator_desc_list_voltage_linear_range(desc, sel);
-                if (voltage >= min_uV && voltage <= max_uV)
-                        break;
+			if (voltage >= min_uV && voltage <= max_uV) {
+				int diff = voltage - min_uV;
+
+				if (diff < best_diff) {
+					best_diff = diff;
+					best_sel = sel;
+					best_voltage = voltage;
+				}
+			}
+
+			ret = linear_range_get_selector_low(range, max_uV, &low_sel);
+			if (ret)
+				continue;
+
+			voltage = regulator_desc_list_voltage_linear_range(desc, low_sel);
+			if (voltage <= max_uV) {
+				int diff = min_uV - voltage;
+
+				if (diff >= 0 && diff < best_below_diff) {
+					best_below_diff = diff;
+					best_below_sel = low_sel;
+					best_below_voltage = voltage;
+				}
+			}
         }
 
-        if (i == desc->n_linear_ranges)
+	if (best_diff != INT_MAX) {
+		ret = best_sel;
+		voltage = best_voltage;
+	} else if (best_below_diff != INT_MAX) {
+		ret = best_below_sel;
+		voltage = best_below_voltage;
+	} else {
                 return -EINVAL;
+	}
 
         return ret;
 }
@@ -207,14 +264,37 @@ static const struct pm8xx_buck_desc *get_buck_reg(struct udevice *pmic, int num)
 	struct pm8xx_priv *priv = dev_get_priv(pmic);
 	struct regulator_match_data *math = (struct regulator_match_data *)priv->match;
 
+	if (!math || !math->buck_desc || math->nr_buck_desc <= 0)
+		return NULL;
+
+	if (num < 0)
+		return NULL;
+
+	if (num >= math->nr_buck_desc) {
+		num = 0;
+	}
+
 	return math->buck_desc + num;
 
 	return NULL;
 }
 
+static int get_buck_reg_index(struct udevice *dev)
+{
+	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
+	int buck = dev->driver_data - 1;
+
+	if (priv && priv->match &&
+	    strcmp(priv->match->name, "mpq8655") != 0 &&
+	    strcmp(priv->match->name, "spm8821") != 0)
+		buck = dev->driver_data - 2;
+
+	return buck;
+}
+
 static int buck_get_value(struct udevice *dev)
 {
-	int buck = dev->driver_data - 1;
+	int buck = get_buck_reg_index(dev);
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
 	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 	int mask = info->vsel_msk;
@@ -224,7 +304,7 @@ static int buck_get_value(struct udevice *dev)
 	if (info == NULL)
 		return -ENOSYS;
 
-	if (strcmp(priv->match->name, "mpq8655") == 0) {
+	if (strcmp(priv->match->name, "spm8821") != 0) {
 		unsigned char vals[2];
 
 		pmic_read(dev->parent, info->vsel_reg, vals, 2);
@@ -248,7 +328,7 @@ static int buck_get_value(struct udevice *dev)
 static int buck_set_value(struct udevice *dev, int uvolt)
 {
 	int sel, ret = -EINVAL;
-	int buck = dev->driver_data - 1;
+	int buck = get_buck_reg_index(dev);
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
 	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 
@@ -259,7 +339,7 @@ static int buck_set_value(struct udevice *dev, int uvolt)
 	if (sel >=0) {
 		/* has get the selctor */
 		sel <<= ffs(info->vsel_msk) - 1;
-		if (strcmp(priv->match->name, "mpq8655") == 0) {
+		if (strcmp(priv->match->name, "spm8821") != 0) {
 			unsigned char vals[2];
 			unsigned int val;
 
@@ -286,14 +366,14 @@ static int buck_set_suspend_value(struct udevice *dev, int uvolt)
 {
 	/* the hardware has already support the function */
 	int sel, ret = -EINVAL;
-	int buck = dev->driver_data - 1;
+	int buck = get_buck_reg_index(dev);
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
 	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 
 	if (info == NULL)
 		return -ENOSYS;
 
-	if (strcmp(priv->match->name, "mpq8655") == 0)
+	if (strcmp(priv->match->name, "spm8821") != 0)
 		return -ENOSYS;
 
 	sel = regulator_map_voltage_linear_range(info, uvolt, uvolt);
@@ -309,7 +389,7 @@ static int buck_set_suspend_value(struct udevice *dev, int uvolt)
 static int buck_get_suspend_value(struct udevice *dev)
 {
 	/* the hardware has already support the function */
-	int buck = dev->driver_data - 1;
+	int buck = get_buck_reg_index(dev);
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
 	int mask = info->vsel_sleep_msk;
 	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
@@ -319,7 +399,7 @@ static int buck_get_suspend_value(struct udevice *dev)
 	if (info == NULL)
 		return -ENOSYS;
 
-	if (strcmp(priv->match->name, "mpq8655") == 0)
+	if (strcmp(priv->match->name, "spm8821") != 0)
 		return -ENOSYS;
 
 	ret = pmic_reg_read(dev->parent, info->vsel_sleep_reg);
@@ -335,7 +415,7 @@ static int buck_get_suspend_value(struct udevice *dev)
 static int buck_get_enable(struct udevice *dev)
 {
 	int ret, val;
-	int buck = dev->driver_data - 1;
+	int buck = get_buck_reg_index(dev);
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
 	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 	int mask = info->enable_msk;
@@ -344,7 +424,7 @@ static int buck_get_enable(struct udevice *dev)
 		return -ENOSYS;
 
 	/* enabled by default, controled by p1 */
-	if (strcmp(priv->match->name, "mpq8655") == 0)
+	if (strcmp(priv->match->name, "spm8821") != 0)
 		return 1;
 
 	ret = pmic_reg_read(dev->parent, info->enable_reg);
@@ -362,13 +442,13 @@ static int buck_set_enable(struct udevice *dev, bool enable)
 {
 	int ret;
 	unsigned int val = 0;
-	int buck = dev->driver_data - 1;
+	int buck = get_buck_reg_index(dev);
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
 	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 	int mask = info->enable_msk;
 
 	/* uboot can't disable it */
-	if (strcmp(priv->match->name, "mpq8655") == 0) {
+	if (strcmp(priv->match->name, "spm8821") != 0) {
 		if (enable == false)
 			return -EPERM;
 		else

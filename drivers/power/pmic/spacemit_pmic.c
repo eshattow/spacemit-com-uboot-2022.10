@@ -14,6 +14,8 @@
 
 DECLEAR_SPM8821_REGULATOR_MATCH_DATA;
 DECLEAR_MPQ8655_REGULATOR_MATCH_DATA;
+DECLEAR_TDA38740_REGULATOR_MATCH_DATA;
+DECLEAR_IS6615A_REGULATOR_MATCH_DATA;
 
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
 DECLEAR_PM853_REGULATOR_MATCH_DATA;
@@ -63,6 +65,8 @@ static struct dm_pmic_ops pm8xx_ops = {
 static const struct udevice_id pm8xx_ids[] = {
 	{ .compatible = "spacemit,spm8821", .data = (ulong)&spm8821_regulator_match_data, },
 	{ .compatible = "spacemit,mpq8655", .data = (ulong)&mpq8655_regulator_match_data, },
+	{ .compatible = "spacemit,tda38740", .data = (ulong)&tda38740_regulator_match_data, },
+	{ .compatible = "spacemit,is6615a", .data = (ulong)&is6615a_regulator_match_data, },
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
 	{ .compatible = "spacemit,pm853", .data = (ulong)&pm853_regulator_match_data, },
 	{ .compatible = "spacemit,sy8810l", .data = (ulong)&sy8810l_regulator_match_data, },
