@@ -543,7 +543,7 @@
 	};
 
 	is6615a_2: is6615a@4f {
-		compatible = "spacemit,tda38740";
+		compatible = "spacemit,is6615a";
 		reg = <0x4f>;
 		bus = <8>;
 		u-boot,dm-spl;
