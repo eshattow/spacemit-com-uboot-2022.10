@@ -412,6 +412,11 @@ static SPACEMIT_CCU_DIV_GATE(pll1_dx, "pll1_dx", "pll1_2457p6_vco",
 	23, 5, BIT(22), BIT(22), 0x0,
 	0);
 
+static SPACEMIT_CCU_GATE_FACTOR(pll1_d64_38p4, "pll1_d64_38p4", "pll1_2457p6_vco",
+        BASE_TYPE_APBS, APBS_PLL1_SWCR2,
+        BIT(31), BIT(31), 0x0,
+        64, 1, 0);
+
 //pll2
 static SPACEMIT_CCU_GATE_FACTOR(pll2_d2, "pll2_d2", "pll2",
 	BASE_TYPE_APBS, APBS_PLL2_SWCR2,
@@ -583,6 +588,8 @@ static SPACEMIT_CCU_DIV_FC_MUX_GATE(ufs_aclk, "ufs_aclk", ufs_aclk_parents,
 	BIT(1), BIT(1), 0x0,
 	0);
 
+static SPACEMIT_CCU_FACTOR(ufs_refclk, "ufs_refclk", "pll1_d64_38p4", 2, 1);
+
 static const char * const axi_clk_parents[] = {
 	"pll1_d8_307p2", "pll1_d6_409p6"
 };
@@ -702,6 +709,7 @@ static u32 transfer_to_spl_list[][2] = {
 	{CLK_PLL1_D6, CLK_PLL1_D6_SPL},
 	{CLK_PLL1_D8, CLK_PLL1_D8_SPL},
 	{CLK_PLL1_DX, CLK_PLL1_DX_SPL},
+	{CLK_PLL1_D64, CLK_PLL1_D64_SPL},
 	{CLK_PLL2_D2, CLK_PLL2_D2_SPL},
 	{CLK_PLL2_D3, CLK_PLL2_D3_SPL},
 	{CLK_PLL2_D4, CLK_PLL2_D4_SPL},
@@ -734,6 +742,7 @@ static u32 transfer_to_spl_list[][2] = {
 	{CLK_QSPI, CLK_QSPI_SPL},
 	{CLK_QSPI_BUS, CLK_QSPI_BUS_SPL},
 	{CLK_UFS_ACLK, CLK_UFS_ACLK_SPL},
+	{CLK_UFS_REFCLK, CLK_UFS_REFCLK_SPL},
 	{CLK_PLL2_66, CLK_PLL2_66_SPL},
 	{CLK_PLL2_33, CLK_PLL2_33_SPL},
 	{CLK_PLL2_50, CLK_PLL2_50_SPL},
@@ -770,6 +779,7 @@ static struct spacemit_clk_table spacemit_k3_clks = {
 		[CLK_PLL1_D6_SPL]	= &pll1_d6.common.clk,
 		[CLK_PLL1_D8_SPL]	= &pll1_d8.common.clk,
 		[CLK_PLL1_DX_SPL]	= &pll1_dx.common.clk,
+		[CLK_PLL1_D64_SPL]	= &pll1_d64_38p4.common.clk,
 		[CLK_PLL2_D2_SPL]	= &pll2_d2.common.clk,
 		[CLK_PLL2_D3_SPL]	= &pll2_d3.common.clk,
 		[CLK_PLL2_D4_SPL]	= &pll2_d4.common.clk,
@@ -802,6 +812,7 @@ static struct spacemit_clk_table spacemit_k3_clks = {
 		[CLK_QSPI_SPL]		= &qspi_clk.common.clk,
 		[CLK_QSPI_BUS_SPL]	= &qspi_bus_clk.common.clk,
 		[CLK_UFS_ACLK_SPL]	= &ufs_aclk.common.clk,
+		[CLK_UFS_REFCLK_SPL]	= &ufs_refclk.common.clk,
 		[CLK_PLL2_66_SPL]	= &pll2_66.common.clk,
 		[CLK_PLL2_33_SPL]	= &pll2_33.common.clk,
 		[CLK_PLL2_50_SPL]	= &pll2_50.common.clk,
@@ -2152,6 +2163,8 @@ static SPACEMIT_CCU_DIV_FC_MUX_GATE(ufs_aclk, "ufs_aclk", ufs_aclk_parents,
 	BIT(1), BIT(1), 0x0,
 	0);
 
+static SPACEMIT_CCU_FACTOR(ufs_refclk, "ufs_refclk", "pll1_d64_38p4", 2, 1);
+
 static const char * const edp0_pclk_parents[] = {
 	"lcd_pxclk", "clk_dummy"
 };
@@ -2606,6 +2619,7 @@ static struct spacemit_clk_table spacemit_k3_clks = {
 		[CLK_DSI4LN2_DPU_ACLK]	= &dsi4ln2_dpu_aclk.common.clk,
 		[CLK_DPU_ACLK]		= &dpu_aclk.common.clk,
 		[CLK_UFS_ACLK]		= &ufs_aclk.common.clk,
+		[CLK_UFS_REFCLK]	= &ufs_refclk.common.clk,
 		[CLK_EDP0_PXCLK]	= &edp0_pxclk.common.clk,
 		[CLK_EDP1_PXCLK]	= &edp1_pxclk.common.clk,
 		[CLK_PCIEA]		= &pciea_clk.common.clk,
