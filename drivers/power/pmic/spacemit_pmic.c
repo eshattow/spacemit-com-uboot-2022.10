@@ -88,6 +88,8 @@ static int pm8xx_probe(struct udevice *dev)
 static const struct pmic_child_info pmic_children_info[] = {
 	{ .prefix = "DCDC_REG", .driver = "pm8xx_buck"},
 	{ .prefix = "EDCDC_REG", .driver = "pm8xx_buck"},
+	{ .prefix = "IDCDC_REG", .driver = "pm8xx_buck"},
+	{ .prefix = "TDCDC_REG", .driver = "pm8xx_buck"},
 	{ .prefix = "LDO_REG", .driver = "pm8xx_ldo"},
 	{ .prefix = "SWITCH_REG", .driver = "pm8xx_switch"},
 	{ .prefix = "PMIC_WDT", .driver = "pm8xx_wdt"},
