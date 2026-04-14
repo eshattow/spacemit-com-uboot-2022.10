@@ -375,7 +375,7 @@ static int __board_pmic_init(const char *name)
 				}
 			}
 		} else if (pmic_name_match(name, IS6615A_COMPAT_PREFIX) || pmic_name_match(name, TDA38740_COMPAT_PREFIX)) {
-			if ((strncmp(s, "EDCDC_REG", 9) == 0)) {
+			if ((strncmp(s, "IDCDC_REG", 9) == 0) || (strncmp(s, "TDCDC_REG", 9) == 0)) {
 				for (i = 0; i < num_buck; ++i) {
 					if (strcmp(buck_desc[i].name, s) != 0)
 						continue;

@@ -238,6 +238,7 @@ static void phyinit_lp5_pre_training(uint32_t ddrc_base, uint32_t ddr_size_mbyte
 {
 	uint32_t offset = 0;
 	unsigned long DPHY_BASE = ddrc_base + 0x800000;
+	volatile uint32_t* dphy_reg = (volatile uint32_t*)(size_t)DPHY_BASE;
 	const ddr_phy_reg_config* override_table;
 
 	if (4096 == ddr_size_mbyte) {
@@ -252,7 +253,7 @@ static void phyinit_lp5_pre_training(uint32_t ddrc_base, uint32_t ddr_size_mbyte
 	lpddr_training_table_init(ddrc_base, lp5_pre_train_table, override_table, io_override_table);
 
 	for (offset = 0x584d2; offset < 0x60000; offset++)
-		REG32(DPHY_BASE + offset * 4) = 0x0;
+		dphy_reg[offset] = 0x0;
 }
 
 static void phyinit_lp5_training(uint32_t ddrc_base, uint32_t ddr_size_mbyte)
@@ -279,18 +280,20 @@ void translate_streaming(uint32_t* d)
 
 void accept_message(uint32_t dphy_base)
 {
+	volatile uint32_t* dphy_reg = (volatile uint32_t*)(size_t)dphy_base;
 	uint32_t read_data;
 
-	REG32(dphy_base + 0x000d0031 * 4) = 0x00000000;
-	read_data = REG32(dphy_base + 0x000d0004 * 4);
+	dphy_reg[0x000d0031] = 0x00000000;
+	read_data = dphy_reg[0x000d0004];
 	while ((read_data & 0x00000001) != 0x00000001) {
-		read_data = REG32(dphy_base + 0x000d0004 * 4);
+		read_data = dphy_reg[0x000d0004];
 	}
-	REG32(dphy_base + 0x000d0031 * 4) = 0x00000001;
+	dphy_reg[0x000d0031] = 0x00000001;
 }
 
 uint32_t major_message_all(uint32_t dphy_base)
 {
+	volatile uint32_t* dphy_reg = (volatile uint32_t*)(size_t)dphy_base;
 	uint32_t read_data;
 	uint32_t i;
 	uint32_t j;
@@ -300,27 +303,27 @@ uint32_t major_message_all(uint32_t dphy_base)
 	static uint32_t dmsg[50];
 #endif
 
-	read_data = REG32(dphy_base + 0x000d0004 * 4);
+	read_data = dphy_reg[0x000d0004];
 	while ((read_data & 0x00000001) != 0x00000000) {
-		read_data = REG32(dphy_base + 0x000d0004 * 4);
+		read_data = dphy_reg[0x000d0004];
 	}
-	read_data = REG32(dphy_base + 0x000d0032 * 4);
+	read_data = dphy_reg[0x000d0032];
 
 	while ((read_data & 0x000000ff) != 0x00000007) {
 		if ((read_data & 0x000000ff) == 0x00000008) {
 			accept_message(dphy_base);
 
-			read_data = REG32(dphy_base + 0x000d0004 * 4);
+			read_data = dphy_reg[0x000d0004];
 			while ((read_data & 0x00000001) != 0x00000000) {
-				read_data = REG32(dphy_base + 0x000d0004 * 4);
+				read_data = dphy_reg[0x000d0004];
 			}
-			j = REG32(dphy_base + 0x000d0032 * 4);
+			j = dphy_reg[0x000d0032];
 			i = 0;
 			while (i <= j) {
 
-				read_data = REG32(dphy_base + 0x000d0032 * 4);
+				read_data = dphy_reg[0x000d0032];
 #if TRAINING_DEBUG
-				read_data1 = REG32(dphy_base + 0x000d0034 * 4);
+				read_data1 = dphy_reg[0x000d0034];
 				dmsg[i] = (read_data1 << 16) | read_data;
 				// LogMsg(0,"read dmsg 0x%08X\n",dmsg[i]);
 				if (i == j) {
@@ -329,9 +332,9 @@ uint32_t major_message_all(uint32_t dphy_base)
 #endif
 				accept_message(dphy_base);
 				i++;
-				read_data = REG32(dphy_base + 0x000d0004 * 4);
+				read_data = dphy_reg[0x000d0004];
 				while ((read_data & 0x00000001) != 0x00000000) {
-					read_data = REG32(dphy_base + 0x000d0004 * 4);
+					read_data = dphy_reg[0x000d0004];
 				}
 			}
 
@@ -340,23 +343,23 @@ uint32_t major_message_all(uint32_t dphy_base)
 			LogMsg(0, "%02x\n", read_data);
 
 			if (read_data == 0xff) {
-				REG32(dphy_base + 0xd0099 * 4) = 0x1;
+				dphy_reg[0xd0099] = 0x1;
 				while (cnt--)
 					;
-				REG32(dphy_base + 0xd0000 * 4) = 0x0;
-				read_data = REG32(dphy_base + 0x200c9 * 4);
+				dphy_reg[0xd0000] = 0x0;
+				read_data = dphy_reg[0x200c9];
 				LogMsg(0, "plllockstatus is %02x\n", read_data);
 				return read_data;
 			}
 			// while(cnt--);
 			LogMsg(0, "============================\n");
 			accept_message(dphy_base);
-			read_data = REG32(dphy_base + 0x000d0004 * 4);
+			read_data = dphy_reg[0x000d0004];
 			while ((read_data & 0x00000001) != 0x00000000) {
-				read_data = REG32(dphy_base + 0x000d0004 * 4);
+				read_data = dphy_reg[0x000d0004];
 			}
 		}
-		read_data = REG32(dphy_base + 0x000d0032 * 4);
+		read_data = dphy_reg[0x000d0032];
 	}
 
 	LogMsg(0, "== Training major message ==\n");
@@ -376,320 +379,323 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 	uint32_t DPHY_BASE = DDRC_BASE + 0x800000;
 	uint32_t count = 0x100;
 	uint32_t rst_code = 22;
+	volatile uint32_t* ddrc_reg = (volatile uint32_t*)(size_t)DDRC_BASE;
+	volatile uint32_t* cfg_reg = (volatile uint32_t*)(size_t)CFG_BASE;
+	volatile uint32_t* dphy_reg = (volatile uint32_t*)(size_t)DPHY_BASE;
 
 	if (8192 == ddr_size_mbyte || 16384 == ddr_size_mbyte) {
-		REG32(DDRC_BASE + 0x00010000) = 0x03080008;
+		ddrc_reg[0x00010000 / 4] = 0x03080008;
 	} else if (4096 == ddr_size_mbyte) {
-		REG32(DDRC_BASE + 0x00010000) = 0x01080008;
+		ddrc_reg[0x00010000 / 4] = 0x01080008;
 	}
 	REG32(0xD4282CE8) &= 0x00ffffff;
-	REG32(0xD4282CE8) |= ((REG32(DDRC_BASE + 0x00010000) & 0xff) << 24);
+	REG32(0xD4282CE8) |= ((ddrc_reg[0x00010000 / 4] & 0xff) << 24);
 
-	REG32(DDRC_BASE + 0x00010008) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010510) = 0x00010005;
-	REG32(DDRC_BASE + 0x00010518) = 0x70000000;
-	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
+	ddrc_reg[0x00010008 / 4] = 0x00000000;
+	ddrc_reg[0x00010510 / 4] = 0x00010005;
+	ddrc_reg[0x00010518 / 4] = 0x70000000;
+	ddrc_reg[0x00010208 / 4] = 0x00000000;
 	if (4096 == ddr_size_mbyte)
-		REG32(DDRC_BASE + 0x00010200) = 0x010003f3;
+		ddrc_reg[0x00010200 / 4] = 0x010003f3;
 	else // dsty_16GB
-		REG32(DDRC_BASE + 0x00010200) = 0x00000361;
+		ddrc_reg[0x00010200 / 4] = 0x00000361;
 
-	REG32(DDRC_BASE + 0x00010280) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010220) = 0x0a000100;
-	REG32(DDRC_BASE + 0x00010224) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010288) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010380) = 0x80012014;
-	REG32(DDRC_BASE + 0x00010100) = 0x00000020;
+	ddrc_reg[0x00010280 / 4] = 0x00000000;
+	ddrc_reg[0x00010220 / 4] = 0x0a000100;
+	ddrc_reg[0x00010224 / 4] = 0x00000000;
+	ddrc_reg[0x00010288 / 4] = 0x00000000;
+	ddrc_reg[0x00010380 / 4] = 0x80012014;
+	ddrc_reg[0x00010100 / 4] = 0x00000020;
 	if (16384 == ddr_size_mbyte) {
-		REG32(DDRC_BASE + 0x00010104) = 0x0000000f;
-		REG32(DDRC_BASE + 0x00010108) = 0x0000000f;
+		ddrc_reg[0x00010104 / 4] = 0x0000000f;
+		ddrc_reg[0x00010108 / 4] = 0x0000000f;
 	} else {
 		// dsty_4GB || dsty_8GB
-		REG32(DDRC_BASE + 0x00010104) = 0x00000005;
-		REG32(DDRC_BASE + 0x00010108) = 0x00000005;
+		ddrc_reg[0x00010104 / 4] = 0x00000005;
+		ddrc_reg[0x00010108 / 4] = 0x00000005;
 	}
-	REG32(DDRC_BASE + 0x00010118) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010c90) = 0x0000000f;
-	REG32(DDRC_BASE + 0x00010b80) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010300) = 0x00400040;
-	REG32(DDRC_BASE + 0x00010384) = 0x00002000;
-	REG32(DDRC_BASE + 0x0001038c) = 0x04040208;
-	REG32(DDRC_BASE + 0x00010390) = 0x08400810;
-	REG32(DDRC_BASE + 0x00010500) = 0x00100000;
-	REG32(DDRC_BASE + 0x00010508) = 0xc0000000;
-	REG32(DDRC_BASE + 0x00010ca0) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000001;
-	REG32(DDRC_BASE + 0x00010f00) = 0x80008200;
-	REG32(DDRC_BASE + 0x00010580) = 0x00110011;
-	REG32(DDRC_BASE + 0x00010ca4) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010308) = 0x00000000;
-	REG32(DDRC_BASE + 0x0001018c) = 0x0000003f;
-	REG32(DDRC_BASE + 0x00010184) = 0x00000003;
-	REG32(DDRC_BASE + 0x00010114) = 0x00000001;
-	REG32(DDRC_BASE + 0x00010128) = 0x00000000;
+	ddrc_reg[0x00010118 / 4] = 0x00000000;
+	ddrc_reg[0x00010c90 / 4] = 0x0000000f;
+	ddrc_reg[0x00010b80 / 4] = 0x00000000;
+	ddrc_reg[0x00010300 / 4] = 0x00400040;
+	ddrc_reg[0x00010384 / 4] = 0x00002000;
+	ddrc_reg[0x0001038c / 4] = 0x04040208;
+	ddrc_reg[0x00010390 / 4] = 0x08400810;
+	ddrc_reg[0x00010500 / 4] = 0x00100000;
+	ddrc_reg[0x00010508 / 4] = 0xc0000000;
+	ddrc_reg[0x00010ca0 / 4] = 0x00000000;
+	ddrc_reg[0x00010c80 / 4] = 0x00000001;
+	ddrc_reg[0x00010f00 / 4] = 0x80008200;
+	ddrc_reg[0x00010580 / 4] = 0x00110011;
+	ddrc_reg[0x00010ca4 / 4] = 0x00000000;
+	ddrc_reg[0x00010308 / 4] = 0x00000000;
+	ddrc_reg[0x0001018c / 4] = 0x0000003f;
+	ddrc_reg[0x00010184 / 4] = 0x00000003;
+	ddrc_reg[0x00010114 / 4] = 0x00000001;
+	ddrc_reg[0x00010128 / 4] = 0x00000000;
 
-	REG32(DDRC_BASE + 0x00010c94) = 0x00000001;
+	ddrc_reg[0x00010c94 / 4] = 0x00000001;
 
-	REG32(DDRC_BASE + 0x00010b84) = 0x00000003;
-	REG32(DDRC_BASE + 0x00010180) = 0x00000011;
-	REG32(DDRC_BASE + 0x00010d00) = 0x00020002;
-	REG32(DDRC_BASE + 0x00010010) = 0x00000100;
-	REG32(DDRC_BASE + 0x00010084) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010284) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010b8c) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010b98) = 0x00000000;
-	REG32(DDRC_BASE + 0x000005a8) = 0x71a4000d;
-	REG32(DDRC_BASE + 0x000005a0) = 0x00000000;
-	REG32(DDRC_BASE + 0x000005a4) = 0x00000300;
-	REG32(DDRC_BASE + 0x000005b0) = 0x00000004;
-	REG32(DDRC_BASE + 0x00000d00) = 0x00000001;
-	REG32(DDRC_BASE + 0x000005b4) = 0xe000012c;
+	ddrc_reg[0x00010b84 / 4] = 0x00000003;
+	ddrc_reg[0x00010180 / 4] = 0x00000011;
+	ddrc_reg[0x00010d00 / 4] = 0x00020002;
+	ddrc_reg[0x00010010 / 4] = 0x00000100;
+	ddrc_reg[0x00010084 / 4] = 0x00000000;
+	ddrc_reg[0x00010284 / 4] = 0x00000000;
+	ddrc_reg[0x00010b8c / 4] = 0x00000000;
+	ddrc_reg[0x00010b98 / 4] = 0x00000000;
+	ddrc_reg[0x000005a8 / 4] = 0x71a4000d;
+	ddrc_reg[0x000005a0 / 4] = 0x00000000;
+	ddrc_reg[0x000005a4 / 4] = 0x00000300;
+	ddrc_reg[0x000005b0 / 4] = 0x00000004;
+	ddrc_reg[0x00000d00 / 4] = 0x00000001;
+	ddrc_reg[0x000005b4 / 4] = 0xe000012c;
 
 	if (16384 == ddr_size_mbyte) {
-		REG32(DDRC_BASE + 0x00000000) = 0x29103622;
-		REG32(DDRC_BASE + 0x00000004) = 0x00100630;
-		REG32(DDRC_BASE + 0x00000008) = 0x09121219;
-		REG32(DDRC_BASE + 0x0000000c) = 0x000c2230;
-		REG32(DDRC_BASE + 0x00000010) = 0x0f04040f;
-		REG32(DDRC_BASE + 0x00000014) = 0x02040c09;
-		REG32(DDRC_BASE + 0x00000018) = 0x00000012;
-		REG32(DDRC_BASE + 0x0000001c) = 0x00000003;
-		REG32(DDRC_BASE + 0x00000024) = 0x00020412;
-		REG32(DDRC_BASE + 0x00000030) = 0x00030000;
-		REG32(DDRC_BASE + 0x00000034) = 0x0c100002;
-		REG32(DDRC_BASE + 0x00000038) = 0x002000e6;
-		REG32(DDRC_BASE + 0x00000060) = 0x0010170e;
-		REG32(DDRC_BASE + 0x00000064) = 0x00002906;
-		REG32(DDRC_BASE + 0x00000078) = 0x001a1419;
-		REG32(DDRC_BASE + 0x00000080) = 0x00030408;
+		ddrc_reg[0x00000000 / 4] = 0x29103622;
+		ddrc_reg[0x00000004 / 4] = 0x00100630;
+		ddrc_reg[0x00000008 / 4] = 0x09121219;
+		ddrc_reg[0x0000000c / 4] = 0x000c2230;
+		ddrc_reg[0x00000010 / 4] = 0x0f04040f;
+		ddrc_reg[0x00000014 / 4] = 0x02040c09;
+		ddrc_reg[0x00000018 / 4] = 0x00000012;
+		ddrc_reg[0x0000001c / 4] = 0x00000003;
+		ddrc_reg[0x00000024 / 4] = 0x00020412;
+		ddrc_reg[0x00000030 / 4] = 0x00030000;
+		ddrc_reg[0x00000034 / 4] = 0x0c100002;
+		ddrc_reg[0x00000038 / 4] = 0x002000e6;
+		ddrc_reg[0x00000060 / 4] = 0x0010170e;
+		ddrc_reg[0x00000064 / 4] = 0x00002906;
+		ddrc_reg[0x00000078 / 4] = 0x001a1419;
+		ddrc_reg[0x00000080 / 4] = 0x00030408;
 
-		REG32(DDRC_BASE + 0x00000600) = 0xc03d0c34;
-		REG32(DDRC_BASE + 0x00000604) = 0x00e00070;
-		REG32(DDRC_BASE + 0x00000608) = 0x06480000;
-		REG32(DDRC_BASE + 0x0000060c) = 0x3f000000;
-		REG32(DDRC_BASE + 0x00000610) = 0x00000000;
+		ddrc_reg[0x00000600 / 4] = 0xc03d0c34;
+		ddrc_reg[0x00000604 / 4] = 0x00e00070;
+		ddrc_reg[0x00000608 / 4] = 0x06480000;
+		ddrc_reg[0x0000060c / 4] = 0x3f000000;
+		ddrc_reg[0x00000610 / 4] = 0x00000000;
 
-		REG32(DDRC_BASE + 0x00000800) = 0x001804d7;
-		REG32(DDRC_BASE + 0x00000804) = 0x02800100;
-		REG32(DDRC_BASE + 0x00000d0c) = 0x00400010;
-		REG32(DDRC_BASE + 0x00000c84) = 0x0f00007f;
-		REG32(DDRC_BASE + 0x00000b80) = 0x00000000;
-		REG32(DDRC_BASE + 0x00000b04) = 0x1024100a;
-		REG32(DDRC_BASE + 0x00000b08) = 0x00000033;
-		REG32(DDRC_BASE + 0x00000b00) = 0x00800000;
-		REG32(DDRC_BASE + 0x00000d04) = 0x00000e12;
-		REG32(DDRC_BASE + 0x00000580) = 0x0343021f;
-		REG32(DDRC_BASE + 0x00000584) = 0x00080303;
-		REG32(DDRC_BASE + 0x00000588) = 0x0018431f;
-		REG32(DDRC_BASE + 0x00000590) = 0x1c0c0403;
-		REG32(DDRC_BASE + 0x00000594) = 0x0410000f;
-		REG32(DDRC_BASE + 0x00000500) = 0x00000000;
-		REG32(DDRC_BASE + 0x00000504) = 0x00000000;
-		REG32(DDRC_BASE + 0x00000508) = 0x00000000;
-		REG32(DDRC_BASE + 0x0000050c) = 0x00000000;
-		REG32(DDRC_BASE + 0x0000005c) = 0x009d0009;
-		REG32(DDRC_BASE + 0x00000c00) = 0x00000000;
-		REG32(DDRC_BASE + 0x000005ac) = 0x00010001;
-		REG32(DDRC_BASE + 0x000005b8) = 0x00000147;
-		REG32(DDRC_BASE + 0x00000a80) = 0x00000070;
-		REG32(DDRC_BASE + 0x00000d08) = 0x0000160a;
+		ddrc_reg[0x00000800 / 4] = 0x001804d7;
+		ddrc_reg[0x00000804 / 4] = 0x02800100;
+		ddrc_reg[0x00000d0c / 4] = 0x00400010;
+		ddrc_reg[0x00000c84 / 4] = 0x0f00007f;
+		ddrc_reg[0x00000b80 / 4] = 0x00000000;
+		ddrc_reg[0x00000b04 / 4] = 0x1024100a;
+		ddrc_reg[0x00000b08 / 4] = 0x00000033;
+		ddrc_reg[0x00000b00 / 4] = 0x00800000;
+		ddrc_reg[0x00000d04 / 4] = 0x00000e12;
+		ddrc_reg[0x00000580 / 4] = 0x0343021f;
+		ddrc_reg[0x00000584 / 4] = 0x00080303;
+		ddrc_reg[0x00000588 / 4] = 0x0018431f;
+		ddrc_reg[0x00000590 / 4] = 0x1c0c0403;
+		ddrc_reg[0x00000594 / 4] = 0x0410000f;
+		ddrc_reg[0x00000500 / 4] = 0x00000000;
+		ddrc_reg[0x00000504 / 4] = 0x00000000;
+		ddrc_reg[0x00000508 / 4] = 0x00000000;
+		ddrc_reg[0x0000050c / 4] = 0x00000000;
+		ddrc_reg[0x0000005c / 4] = 0x009d0009;
+		ddrc_reg[0x00000c00 / 4] = 0x00000000;
+		ddrc_reg[0x000005ac / 4] = 0x00010001;
+		ddrc_reg[0x000005b8 / 4] = 0x00000147;
+		ddrc_reg[0x00000a80 / 4] = 0x00000070;
+		ddrc_reg[0x00000d08 / 4] = 0x0000160a;
 	} else {
 		// dsty_4GB || dsty_8GB
-		REG32(DDRC_BASE + 0x00000000) = 0x28103622;
-		REG32(DDRC_BASE + 0x00000004) = 0x00100630;
-		REG32(DDRC_BASE + 0x00000008) = 0x09111117;
-		REG32(DDRC_BASE + 0x0000000c) = 0x000c212f;
-		REG32(DDRC_BASE + 0x00000010) = 0x0f04040f;
-		REG32(DDRC_BASE + 0x00000014) = 0x02040c09;
-		REG32(DDRC_BASE + 0x00000018) = 0x00000012;
-		REG32(DDRC_BASE + 0x0000001c) = 0x00000003;
-		REG32(DDRC_BASE + 0x00000024) = 0x00020410;
-		REG32(DDRC_BASE + 0x00000030) = 0x00030000;
-		REG32(DDRC_BASE + 0x00000034) = 0x0c100002;
-		REG32(DDRC_BASE + 0x00000038) = 0x002000e6;
-		REG32(DDRC_BASE + 0x00000060) = 0x000f160e;
-		REG32(DDRC_BASE + 0x00000064) = 0x00002806;
-		REG32(DDRC_BASE + 0x00000078) = 0x00191318;
-		REG32(DDRC_BASE + 0x00000080) = 0x00030408;
+		ddrc_reg[0x00000000 / 4] = 0x28103622;
+		ddrc_reg[0x00000004 / 4] = 0x00100630;
+		ddrc_reg[0x00000008 / 4] = 0x09111117;
+		ddrc_reg[0x0000000c / 4] = 0x000c212f;
+		ddrc_reg[0x00000010 / 4] = 0x0f04040f;
+		ddrc_reg[0x00000014 / 4] = 0x02040c09;
+		ddrc_reg[0x00000018 / 4] = 0x00000012;
+		ddrc_reg[0x0000001c / 4] = 0x00000003;
+		ddrc_reg[0x00000024 / 4] = 0x00020410;
+		ddrc_reg[0x00000030 / 4] = 0x00030000;
+		ddrc_reg[0x00000034 / 4] = 0x0c100002;
+		ddrc_reg[0x00000038 / 4] = 0x002000e6;
+		ddrc_reg[0x00000060 / 4] = 0x000f160e;
+		ddrc_reg[0x00000064 / 4] = 0x00002806;
+		ddrc_reg[0x00000078 / 4] = 0x00191318;
+		ddrc_reg[0x00000080 / 4] = 0x00030408;
 
-		REG32(DDRC_BASE + 0x00000600) = 0xc03d0c34;
-		REG32(DDRC_BASE + 0x00000604) = 0x00e00070;
-		REG32(DDRC_BASE + 0x00000608) = 0x06480000;
-		REG32(DDRC_BASE + 0x0000060c) = 0x3f000000;
-		REG32(DDRC_BASE + 0x00000610) = 0x00000000;
+		ddrc_reg[0x00000600 / 4] = 0xc03d0c34;
+		ddrc_reg[0x00000604 / 4] = 0x00e00070;
+		ddrc_reg[0x00000608 / 4] = 0x06480000;
+		ddrc_reg[0x0000060c / 4] = 0x3f000000;
+		ddrc_reg[0x00000610 / 4] = 0x00000000;
 
-		REG32(DDRC_BASE + 0x00000800) = 0x001804d7;
-		REG32(DDRC_BASE + 0x00000804) = 0x02800100;
-		REG32(DDRC_BASE + 0x00000d0c) = 0x00400010;
-		REG32(DDRC_BASE + 0x00000c84) = 0x0f00007f;
-		REG32(DDRC_BASE + 0x00000b80) = 0x00000000;
-		REG32(DDRC_BASE + 0x00000b04) = 0x1024100a;
-		REG32(DDRC_BASE + 0x00000b08) = 0x00000033;
-		REG32(DDRC_BASE + 0x00000b00) = 0x00800000;
-		REG32(DDRC_BASE + 0x00000d04) = 0x00000e12;
-		REG32(DDRC_BASE + 0x00000580) = 0x033f021f;
-		REG32(DDRC_BASE + 0x00000584) = 0x00080303;
-		REG32(DDRC_BASE + 0x00000588) = 0x00183f1f;
-		REG32(DDRC_BASE + 0x00000590) = 0x180c0403;
-		REG32(DDRC_BASE + 0x00000594) = 0x0410000f;
-		REG32(DDRC_BASE + 0x00000500) = 0x00000000;
-		REG32(DDRC_BASE + 0x00000504) = 0x00000000;
-		REG32(DDRC_BASE + 0x00000508) = 0x00000000;
-		REG32(DDRC_BASE + 0x0000050c) = 0x00000000;
-		REG32(DDRC_BASE + 0x0000005c) = 0x009d0009;
-		REG32(DDRC_BASE + 0x00000c00) = 0x00000000;
-		REG32(DDRC_BASE + 0x000005ac) = 0x00010001;
-		REG32(DDRC_BASE + 0x000005b8) = 0x00000147;
-		REG32(DDRC_BASE + 0x00000a80) = 0x00000070;
-		REG32(DDRC_BASE + 0x00000d08) = 0x0000150b;
+		ddrc_reg[0x00000800 / 4] = 0x001804d7;
+		ddrc_reg[0x00000804 / 4] = 0x02800100;
+		ddrc_reg[0x00000d0c / 4] = 0x00400010;
+		ddrc_reg[0x00000c84 / 4] = 0x0f00007f;
+		ddrc_reg[0x00000b80 / 4] = 0x00000000;
+		ddrc_reg[0x00000b04 / 4] = 0x1024100a;
+		ddrc_reg[0x00000b08 / 4] = 0x00000033;
+		ddrc_reg[0x00000b00 / 4] = 0x00800000;
+		ddrc_reg[0x00000d04 / 4] = 0x00000e12;
+		ddrc_reg[0x00000580 / 4] = 0x033f021f;
+		ddrc_reg[0x00000584 / 4] = 0x00080303;
+		ddrc_reg[0x00000588 / 4] = 0x00183f1f;
+		ddrc_reg[0x00000590 / 4] = 0x180c0403;
+		ddrc_reg[0x00000594 / 4] = 0x0410000f;
+		ddrc_reg[0x00000500 / 4] = 0x00000000;
+		ddrc_reg[0x00000504 / 4] = 0x00000000;
+		ddrc_reg[0x00000508 / 4] = 0x00000000;
+		ddrc_reg[0x0000050c / 4] = 0x00000000;
+		ddrc_reg[0x0000005c / 4] = 0x009d0009;
+		ddrc_reg[0x00000c00 / 4] = 0x00000000;
+		ddrc_reg[0x000005ac / 4] = 0x00010001;
+		ddrc_reg[0x000005b8 / 4] = 0x00000147;
+		ddrc_reg[0x00000a80 / 4] = 0x00000070;
+		ddrc_reg[0x00000d08 / 4] = 0x0000150b;
 	}
-	REG32(DDRC_BASE + 0x00000c80) = 0x0f000001;
-	REG32(DDRC_BASE + 0x00000c88) = 0x0f00007f;
-	REG32(DDRC_BASE + 0x00000650) = 0x00000098;
-	REG32(DDRC_BASE + 0x00000d30) = 0x002faf09;
-	REG32(DDRC_BASE + 0x00000d34) = 0x180009c5;
-	REG32(DDRC_BASE + 0x00020000) = 0x00000000;
-	REG32(DDRC_BASE + 0x00020004) = 0x0000501f;
-	REG32(DDRC_BASE + 0x00021004) = 0x0000501f;
-	REG32(DDRC_BASE + 0x00022004) = 0x0000501f;
-	REG32(DDRC_BASE + 0x00023004) = 0x0000501f;
-	REG32(DDRC_BASE + 0x00024004) = 0x0000501f;
-	REG32(DDRC_BASE + 0x00020008) = 0x0000501f;
-	REG32(DDRC_BASE + 0x00021008) = 0x0000501f;
-	REG32(DDRC_BASE + 0x00022008) = 0x0000501f;
-	REG32(DDRC_BASE + 0x00023008) = 0x0000501f;
-	REG32(DDRC_BASE + 0x00024008) = 0x0000501f;
-	REG32(DDRC_BASE + 0x00020090) = 0x00000000;
-	REG32(DDRC_BASE + 0x00021090) = 0x00000000;
-	REG32(DDRC_BASE + 0x00022090) = 0x00000000;
-	REG32(DDRC_BASE + 0x00023090) = 0x00000000;
-	REG32(DDRC_BASE + 0x00024090) = 0x00000000;
-	REG32(DDRC_BASE + 0x00020094) = 0x00000000;
-	REG32(DDRC_BASE + 0x00021094) = 0x00000000;
-	REG32(DDRC_BASE + 0x00022094) = 0x00000000;
-	REG32(DDRC_BASE + 0x00023094) = 0x00000000;
-	REG32(DDRC_BASE + 0x00024094) = 0x00000000;
-	REG32(DDRC_BASE + 0x00020098) = 0x00000000;
-	REG32(DDRC_BASE + 0x00021098) = 0x00000000;
-	REG32(DDRC_BASE + 0x00022098) = 0x00000000;
-	REG32(DDRC_BASE + 0x00023098) = 0x00000000;
-	REG32(DDRC_BASE + 0x00024098) = 0x00000000;
-	REG32(DDRC_BASE + 0x0002009c) = 0x00000e00;
-	REG32(DDRC_BASE + 0x0002109c) = 0x00000e00;
-	REG32(DDRC_BASE + 0x0002209c) = 0x00000e00;
-	REG32(DDRC_BASE + 0x0002309c) = 0x00000e00;
-	REG32(DDRC_BASE + 0x0002409c) = 0x00000e00;
-	REG32(DDRC_BASE + 0x000200a0) = 0x00000000;
-	REG32(DDRC_BASE + 0x000210a0) = 0x00000000;
-	REG32(DDRC_BASE + 0x000220a0) = 0x00000000;
-	REG32(DDRC_BASE + 0x000230a0) = 0x00000000;
-	REG32(DDRC_BASE + 0x000240a0) = 0x00000000;
+	ddrc_reg[0x00000c80 / 4] = 0x0f000001;
+	ddrc_reg[0x00000c88 / 4] = 0x0f00007f;
+	ddrc_reg[0x00000650 / 4] = 0x00000098;
+	ddrc_reg[0x00000d30 / 4] = 0x002faf09;
+	ddrc_reg[0x00000d34 / 4] = 0x180009c5;
+	ddrc_reg[0x00020000 / 4] = 0x00000000;
+	ddrc_reg[0x00020004 / 4] = 0x0000501f;
+	ddrc_reg[0x00021004 / 4] = 0x0000501f;
+	ddrc_reg[0x00022004 / 4] = 0x0000501f;
+	ddrc_reg[0x00023004 / 4] = 0x0000501f;
+	ddrc_reg[0x00024004 / 4] = 0x0000501f;
+	ddrc_reg[0x00020008 / 4] = 0x0000501f;
+	ddrc_reg[0x00021008 / 4] = 0x0000501f;
+	ddrc_reg[0x00022008 / 4] = 0x0000501f;
+	ddrc_reg[0x00023008 / 4] = 0x0000501f;
+	ddrc_reg[0x00024008 / 4] = 0x0000501f;
+	ddrc_reg[0x00020090 / 4] = 0x00000000;
+	ddrc_reg[0x00021090 / 4] = 0x00000000;
+	ddrc_reg[0x00022090 / 4] = 0x00000000;
+	ddrc_reg[0x00023090 / 4] = 0x00000000;
+	ddrc_reg[0x00024090 / 4] = 0x00000000;
+	ddrc_reg[0x00020094 / 4] = 0x00000000;
+	ddrc_reg[0x00021094 / 4] = 0x00000000;
+	ddrc_reg[0x00022094 / 4] = 0x00000000;
+	ddrc_reg[0x00023094 / 4] = 0x00000000;
+	ddrc_reg[0x00024094 / 4] = 0x00000000;
+	ddrc_reg[0x00020098 / 4] = 0x00000000;
+	ddrc_reg[0x00021098 / 4] = 0x00000000;
+	ddrc_reg[0x00022098 / 4] = 0x00000000;
+	ddrc_reg[0x00023098 / 4] = 0x00000000;
+	ddrc_reg[0x00024098 / 4] = 0x00000000;
+	ddrc_reg[0x0002009c / 4] = 0x00000e00;
+	ddrc_reg[0x0002109c / 4] = 0x00000e00;
+	ddrc_reg[0x0002209c / 4] = 0x00000e00;
+	ddrc_reg[0x0002309c / 4] = 0x00000e00;
+	ddrc_reg[0x0002409c / 4] = 0x00000e00;
+	ddrc_reg[0x000200a0 / 4] = 0x00000000;
+	ddrc_reg[0x000210a0 / 4] = 0x00000000;
+	ddrc_reg[0x000220a0 / 4] = 0x00000000;
+	ddrc_reg[0x000230a0 / 4] = 0x00000000;
+	ddrc_reg[0x000240a0 / 4] = 0x00000000;
 
 	if (8192 == ddr_size_mbyte) {
-		REG32(DDRC_BASE + 0x000200c0) = 0x00000008; // SARBASE0
-		REG32(DDRC_BASE + 0x000200c4) = 0x00000007; // SARSIZE0
-		REG32(DDRC_BASE + 0x000200c8) = 0x00000010; // SARBASE1
-		REG32(DDRC_BASE + 0x000200cc) = 0x00000007; // SARSIZE1
-		REG32(DDRC_BASE + 0x000200d0) = 0x00000018; // SARBASE2
-		REG32(DDRC_BASE + 0x000200d4) = 0x00000007; // SARSIZE2
-		REG32(DDRC_BASE + 0x000200d8) = 0x00000020; // SARBASE3
-		REG32(DDRC_BASE + 0x000200dc) = 0x00000007; // SARSIZE3
+		ddrc_reg[0x000200c0 / 4] = 0x00000008; // SARBASE0
+		ddrc_reg[0x000200c4 / 4] = 0x00000007; // SARSIZE0
+		ddrc_reg[0x000200c8 / 4] = 0x00000010; // SARBASE1
+		ddrc_reg[0x000200cc / 4] = 0x00000007; // SARSIZE1
+		ddrc_reg[0x000200d0 / 4] = 0x00000018; // SARBASE2
+		ddrc_reg[0x000200d4 / 4] = 0x00000007; // SARSIZE2
+		ddrc_reg[0x000200d8 / 4] = 0x00000020; // SARBASE3
+		ddrc_reg[0x000200dc / 4] = 0x00000007; // SARSIZE3
 
-		REG32(DDRC_BASE + 0x00030004) = 0x00000018; // ADDRMAPX
-		REG32(DDRC_BASE + 0x0003000c) = 0x003f0903;
-		REG32(DDRC_BASE + 0x00030010) = 0x00000101;
-		REG32(DDRC_BASE + 0x00030014) = 0x1f030303;
-		REG32(DDRC_BASE + 0x00030018) = 0x03030300;
-		REG32(DDRC_BASE + 0x0003001c) = 0x1f1f0808;
-		REG32(DDRC_BASE + 0x00030020) = 0x08080808;
-		REG32(DDRC_BASE + 0x00030024) = 0x08080808;
-		REG32(DDRC_BASE + 0x00030028) = 0x08080808;
-		REG32(DDRC_BASE + 0x0003002c) = 0x00000808;
+		ddrc_reg[0x00030004 / 4] = 0x00000018; // ADDRMAPX
+		ddrc_reg[0x0003000c / 4] = 0x003f0903;
+		ddrc_reg[0x00030010 / 4] = 0x00000101;
+		ddrc_reg[0x00030014 / 4] = 0x1f030303;
+		ddrc_reg[0x00030018 / 4] = 0x03030300;
+		ddrc_reg[0x0003001c / 4] = 0x1f1f0808;
+		ddrc_reg[0x00030020 / 4] = 0x08080808;
+		ddrc_reg[0x00030024 / 4] = 0x08080808;
+		ddrc_reg[0x00030028 / 4] = 0x08080808;
+		ddrc_reg[0x0003002c / 4] = 0x00000808;
 	} else if (4096 == ddr_size_mbyte) {
-		REG32(DDRC_BASE + 0x000200c0) = 0x00000008; // SARBASE0
-		REG32(DDRC_BASE + 0x000200c4) = 0x00000003; // SARSIZE0
-		REG32(DDRC_BASE + 0x000200c8) = 0x0000000c; // SARBASE1
-		REG32(DDRC_BASE + 0x000200cc) = 0x00000003; // SARSIZE1
-		REG32(DDRC_BASE + 0x000200d0) = 0x00000010; // SARBASE2
-		REG32(DDRC_BASE + 0x000200d4) = 0x00000003; // SARSIZE2
-		REG32(DDRC_BASE + 0x000200d8) = 0x00000014; // SARBASE3
-		REG32(DDRC_BASE + 0x000200dc) = 0x00000003; // SARSIZE3
+		ddrc_reg[0x000200c0 / 4] = 0x00000008; // SARBASE0
+		ddrc_reg[0x000200c4 / 4] = 0x00000003; // SARSIZE0
+		ddrc_reg[0x000200c8 / 4] = 0x0000000c; // SARBASE1
+		ddrc_reg[0x000200cc / 4] = 0x00000003; // SARSIZE1
+		ddrc_reg[0x000200d0 / 4] = 0x00000010; // SARBASE2
+		ddrc_reg[0x000200d4 / 4] = 0x00000003; // SARSIZE2
+		ddrc_reg[0x000200d8 / 4] = 0x00000014; // SARBASE3
+		ddrc_reg[0x000200dc / 4] = 0x00000003; // SARSIZE3
 
-		REG32(DDRC_BASE + 0x00030004) = 0x0000003f; // ADDRMAPX
-		REG32(DDRC_BASE + 0x0003000c) = 0x003f0903;
-		REG32(DDRC_BASE + 0x00030010) = 0x00000101;
-		REG32(DDRC_BASE + 0x00030014) = 0x1f030303;
-		REG32(DDRC_BASE + 0x00030018) = 0x03030300;
-		REG32(DDRC_BASE + 0x0003001c) = 0x1f1f0808;
-		REG32(DDRC_BASE + 0x00030020) = 0x08080808;
-		REG32(DDRC_BASE + 0x00030024) = 0x08080808;
-		REG32(DDRC_BASE + 0x00030028) = 0x08080808;
-		REG32(DDRC_BASE + 0x0003002c) = 0x00000808;
+		ddrc_reg[0x00030004 / 4] = 0x0000003f; // ADDRMAPX
+		ddrc_reg[0x0003000c / 4] = 0x003f0903;
+		ddrc_reg[0x00030010 / 4] = 0x00000101;
+		ddrc_reg[0x00030014 / 4] = 0x1f030303;
+		ddrc_reg[0x00030018 / 4] = 0x03030300;
+		ddrc_reg[0x0003001c / 4] = 0x1f1f0808;
+		ddrc_reg[0x00030020 / 4] = 0x08080808;
+		ddrc_reg[0x00030024 / 4] = 0x08080808;
+		ddrc_reg[0x00030028 / 4] = 0x08080808;
+		ddrc_reg[0x0003002c / 4] = 0x00000808;
 	} else {
 		// dsty_16GB
-		REG32(DDRC_BASE + 0x000200c0) = 0x00000008; // SARBASE0
-		REG32(DDRC_BASE + 0x000200c4) = 0x0000000f; // SARSIZE0
-		REG32(DDRC_BASE + 0x000200c8) = 0x00000018; // SARBASE1
-		REG32(DDRC_BASE + 0x000200cc) = 0x0000000f; // SARSIZE1
-		REG32(DDRC_BASE + 0x000200d0) = 0x00000028; // SARBASE2
-		REG32(DDRC_BASE + 0x000200d4) = 0x0000000f; // SARSIZE2
-		REG32(DDRC_BASE + 0x000200d8) = 0x00000038; // SARBASE3
-		REG32(DDRC_BASE + 0x000200dc) = 0x0000000f; // SARSIZE3
+		ddrc_reg[0x000200c0 / 4] = 0x00000008; // SARBASE0
+		ddrc_reg[0x000200c4 / 4] = 0x0000000f; // SARSIZE0
+		ddrc_reg[0x000200c8 / 4] = 0x00000018; // SARBASE1
+		ddrc_reg[0x000200cc / 4] = 0x0000000f; // SARSIZE1
+		ddrc_reg[0x000200d0 / 4] = 0x00000028; // SARBASE2
+		ddrc_reg[0x000200d4 / 4] = 0x0000000f; // SARSIZE2
+		ddrc_reg[0x000200d8 / 4] = 0x00000038; // SARBASE3
+		ddrc_reg[0x000200dc / 4] = 0x0000000f; // SARSIZE3
 
-		REG32(DDRC_BASE + 0x00030004) = 0x00000019; // ADDRMAPX
-		REG32(DDRC_BASE + 0x0003000c) = 0x003f0903;
-		REG32(DDRC_BASE + 0x00030010) = 0x00000101;
-		REG32(DDRC_BASE + 0x00030014) = 0x1f030303;
-		REG32(DDRC_BASE + 0x00030018) = 0x03030300;
-		REG32(DDRC_BASE + 0x0003001c) = 0x1f080808;
-		REG32(DDRC_BASE + 0x00030020) = 0x08080808;
-		REG32(DDRC_BASE + 0x00030024) = 0x08080808;
-		REG32(DDRC_BASE + 0x00030028) = 0x08080808;
-		REG32(DDRC_BASE + 0x0003002c) = 0x00000808;
+		ddrc_reg[0x00030004 / 4] = 0x00000019; // ADDRMAPX
+		ddrc_reg[0x0003000c / 4] = 0x003f0903;
+		ddrc_reg[0x00030010 / 4] = 0x00000101;
+		ddrc_reg[0x00030014 / 4] = 0x1f030303;
+		ddrc_reg[0x00030018 / 4] = 0x03030300;
+		ddrc_reg[0x0003001c / 4] = 0x1f080808;
+		ddrc_reg[0x00030020 / 4] = 0x08080808;
+		ddrc_reg[0x00030024 / 4] = 0x08080808;
+		ddrc_reg[0x00030028 / 4] = 0x08080808;
+		ddrc_reg[0x0003002c / 4] = 0x00000808;
 	}
 
-	REG32(DDRC_BASE + 0x00030030) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010b84) = 0x00000002;
-	REG32(DDRC_BASE + 0x00010d00) = 0xc0020002;
-	REG32(DDRC_BASE + 0x00010180) = 0x00000811;
-	REG32(DDRC_BASE + 0x00010180) = 0x00000800;
-	REG32(DDRC_BASE + 0x00010208) = 0x00000001;
-	REG32(CFG_BASE + 0x18) |= (1 << rst_code); // RELEASE FOR DCLK
-	REG32(CFG_BASE + 0x18) |= (1 << 1);
-	REG32(DDRC_BASE + 0x00010280) = 0x80000000;
-	REG32(DDRC_BASE + 0x000005b4) = 0xc000012c;
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010288) = 0x00000001;
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000001;
-	read_data = REG32(DDRC_BASE + 0x00010c84);
+	ddrc_reg[0x00030030 / 4] = 0x00000000;
+	ddrc_reg[0x00010b84 / 4] = 0x00000002;
+	ddrc_reg[0x00010d00 / 4] = 0xc0020002;
+	ddrc_reg[0x00010180 / 4] = 0x00000811;
+	ddrc_reg[0x00010180 / 4] = 0x00000800;
+	ddrc_reg[0x00010208 / 4] = 0x00000001;
+	cfg_reg[0x18 / 4] |= (1 << rst_code); // RELEASE FOR DCLK
+	cfg_reg[0x18 / 4] |= (1 << 1);
+	ddrc_reg[0x00010280 / 4] = 0x80000000;
+	ddrc_reg[0x000005b4 / 4] = 0xc000012c;
+	ddrc_reg[0x00010c80 / 4] = 0x00000000;
+	ddrc_reg[0x00010288 / 4] = 0x00000001;
+	ddrc_reg[0x00010c80 / 4] = 0x00000001;
+	read_data = ddrc_reg[0x00010c84 / 4];
 	while ((read_data & 0x00000001) != 0x00000001) {
-		read_data = REG32(DDRC_BASE + 0x00010c84);
+		read_data = ddrc_reg[0x00010c84 / 4];
 	}
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010510) = 0x00010014;
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000001;
-	read_data = REG32(DDRC_BASE + 0x00010c84);
+	ddrc_reg[0x00010c80 / 4] = 0x00000000;
+	ddrc_reg[0x00010510 / 4] = 0x00010014;
+	ddrc_reg[0x00010c80 / 4] = 0x00000001;
+	read_data = ddrc_reg[0x00010c84 / 4];
 	while ((read_data & 0x00000001) != 0x00000001) {
-		read_data = REG32(DDRC_BASE + 0x00010c84);
+		read_data = ddrc_reg[0x00010c84 / 4];
 	}
 
-	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
+	ddrc_reg[0x00010208 / 4] = 0x00000000;
 	if (DDR_QUICKBOOT_MODE != ddr_mode) {
 		phyinit_lp5_pre_training(DDRC_BASE, ddr_size_mbyte);
 
-		REG32(DDRC_BASE + 0x00010180) |= (0x1 << 11);
+		ddrc_reg[0x00010180 / 4] |= (0x1 << 11);
 
-		REG32(DPHY_BASE + 0xd0000 * 4) = 0x1;
-		REG32(DPHY_BASE + 0xd0099 * 4) = 0x9;
-		REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
-		REG32(DPHY_BASE + 0xd0099 * 4) = 0x0;
+		dphy_reg[0xd0000] = 0x1;
+		dphy_reg[0xd0099] = 0x9;
+		dphy_reg[0xd0099] = 0x1;
+		dphy_reg[0xd0099] = 0x0;
 		read_data = major_message_all(DPHY_BASE);
 		if (read_data == 0xff)
 			return;
-		REG32(DPHY_BASE + 0xd0099 * 4) = 0x1;
+		dphy_reg[0xd0099] = 0x1;
 		while (count--)
 			;
-		REG32(DPHY_BASE + 0xd0000 * 4) = 0x0;
+		dphy_reg[0xd0000] = 0x0;
 
 		phyinit_lp5_training(DDRC_BASE, ddr_size_mbyte);
 
@@ -700,114 +706,115 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 	}
 
 	if (16384 != ddr_size_mbyte) {
-		REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
-		REG32(DDRC_BASE + 0x00000060) = 0x0010160e;
-		REG32(DDRC_BASE + 0x00000024) = 0x00020410;
-		REG32(DDRC_BASE + 0x00010c80) = 0x00000001;
-		read_data = REG32(DDRC_BASE + 0x00010c84);
+		ddrc_reg[0x00010c80 / 4] = 0x00000000;
+		ddrc_reg[0x00000060 / 4] = 0x0010160e;
+		ddrc_reg[0x00000024 / 4] = 0x00020410;
+		ddrc_reg[0x00010c80 / 4] = 0x00000001;
+		read_data = ddrc_reg[0x00010c84 / 4];
 		while ((read_data & 0x00000001) != 0x00000001) {
-			read_data = REG32(DDRC_BASE + 0x00010c84);
+			read_data = ddrc_reg[0x00010c84 / 4];
 		}
 	}
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010510) = 0x00010034;
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000001;
-	read_data = REG32(DDRC_BASE + 0x00010c84);
+	ddrc_reg[0x00010c80 / 4] = 0x00000000;
+	ddrc_reg[0x00010510 / 4] = 0x00010034;
+	ddrc_reg[0x00010c80 / 4] = 0x00000001;
+	read_data = ddrc_reg[0x00010c84 / 4];
 	while ((read_data & 0x00000001) != 0x00000001) {
-		read_data = REG32(DDRC_BASE + 0x00010c84);
+		read_data = ddrc_reg[0x00010c84 / 4];
 	}
-	read_data = REG32(DDRC_BASE + 0x00010514);
+	read_data = ddrc_reg[0x00010514 / 4];
 	while ((read_data & 0x00000001) != 0x00000001) {
-		read_data = REG32(DDRC_BASE + 0x00010514);
+		read_data = ddrc_reg[0x00010514 / 4];
 	}
 
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010510) = 0x00010015;
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000001;
-	read_data = REG32(DDRC_BASE + 0x00010c84);
+	ddrc_reg[0x00010c80 / 4] = 0x00000000;
+	ddrc_reg[0x00010510 / 4] = 0x00010015;
+	ddrc_reg[0x00010c80 / 4] = 0x00000001;
+	read_data = ddrc_reg[0x00010c84 / 4];
 	while ((read_data & 0x00000001) != 0x00000001) {
-		read_data = REG32(DDRC_BASE + 0x00010c84);
+		read_data = ddrc_reg[0x00010c84 / 4];
 	}
-	REG32(DDRC_BASE + 0x00010180) = 0x00000000;
-	read_data = REG32(DDRC_BASE + 0x00010014);
+	ddrc_reg[0x00010180 / 4] = 0x00000000;
+	read_data = ddrc_reg[0x00010014 / 4];
 	while ((read_data & 0x00000003) != 0x00000001) {
-		read_data = REG32(DDRC_BASE + 0x00010014);
+		read_data = ddrc_reg[0x00010014 / 4];
 	}
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010508) = 0xc0000000;
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000001;
-	read_data = REG32(DDRC_BASE + 0x00010c84);
+	ddrc_reg[0x00010c80 / 4] = 0x00000000;
+	ddrc_reg[0x00010508 / 4] = 0xc0000000;
+	ddrc_reg[0x00010c80 / 4] = 0x00000001;
+	read_data = ddrc_reg[0x00010c84 / 4];
 	while ((read_data & 0x00000001) != 0x00000001) {
-		read_data = REG32(DDRC_BASE + 0x00010c84);
+		read_data = ddrc_reg[0x00010c84 / 4];
 	}
-	REG32(DDRC_BASE + 0x00010280) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010288) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010c80) = 0x00000001;
-	read_data = REG32(DDRC_BASE + 0x00010c84);
+	ddrc_reg[0x00010280 / 4] = 0x00000000;
+	ddrc_reg[0x00010c80 / 4] = 0x00000000;
+	ddrc_reg[0x00010288 / 4] = 0x00000000;
+	ddrc_reg[0x00010c80 / 4] = 0x00000001;
+	read_data = ddrc_reg[0x00010c84 / 4];
 	while ((read_data & 0x00000001) != 0x00000001) {
-		read_data = REG32(DDRC_BASE + 0x00010c84);
+		read_data = ddrc_reg[0x00010c84 / 4];
 	}
-	REG32(DDRC_BASE + 0x00010208) = 0x00000000;
-	REG32(DDRC_BASE + 0x00010180) = 0x00000010;
-	REG32(DDRC_BASE + 0x000005b4) = 0xe000012c;
-	REG32(DDRC_BASE + 0x00010b84) = 0x00000000;
-	REG32(DDRC_BASE + 0x00020090) = 0x00000001;
-	REG32(DDRC_BASE + 0x00021090) = 0x00000001;
-	REG32(DDRC_BASE + 0x00022090) = 0x00000001;
-	REG32(DDRC_BASE + 0x00023090) = 0x00000001;
-	REG32(DDRC_BASE + 0x00024090) = 0x00000001;
+	ddrc_reg[0x00010208 / 4] = 0x00000000;
+	ddrc_reg[0x00010180 / 4] = 0x00000010;
+	ddrc_reg[0x000005b4 / 4] = 0xe000012c;
+	ddrc_reg[0x00010b84 / 4] = 0x00000000;
+	ddrc_reg[0x00020090 / 4] = 0x00000001;
+	ddrc_reg[0x00021090 / 4] = 0x00000001;
+	ddrc_reg[0x00022090 / 4] = 0x00000001;
+	ddrc_reg[0x00023090 / 4] = 0x00000001;
+	ddrc_reg[0x00024090 / 4] = 0x00000001;
 }
 
 static void init_ddr_clock(uint32_t DDRC_BASE, uint32_t data_rate_mtps)
 {
 	uint32_t read_data;
 	uint32_t CFG_BASE = DDRC_BASE + 0x600000;
+	volatile uint32_t* cfg_reg = (volatile uint32_t*)(size_t)CFG_BASE;
 
 	if (5500 == part_info->data_rate_mtps) {
 		/* DPLL 2750MHz*/
-		REG32(CFG_BASE + 0x8) = 0x0b3912aa;
-		REG32(CFG_BASE + 0x10) = 0xa0558b8b;
-		REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0xab << 8);
+		cfg_reg[0x8 / 4] = 0x0b3912aa;
+		cfg_reg[0x10 / 4] = 0xa0558b8b;
+		cfg_reg[0xc / 4] |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0xab << 8);
 	} else if (6000 == part_info->data_rate_mtps) {
 		/* DPLL 3000MHz*/
-		REG32(CFG_BASE + 0x8) = 0x0b3e2000;
-		REG32(CFG_BASE + 0x10) = 0xa0558c8c;
-		REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0x00 << 8);
+		cfg_reg[0x8 / 4] = 0x0b3e2000;
+		cfg_reg[0x10 / 4] = 0xa0558c8c;
+		cfg_reg[0xc / 4] |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0x00 << 8);
 	} else {
 		/* DPLL 3200MHz*/
-		REG32(CFG_BASE + 0xc) |= (0x1 << 22) | (0x1 << 16) | (0xff);
+		cfg_reg[0xc / 4] |= (0x1 << 22) | (0x1 << 16) | (0xff);
 	}
 
-	read_data = REG32(CFG_BASE + 0x1c);
+	read_data = cfg_reg[0x1c / 4];
 	while ((read_data & 0x00000001) != 0x1) {
-		read_data = REG32(CFG_BASE + 0x1c);
+		read_data = cfg_reg[0x1c / 4];
 	}
 	// clear frequency divider
-	REG32(CFG_BASE + 0x18) &= ~(0x3f << 16);
+	cfg_reg[0x18 / 4] &= ~(0x3f << 16);
 
 	if (1066 == part_info->data_rate_mtps) {
-		REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x7 << 16); // sel 2, div 8
+		cfg_reg[0x18 / 4] |= (0x1 << 19) | (0x7 << 16); // sel 2, div 8
 	} else if (4266 == part_info->data_rate_mtps) {
-		REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x1 << 16); // sel 2, div 2
-		// REG32(CFG_BASE + 0x18) |= (0x2 << 19) | (0x1 << 16); // sel 2, div 2 3200mbps
+		cfg_reg[0x18 / 4] |= (0x1 << 19) | (0x1 << 16); // sel 2, div 2
+		// cfg_reg[0x18 / 4] |= (0x2 << 19) | (0x1 << 16); // sel 2, div 2 3200mbps
 	} else if (5120 == part_info->data_rate_mtps) {
-		REG32(CFG_BASE + 0x18) |= (0x7 << 19) | (0x0 << 16); // sel 3, div 1 5120mbps
+		cfg_reg[0x18 / 4] |= (0x7 << 19) | (0x0 << 16); // sel 3, div 1 5120mbps
 	} else {
-		REG32(CFG_BASE + 0x18) |= (0x2 << 19) | (0x0 << 16); // sel 3, div 1 6400mbps
-		// REG32(CFG_BASE + 0x18) |= (0x1 << 19) | (0x1 << 16); // sel 3, div 1
+		cfg_reg[0x18 / 4] |= (0x2 << 19) | (0x0 << 16); // sel 3, div 1 6400mbps
+		// cfg_reg[0x18 / 4] |= (0x1 << 19) | (0x1 << 16); // sel 3, div 1
 	}
 
 	// initial frequency change
-	REG32(CFG_BASE + 0x18) |= (1 << 25);
-	LogMsg(0, "read 6400 reg 0x%08X 0x%08X\n", CFG_BASE + 0x18, REG32(CFG_BASE + 0x18));
-	REG32(0xD4282CE8) = REG32(CFG_BASE + 0x18);
-	LogMsg(0, "check setting reg 0x%08X 0x%08X\n", 0xD4282CE8, REG32(0xD4282CE8));
-	read_data = REG32(CFG_BASE + 0x18);
+	cfg_reg[0x18 / 4] |= (1 << 25);
+	LogMsg(0, "read 6400 reg 0x%08X 0x%08X\n", CFG_BASE + 0x18, cfg_reg[0x18 / 4]);
+	cfg_reg[0x18 / 4] = cfg_reg[0x18 / 4];
+	LogMsg(0, "check setting reg 0x%08X 0x%08X\n", 0xD4282CE8, cfg_reg[0x18 / 4]);
+	read_data = cfg_reg[0x18 / 4];
 	while ((read_data & 0x2000000) != 0x0) {
-		read_data = REG32(CFG_BASE + 0x18);
+		read_data = cfg_reg[0x18 / 4];
 	}
-	REG32(CFG_BASE + 0x18) |= 0x1;
+	cfg_reg[0x18 / 4] |= 0x1;
 }
 
 static void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info,

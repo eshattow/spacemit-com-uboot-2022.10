@@ -281,13 +281,7 @@ static const struct pm8xx_buck_desc *get_buck_reg(struct udevice *pmic, int num)
 
 static int get_buck_reg_index(struct udevice *dev)
 {
-	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 	int buck = dev->driver_data - 1;
-
-	if (priv && priv->match &&
-	    strcmp(priv->match->name, "mpq8655") != 0 &&
-	    strcmp(priv->match->name, "spm8821") != 0)
-		buck = dev->driver_data - 2;
 
 	return buck;
 }
@@ -355,7 +349,7 @@ static int buck_set_value(struct udevice *dev, int uvolt)
 
 			ret = pmic_write(dev->parent, info->vsel_reg, vals, 2);
 		 } else {
-			 ret = pmic_clrsetbits(dev->parent, info->vsel_reg, info->vsel_msk, sel);
+			ret = pmic_clrsetbits(dev->parent, info->vsel_reg, info->vsel_msk, sel);
 		 }
 	}
 

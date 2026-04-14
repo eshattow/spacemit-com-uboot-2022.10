@@ -528,8 +528,8 @@
 		regulators {
 			u-boot,dm-spl;
 
-			is6615a_edcdc_4: EDCDC_REG4 {
-				regulator-name = "edcdc4";
+			is6615a_idcdc_1: IDCDC_REG1 {
+				regulator-name = "idcdc1";
 				regulator-min-microvolt = <534000>;
 				regulator-max-microvolt = <1000000>;
 				regulator-init-microvolt = <880000>;
@@ -543,7 +543,7 @@
 	};
 
 	is6615a_2: is6615a@4f {
-		compatible = "spacemit,tda38740";
+		compatible = "spacemit,is6615a";
 		reg = <0x4f>;
 		bus = <8>;
 		u-boot,dm-spl;
@@ -551,8 +551,8 @@
 		regulators {
 			u-boot,dm-spl;
 
-			is6615a_edcdc_5: EDCDC_REG5 {
-				regulator-name = "edcdc5";
+			is6615a_idcdc_2: IDCDC_REG2 {
+				regulator-name = "idcdc2";
 				regulator-min-microvolt = <534000>;
 				regulator-max-microvolt = <1000000>;
 				regulator-init-microvolt = <950000>;

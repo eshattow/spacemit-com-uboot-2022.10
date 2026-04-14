@@ -684,8 +684,8 @@
 		regulators {
 			u-boot,dm-spl;
 
-			tda38740_edcdc_2: EDCDC_REG2 {
-				regulator-name = "edcdc2";
+			tda38740_tdcdc_1: TDCDC_REG1 {
+				regulator-name = "tdcdc1";
 				regulator-min-microvolt = <534000>;
 				regulator-max-microvolt = <1000000>;
 				regulator-init-microvolt = <850000>;
@@ -707,8 +707,8 @@
 		regulators {
 			u-boot,dm-spl;
 
-			tda38740_edcdc_3: EDCDC_REG3 {
-				regulator-name = "edcdc3";
+			tda38740_tdcdc_2: TDCDC_REG2 {
+				regulator-name = "tdcdc2";
 				regulator-min-microvolt = <534000>;
 				regulator-max-microvolt = <1000000>;
 				regulator-init-microvolt = <950000>;
@@ -730,8 +730,8 @@
 		regulators {
 			u-boot,dm-spl;
 
-			is6615a_edcdc_4: EDCDC_REG4 {
-				regulator-name = "edcdc4";
+			is6615a_edcdc_1: IDCDC_REG1 {
+				regulator-name = "idcdc1";
 				regulator-min-microvolt = <534000>;
 				regulator-max-microvolt = <1000000>;
 				regulator-init-microvolt = <850000>;
@@ -753,8 +753,8 @@
 		regulators {
 			u-boot,dm-spl;
 
-			is6615a_edcdc_5: EDCDC_REG5 {
-				regulator-name = "edcdc5";
+			is6615a_idcdc_2: IDCDC_REG2 {
+				regulator-name = "idcdc2";
 				regulator-min-microvolt = <534000>;
 				regulator-max-microvolt = <1000000>;
 				regulator-init-microvolt = <950000>;

@@ -29,12 +29,12 @@ static const struct pm8xx_linear_range is6615a_buck_ranges[] = {	\
 #define IS6615A_REGULATOR_DESC		\
 static const struct pm8xx_buck_desc is6615a_buck_desc[] = {			\
 	/* BUCK */		\
-	PM8XX_DESC_COMMON(IS6615A_ID_DCDC1, "EDCDC_REG4",			\
+	PM8XX_DESC_COMMON(IS6615A_ID_DCDC1, "IDCDC_REG1",			\
 			240, IS6615A_BUCK_VSEL_REG, IS6615A_BUCK_VSEL_MASK,	\
 			IS6615A_BUCK_CTRL_REG, IS6615A_BUCK_EN_MASK,		\
 			0, 0,							\
 			is6615a_buck_ranges),	\
-	PM8XX_DESC_COMMON(IS6615A_ID_DCDC2, "EDCDC_REG5",			\
+	PM8XX_DESC_COMMON(IS6615A_ID_DCDC2, "IDCDC_REG2",			\
 			240, IS6615A_BUCK_VSEL_REG, IS6615A_BUCK_VSEL_MASK,	\
 			IS6615A_BUCK_CTRL_REG, IS6615A_BUCK_EN_MASK,		\
 			0, 0,							\

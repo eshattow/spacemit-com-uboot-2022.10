@@ -226,11 +226,23 @@ void spl_board_init(void)
 }
 
 #if CONFIG_IS_ENABLED(FIT_IMAGE_POST_PROCESS)
+extern void flush_cache(unsigned long addr, unsigned long size);
+
 /* load the esos firmare */
 void board_fit_image_post_process(const void *fit, int node, void **p_image, size_t *p_size)
 {
 #ifdef CONFIG_SPL_REMOTEPROC_K3_PROC
+	char product_name[64] = { 0 };
+
 	const char *name = fit_get_name(fit, node, NULL);
+
+	if (name && !strcmp(name, "rcpu-data-null")) {
+		/* copy the product name to this space */
+		get_product_name(product_name, 64);
+
+		strcpy((void *)*p_image, product_name);
+		flush_cache((unsigned long)*p_image, 64);
+	}
 
 	if (name && !strncmp(name, "rcpu0-fw", 8)) {
 		rproc_load(0, (ulong)*p_image, *p_size);
