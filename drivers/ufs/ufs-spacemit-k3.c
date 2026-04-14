@@ -1253,6 +1253,7 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 	int i;
 	bool have_unit_state;
 	bool need_reconfigure;
+	bool preserve_lu0_template;
 	struct ufs_hba *hba = dev_get_uclass_priv(dev);
 
 	desc_buf = kmalloc(hba->desc_size.conf_desc, GFP_KERNEL);
@@ -1398,22 +1399,39 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 					       conf_head_desc, conf_unit_desc,
 					       source_lun);
 
-	conf_template_lun = spacemit_k3_ufs_find_conf_template_lun(
-		desc_buf, conf_head_desc, conf_unit_desc, unit_lu_enabled,
-		have_unit_state, source_lun);
-	if (conf_template_lun > 0)
-		spacemit_k3_ufs_copy_conf_unit(hba, desc_buf, conf_head_desc,
-					       conf_unit_desc, conf_template_lun,
-					       0);
+	/*
+	 * If LU0 is already active and has a valid configuration template,
+	 * keep it as-is and only merge capacity. Reapplying UNIT descriptor
+	 * fields can reintroduce vendor provisioning attributes that make
+	 * a full-capacity single-LUN CONFIGURATION write invalid.
+	 */
+	preserve_lu0_template =
+		source_lun == 0 &&
+		spacemit_k3_ufs_conf_unit_has_template(
+			desc_buf, conf_head_desc, conf_unit_desc, 0);
+	if (preserve_lu0_template) {
+		template_lun = 0;
+		dev_dbg(hba->dev,
+			"ufs: preserving active LU0 configuration template for single-LUN merge\n");
+	} else {
+		conf_template_lun = spacemit_k3_ufs_find_conf_template_lun(
+			desc_buf, conf_head_desc, conf_unit_desc, unit_lu_enabled,
+			have_unit_state, source_lun);
+		if (conf_template_lun > 0)
+			spacemit_k3_ufs_copy_conf_unit(
+				hba, desc_buf, conf_head_desc, conf_unit_desc,
+				conf_template_lun, 0);
 
-	ret = spacemit_k3_ufs_apply_any_unit_desc_template(
-		hba, desc_buf, conf_head_desc, conf_unit_desc, unit_lu_enabled,
-		have_unit_state, source_lun, &template_lun);
-	if (ret && ret != -ENODATA) {
-		dev_warn(hba->dev,
-			 "%s: failed to build LU0 template from UNIT descriptors: %d, falling back to config/geometry\n",
-			 __func__, ret);
-		ret = 0;
+		ret = spacemit_k3_ufs_apply_any_unit_desc_template(
+			hba, desc_buf, conf_head_desc, conf_unit_desc,
+			unit_lu_enabled, have_unit_state, source_lun,
+			&template_lun);
+		if (ret && ret != -ENODATA) {
+			dev_warn(hba->dev,
+				 "%s: failed to build LU0 template from UNIT descriptors: %d, falling back to config/geometry\n",
+				 __func__, ret);
+			ret = 0;
+		}
 	}
 
 	ret = spacemit_k3_ufs_complete_synth_lu0_template(
