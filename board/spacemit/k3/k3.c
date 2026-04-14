@@ -60,7 +60,7 @@ struct boot_storage_op
 	bool (*write)(ulong byte_addr, ulong byte_size, void *buff);
 };
 
-static const struct k3_nor_boot_target k3_nor_boot_prio[] = {
+static struct k3_nor_boot_target k3_nor_boot_prio[] = {
 #ifdef CONFIG_SCSI
 	{ K3_NOR_BOOT_TARGET_SCSI, "scsi", "ufs_devnum",
 	  K3_NOR_UFS_DEVNUM_DEFAULT },
@@ -79,8 +79,55 @@ static const struct k3_nor_boot_target k3_nor_boot_prio[] = {
 #endif
 };
 
+static void k3_nor_update_prio_from_dtb(void)
+{
+	int count = ARRAY_SIZE(k3_nor_boot_prio);
+	static bool already_updated = false;
+	struct k3_nor_boot_target temp;
+	const char *prior_target;
+	ofnode node;
+	int i, j;
+
+	if (already_updated)
+		return;
+
+	already_updated = true;
+	node = ofnode_path(NOR_BOOT_PRIORITY_NODE);
+	if (!ofnode_valid(node)) {
+		return;
+	}
+
+	prior_target = ofnode_read_string(node, "highest-priority");
+	if (!prior_target) {
+		return;
+	}
+
+	if (strcmp(prior_target, "ufs") == 0) {
+		prior_target = "scsi";
+	} else if (strcmp(prior_target, "ssd") == 0) {
+		prior_target = "nvme";
+	}
+
+	for (i = 0; i < count; i++) {
+		if (strcmp(k3_nor_boot_prio[i].blk_name, prior_target) == 0) {
+			if (i == 0)
+				break;
+
+			// shift its previous element by one position
+			temp = k3_nor_boot_prio[i];
+			for (j = i; j > 0; j--) {
+				k3_nor_boot_prio[j] = k3_nor_boot_prio[j - 1];
+			}
+
+			k3_nor_boot_prio[0] = temp;
+			break;
+		}
+	}
+}
+
 const struct k3_nor_boot_target *k3_nor_get_boot_prio(unsigned int *count)
 {
+	k3_nor_update_prio_from_dtb();
 	if (count)
 		*count = ARRAY_SIZE(k3_nor_boot_prio);
 

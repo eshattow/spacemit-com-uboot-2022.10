@@ -114,6 +114,8 @@
 
 #define USB_BOOT_COMMAND 		"bootm 0x140000000"
 
+#define NOR_BOOT_PRIORITY_NODE		"/nor-boot-priority-helper"
+
 #ifndef __ASSEMBLY__
 #include "linux/types.h"
 
