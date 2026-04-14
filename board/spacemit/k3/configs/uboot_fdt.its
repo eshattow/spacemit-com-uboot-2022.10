@@ -117,6 +117,16 @@
 				algo = "crc32";
 			};
 		};
+
+		fdt_11 {
+			description = "k3-pico-itx.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3-pico-itx.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -179,6 +189,12 @@
 			description = "k3_evb2-2";
 			loadables = "uboot";
 			fdt = "fdt_10";
+		};
+
+		conf_11 {
+			description = "k3-pico-itx";
+			loadables = "uboot";
+			fdt = "fdt_11";
 		};
 	};
 };

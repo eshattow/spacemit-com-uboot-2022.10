@@ -29,6 +29,7 @@ SY8810L_BUCK_LINER_RANGE;SY8810L_REGULATOR_DESC;
 MPQ8655_BUCK_LINER_RANGE;MPQ8655_REGULATOR_DESC;
 TDA38740_BUCK_LINER_RANGE;TDA38740_REGULATOR_DESC;
 IS6615A_BUCK_LINER_RANGE;IS6615A_REGULATOR_DESC;
+AU4562_BUCK_LINER_RANGE;AU4562_REGULATOR_DESC;
 
 static const char *global_compatible[] = {
 	"spacemit,spm8821",
@@ -64,10 +65,15 @@ static const struct tlv_pmic_info tlv_pmic_infos[] = {
 			"spacemit,is6615a-2",
 		},
 	},
+	{
+		.name = "au4562",
+		.compatibles = {
+			"spacemit,au4562",
+		},
+	},
 };
 
 #define TLV_PMIC_TYPE_MAX_LEN	32
-#define RCPU_CORE1_BOOT_ENTRY_HI	0xc0880090
 
 static const struct tlv_pmic_info *board_pmic_tlv_info(void)
 {
@@ -81,10 +87,8 @@ static const struct tlv_pmic_info *board_pmic_tlv_info(void)
 		pmic_name[sizeof(pmic_name) - 1] = '\0';
 
 		for (i = 0; i < ARRAY_SIZE(tlv_pmic_infos); ++i) {
-			if (!strcmp((const char *)pmic_name, tlv_pmic_infos[i].name)) {
-				writel(i, (void __iomem *)RCPU_CORE1_BOOT_ENTRY_HI);
+			if (!strcmp((const char *)pmic_name, tlv_pmic_infos[i].name))
 				return &tlv_pmic_infos[i];
-			}
 
 			for (j = 0; j < ARRAY_SIZE(tlv_pmic_infos[i].compatibles); ++j) {
 				if (!tlv_pmic_infos[i].compatibles[j])
@@ -110,6 +114,7 @@ static const struct tlv_pmic_info *board_pmic_tlv_info(void)
 #define MPQ8655_COMPAT_PREFIX	"spacemit,mpq8655"
 #define TDA38740_COMPAT_PREFIX	"spacemit,tda38740"
 #define IS6615A_COMPAT_PREFIX	"spacemit,is6615a"
+#define AU4562_COMPAT_PREFIX	"spacemit,au4562"
 
 static bool pmic_name_match(const char *name, const char *prefix)
 {
@@ -137,6 +142,11 @@ void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck
 	} else if (pmic_name_match(name, IS6615A_COMPAT_PREFIX)) {
 		*buck_desc = is6615a_buck_desc;
 		*num_buck = sizeof(is6615a_buck_desc) / sizeof(is6615a_buck_desc[0]);
+		*ldo_desc = NULL;
+		*num_ldo = 0;
+	} else if (pmic_name_match(name, AU4562_COMPAT_PREFIX)) {
+		*buck_desc = au4562_buck_desc;
+		*num_buck = sizeof(au4562_buck_desc) / sizeof(au4562_buck_desc[0]);
 		*ldo_desc = NULL;
 		*num_ldo = 0;
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
@@ -280,12 +290,6 @@ static int __board_pmic_init(const char *name)
 	if (ret < 0)
 		return -EINVAL;
 
-	ret = i2c_probe(saddr);
-	if (ret < 0) {
-//		pr_info("%s: %s probe i2c failed\n", __func__, name);
-		return -EINVAL;
-	}
-
 #if defined(CONFIG_K3_BOARD_ASIC)
 	if (!strncmp(name, "spacemit,spm8821", 16)) {
 		/* enable p1 wdt reset */
@@ -379,6 +383,37 @@ static int __board_pmic_init(const char *name)
 				for (i = 0; i < num_buck; ++i) {
 					if (strcmp(buck_desc[i].name, s) != 0)
 						continue;
+
+					/* set the regulator */
+					if (value) {
+						sel = regulator_map_voltage_linear_range(buck_desc + i, value, max);
+						i2c_read(saddr, 0x20, 1, regvals, 1);
+						if (sel >= 0) {
+							sel <<= ffs(buck_desc[i].vsel_msk) - 1;
+							i2c_read(saddr, buck_desc[i].vsel_reg, 1, regvals, 2);
+							value = regvals[0] | ((unsigned short)regvals[1] << 8);
+							value = (value & ~buck_desc[i].vsel_msk) | sel;
+
+							regvals[0] = value & 0xff;
+							regvals[1] = (value >> 8) & 0xff;
+							i2c_write(saddr, buck_desc[i].vsel_reg, 1, regvals, 2);
+						}
+					}
+					break;
+				}
+			}
+		} else if (pmic_name_match(name, AU4562_COMPAT_PREFIX)) {
+			if (strncmp(s, "ADCDC_REG", 9) == 0) {
+				for (i = 0; i < num_buck; ++i) {
+					if (strcmp(buck_desc[i].name, s) != 0)
+						continue;
+
+					if (strncmp(s, "ADCDC_REG1", 10) == 0)
+						regval = 0x1;
+					else if (strncmp(s, "ADCDC_REG2", 10) == 0)
+						regval = 0x0;
+
+					i2c_write(saddr, 0x00, 1, &regval, 1);
 
 					/* set the regulator */
 					if (value) {

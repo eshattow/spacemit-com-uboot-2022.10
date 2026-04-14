@@ -22,6 +22,7 @@ SPM8821_REGULATOR_MATCH_DATA;
 MPQ8655_BUCK_LINER_RANGE; MPQ8655_REGULATOR_DESC; MPQ8655_REGULATOR_MATCH_DATA;
 TDA38740_BUCK_LINER_RANGE; TDA38740_REGULATOR_DESC; TDA38740_REGULATOR_MATCH_DATA;
 IS6615A_BUCK_LINER_RANGE; IS6615A_REGULATOR_DESC; IS6615A_REGULATOR_MATCH_DATA;
+AU4562_BUCK_LINER_RANGE; AU4562_REGULATOR_DESC; AU4562_REGULATOR_MATCH_DATA;
 
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
 PM853_BUCK_LINER_RANGE1; PM853_BUCK_LINER_RANGE2; PM853_LDO_LINER_RANGE1; PM853_LDO_LINER_RANGE2;
@@ -301,7 +302,17 @@ static int buck_get_value(struct udevice *dev)
 	if (strcmp(priv->match->name, "spm8821") != 0) {
 		unsigned char vals[2];
 
-		pmic_read(dev->parent, info->vsel_reg, vals, 2);
+		if (strcmp(priv->match->name, "au4562") == 0) {
+			if (buck == 0)
+				val = 0x1;
+			else if (buck == 1)
+				val = 0x0;
+
+			vals[0] = val;
+			pmic_write(dev->parent, 0x0, vals, 1);
+		}
+
+		ret = pmic_read(dev->parent, info->vsel_reg, vals, 2);
 		if (ret < 0)
 			return ret;
 
@@ -336,6 +347,16 @@ static int buck_set_value(struct udevice *dev, int uvolt)
 		if (strcmp(priv->match->name, "spm8821") != 0) {
 			unsigned char vals[2];
 			unsigned int val;
+
+			if (strcmp(priv->match->name, "au4562") == 0) {
+				if (buck == 0)
+					val = 0x1;
+				else if (buck == 1)
+					val = 0x0;
+
+				vals[0] = val;
+				pmic_write(dev->parent, 0x0, vals, 1);
+			}
 
 			ret = pmic_read(dev->parent, info->vsel_reg, vals, 2);
 			if (ret < 0)
