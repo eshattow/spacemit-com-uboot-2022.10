@@ -16,6 +16,7 @@ DECLEAR_SPM8821_REGULATOR_MATCH_DATA;
 DECLEAR_MPQ8655_REGULATOR_MATCH_DATA;
 DECLEAR_TDA38740_REGULATOR_MATCH_DATA;
 DECLEAR_IS6615A_REGULATOR_MATCH_DATA;
+DECLEAR_AU4562_REGULATOR_MATCH_DATA;
 
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
 DECLEAR_PM853_REGULATOR_MATCH_DATA;
@@ -67,6 +68,7 @@ static const struct udevice_id pm8xx_ids[] = {
 	{ .compatible = "spacemit,mpq8655", .data = (ulong)&mpq8655_regulator_match_data, },
 	{ .compatible = "spacemit,tda38740", .data = (ulong)&tda38740_regulator_match_data, },
 	{ .compatible = "spacemit,is6615a", .data = (ulong)&is6615a_regulator_match_data, },
+	{ .compatible = "spacemit,au4562", .data = (ulong)&au4562_regulator_match_data, },
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
 	{ .compatible = "spacemit,pm853", .data = (ulong)&pm853_regulator_match_data, },
 	{ .compatible = "spacemit,sy8810l", .data = (ulong)&sy8810l_regulator_match_data, },
@@ -90,6 +92,7 @@ static const struct pmic_child_info pmic_children_info[] = {
 	{ .prefix = "EDCDC_REG", .driver = "pm8xx_buck"},
 	{ .prefix = "IDCDC_REG", .driver = "pm8xx_buck"},
 	{ .prefix = "TDCDC_REG", .driver = "pm8xx_buck"},
+	{ .prefix = "ADCDC_REG", .driver = "pm8xx_buck"},
 	{ .prefix = "LDO_REG", .driver = "pm8xx_ldo"},
 	{ .prefix = "SWITCH_REG", .driver = "pm8xx_switch"},
 	{ .prefix = "PMIC_WDT", .driver = "pm8xx_wdt"},

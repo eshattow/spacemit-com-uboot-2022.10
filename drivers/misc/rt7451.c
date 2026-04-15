@@ -121,29 +121,60 @@ static int rt7451_write_and_verify(struct udevice *bus, u8 chip_addr, u8 reg, u8
 	return 0;
 }
 
-static int rt7451_init_sequence(struct rt7451_priv *priv)
+static int rt7451_ensure_reg(struct udevice *bus, u8 chip_addr, u8 reg, u8 val,
+			     bool *already_ok)
 {
+	u8 readback;
 	int ret;
 
-	/* Write 0x16 to register 0xf8 on primary address (0x13) */
-	ret = rt7451_write_and_verify(priv->i2c_bus, priv->primary_addr,
-				      RT7451_REG_CONFIG1, RT7451_CONFIG1_INIT_VAL);
+	ret = rt7451_i2c_read_reg(bus, chip_addr, reg, &readback);
+	if (ret)
+		return ret;
+
+	if (readback == val) {
+		if (already_ok)
+			*already_ok = true;
+		return 0;
+	}
+
+	if (already_ok)
+		*already_ok = false;
+
+	debug("RT7451: chip 0x%02x reg 0x%02x = 0x%02x, expected 0x%02x\n",
+	      chip_addr, reg, readback, val);
+
+	return rt7451_write_and_verify(bus, chip_addr, reg, val);
+}
+
+static int rt7451_init_sequence(struct rt7451_priv *priv)
+{
+	bool primary_ok, secondary_ok;
+	int ret;
+
+	ret = rt7451_ensure_reg(priv->i2c_bus, priv->primary_addr,
+				RT7451_REG_CONFIG1, RT7451_CONFIG1_INIT_VAL,
+				&primary_ok);
 	if (ret) {
 		printf("RT7451: Failed to init primary addr 0x%02x\n",
 		       priv->primary_addr);
 		return ret;
 	}
 
-	/* Small delay between writes */
-	udelay(1000);
+	if (!primary_ok)
+		udelay(1000);
 
-	/* Write 0x28 to register 0xa4 on secondary address (0x29) */
-	ret = rt7451_write_and_verify(priv->i2c_bus, priv->secondary_addr,
-				      RT7451_REG_CONFIG2, RT7451_CONFIG2_INIT_VAL);
+	ret = rt7451_ensure_reg(priv->i2c_bus, priv->secondary_addr,
+				RT7451_REG_CONFIG2, RT7451_CONFIG2_INIT_VAL,
+				&secondary_ok);
 	if (ret) {
 		printf("RT7451: Failed to init secondary addr 0x%02x\n",
 		       priv->secondary_addr);
 		return ret;
+	}
+
+	if (primary_ok && secondary_ok) {
+		printf("RT7451: Retimer already initialized, skipping\n");
+		return 0;
 	}
 
 	printf("RT7451: Retimer initialized successfully\n");

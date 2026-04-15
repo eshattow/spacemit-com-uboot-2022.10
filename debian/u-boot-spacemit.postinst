@@ -259,9 +259,19 @@ configure)
         exit 1
     fi
 
+    # 检测是否为UEFI启动
+    IS_UEFI=0
+    if [ -d "/sys/firmware/efi" ]; then
+        IS_UEFI=1
+        echo "UEFI boot detected, skipping U-Boot ITB installation."
+    fi
+
     BIN_DIR="/usr/lib/u-boot/$target"
     # 待检查文件列表
-    files="${BIN_DIR}/${BOOTINFO_FILE} ${BIN_DIR}/FSBL.bin ${BIN_DIR}/env.bin ${BIN_DIR}/u-boot.itb $BOOTINFO $FSBL $ENV $UBOOT"
+    files="${BIN_DIR}/${BOOTINFO_FILE} ${BIN_DIR}/FSBL.bin ${BIN_DIR}/env.bin $BOOTINFO $FSBL $ENV"
+    if [ "$IS_UEFI" -eq 0 ]; then
+        files="$files ${BIN_DIR}/u-boot.itb $UBOOT"
+    fi
     for file in $files; do
         if [ ! -e "$file" ]; then
             # 任意不存在则退出
@@ -275,7 +285,9 @@ configure)
     dd if=/usr/lib/u-boot/$target/$BOOTINFO_FILE of=$BOOTINFO seek=$BOOTINFO_SEEK bs=1 && sync
     dd if=/usr/lib/u-boot/$target/FSBL.bin of=$FSBL seek=$FSBL_SEEK bs=1 && sync
     dd if=/usr/lib/u-boot/$target/env.bin of=$ENV seek=$ENV_SEEK bs=1 && sync
-    dd if=/usr/lib/u-boot/$target/u-boot.itb of=$UBOOT seek=$UBOOT_SEEK bs=1K && sync
+    if [ "$IS_UEFI" -eq 0 ]; then
+        dd if=/usr/lib/u-boot/$target/u-boot.itb of=$UBOOT seek=$UBOOT_SEEK bs=1K && sync
+    fi
     set +x
     ;;
 esac
