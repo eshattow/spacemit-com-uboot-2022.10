@@ -7,7 +7,7 @@
 
 static const ddr_config_t lp5_ddr_io_para = {
 	// WDS     RX ODT   DQODT CAODT NTODT  SOCODT PDDS
-	PHY_R_30, PHY_R_40, R_60, R_80, R_OFF, R_OFF, R_40
+	PHY_R_30, PHY_R_60, R_60, R_80, R_OFF, R_OFF, R_40
 };
 
 ddr_phy_reg_config io_override_table[MAX_MODIFIED_IO_PARA_ITEMS];
