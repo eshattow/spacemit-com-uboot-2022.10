@@ -273,6 +273,7 @@
 	u-boot,dm-spl;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c8>;
+	spacemit,sda-glitch-nofix;
 	status = "okay";
 
 	spm8821: pmic@41 {
