@@ -178,11 +178,10 @@ static struct blk_desc *k3_nor_get_usb_desc(u32 devnum)
 }
 #endif
 
+extern bool nvme_scanned;
 #ifdef CONFIG_NVME
 static struct blk_desc *k3_nor_get_nvme_desc(u32 devnum)
 {
-	static bool nvme_scanned;
-
 	if (!nvme_scanned) {
 		run_command("nvme scan", 0);
 		nvme_scanned = true;
