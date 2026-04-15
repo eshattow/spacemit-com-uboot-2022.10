@@ -189,7 +189,18 @@ configure)
                 BOOTINFO_FILE=bootinfo_spinor.bin
             fi
 
-            if [ -e "/dev/mtdblock5" ]; then
+            # 解析 /proc/mtd 判断分区布局
+            if [ ! -f "/proc/mtd" ]; then
+                echo "Error: /proc/mtd not found, cannot determine MTD partition layout"
+                exit 1
+            fi
+
+            # 获取 mtd0 的名称
+            MTD0_NAME=$(grep '^mtd0:' /proc/mtd | awk -F'"' '{print $2}')
+            
+            if [ "$MTD0_NAME" = "bootinfo" ]; then
+                # mtd0 是 bootinfo，说明各组件有独立分区，按分区编号写入
+                echo "Detected MTD partition layout: independent partitions"
                 BOOTINFO=/dev/mtdblock0
                 BOOTINFO_SEEK=0
                 FSBL=/dev/mtdblock1
@@ -199,7 +210,9 @@ configure)
                 UBOOT=/dev/mtdblock5
                 # 以KB为单位
                 UBOOT_SEEK=0
-            elif [ -e "/dev/mtdblock0" ]; then
+            else
+                # mtd0 是整个设备，使用偏移方式写入
+                echo "Detected MTD partition layout: single device with offsets (mtd0=$MTD0_NAME)"
                 BOOTINFO=/dev/mtdblock0
                 BOOTINFO_SEEK=0
                 FSBL=/dev/mtdblock0
@@ -212,31 +225,38 @@ configure)
             fi
             ;;
         "/dev/nvme0n1")
-            # 兼容无bootmode的情况
-            if [ -e "/dev/mtdblock5" ]; then
-                BOOTINFO_FILE=bootinfo_spinor.bin
-                BOOTINFO=/dev/mtdblock0
-                BOOTINFO_SEEK=0
-                FSBL=/dev/mtdblock1
-                FSBL_SEEK=0
-                ENV=/dev/mtdblock2
-                ENV_SEEK=0
-                UBOOT=/dev/mtdblock5
-                # 以KB为单位
-                UBOOT_SEEK=0
-            elif [ -e "/dev/mtdblock0" ]; then
-                BOOTINFO_FILE=bootinfo_spinor.bin
-                BOOTINFO=/dev/mtdblock0
-                BOOTINFO_SEEK=0
-                FSBL=/dev/mtdblock0
-                FSBL_SEEK=$((128 * 1024))
-                ENV=/dev/mtdblock0
-                ENV_SEEK=$((640 * 1024))
-                UBOOT=/dev/mtdblock0
-                # 以KB为单位
-                UBOOT_SEEK=2112
+            # NVMe+NOR 组合，检查 MTD 分区布局
+            if [ -f "/proc/mtd" ]; then
+                # 有 MTD，从 NOR 启动
+                MTD0_NAME=$(grep '^mtd0:' /proc/mtd | awk -F'"' '{print $2}')
+                
+                if [ "$MTD0_NAME" = "bootinfo" ]; then
+                    # mtd0 是 bootinfo，独立分区布局
+                    BOOTINFO_FILE=bootinfo_spinor.bin
+                    BOOTINFO=/dev/mtdblock0
+                    BOOTINFO_SEEK=0
+                    FSBL=/dev/mtdblock1
+                    FSBL_SEEK=0
+                    ENV=/dev/mtdblock2
+                    ENV_SEEK=0
+                    UBOOT=/dev/mtdblock5
+                    # 以KB为单位
+                    UBOOT_SEEK=0
+                else
+                    # mtd0 是整个设备，使用偏移方式
+                    BOOTINFO_FILE=bootinfo_spinor.bin
+                    BOOTINFO=/dev/mtdblock0
+                    BOOTINFO_SEEK=0
+                    FSBL=/dev/mtdblock0
+                    FSBL_SEEK=$((128 * 1024))
+                    ENV=/dev/mtdblock0
+                    ENV_SEEK=$((640 * 1024))
+                    UBOOT=/dev/mtdblock0
+                    # 以KB为单位
+                    UBOOT_SEEK=2112
+                fi
             else
-                # emmc + ssd
+                # 没有 MTD，使用 eMMC 启动
                 BOOTINFO_FILE=bootinfo_block.bin
                 BOOTINFO=/dev/mmcblk2
                 BOOTINFO_SEEK=$((1024 * 1024))
