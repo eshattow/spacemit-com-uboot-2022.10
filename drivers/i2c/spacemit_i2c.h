@@ -62,6 +62,10 @@ extern void i2c_clk_enable(void);
 #define ISR_SAD		BIT(23)		/* slave address detected */
 #define ISR_BED		BIT(22)		/* bus error no ACK/NAK */
 
+/* ----- Reset cycle counter register bits -------------------------------- */
+
+#define IRCR_SDA_GLITCH_NOFIX	BIT(7)		/* bypass the SDA glitch fix */
+
 #define I2C_ISR_INIT	0x1FDE000
 
 #endif
