@@ -36,7 +36,7 @@ struct spacemit_i2c {
  * i2c_reset: - reset the host controller
  *
  */
-static void i2c_reset(struct spacemit_i2c *base)
+static void i2c_reset(struct spacemit_i2c *base, bool sda_glitch_nofix)
 {
 	u32 icr_mode;
 
@@ -55,6 +55,9 @@ static void i2c_reset(struct spacemit_i2c *base)
 	/* set control reg values */
 	writel(I2C_ICR_INIT | icr_mode, &base->icr);
 	writel(I2C_ISR_INIT, &base->isr); /* set clear interrupt bits */
+	if (sda_glitch_nofix)
+		writel(readl(&base->irst_cyc) | IRCR_SDA_GLITCH_NOFIX,
+		       &base->irst_cyc);
 	writel(readl(&base->icr) | ICR_IUE, &base->icr); /* enable unit */
 	udelay(1e0);
 }
@@ -97,7 +100,8 @@ static int i2c_isr_set_cleared(struct spacemit_i2c *base, unsigned long set_mask
  *          -5: illegal parameters
  *          -6: bus is busy and couldn't be aquired
  */
-static int i2c_transfer(struct spacemit_i2c *base, struct spacemit_i2c_msg *msg)
+static int i2c_transfer(struct spacemit_i2c *base, struct spacemit_i2c_msg *msg,
+			bool sda_glitch_nofix)
 {
 	int ret;
 
@@ -205,12 +209,12 @@ transfer_error_bus_busy:
 
 i2c_transfer_finish:
 	debug("i2c_transfer: ISR: 0x%04x\n", readl(&base->isr));
-	i2c_reset(base);
+	i2c_reset(base, sda_glitch_nofix);
 	return ret;
 }
 
 static int __i2c_read(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen,
-		      uchar *buffer, int len)
+		      uchar *buffer, int len, bool sda_glitch_nofix)
 {
 	struct spacemit_i2c_msg msg;
 
@@ -221,7 +225,7 @@ static int __i2c_read(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen,
 		return -EINVAL;
 	}
 
-	i2c_reset(base);
+	i2c_reset(base, sda_glitch_nofix);
 
 	/* dummy chip address write */
 	debug("i2c_read: dummy chip address write\n");
@@ -230,7 +234,7 @@ static int __i2c_read(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen,
 	msg.direction = I2C_WRITE;
 	msg.data = (chip << 1);
 	msg.data &= 0xFE;
-	if (i2c_transfer(base, &msg))
+	if (i2c_transfer(base, &msg, sda_glitch_nofix))
 		return -1;
 
 	/*
@@ -244,7 +248,7 @@ static int __i2c_read(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen,
 		msg.acknack   = I2C_ACKNAK_WAITACK;
 		msg.direction = I2C_WRITE;
 		msg.data      = addr[alen];
-		if (i2c_transfer(base, &msg))
+		if (i2c_transfer(base, &msg, sda_glitch_nofix))
 			return -1;
 	}
 
@@ -255,7 +259,7 @@ static int __i2c_read(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen,
 	msg.direction = I2C_WRITE;
 	msg.data      = (chip << 1);
 	msg.data     |= 0x01;
-	if (i2c_transfer(base, &msg))
+	if (i2c_transfer(base, &msg, sda_glitch_nofix))
 		return -1;
 
 	/* read bytes; send NACK at last byte */
@@ -270,7 +274,7 @@ static int __i2c_read(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen,
 
 		msg.direction = I2C_READ;
 		msg.data      = 0x00;
-		if (i2c_transfer(base, &msg))
+		if (i2c_transfer(base, &msg, sda_glitch_nofix))
 			return -1;
 
 		*buffer = msg.data;
@@ -279,19 +283,19 @@ static int __i2c_read(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen,
 		buffer++;
 	}
 
-	i2c_reset(base);
+	i2c_reset(base, sda_glitch_nofix);
 
 	return 0;
 }
 
 static int __i2c_write(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen,
-		       uchar *buffer, int len)
+		       uchar *buffer, int len, bool sda_glitch_nofix)
 {
 	struct spacemit_i2c_msg msg;
 
 	debug("i2c_write(chip=0x%02x, len=0x%02x)\n", chip, len);
 
-	i2c_reset(base);
+	i2c_reset(base, sda_glitch_nofix);
 
 	/* chip address write */
 	debug("i2c_write: chip address write\n");
@@ -300,7 +304,7 @@ static int __i2c_write(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen
 	msg.direction = I2C_WRITE;
 	msg.data = (chip << 1);
 	msg.data &= 0xFE;
-	if (i2c_transfer(base, &msg))
+	if (i2c_transfer(base, &msg, sda_glitch_nofix))
 		return -1;
 
 	/*
@@ -314,7 +318,7 @@ static int __i2c_write(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen
 		msg.acknack   = I2C_ACKNAK_WAITACK;
 		msg.direction = I2C_WRITE;
 		msg.data      = addr[alen];
-		if (i2c_transfer(base, &msg))
+		if (i2c_transfer(base, &msg, sda_glitch_nofix))
 			return -1;
 	}
 
@@ -332,11 +336,11 @@ static int __i2c_write(struct spacemit_i2c *base, uchar chip, u8 *addr, int alen
 		msg.direction = I2C_WRITE;
 		msg.data      = *(buffer++);
 
-		if (i2c_transfer(base, &msg))
+		if (i2c_transfer(base, &msg, sda_glitch_nofix))
 			return -1;
 	}
 
-	i2c_reset(base);
+	i2c_reset(base, sda_glitch_nofix);
 
 	return 0;
 }
@@ -426,20 +430,20 @@ static int __i2c_probe_chip(struct spacemit_i2c *base, uchar chip)
 {
 	struct spacemit_i2c_msg msg;
 
-	i2c_reset(base);
+	i2c_reset(base, false);
 
 	msg.condition = I2C_COND_START;
 	msg.acknack   = I2C_ACKNAK_WAITACK;
 	msg.direction = I2C_WRITE;
 	msg.data      = (chip << 1) + 1;
-	if (i2c_transfer(base, &msg))
+	if (i2c_transfer(base, &msg, false))
 		return -1;
 
 	msg.condition = I2C_COND_STOP;
 	msg.acknack   = I2C_ACKNAK_SENDNAK;
 	msg.direction = I2C_READ;
 	msg.data      = 0x00;
-	if (i2c_transfer(base, &msg))
+	if (i2c_transfer(base, &msg, false))
 		return -1;
 
 	return 0;
@@ -483,7 +487,7 @@ static int spacemit_i2c_read(struct i2c_adapter *adap, uchar chip, uint addr, in
 	addr_bytes[3] = (addr >> 24) & 0xFF;
 
 	assert_noisy(adap->hwadapnr != -1);
-	return __i2c_read(i2c_base[adap->hwadapnr], chip, addr_bytes, alen, buffer, len);
+	return __i2c_read(i2c_base[adap->hwadapnr], chip, addr_bytes, alen, buffer, len, false);
 }
 
 /*
@@ -509,7 +513,7 @@ static int spacemit_i2c_write(struct i2c_adapter *adap, uchar chip, uint addr, i
 	addr_bytes[3] = (addr >> 24) & 0xFF;
 
 	assert_noisy(adap->hwadapnr != -1);
-	return __i2c_write(i2c_base[adap->hwadapnr], chip, addr_bytes, alen, buffer, len);
+	return __i2c_write(i2c_base[adap->hwadapnr], chip, addr_bytes, alen, buffer, len, false);
 }
 
 U_BOOT_I2C_ADAP_COMPLETE(spacemit_i2c0, spacemit_i2c_init, spacemit_i2c_probe,
@@ -564,7 +568,7 @@ struct spacemit_i2c_priv {
         struct clk clk;
 #endif
 	u32 clk_rate;
-
+	bool sda_glitch_nofix;
 };
 
 static int spacemit_i2c_xfer(struct udevice *bus, struct i2c_msg *msg, int nmsgs)
@@ -588,10 +592,12 @@ static int spacemit_i2c_xfer(struct udevice *bus, struct i2c_msg *msg, int nmsgs
 
 	if (dmsg->flags & I2C_M_RD)
 		return __i2c_read(i2c->base, dmsg->addr, omsg->buf,
-				  omsg->len, dmsg->buf, dmsg->len);
+				  omsg->len, dmsg->buf, dmsg->len,
+				  i2c->sda_glitch_nofix);
 	else
 		return __i2c_write(i2c->base, dmsg->addr, omsg->buf,
-				   omsg->len, dmsg->buf, dmsg->len);
+				   omsg->len, dmsg->buf, dmsg->len,
+				   i2c->sda_glitch_nofix);
 }
 
 static int spacemit_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)
@@ -646,6 +652,9 @@ static int spacemit_i2c_probe(struct udevice *bus)
         }
 
 	ret = spacemit_i2c_set_bus_speed(bus, priv->clk_rate);
+
+	priv->sda_glitch_nofix = dev_read_bool(bus, "spacemit,sda-glitch-nofix");
+
 	return 0;
 }
 
