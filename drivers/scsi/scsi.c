@@ -539,7 +539,7 @@ static int scsi_detect_dev(struct udevice *dev, int target, int lun,
 		scsi_print_error(pccb);
 		return -EINVAL;
 	}
-	dev_desc->lba = capacity;
+	dev_desc->lba = capacity + 1;
 	dev_desc->blksz = blksz;
 	dev_desc->log2blksz = LOG2(dev_desc->blksz);
 	dev_desc->type = perq;
