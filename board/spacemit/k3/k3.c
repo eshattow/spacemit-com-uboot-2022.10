@@ -1780,6 +1780,66 @@ int board_fit_config_name_match(const char *name)
 }
 #endif
 
+static int ft_board_info_fixup(void *blob, struct bd_info *bd)
+{
+	int node;
+	const char *part_number;
+
+	node = fdt_path_offset(blob, "/");
+	if (node < 0) {
+		pr_err("Can't find root node!\n");
+		return -EINVAL;
+	}
+
+	part_number = env_get("part#");
+	if (NULL != part_number)
+		fdt_setprop(blob, node, "part-number", part_number, strlen(part_number));
+
+	return 0;
+}
+
+static int ft_board_mac_addr_fixup(void *blob, struct bd_info *bd)
+{
+	int node, i;
+	const char *addr_value;
+	// char addr_str[ARP_HLEN_ASCII + 1];
+	const char *mac_item[] = {"wifi_addr", "bt_addr"};
+
+	node = fdt_path_offset(blob, "/soc");
+	if (node < 0) {
+		pr_err("Can't find soc node!\n");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(mac_item); i++) {
+		addr_value = env_get(mac_item[i]);
+		if (NULL != addr_value) {
+			// memset(addr_str, 0, sizeof(addr_str));
+			// sprintf(addr_str, "%pM", addr_value);
+			fdt_setprop(blob, node, mac_item[i], addr_value, strlen(addr_value));
+		}
+	}
+
+	return 0;
+}
+
+int ft_board_setup(void *blob, struct bd_info *bd)
+{
+	__maybe_unused struct fdt_memory mem;
+
+	if (CONFIG_IS_ENABLED(FDT_SIMPLEFB)) {
+		/* reserved with no-map tag the video buffer */
+		mem.start = gd->video_bottom;
+		mem.end = gd->video_top - 1;
+
+		fdtdec_add_reserved_memory(blob, "framebuffer", &mem, NULL, 0, NULL, 0);
+	}
+
+	ft_board_info_fixup(blob, bd);
+	ft_board_mac_addr_fixup(blob, bd);
+	return 0;
+}
+
 static void update_boot_mode_to_bootargs(void)
 {
 	uint32_t boot_mode;
