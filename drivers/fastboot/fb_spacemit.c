@@ -99,12 +99,10 @@ static int k3_nor_probe_usb(u32 devnum, const char *partition)
 	return k3_detect_blk_or_part_quiet("usb", devnum, partition);
 }
 #endif
-
+bool nvme_scanned;
 #ifdef CONFIG_NVME
 static int k3_nor_probe_nvme(u32 devnum, const char *partition)
 {
-	static bool nvme_scanned;
-
 	if (!nvme_scanned) {
 		run_command("nvme scan", 0);
 		nvme_scanned = true;
