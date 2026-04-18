@@ -101,7 +101,7 @@
 #define K3_NOR_UFS_DEVNUM_DEFAULT	(0)
 #define K3_NOR_EMMC_DEVNUM_DEFAULT	(MMC_DEV_EMMC)
 
-#define DEFAULT_PRODUCT_NAME		"k3_evb"
+#define DEFAULT_PRODUCT_NAME		"k3_deb1"
 #define BOOTFS_NAME			("bootfs")
 
 // for those has NOT been through test procedure(ATE)

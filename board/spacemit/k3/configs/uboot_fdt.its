@@ -130,7 +130,7 @@
 	};
 
 	configurations {
-		default = "conf_1";
+		default = "conf_3";
 		conf_1 {
 			description = "k3_fpga";
 			loadables = "uboot";
