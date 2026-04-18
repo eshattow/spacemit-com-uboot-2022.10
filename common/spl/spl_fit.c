@@ -17,6 +17,7 @@
 #include <asm/cache.h>
 #include <asm/global_data.h>
 #include <linux/libfdt.h>
+#include <linux/lzo.h>
 #include <cpu_func.h>
 #include <linux/kernel.h>
 
@@ -39,6 +40,12 @@ struct spl_fit_info {
 
 __weak void board_spl_fit_post_load(const void *fit)
 {
+}
+
+__weak int board_spl_fit_image_post_load(const void *fit, int node,
+					 struct spl_image_info *image_info)
+{
+	return 0;
 }
 
 __weak ulong board_spl_fit_size_align(ulong size)
@@ -262,10 +269,8 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 			pr_debug("%s ", genimg_get_type_name(type));
 	}
 
-	if (IS_ENABLED(CONFIG_SPL_GZIP)) {
-		fit_image_get_comp(fit, node, &image_comp);
+	if (!fit_image_get_comp(fit, node, &image_comp))
 		pr_debug("%s ", genimg_get_comp_name(image_comp));
-	}
 
 	if (fit_image_get_load(fit, node, &load_addr)) {
 		if (!image_info->load_addr) {
@@ -334,6 +339,9 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 	if (CONFIG_IS_ENABLED(FIT_IMAGE_POST_PROCESS))
 		board_fit_image_post_process(fit, node, &src, &length);
 
+	if (!length)
+		goto skip_image_copy;
+
 	load_ptr = map_sysmem(load_addr, length);
 	if (IS_ENABLED(CONFIG_SPL_GZIP) && image_comp == IH_COMP_GZIP) {
 		size = length;
@@ -342,6 +350,14 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 			return -EIO;
 		}
 		length = size;
+	} else if (IS_ENABLED(CONFIG_SPL_LZO) && image_comp == IH_COMP_LZO) {
+		size_t lzo_len = CONFIG_SYS_BOOTM_LEN;
+
+		if (lzop_decompress(src, length, load_ptr, &lzo_len)) {
+			printf("LZO uncompressing error\n");
+			return -EIO;
+		}
+		length = lzo_len;
 	} else {
 		memcpy(load_ptr, src, length);
 	}
@@ -350,8 +366,11 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 	flush_lenth = round_up(length, CONFIG_RISCV_CBOM_BLOCK_SIZE);
 	flush_dcache_range(flush_dcache_addr, flush_dcache_addr + flush_lenth);
 
+skip_image_copy:
+
 	if (image_info) {
 		ulong entry_point;
+		int ret;
 
 		image_info->load_addr = load_addr;
 		image_info->size = length;
@@ -360,6 +379,10 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 			image_info->entry_point = entry_point;
 		else
 			image_info->entry_point = FDT_ERROR;
+
+		ret = board_spl_fit_image_post_load(fit, node, image_info);
+		if (ret < 0)
+			return ret;
 	}
 
 	return 0;

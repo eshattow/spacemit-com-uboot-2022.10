@@ -842,6 +842,17 @@ int board_return_to_bootrom(struct spl_image_info *spl_image,
 			    struct spl_boot_device *bootdev);
 
 /**
+ * board_spl_fit_image_post_load - process a FIT image after load/decompress
+ * @fit: Pointer to a valid Flattened Image Tree blob
+ * @node: Node offset of the loaded image
+ * @image_info: Information about the loaded image buffer
+ *
+ * Return: 0 on success, negative on failure.
+ */
+int board_spl_fit_image_post_load(const void *fit, int node,
+				  struct spl_image_info *image_info);
+
+/**
  * board_spl_fit_post_load - allow process images after loading finished
  * @fit: Pointer to a valid Flattened Image Tree blob
  */

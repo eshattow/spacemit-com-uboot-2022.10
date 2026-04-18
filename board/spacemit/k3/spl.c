@@ -14,10 +14,14 @@
 #include <common.h>
 #include <env.h>
 #include <env_internal.h>
+#include <malloc.h>
+#include <mapmem.h>
 #include <asm/io.h>
+#include <asm/unaligned.h>
 #include <i2c.h>
 #include <espi.h>
 #include <tlv_eeprom.h>
+#include <linux/lzo.h>
 #include <dt-bindings/pinctrl/k3-pinctrl.h>
 #include <asm/sections.h>
 #include <u-boot/crc.h>
@@ -25,6 +29,8 @@
 #if defined(CONFIG_K3_BOARD_FPGA)
 #define GDB_DOWNLOAD_DEBUG
 #endif
+
+#define LZOP_HEADER_HAS_FILTER	0x00000800UL
 
 /* MFPR (Multi-Function Pin Register) definitions */
 #define MFPR_BASE          0xD401E000
@@ -228,32 +234,190 @@ void spl_board_init(void)
 #if CONFIG_IS_ENABLED(FIT_IMAGE_POST_PROCESS)
 extern void flush_cache(unsigned long addr, unsigned long size);
 
-/* load the esos firmare */
-void board_fit_image_post_process(const void *fit, int node, void **p_image, size_t *p_size)
+static int lzop_get_uncompressed_size(const unsigned char *src, size_t src_len,
+				      size_t *out_len)
+{
+	const unsigned char *p = src;
+	const unsigned char *end = src + src_len;
+	size_t total = 0;
+	u16 version;
+	u32 flags;
+	u32 dlen;
+	u32 slen;
+	u8 name_len;
+
+	if (!src || !out_len || !lzop_is_valid_header(src))
+		return -EINVAL;
+
+	p += 9;
+	if ((size_t)(end - p) < 7)
+		return -EINVAL;
+
+	version = get_unaligned_be16(p);
+	p += 7;
+	if (version >= 0x0940) {
+		if (p >= end)
+			return -EINVAL;
+		p++;
+	}
+
+	if ((size_t)(end - p) < 12)
+		return -EINVAL;
+
+	flags = get_unaligned_be32(p);
+	if (flags & LZOP_HEADER_HAS_FILTER) {
+		if ((size_t)(end - p) < 16)
+			return -EINVAL;
+		p += 4;
+	}
+
+	p += 12;
+
+	if (version >= 0x0940) {
+		if ((size_t)(end - p) < 4)
+			return -EINVAL;
+		p += 4;
+	}
+
+	if (p >= end)
+		return -EINVAL;
+
+	name_len = *p++;
+	if ((size_t)(end - p) < (size_t)name_len + 4)
+		return -EINVAL;
+	p += name_len + 4;
+
+	while (p < end) {
+		if ((size_t)(end - p) < 4)
+			return -EINVAL;
+		dlen = get_unaligned_be32(p);
+		p += 4;
+
+		if (!dlen) {
+			*out_len = total;
+			return 0;
+		}
+
+		if ((size_t)(end - p) < 8)
+			return -EINVAL;
+		slen = get_unaligned_be32(p);
+		p += 8;
+
+		if (!slen || slen > dlen || (size_t)(end - p) < slen)
+			return -EINVAL;
+
+		total += dlen;
+		p += slen;
+	}
+
+	return -EINVAL;
+}
+
+static int decompress_lzo_fit_image_to_malloc(const void *fit, int node,
+					      void **p_image, size_t *p_size)
+{
+	uint8_t comp = IH_COMP_NONE;
+	size_t out_len;
+	size_t expected_len;
+	void *dst;
+	int ret;
+
+	if (fit_image_get_comp(fit, node, &comp) || comp != IH_COMP_LZO)
+		return 0;
+
+	ret = lzop_get_uncompressed_size(*p_image, *p_size, &expected_len);
+	if (ret || !expected_len)
+		return -EINVAL;
+
+	dst = malloc(expected_len);
+	if (!dst)
+		return -ENOMEM;
+
+	out_len = expected_len;
+	ret = lzop_decompress(*p_image, *p_size, dst, &out_len);
+	if (ret) {
+		free(dst);
+		return ret;
+	}
+
+	*p_image = dst;
+	*p_size = out_len;
+
+	return 1;
+}
+
+void board_fit_image_post_process(const void *fit, int node, void **p_image,
+				  size_t *p_size)
+{
+	const char *name = fit_get_name(fit, node, NULL);
+
+	/*
+	 * Keep the standard pre-load FIT post-process hook intact for
+	 * compatibility. Spacemit still needs this early hook for rcpu firmware
+	 * images, since the generic SPL load path would otherwise copy or
+	 * decompress the ELF payload into the remote processor reserved memory
+	 * before rproc_load() parses it.
+	 */
+#ifdef CONFIG_SPL_REMOTEPROC_K3_PROC
+	bool fw_image = name && (!strncmp(name, "rcpu0-fw", 8) ||
+				 !strncmp(name, "rcpu1-fw", 8));
+	bool free_image = false;
+	int ret;
+
+	if (!fw_image)
+		return;
+
+	ret = decompress_lzo_fit_image_to_malloc(fit, node, p_image, p_size);
+	if (ret < 0) {
+		*p_size = 0;
+		return;
+	}
+	free_image = ret > 0;
+
+	if (!strncmp(name, "rcpu0-fw", 8)) {
+		ret = rproc_load(0, (ulong)*p_image, *p_size);
+		if (!ret)
+			ret = rproc_start(0);
+		if (ret)
+			pr_err("failed to start rcpu0 firmware: %d\n", ret);
+	} else {
+		ret = rproc_load(1, (ulong)*p_image, *p_size);
+		if (!ret)
+			ret = rproc_start(1);
+		if (ret)
+			pr_err("failed to start rcpu1 firmware: %d\n", ret);
+	}
+
+	if (free_image)
+		free(*p_image);
+
+	*p_size = 0;
+#endif
+}
+
+int board_spl_fit_image_post_load(const void *fit, int node,
+				  struct spl_image_info *image_info)
 {
 #ifdef CONFIG_SPL_REMOTEPROC_K3_PROC
 	char product_name[64] = { 0 };
-
 	const char *name = fit_get_name(fit, node, NULL);
+	bool data_null_image = name && !strcmp(name, "rcpu-data-null");
+	void *image;
 
-	if (name && !strcmp(name, "rcpu-data-null")) {
+	if (!image_info || !image_info->size)
+		return 0;
+
+	if (data_null_image) {
+		image = map_sysmem(image_info->load_addr, image_info->size);
 		/* copy the product name to this space */
 		get_product_name(product_name, 64);
-
-		strcpy((void *)*p_image, product_name);
-		flush_cache((unsigned long)*p_image, 64);
-	}
-
-	if (name && !strncmp(name, "rcpu0-fw", 8)) {
-		rproc_load(0, (ulong)*p_image, *p_size);
-		rproc_start(0);
-		*p_size = 0;
-	} else if (name && !strncmp(name, "rcpu1-fw", 8)) {
-		rproc_load(1, (ulong)*p_image, *p_size);
-		rproc_start(1);
-		*p_size = 0;
+		strcpy(image, product_name);
+		flush_cache(image_info->load_addr, 64);
+		return 0;
 	}
 #endif
+
+	return 0;
 }
 #endif
 
