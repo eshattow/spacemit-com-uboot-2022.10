@@ -248,6 +248,7 @@ static struct tlv_code_desc tlv_code_list[] = {
 	{ TLV_CODE_DDR_TX_ODT,     "DDR tx odt"},
 	{ TLV_CODE_DDR_PARTNUMBER, "DDR Part Number"},
 	{ TLV_CODE_PMIC_TYPE,      "PMIC Type"},
+	{ TLV_CODE_SECOND_BOOT_DEV,"Second Boot Device"},
 	{ TLV_CODE_CRC_32,         "CRC-32"}
 };
 
@@ -316,6 +317,7 @@ static void decode_tlv(struct tlvinfo_tlv *tlv)
 	case TLV_CODE_SERVICE_TAG:
 	case TLV_CODE_DDR_PARTNUMBER:
 	case TLV_CODE_PMIC_TYPE:
+	case TLV_CODE_SECOND_BOOT_DEV:
 		memcpy(value, tlv->value, tlv->length);
 		value[tlv->length] = 0;
 		break;
@@ -643,6 +645,7 @@ bool tlvinfo_add_tlv(u8 *eeprom, int tcode, char *strval)
 	case TLV_CODE_SERVICE_TAG:
 	case TLV_CODE_DDR_PARTNUMBER:
 	case TLV_CODE_PMIC_TYPE:
+	case TLV_CODE_SECOND_BOOT_DEV:
 		strncpy(data, strval, MAX_TLV_VALUE_LEN);
 		new_tlv_len = min_t(size_t, MAX_TLV_VALUE_LEN, strlen(strval));
 		break;
