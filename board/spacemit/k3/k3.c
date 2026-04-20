@@ -26,6 +26,7 @@
 #include <tlv_eeprom.h>
 #include <clk.h>
 #include <scsi.h>
+#include <ufs.h>
 #include <fs.h>
 #include <usb.h>
 #include <part.h>
@@ -246,6 +247,33 @@ int board_scsi_scan_once(bool verbose)
 	}
 
 	return ret;
+}
+
+int k3_prepare_scsi_flash_target(u32 devnum)
+{
+	static bool scsi_flash_target_prepared;
+	int ret;
+
+	if (scsi_flash_target_prepared)
+		return 0;
+
+#ifdef CONFIG_UFS
+	ret = ufs_prepare_dev_for_flash(devnum);
+	if (ret) {
+		pr_err("failed to prepare UFS device %u for flashing: %d\n",
+		       devnum, ret);
+		return ret;
+	}
+#endif
+
+	ret = board_scsi_scan_once(false);
+	if (ret) {
+		pr_err("failed to scan SCSI bus for device %u: %d\n", devnum, ret);
+		return ret;
+	}
+
+	scsi_flash_target_prepared = true;
+	return 0;
 }
 
 static struct blk_desc *k3_nor_get_scsi_desc(u32 devnum)

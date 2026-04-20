@@ -32,6 +32,11 @@ struct spacemit_k3_ufs_priv {
 	u32 clock_freq_hz;
 	ulong aclk_rate_hz; 
 };
+
+static void spacemit_k3_ufs_config_scsi_scan_luns(struct udevice *dev);
+static void spacemit_k3_ufs_phy_shutdown(struct ufs_hba *hba,
+					 struct spacemit_k3_ufs_priv *priv);
+
 /*UFS HOST PHY REGISTER*/
 #define UFS_ARASAN_TOP_BASE 0x1C00
 #define UFS_ARASAN_PHY_MNG_BASE 0x1B00
@@ -87,7 +92,7 @@ struct spacemit_k3_ufs_priv {
 #define RX_GARBAGE_COUNT_OFFSET 0x00F2
 #define VS_TX_BURST_CLOSURE_DELAY 0xD084
 
-#define UFS_LOGICAL_BLOCK_SIZE 512
+#define UFS_GEOMETRY_CAPACITY_UNIT_BYTES 512ULL
 
 /*special analog reg*/
 #define ANA_EQ_CTRL_REG_ATTR 0x00CD
@@ -1071,16 +1076,20 @@ static void spacemit_k3_ufs_dump_conf_state_err(struct ufs_hba *hba,
 }
 
 static int
-spacemit_k3_ufs_get_total_alloc_units_from_geometry(struct ufs_hba *hba,
-						    u64 *total_alloc_units,
-						    u8 *logical_blk_size)
+spacemit_k3_ufs_get_geometry_capacity(struct ufs_hba *hba,
+				      u64 *total_alloc_units,
+				      u8 *logical_blk_size)
 {
 	u8 *desc_buf;
-	u64 qTotalRawDeviceCapacity;
-	u32 dSegmentSize;
-	u8 bAllocationUnitSize;
+	u64 total_raw_device_capacity;
 	u64 alloc_unit_bytes;
+	u32 segment_size;
+	u8 alloc_unit_size;
+	int desc_size = hba->desc_size.geom_desc;
 	int ret;
+
+	if (!total_alloc_units && !logical_blk_size)
+		return -EINVAL;
 
 	desc_buf = kmalloc(hba->desc_size.geom_desc, GFP_KERNEL);
 	if (!desc_buf)
@@ -1088,41 +1097,48 @@ spacemit_k3_ufs_get_total_alloc_units_from_geometry(struct ufs_hba *hba,
 
 	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
 					    QUERY_DESC_IDN_GEOMETRY, 0, 0,
-					    desc_buf,
-					    &hba->desc_size.geom_desc);
+					    desc_buf, &desc_size);
 	if (ret)
 		goto out;
 
-	qTotalRawDeviceCapacity =
-		get_unaligned_be64(&desc_buf[GEO_DESC_PARAM_TOTAL_RAW_DEV_CAP]);
-	dSegmentSize = get_unaligned_be32(&desc_buf[GEO_DESC_PARAM_SEG_SIZE]);
-	bAllocationUnitSize = desc_buf[GEO_DESC_PARAM_ALLOC_UNIT_SIZE];
-	if (!dSegmentSize || !bAllocationUnitSize) {
-		ret = -EINVAL;
-		goto out;
+	if (logical_blk_size) {
+		*logical_blk_size = desc_buf[GEO_DESC_PARAM_OPT_LOGIC_BLK_SIZE];
+		if (!*logical_blk_size)
+			*logical_blk_size = desc_buf[GEO_DESC_PARAM_MIN_ADDR_BLK_SIZE];
+		if (!*logical_blk_size)
+			*logical_blk_size = SPACEMIT_UFS_DEFAULT_LOGICAL_BLK_SIZE;
 	}
 
-	alloc_unit_bytes = (u64)dSegmentSize * bAllocationUnitSize *
-			   UFS_LOGICAL_BLOCK_SIZE;
-	if (!alloc_unit_bytes) {
-		ret = -EINVAL;
-		goto out;
-	}
+	if (total_alloc_units) {
+		total_raw_device_capacity = get_unaligned_be64(
+			&desc_buf[GEO_DESC_PARAM_TOTAL_RAW_DEV_CAP]);
+		segment_size = get_unaligned_be32(&desc_buf[GEO_DESC_PARAM_SEG_SIZE]);
+		alloc_unit_size = desc_buf[GEO_DESC_PARAM_ALLOC_UNIT_SIZE];
+		if (!segment_size || !alloc_unit_size) {
+			ret = -EINVAL;
+			goto out;
+		}
 
-	*total_alloc_units =
-		(qTotalRawDeviceCapacity * UFS_LOGICAL_BLOCK_SIZE) /
-		alloc_unit_bytes;
-	if (!*total_alloc_units || *total_alloc_units > 0xFFFFFFFFULL)
-		ret = -ERANGE;
+		alloc_unit_bytes = (u64)segment_size * alloc_unit_size *
+				   UFS_GEOMETRY_CAPACITY_UNIT_BYTES;
+		if (!alloc_unit_bytes) {
+			ret = -EINVAL;
+			goto out;
+		}
 
-	if (!ret && logical_blk_size) {
-		u8 blk_size = desc_buf[GEO_DESC_PARAM_OPT_LOGIC_BLK_SIZE];
+		*total_alloc_units =
+			(total_raw_device_capacity *
+			 UFS_GEOMETRY_CAPACITY_UNIT_BYTES) /
+			alloc_unit_bytes;
+		if (!*total_alloc_units || *total_alloc_units > 0xFFFFFFFFULL) {
+			ret = -ERANGE;
+			goto out;
+		}
 
-		if (!blk_size)
-			blk_size = desc_buf[GEO_DESC_PARAM_MIN_ADDR_BLK_SIZE];
-		if (!blk_size)
-			blk_size = SPACEMIT_UFS_DEFAULT_LOGICAL_BLK_SIZE;
-		*logical_blk_size = blk_size;
+		dev_dbg(hba->dev,
+			"ufs: geometry raw_cap=%llu seg_size=%u alloc_unit_size=%u total_alloc_units=%llu\n",
+			total_raw_device_capacity, segment_size, alloc_unit_size,
+			*total_alloc_units);
 	}
 
 out:
@@ -1237,9 +1253,10 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 	u8 *orig_desc_buf = NULL;
 	u8 unit_lu_enabled[SPACEMIT_UFS_CONFIG_LUN_SLOTS];
 	u32 conf_desc_lock = 0;
-	u64 total_alloc_units = 0;
-	u64 configured_alloc_units = 0;
-	u64 geometry_alloc_units = 0;
+	u64 current_lu0_alloc_units = 0;
+	u64 enabled_alloc_units = 0;
+	u64 geometry_total_alloc_units = 0;
+	u64 target_alloc_units = 0;
 	u8 geometry_logical_blk_size = 0;
 	int ret;
 	int unit_state_ret;
@@ -1310,37 +1327,27 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 		if (conf_enabled)
 			conf_enabled_lun_count++;
 
+		if (i == 0)
+			current_lu0_alloc_units = get_unaligned_be32(
+				&desc_buf[offset +
+					  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
+
 		if (enabled) {
 			if (source_lun < 0)
 				source_lun = i;
-			total_alloc_units += get_unaligned_be32(
+			enabled_alloc_units += get_unaligned_be32(
 				&desc_buf[offset +
 					  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
 		}
 	}
 
 	dev_dbg(hba->dev,
-		"ufs: config layout len=0x%x head=0x%x unit=0x%x conf_luns=%d unit_luns=%d source=%d total_alloc_units=%llu\n",
+		"ufs: config layout len=0x%x head=0x%x unit=0x%x conf_luns=%d unit_luns=%d source=%d enabled_alloc_units=%llu\n",
 		hba->desc_size.conf_desc, conf_head_desc, conf_unit_desc,
 		conf_enabled_lun_count, unit_enabled_lun_count, source_lun,
-		total_alloc_units);
+		enabled_alloc_units);
 
 	have_unit_state = !unit_state_ret;
-	configured_alloc_units = total_alloc_units;
-	ret = spacemit_k3_ufs_get_total_alloc_units_from_geometry(
-		hba, &geometry_alloc_units, &geometry_logical_blk_size);
-	if (ret) {
-		dev_warn(hba->dev,
-			 "%s: failed to get geometry defaults: %d\n",
-			 __func__, ret);
-		geometry_alloc_units = 0;
-		geometry_logical_blk_size = 0;
-		ret = 0;
-	} else if (geometry_alloc_units &&
-		   geometry_alloc_units >= total_alloc_units) {
-		total_alloc_units = geometry_alloc_units;
-	}
-
 	if (have_unit_state)
 		need_reconfigure =
 			(unit_enabled_lun_count != 1 || !unit_lu_enabled[0]);
@@ -1349,22 +1356,37 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 			(conf_enabled_lun_count != 1 ||
 				 desc_buf[conf_head_desc + CONFIG_DESC_UNIT_PARAM_LU_EN] != 0x1);
 
-	if (configured_alloc_units != total_alloc_units)
-		need_reconfigure = true;
-
-	debug("ufs: conf_lun_count=%d unit_lun_count=%d total_alloc_units=%llu need_recfg=%d\n",
-	      conf_enabled_lun_count, unit_enabled_lun_count, total_alloc_units,
-	      need_reconfigure);
+	debug("ufs: conf_lun_count=%d unit_lun_count=%d enabled_alloc_units=%llu need_recfg=%d\n",
+	      conf_enabled_lun_count, unit_enabled_lun_count,
+	      enabled_alloc_units, need_reconfigure);
 
 	if (!need_reconfigure) {
 		ret = 0;
 		goto out;
 	}
 
-	if (!total_alloc_units || total_alloc_units > 0xFFFFFFFFULL) {
+	ret = spacemit_k3_ufs_get_geometry_capacity(
+		hba, &geometry_total_alloc_units, &geometry_logical_blk_size);
+	if (ret) {
 		dev_err(hba->dev,
-			"%s: no valid alloc-unit target for LU0 reprovision\n",
+			"%s: failed to get geometry total capacity for LU0 reprovision: %d\n",
+			__func__, ret);
+		goto out;
+	}
+
+	target_alloc_units = geometry_total_alloc_units;
+	if (!target_alloc_units || target_alloc_units > 0xFFFFFFFFULL) {
+		dev_err(hba->dev,
+			"%s: no valid geometry alloc-unit target for LU0 reprovision\n",
 			__func__);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (enabled_alloc_units && target_alloc_units < enabled_alloc_units) {
+		dev_err(hba->dev,
+			"%s: geometry target alloc %llu is smaller than enabled user alloc %llu\n",
+			__func__, target_alloc_units, enabled_alloc_units);
 		ret = -EINVAL;
 		goto out;
 	}
@@ -1385,10 +1407,13 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 	}
 
 	/*
-	 * Keep only LU0 enabled and move all capacity into LU0. Prefer an
-	 * enabled LU as the template source. If none exists, fall back to any
-	 * usable disabled LU template and finally synthesize the minimal LU0
-	 * fields from geometry information.
+	 * Keep only LU0 enabled. For devices that are not already single-LUN,
+	 * provision LU0 with the full geometry capacity so the flashed image
+	 * sees the device's complete user address space. Already-single-LUN
+	 * devices return above and keep their current LU0 size unchanged.
+	 * Prefer an enabled LU as the template source. If none exists, fall
+	 * back to any usable disabled LU template and finally synthesize the
+	 * minimal LU0 fields from geometry information.
 	 */
 	spacemit_k3_ufs_dump_conf_header(hba, "current", desc_buf,
 					 conf_head_desc);
@@ -1426,13 +1451,13 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 			hba, desc_buf, conf_head_desc, conf_unit_desc,
 			unit_lu_enabled, have_unit_state, source_lun,
 			&template_lun);
-		if (ret && ret != -ENODATA) {
-			dev_warn(hba->dev,
-				 "%s: failed to build LU0 template from UNIT descriptors: %d, falling back to config/geometry\n",
-				 __func__, ret);
-			ret = 0;
+			if (ret && ret != -ENODATA) {
+				dev_warn(hba->dev,
+					 "%s: failed to build LU0 template from UNIT descriptors: %d, falling back to existing config fields and geometry block-size defaults\n",
+					 __func__, ret);
+				ret = 0;
+			}
 		}
-	}
 
 	ret = spacemit_k3_ufs_complete_synth_lu0_template(
 		hba, desc_buf, conf_head_desc, conf_unit_desc,
@@ -1451,8 +1476,8 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 
 	dev_dbg(hba->dev,
 		"ufs: reconfig single-LUN source=%d template=%d alloc(current=%llu target=%llu)\n",
-		source_lun, template_lun, configured_alloc_units,
-		total_alloc_units);
+		source_lun, template_lun, current_lu0_alloc_units,
+		target_alloc_units);
 
 	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
 		int offset = conf_head_desc + conf_unit_desc * i;
@@ -1460,7 +1485,7 @@ spacemit_k3_ufs_check_and_config_single_lun(struct udevice *dev)
 		if (i == 0) {
 			desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] = 0x1;
 			put_unaligned_be32(
-				(u32)total_alloc_units,
+				(u32)target_alloc_units,
 				&desc_buf[offset +
 					  CONFIG_DESC_UNIT_PARAM_NUM_ALLOC_UNIT]);
 		} else {
@@ -1560,21 +1585,147 @@ out:
 	return ret;
 }
 
-#if !defined(CONFIG_SPL_BUILD)
-extern enum board_boot_mode get_boot_mode(void);
-
-static bool spacemit_k3_ufs_should_enforce_single_lun(void)
+static int spacemit_k3_ufs_is_single_lun_active(struct udevice *dev)
 {
-	enum board_boot_mode boot_mode = get_boot_mode();
+	u8 *desc_buf;
+	u8 unit_lu_enabled[SPACEMIT_UFS_CONFIG_LUN_SLOTS];
+	int unit_state_ret;
+	int unit_enabled_lun_count = 0;
+	int conf_enabled_lun_count = 0;
+	int conf_head_desc;
+	int conf_unit_desc;
+	int ret;
+	int i;
+	bool have_unit_state;
+	bool single_lun_active;
+	struct ufs_hba *hba = dev_get_uclass_priv(dev);
 
-	/*
-	 * Normal UFS boots are expected to run on already provisioned media.
-	 * Skip the expensive descriptor walk in that path and keep the
-	 * single-LUN enforcement for recovery / flashing flows.
-	 */
-	return boot_mode != BOOT_MODE_UFS;
+	desc_buf = kmalloc(hba->desc_size.conf_desc, GFP_KERNEL);
+	if (!desc_buf)
+		return -ENOMEM;
+
+	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
+					    QUERY_DESC_IDN_CONFIGURATION, 0, 0,
+					    desc_buf, &hba->desc_size.conf_desc);
+	if (ret) {
+		dev_err(hba->dev,
+			"%s: failed to read config descriptor: %d\n",
+			__func__, ret);
+		goto out;
+	}
+
+	unit_state_ret = spacemit_k3_ufs_read_unit_lu_state(
+		hba, unit_lu_enabled, &unit_enabled_lun_count);
+	ret = spacemit_k3_ufs_get_conf_desc_layout_from_dev_desc(
+		hba, &conf_head_desc, &conf_unit_desc);
+	if (ret && unit_state_ret) {
+		ret = spacemit_k3_ufs_get_conf_desc_layout(hba, &conf_head_desc,
+							   &conf_unit_desc);
+	} else if (ret) {
+		ret = spacemit_k3_ufs_select_conf_desc_layout(hba, desc_buf,
+							      unit_lu_enabled,
+							      &conf_head_desc,
+							      &conf_unit_desc);
+	}
+	if (ret) {
+		dev_err(hba->dev,
+			"%s: unsupported config descriptor layout (len=0x%x)\n",
+			__func__, hba->desc_size.conf_desc);
+		goto out;
+	}
+
+	for (i = 0; i < SPACEMIT_UFS_CONFIG_LUN_SLOTS; i++) {
+		int offset = conf_head_desc + conf_unit_desc * i;
+
+		if (desc_buf[offset + CONFIG_DESC_UNIT_PARAM_LU_EN] == 0x1)
+			conf_enabled_lun_count++;
+	}
+
+	have_unit_state = !unit_state_ret;
+	if (have_unit_state)
+		single_lun_active =
+			(unit_enabled_lun_count == 1 && unit_lu_enabled[0]);
+	else
+		single_lun_active =
+			(conf_enabled_lun_count == 1 &&
+			 desc_buf[conf_head_desc + CONFIG_DESC_UNIT_PARAM_LU_EN] == 0x1);
+
+	ret = single_lun_active ? 1 : 0;
+
+out:
+	kfree(desc_buf);
+	return ret;
 }
-#endif
+
+static int spacemit_k3_ufs_reprobe(struct udevice *dev, const char *reason)
+{
+	struct spacemit_k3_ufs_priv *priv = dev_get_priv(dev);
+	struct ufs_hba *hba = dev_get_uclass_priv(dev);
+	struct ufs_hba_ops *hba_ops = (struct ufs_hba_ops *)dev->driver_data;
+	int ret;
+
+	if (!hba_ops)
+		return -ENODEV;
+
+	if (hba_ops->device_reset)
+		hba_ops->device_reset(hba);
+
+	ret = ufshcd_probe(dev, hba_ops);
+	if (ret) {
+		spacemit_k3_ufs_phy_shutdown(hba, priv);
+		spacemit_k3_ufs_clk_disable(priv);
+		dev_err(hba->dev, "ufs reprobe after %s failed: %d\n", reason, ret);
+		return ret;
+	}
+
+	spacemit_k3_ufs_config_scsi_scan_luns(dev);
+	return 0;
+}
+
+int ufs_prepare_dev_for_flash(int index)
+{
+	struct udevice *dev;
+	struct ufs_hba *hba;
+	int ret;
+
+	ret = uclass_get_device(UCLASS_UFS, index, &dev);
+	if (ret)
+		return ret;
+
+	hba = dev_get_uclass_priv(dev);
+	ret = spacemit_k3_ufs_check_and_config_single_lun(dev);
+	if (ret < 0) {
+		dev_err(hba->dev,
+			"ufs: failed to enforce single-LUN layout for flashing: %d\n",
+			ret);
+		return ret;
+	}
+
+	if (!ret)
+		return 0;
+
+	dev_info(hba->dev,
+		 "restarting UFS once to apply single-LUN layout for flashing\n");
+	ret = spacemit_k3_ufs_reprobe(dev, "single-LUN provisioning");
+	if (ret)
+		return ret;
+
+	ret = spacemit_k3_ufs_is_single_lun_active(dev);
+	if (ret < 0) {
+		dev_err(hba->dev,
+			"ufs: failed to verify single-LUN layout after reprobe: %d\n",
+			ret);
+		return ret;
+	}
+
+	if (!ret) {
+		dev_err(hba->dev,
+			"ufs: single-LUN layout is still inactive after reprobe\n");
+		return -EIO;
+	}
+
+	return 0;
+}
 
 static void spacemit_k3_ufs_config_scsi_scan_luns(struct udevice *dev)
 {
@@ -2177,73 +2328,9 @@ static int spacemit_k3_ufs_pltfm_probe(struct udevice *dev)
 		spacemit_k3_ufs_clk_disable(priv);
 		pr_err("ufs host probe failed:%d\n", ret);
 	} else {
-#if !defined(CONFIG_SPL_BUILD)
-		int lun_cfg_ret;
-		bool recover_after_lun_cfg = false;
-
-		if (spacemit_k3_ufs_should_enforce_single_lun()) {
-			/* Check and configure single LUN if needed - skip in SPL */
-			lun_cfg_ret = spacemit_k3_ufs_check_and_config_single_lun(dev);
-			if (lun_cfg_ret > 0) {
-				dev_info(
-					hba->dev,
-					"restarting UFS once to apply single-LUN layout\n");
-				hba->ops->device_reset(hba);
-				ret = ufshcd_probe(dev, hba_ops);
-				if (ret) {
-					spacemit_k3_ufs_phy_shutdown(hba, priv);
-					spacemit_k3_ufs_clk_disable(priv);
-					dev_err(hba->dev,
-						"ufs reprobe after LUN config failed: %d\n",
-						ret);
-					return ret;
-				}
-
-				lun_cfg_ret =
-					spacemit_k3_ufs_check_and_config_single_lun(
-						dev);
-			}
-
-				if (lun_cfg_ret < 0) {
-					recover_after_lun_cfg =
-						(lun_cfg_ret == -ETIMEDOUT ||
-						 lun_cfg_ret == -EIO);
-					if (lun_cfg_ret == -EROFS ||
-					    lun_cfg_ret == -EALREADY ||
-					    lun_cfg_ret == -EPERM)
-						dev_err(hba->dev,
-							"failed to enforce single-LUN layout: %d (unrecoverable)\n",
-							lun_cfg_ret);
-					else
-						dev_warn(hba->dev,
-							 "failed to enforce single-LUN layout: %d\n",
-							 lun_cfg_ret);
-				} else if (lun_cfg_ret > 0) {
-					dev_warn(
-						hba->dev,
-					"single-LUN config pending, a cold power cycle may be required\n");
-			}
-
-			if (recover_after_lun_cfg) {
-				dev_warn(hba->dev,
-					 "ufs: recovering controller after failed LUN reconfiguration\n");
-				hba->ops->device_reset(hba);
-				ret = ufshcd_probe(dev, hba_ops);
-				if (ret) {
-					spacemit_k3_ufs_phy_shutdown(hba, priv);
-					spacemit_k3_ufs_clk_disable(priv);
-					dev_err(hba->dev,
-						"ufs reprobe after failed LUN config recovery failed: %d\n",
-						ret);
-					return ret;
-				}
-			}
-		}
-#endif
 		/*
 		 * Scan the LUNs that are actually enabled on the device.
-		 * If single-LUN reconfiguration failed, do not get stuck
-		 * probing only LUN0 on a multi-LUN provisioned device.
+		 * Single-LUN provisioning is handled explicitly by flashing paths.
 		 */
 		spacemit_k3_ufs_config_scsi_scan_luns(dev);
 	}

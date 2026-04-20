@@ -115,12 +115,8 @@ static int k3_nor_probe_nvme(u32 devnum, const char *partition)
 #ifdef CONFIG_SCSI
 static int k3_nor_probe_scsi(u32 devnum, const char *partition)
 {
-	static bool scsi_scanned;
-
-	if (!scsi_scanned) {
-		scsi_scan(false);
-		scsi_scanned = true;
-	}
+	if (k3_prepare_scsi_flash_target(devnum))
+		return -1;
 
 	return k3_detect_blk_or_part_quiet("scsi", devnum, partition);
 }
@@ -1649,14 +1645,8 @@ int _get_available_blk_or_part(char **blk_dev, int *index, const char *partition
 #ifdef CONFIG_UFS
 	/* For UFS boot mode, use SCSI block device */
 	if (boot_mode == BOOT_MODE_UFS) {
-		static bool ufs_scanned = false;
-		if (!ufs_scanned) {
-			/* Probe UFS and scan SCSI devices */
-			if (ufs_probe() == 0) {
-				scsi_scan(false);
-				ufs_scanned = true;
-			}
-		}
+		if (k3_prepare_scsi_flash_target(0))
+			return -1;
 		*blk_dev = "scsi";
 		*index = 0;
 		if (detect_blk_dev_or_partition_exist(*blk_dev, *index, partition) >= 0)
