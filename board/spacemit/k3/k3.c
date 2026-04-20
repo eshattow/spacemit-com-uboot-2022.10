@@ -79,39 +79,30 @@ static struct k3_nor_boot_target k3_nor_boot_prio[] = {
 #endif
 };
 
-static void k3_nor_update_prio_from_dtb(void)
+/*
+ * Returns if the target was found
+ */
+static bool k3_nor_set_highest_prio(const char *target_name)
 {
 	int count = ARRAY_SIZE(k3_nor_boot_prio);
-	static bool already_updated = false;
+	const char *mapped_name = target_name;
 	struct k3_nor_boot_target temp;
-	const char *prior_target;
-	ofnode node;
 	int i, j;
 
-	if (already_updated)
-		return;
+	if (!target_name || !strlen(target_name))
+		return false;
 
-	already_updated = true;
-	node = ofnode_path(NOR_BOOT_PRIORITY_NODE);
-	if (!ofnode_valid(node)) {
-		return;
-	}
-
-	prior_target = ofnode_read_string(node, "highest-priority");
-	if (!prior_target) {
-		return;
-	}
-
-	if (strcmp(prior_target, "ufs") == 0) {
-		prior_target = "scsi";
-	} else if (strcmp(prior_target, "ssd") == 0) {
-		prior_target = "nvme";
+	// for ease of use, string substitution is provided
+	if (strcasecmp(target_name, "UFS") == 0) {
+		mapped_name = "scsi";
+	} else if (strcasecmp(target_name, "SSD") == 0) {
+		mapped_name = "nvme";
 	}
 
 	for (i = 0; i < count; i++) {
-		if (strcmp(k3_nor_boot_prio[i].blk_name, prior_target) == 0) {
+		if (strcasecmp(k3_nor_boot_prio[i].blk_name, mapped_name) == 0) {
 			if (i == 0)
-				break;
+				return true;
 
 			// shift its previous element by one position
 			temp = k3_nor_boot_prio[i];
@@ -120,14 +111,60 @@ static void k3_nor_update_prio_from_dtb(void)
 			}
 
 			k3_nor_boot_prio[0] = temp;
-			break;
+			return true;
 		}
 	}
+
+	return false;
+}
+
+static bool already_updated = false;
+
+static void k3_nor_update_prio_from_dtb(void)
+{
+	const char *prior_target;
+	ofnode node;
+
+	node = ofnode_path(NOR_BOOT_PRIORITY_NODE);
+	if (!ofnode_valid(node)) {
+		return;
+	}
+
+	prior_target = ofnode_read_string(node, "highest-priority");
+	if (prior_target)
+		k3_nor_set_highest_prio(prior_target);
+}
+
+
+/*
+ * Returns if check dtb is needed
+ */
+bool k3_nor_update_prio_from_tlv(void)
+{
+	char read_buf[64] = {0};
+	int read_len;
+
+	read_len = get_tlvinfo(TLV_CODE_SECOND_BOOT_DEV, read_buf, sizeof(read_buf) - 1);
+
+	if (read_len > 0) {
+		if (k3_nor_set_highest_prio(read_buf)) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 const struct k3_nor_boot_target *k3_nor_get_boot_prio(unsigned int *count)
 {
-	k3_nor_update_prio_from_dtb();
+	// support customize second boot device
+	// tlv is prior than dtb
+	if (!already_updated) {
+		already_updated = true;
+		if (k3_nor_update_prio_from_tlv())
+			k3_nor_update_prio_from_dtb();
+	}
+
 	if (count)
 		*count = ARRAY_SIZE(k3_nor_boot_prio);
 

@@ -618,48 +618,45 @@ int soc_dp_phy_exit(struct soc_dp_phy *phy)
 
 int soc_dp_phy_power_off(struct soc_dp_phy *phy)
 {
-	if (phy->power_count == 1) {
-		soc_dp_reg_write_range(phy, SOC_DPTX_XMIT_ENABLE, 0);
-		mdelay(2);
+	soc_dp_reg_write_range(phy, SOC_DPTX_XMIT_ENABLE, 0);
+	mdelay(2);
 
-		soc_dp_reg_write_range(phy, SOC_DPTX_ANA_MPLL_PD, 1);
-		soc_dp_reg_write_range(phy, SOC_DPTX_ANA_PREPLL_PD, 1);
-		mdelay(2);
-	}
+	// soc_dp_reg_write_range(phy, SOC_DPTX_ANA_MPLL_PD, 1);
+	soc_dp_reg_write_range(phy, SOC_DPTX_ANA_PREPLL_PD, 1);
+	mdelay(2);
 
-	--phy->power_count;
 	return 0;
 }
 
 int soc_dp_phy_power_on(struct soc_dp_phy *phy)
 {
-	int ret;
+	int ret, retry;
 	u32 lane_en;
 
-	if (phy->power_count == 0) {
-		switch (phy->lane_count) {
-		case SOC_DP_LANE_1:
-			lane_en = 0x1; break;
-		case SOC_DP_LANE_2:
-			lane_en = 0x3; break;
-		case SOC_DP_LANE_4:
-		default:
-			lane_en = 0xF; break;
-		}
-
-		soc_dp_reg_write_range(phy, SOC_DPTX_ANA_MPLL_PD, 0);
-		soc_dp_reg_write_range(phy, SOC_DPTX_ANA_PREPLL_PD, 0);
-		mdelay(2);
-
-		soc_dp_reg_write_range(phy, SOC_DPTX_XMIT_ENABLE, lane_en);
-		mdelay(2);
-
-		ret = soc_dp_check_pll_lock(phy);
-		if (ret)
-			return ret;
+	switch (phy->lane_count) {
+	case SOC_DP_LANE_1:
+		lane_en = 0x1; break;
+	case SOC_DP_LANE_2:
+		lane_en = 0x3; break;
+	case SOC_DP_LANE_4:
+	default:
+		lane_en = 0xF; break;
 	}
 
-	++phy->power_count;
+	soc_dp_reg_write_range(phy, SOC_DPTX_ANA_MPLL_PD, 0);
+	soc_dp_reg_write_range(phy, SOC_DPTX_ANA_PREPLL_PD, 0);
+	mdelay(2);
+
+	soc_dp_reg_write_range(phy, SOC_DPTX_XMIT_ENABLE, lane_en);
+	mdelay(2);
+
+	for (retry = 0; retry < 3; retry++) {
+		ret = soc_dp_check_pll_lock(phy);
+		if (!ret)
+			break;
+		mdelay(2);
+	}
+
 	return 0;
 }
 
@@ -872,6 +869,10 @@ int soc_dp_phy_init(struct soc_dp_phy *phy, uintptr_t base_addr,
 		return ret;
 
 	ret = soc_dp_phy_set_pixel_clk(phy, 148500);
+	if (ret)
+		return ret;
+
+	ret = soc_dp_phy_power_on(phy);
 	if (ret)
 		return ret;
 

@@ -227,6 +227,19 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 			return ret;
 		}
 
+		if (timing.hactive.typ > 3840) {
+			pr_info("%s: no support the resolution of %dx%d\n", __func__, timing.hactive.typ, timing.vactive.typ);
+			return -EINVAL;
+		}
+
+		uc_priv->xsize = timing.hactive.typ;
+		uc_priv->ysize = timing.vactive.typ;
+
+		pr_info("fb=%lx, size=%dx%d\n", fbbase, uc_priv->xsize, uc_priv->ysize);
+
+		memset((void *)fbbase, 0, uc_priv->xsize * uc_priv->ysize * VNBYTES(uc_priv->bpix));
+		flush_cache(fbbase, uc_priv->xsize * uc_priv->ysize * VNBYTES(uc_priv->bpix));
+
 		ret = display_enable(disp, 1 << VIDEO_BPP32, &timing);
 		if (ret) {
 			pr_info("%s: Failed to read timings\n", __func__);
@@ -247,19 +260,6 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 		spacemit_mode->yres = timing.vactive.typ;
 		spacemit_mode->hsync_invert = 1;
 		spacemit_mode->hsync_invert = 1;
-
-		if (timing.hactive.typ > 3840) {
-			pr_info("%s: no support the resolution of %dx%d\n", __func__, timing.hactive.typ, timing.vactive.typ);
-			return -EINVAL;
-		}
-
-		uc_priv->xsize = timing.hactive.typ;
-		uc_priv->ysize = timing.vactive.typ;
-
-		pr_info("fb=%lx, size=%dx%d\n", fbbase, uc_priv->xsize, uc_priv->ysize);
-
-		memset((void *)fbbase, 0, uc_priv->xsize * uc_priv->ysize * VNBYTES(uc_priv->bpix));
-		flush_cache(fbbase, uc_priv->xsize * uc_priv->ysize * VNBYTES(uc_priv->bpix));
 
 		dpu_init(spacemit_mode, fbbase, dpu_base_addr, dpu_type);
 

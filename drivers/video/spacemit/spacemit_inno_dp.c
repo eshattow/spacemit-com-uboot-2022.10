@@ -25,6 +25,197 @@
 
 extern bool is_video_connected;
 
+#define DP_CEA_1080P60_VIC	16
+
+static void dp_set_entry(struct timing_entry *entry, u32 value)
+{
+	entry->min = value;
+	entry->typ = value;
+	entry->max = value;
+}
+
+static void dp_set_1080p60_timing(struct display_timing *timing)
+{
+	memset(timing, 0, sizeof(*timing));
+
+	dp_set_entry(&timing->pixelclock, 148500000);
+	dp_set_entry(&timing->hactive, 1920);
+	dp_set_entry(&timing->hfront_porch, 88);
+	dp_set_entry(&timing->hback_porch, 148);
+	dp_set_entry(&timing->hsync_len, 44);
+	dp_set_entry(&timing->vactive, 1080);
+	dp_set_entry(&timing->vfront_porch, 4);
+	dp_set_entry(&timing->vback_porch, 36);
+	dp_set_entry(&timing->vsync_len, 5);
+	timing->flags = DISPLAY_FLAGS_HSYNC_HIGH | DISPLAY_FLAGS_VSYNC_HIGH;
+}
+
+static void dp_decode_detailed_timing(const struct edid_detailed_timing *t,
+				      struct display_timing *timing)
+{
+	u32 hactive, hblank, hsync_offset, hsync_width;
+	u32 vactive, vblank, vsync_offset, vsync_width;
+
+	memset(timing, 0, sizeof(*timing));
+
+	hactive = EDID_DETAILED_TIMING_HORIZONTAL_ACTIVE(*t);
+	hblank = EDID_DETAILED_TIMING_HORIZONTAL_BLANKING(*t);
+	hsync_offset = EDID_DETAILED_TIMING_HSYNC_OFFSET(*t);
+	hsync_width = EDID_DETAILED_TIMING_HSYNC_PULSE_WIDTH(*t);
+	vactive = EDID_DETAILED_TIMING_VERTICAL_ACTIVE(*t);
+	vblank = EDID_DETAILED_TIMING_VERTICAL_BLANKING(*t);
+	vsync_offset = EDID_DETAILED_TIMING_VSYNC_OFFSET(*t);
+	vsync_width = EDID_DETAILED_TIMING_VSYNC_PULSE_WIDTH(*t);
+
+	dp_set_entry(&timing->pixelclock,
+		     EDID_DETAILED_TIMING_PIXEL_CLOCK(*t));
+	dp_set_entry(&timing->hactive, hactive);
+	dp_set_entry(&timing->hfront_porch, hsync_offset);
+	dp_set_entry(&timing->hback_porch, hblank - hsync_offset - hsync_width);
+	dp_set_entry(&timing->hsync_len, hsync_width);
+	dp_set_entry(&timing->vactive, vactive);
+	dp_set_entry(&timing->vfront_porch, vsync_offset);
+	dp_set_entry(&timing->vback_porch, vblank - vsync_offset - vsync_width);
+	dp_set_entry(&timing->vsync_len, vsync_width);
+
+	timing->flags = 0;
+	if (EDID_DETAILED_TIMING_FLAG_HSYNC_POLARITY(*t))
+		timing->flags |= DISPLAY_FLAGS_HSYNC_HIGH;
+	else
+		timing->flags |= DISPLAY_FLAGS_HSYNC_LOW;
+
+	if (EDID_DETAILED_TIMING_FLAG_VSYNC_POLARITY(*t))
+		timing->flags |= DISPLAY_FLAGS_VSYNC_HIGH;
+	else
+		timing->flags |= DISPLAY_FLAGS_VSYNC_LOW;
+
+	if (EDID_DETAILED_TIMING_FLAG_INTERLACED(*t))
+		timing->flags |= DISPLAY_FLAGS_INTERLACED;
+}
+
+static u32 dp_calc_vrefresh(const struct display_timing *timing)
+{
+	u32 htotal, vtotal;
+	u64 refresh;
+
+	htotal = timing->hactive.typ + timing->hfront_porch.typ +
+		 timing->hback_porch.typ + timing->hsync_len.typ;
+	vtotal = timing->vactive.typ + timing->vfront_porch.typ +
+		 timing->vback_porch.typ + timing->vsync_len.typ;
+	if (!htotal || !vtotal)
+		return 0;
+
+	refresh = (u64)timing->pixelclock.typ;
+	refresh += (u64)htotal * vtotal / 2;
+	do_div(refresh, (u64)htotal * vtotal);
+
+	return refresh;
+}
+
+static bool dp_is_1080p60_timing(const struct display_timing *timing)
+{
+	u32 refresh = dp_calc_vrefresh(timing);
+
+	return timing->hactive.typ == 1920 &&
+	       timing->vactive.typ == 1080 &&
+	       !(timing->flags & DISPLAY_FLAGS_INTERLACED) &&
+	       refresh >= 59 && refresh <= 61;
+}
+
+static bool dp_find_1080p60_dtd(const struct edid_detailed_timing *dtd,
+				int count, struct display_timing *timing)
+{
+	int i;
+	struct display_timing tmp;
+
+	for (i = 0; i < count; i++) {
+		if (EDID_DETAILED_TIMING_PIXEL_CLOCK(dtd[i]) == 0)
+			continue;
+
+		dp_decode_detailed_timing(&dtd[i], &tmp);
+		if (!dp_is_1080p60_timing(&tmp))
+			continue;
+
+		*timing = tmp;
+		return true;
+	}
+
+	return false;
+}
+
+static bool dp_find_1080p60_cea_vdb(const struct edid_cea861_info *cea,
+				    struct display_timing *timing)
+{
+	int offset = cea->dtd_offset;
+	int data_len;
+	int i;
+
+	if (offset < 4 || offset > EDID_SIZE)
+		return false;
+
+	data_len = offset - 4;
+	for (i = 0; i < data_len; ) {
+		int len = EDID_CEA861_DB_LEN(*cea, i);
+		int type = EDID_CEA861_DB_TYPE(*cea, i);
+		int j;
+
+		if (i + len >= data_len)
+			break;
+
+		if (type == EDID_CEA861_DB_VIDEO) {
+			for (j = 0; j < len; j++) {
+				u8 svd = cea->data[i + 1 + j];
+
+				if ((svd & 0x7f) != DP_CEA_1080P60_VIC)
+					continue;
+
+				dp_set_1080p60_timing(timing);
+				return true;
+			}
+		}
+
+		i += len + 1;
+	}
+
+	return false;
+}
+
+static bool dp_find_1080p60_from_edid(const u8 *buf, int buf_size,
+				      struct display_timing *timing)
+{
+	const struct edid1_info *edid = (const struct edid1_info *)buf;
+
+	if (buf_size < sizeof(*edid) || edid_check_info((struct edid1_info *)edid))
+		return false;
+
+	if (dp_find_1080p60_dtd((const struct edid_detailed_timing *)
+				edid->monitor_details.descriptor,
+				ARRAY_SIZE(edid->monitor_details.descriptor),
+				timing))
+		return true;
+
+	if (edid->extension_flag && buf_size >= EDID_EXT_SIZE) {
+		const struct edid_cea861_info *cea =
+			(const struct edid_cea861_info *)(buf + sizeof(*edid));
+
+		if (cea->extension_tag == EDID_CEA861_EXTENSION_TAG) {
+			int count = EDID_CEA861_DTD_COUNT(*cea);
+			int offset = cea->dtd_offset;
+
+			if (dp_find_1080p60_cea_vdb(cea, timing))
+				return true;
+
+			if (offset >= 4 &&
+			    offset + count * sizeof(struct edid_detailed_timing) < EDID_SIZE &&
+			    dp_find_1080p60_dtd((const struct edid_detailed_timing *)((const u8 *)cea + offset),
+						count, timing))
+				return true;
+		}
+	}
+
+	return false;
+}
+
 static int dp_enable(struct udevice *dev, int panel_bpp,
 		     const struct display_timing *edid)
 {
@@ -32,11 +223,15 @@ static int dp_enable(struct udevice *dev, int panel_bpp,
 	struct soc_dp_video_mode *mode = &priv->dp_dev.video_mode;
 	unsigned long get_rate, set_rate;
 	int ret;
+	void __iomem *pmu_addr;
+	u32 value;
+
+	pr_debug("%s \n", __func__);
 
 	if (soc_dp_hw_read_sink_caps(&priv->dp_dev)) {
 		pr_info("Failed to read sink caps\n");
 		priv->dp_dev.link.revision = 0x14;
-		priv->dp_dev.link.max_rate = SOC_DP_LINK_RATE_2_70;
+		priv->dp_dev.link.max_rate = SOC_DP_LINK_RATE_5_40;
 		priv->dp_dev.link.max_num_lanes = SOC_DP_LANE_2;
 		priv->dp_dev.link.enhanced_framing = 1;
 	}
@@ -60,6 +255,18 @@ static int dp_enable(struct udevice *dev, int panel_bpp,
 
 	get_rate = clk_get_rate(&priv->dppxclk);
 	pr_debug("%s dppxclk rate = %ld\n", __func__, get_rate);
+
+	/* use DP pixel clock */
+	pmu_addr = (void __iomem *)0xd4282800;
+	if (priv->dp_id == 0 || priv->edp_id == 0) {
+		value = readl(pmu_addr + 0x23c);
+		value |= BIT(2);
+		writel(value, (pmu_addr + 0x23c));
+	} else if (priv->dp_id == 1 || priv->edp_id == 1) {
+		value = readl(pmu_addr + 0x23c);
+		value |= BIT(18);
+		writel(value, (pmu_addr + 0x23c));
+	}
 
 	mode->clock = edid->pixelclock.typ / 1000;
 
@@ -95,6 +302,8 @@ static int dp_read_edid(struct udevice *dev, uint8_t *buf, int buf_size)
 	int ret;
 	int i;
 
+	pr_debug("%s \n", __func__);
+
 	for (i = 0; i < 3; i++) {
 		ret = soc_dp_conn_get_edid_block(&priv->dp_dev, buf, 0, EDID_LENGTH);
 		if (ret) {
@@ -119,6 +328,33 @@ static int dp_read_edid(struct udevice *dev, uint8_t *buf, int buf_size)
 	}
 
 	return ret;
+}
+
+static int dp_read_timing(struct udevice *dev, struct display_timing *timing)
+{
+	struct spacemit_inno_dp_priv *priv = dev_get_priv(dev);
+	u8 edid[EDID_EXT_LENGTH];
+	struct display_timing fallback_timing;
+	int edid_len;
+	int panel_bpp;
+	int ret;
+
+	pr_debug("%s \n", __func__);
+
+	edid_len = dp_read_edid(dev, edid, sizeof(edid));
+	if (edid_len < 0)
+		return edid_len;
+
+	ret = edid_get_timing(edid, edid_len, timing, &panel_bpp);
+	if (ret)
+		return ret;
+
+	if (!priv->dp_dev.edp_mode && timing->hactive.typ > 1920) {
+		if (dp_find_1080p60_from_edid(edid, edid_len, &fallback_timing))
+			*timing = fallback_timing;
+	}
+
+	return 0;
 }
 
 static int spacemit_dp_of_to_plat(struct udevice *dev)
@@ -412,7 +648,7 @@ static int spacemit_dp_probe(struct udevice *dev)
 	ret = uclass_get_device_by_phandle(UCLASS_PANEL_BACKLIGHT, dev,
 					   "backlight", &priv->backlight);
 	if (ret) {
-		pr_info("%s: Warning: cannot get backlight pwm: ret = %d\n",
+		pr_debug("%s: Warning: cannot get backlight pwm: ret = %d\n",
 			__func__, ret);
 		priv->bl_valid = false;
 	} else {
@@ -471,7 +707,6 @@ static int spacemit_dp_probe(struct udevice *dev)
 	}
 
 	soc_dp_init(&priv->dp_dev, base, SOC_DP_REF_CLK_24M, SOC_VIDEO_RGB_8BIT);
-	soc_dp_phy_power_on(&priv->dp_dev.phy);
 	mdelay(5);
 
 	if (soc_dp_hw_detect_hpd(&priv->dp_dev) != connector_status_connected) {
@@ -486,6 +721,7 @@ static int spacemit_dp_probe(struct udevice *dev)
 }
 
 static const struct dm_display_ops spacemit_dp_ops = {
+	.read_timing = dp_read_timing,
 	.read_edid = dp_read_edid,
 	.enable = dp_enable,
 };

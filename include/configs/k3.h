@@ -88,6 +88,7 @@
 #define TLV_CODE_PMIC_TYPE		0x80
 #define TLV_CODE_EEPROM_I2C_INDEX	0x81
 #define TLV_CODE_EEPROM_PIN_GROUP	0x82
+#define TLV_CODE_SECOND_BOOT_DEV	0x83
 
 #if defined(CONFIG_SPL_BUILD)
 #define MMC_DEV_EMMC			(1)
@@ -101,7 +102,7 @@
 #define K3_NOR_UFS_DEVNUM_DEFAULT	(0)
 #define K3_NOR_EMMC_DEVNUM_DEFAULT	(MMC_DEV_EMMC)
 
-#define DEFAULT_PRODUCT_NAME		"k3_evb"
+#define DEFAULT_PRODUCT_NAME		"k3_deb1"
 #define BOOTFS_NAME			("bootfs")
 
 // for those has NOT been through test procedure(ATE)

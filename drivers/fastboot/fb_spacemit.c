@@ -1159,6 +1159,7 @@ const struct oem_config_info config_info[] = {
 	{ "pmic_type", TLV_CODE_PMIC_TYPE, 3, NULL},
 	{ "eeprom_i2c_index", TLV_CODE_EEPROM_I2C_INDEX, 3, NULL},
 	{ "eeprom_pin_group", TLV_CODE_EEPROM_PIN_GROUP, 3, NULL},
+	{ "SecondBootDev", TLV_CODE_SECOND_BOOT_DEV, 32, NULL},
 };
 
 static int write_config_info_to_eeprom(uint32_t id, char *value)
