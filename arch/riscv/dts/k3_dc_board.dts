@@ -11,6 +11,17 @@
 
 / {
 	model = "spacemit k3 dc board";
+
+	vcc_pcie4: regulator-vcc-pcie4 {
+		compatible = "regulator-fixed";
+		regulator-name = "pcie4 Vcc";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio 41 0>;
+		enable-active-high;
+		regulator-boot-on;
+		status = "okay";
+	};
 };
 
 &cpus {
