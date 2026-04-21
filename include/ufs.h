@@ -20,6 +20,18 @@ int ufs_probe(void);
  */
 int ufs_probe_dev(int index);
 
+/**
+ * ufs_prepare_dev_for_flash() - prepare a UFS device for flashing
+ *
+ * The default implementation only probes the controller. Platform drivers may
+ * override this to enforce provisioning requirements before flashing starts.
+ *
+ * @index: index in the UFS uclass sequence
+ *
+ * Return: 0 if the device is ready for flashing, -ve on error
+ */
+int ufs_prepare_dev_for_flash(int index);
+
 /*
  * ufs_scsi_bind() - Create a new scsi device as a child of the UFS device and
  *		     bind it to the ufs_scsi driver

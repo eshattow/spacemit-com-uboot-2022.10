@@ -2399,6 +2399,11 @@ int ufs_probe_dev(int index)
 	return uclass_get_device(UCLASS_UFS, index, &dev);
 }
 
+__weak int ufs_prepare_dev_for_flash(int index)
+{
+	return ufs_probe_dev(index);
+}
+
 int ufs_probe(void)
 {
 	struct udevice *dev;

@@ -28,6 +28,7 @@
 #include <mtd.h>
 #include <fb_mtd.h>
 #include <nvme.h>
+#include <ufs.h>
 #ifdef CONFIG_SCSI
 #include <scsi.h>
 #endif
@@ -97,12 +98,8 @@ static struct blk_desc *k3_nor_get_nvme_desc(u32 devnum)
 #ifdef CONFIG_SCSI
 static struct blk_desc *k3_nor_get_scsi_desc(u32 devnum)
 {
-	static bool scsi_scanned;
-
-	if (!scsi_scanned) {
-		scsi_scan(false);
-		scsi_scanned = true;
-	}
+	if (k3_prepare_scsi_flash_target(devnum))
+		return NULL;
 
 	return blk_get_dev("scsi", devnum);
 }
@@ -1103,7 +1100,7 @@ static int perform_flash_operations(struct cmd_tbl *cmdtp, struct flash_dev *fde
 	u32 boot_mode = get_boot_pin_select();
 	switch(boot_mode){
 	case BOOT_MODE_UFS:
-		fdev->dev_desc = blk_get_dev("scsi", K3_NOR_UFS_DEVNUM_DEFAULT);
+		fdev->dev_desc = k3_nor_get_scsi_desc(K3_NOR_UFS_DEVNUM_DEFAULT);
 		if (!fdev->dev_desc || fdev->dev_desc->type == DEV_TYPE_UNKNOWN) {
 			printf("get blk faild\n");
 			return -1;
