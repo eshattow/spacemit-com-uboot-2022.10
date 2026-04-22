@@ -11,6 +11,17 @@
 
 / {
 	model = "spacemit k3 dc board";
+
+	vcc_pcie4: regulator-vcc-pcie4 {
+		compatible = "regulator-fixed";
+		regulator-name = "pcie4 Vcc";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio 41 0>;
+		enable-active-high;
+		regulator-boot-on;
+		status = "okay";
+	};
 };
 
 &cpus {
@@ -200,10 +211,6 @@
 	status = "okay";
 };
 
-&ufs {
-	status = "disabled";
-};
-
 &qspi {
 	status = "okay";
 
@@ -253,6 +260,34 @@
 			google,remote-bus = <1>;
 		};
 	};
+};
+
+&ufs {
+	status = "okay";
+};
+
+&sdhci0 {
+	pinctrl-names = "default","fast";
+	pinctrl-0 = <&pinctrl_mmc1>;
+	pinctrl-1 = <&pinctrl_mmc1_fast>;
+	bus-width = <4>;
+	cd-gpios = <&gpio 88 0>;
+	cd-inverted;
+	vqmmc-supply = <&ldo_1>;
+	clock-frequency = <204800000>;
+	spacemit,tx_delaycode = <0x1f>;
+	sdh-phy-module = <0>;
+	status = "okay";
+};
+
+&sdhci2 {
+	bus-width = <8>;
+	non-removable;
+	mmc-hs400-1_8v;
+	mmc-hs400-enhanced-strobe;
+	clock-frequency = <375000000>;
+	sdh-phy-module = <1>;
+	status = "okay";
 };
 
 &i2c8 {
