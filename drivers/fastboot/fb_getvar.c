@@ -30,6 +30,7 @@ static void getvar_version_baseband(char *var_parameter, char *response);
 static void getvar_product(char *var_parameter, char *response);
 static void getvar_platform(char *var_parameter, char *response);
 static void getvar_current_slot(char *var_parameter, char *response);
+static void getvar_is_logical(char *var_parameter, char *response);
 #if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
 static void getvar_mtd_size(char *var_parameter, char *response);
 static void getvar_blk_size(char *var_parameter, char *response);
@@ -87,6 +88,9 @@ static const struct {
 	}, {
 		.variable = "current-slot",
 		.dispatch = getvar_current_slot
+	}, {
+		.variable = "is-logical",
+		.dispatch = getvar_is_logical
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 	}, {
 		.variable = "has-slot",
@@ -247,6 +251,25 @@ static void getvar_current_slot(char *var_parameter, char *response)
 	fastboot_okay("a", response);
 }
 
+static void getvar_is_logical(char *var_parameter, char *response)
+{
+	fastboot_okay("no", response);
+}
+
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH) || \
+	CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC) || \
+	CONFIG_IS_ENABLED(FASTBOOT_MULTI_FLASH_OPTION_MMC)
+static bool is_virtual_ec_partition(const char *part_name)
+{
+	if (!part_name)
+		return false;
+
+	return !strcmp(part_name, "ec") ||
+	       !strcmp(part_name, "ec_a") ||
+	       !strcmp(part_name, "ec_b");
+}
+#endif
+
 #if CONFIG_IS_ENABLED(SPACEMIT_FLASH)
 /**
  * @brief Get the mtd size and return, if not mtd dev exists, it would return NULL.
@@ -347,6 +370,10 @@ static void getvar_has_slot(char *part_name, char *response)
 
 	if (!part_name || part_name[0] == '\0')
 		goto fail;
+	if (is_virtual_ec_partition(part_name)) {
+		fastboot_okay("no", response);
+		return;
+	}
 
 	/* part_name_wslot = part_name + "_a" */
 	len = strlcpy(part_name_wslot, part_name, PART_NAME_LEN - 3);
@@ -379,6 +406,11 @@ static void getvar_partition_type(char *part_name, char *response)
 	struct blk_desc *dev_desc;
 	struct disk_partition part_info;
 
+	if (is_virtual_ec_partition(part_name)) {
+		fastboot_okay("raw", response);
+		return;
+	}
+
 	r = fastboot_mmc_get_part_info(part_name, &dev_desc, &part_info,
 				       response);
 	if (r >= 0) {
@@ -396,6 +428,11 @@ static void getvar_partition_size(char *part_name, char *response)
 {
 	int r;
 	size_t size = 0;
+
+	if (is_virtual_ec_partition(part_name)) {
+		fastboot_response("OKAY", response, "0x%016zx", size);
+		return;
+	}
 
 	r = getvar_get_part_info(part_name, response, &size);
 	if (r >= 0)

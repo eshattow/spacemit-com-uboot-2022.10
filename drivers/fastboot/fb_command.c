@@ -21,6 +21,8 @@
 #include <fb_blk.h>
 #include <search.h>
 #include <dm.h>
+#include <malloc.h>
+#include <linux/errno.h>
 
 /**
  * image_size - final fastboot image size
@@ -62,6 +64,14 @@ static int import_downloaded_env(void)
 
 	return -EINVAL;
 }
+
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
+static void oem_ec(char *cmd_parameter, char *response)
+{
+	fastboot_oem_flash_ec(cmd_parameter, fastboot_buf_addr, image_size,
+			      response);
+}
+#endif
 #endif
 
 #if !defined(CONFIG_SPL_BUILD)
@@ -132,6 +142,10 @@ static const struct {
 	[FASTBOOT_COMMAND_ERASE] =  {
 		.command = "erase",
 		.dispatch = erase
+	},
+	[FASTBOOT_COMMAND_OEM_EC] = {
+		.command = "oem ec",
+		.dispatch = oem_ec,
 	},
 #endif
 	[FASTBOOT_COMMAND_BOOT] =  {

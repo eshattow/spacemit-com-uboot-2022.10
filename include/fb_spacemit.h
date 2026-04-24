@@ -228,6 +228,9 @@ enum usb_device_speed spacemit_k3_fastboot_requested_speed(void);
 void spacemit_k3_fastboot_set_superspeed_flag(bool enable);
 #endif
 
+void fastboot_oem_flash_ec(const char *cmd_parameter, void *download_buffer,
+			   u32 download_bytes, char *response);
+
 #ifdef CONFIG_SCSI
 int k3_prepare_scsi_flash_target(u32 devnum);
 #endif
