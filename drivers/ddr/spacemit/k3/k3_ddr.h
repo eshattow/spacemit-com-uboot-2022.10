@@ -133,6 +133,7 @@ typedef enum {
 } ddr_odt_e;
 
 typedef struct {
+	uint8_t ddr_type;
 	uint8_t phy_write_ds;
 	uint8_t phy_rx_odt;
 	uint8_t dq_odt;
@@ -140,6 +141,7 @@ typedef struct {
 	uint8_t nt_odt;
 	uint8_t soc_odt;
 	uint8_t pdds;
+	uint8_t enable_2d_training;
 } ddr_config_t;
 
 typedef struct {
@@ -160,6 +162,8 @@ extern const phy_init_config *lp4x_pre_train_table[];
 extern const phy_init_config *lp4x_4g_train_table[], *lp4x_8g_train_table[], *lp4x_16g_train_table[];
 extern const ddr_phy_reg_config phy_override_seq_lp4x_8g[], phy_override_seq_lp4x_16g[];
 
+extern ddr_phy_reg_config io_override_table[MAX_MODIFIED_IO_PARA_ITEMS];
+
 extern void lpddr_init_prepare(ddr_part_info* part_info, ddr_boot_mode ddr_mode);
 extern int lp5_training_prepare(void);
 extern int lp4x_training_prepare(void);
@@ -178,6 +182,9 @@ extern void init_snps_lp4x_ddrc(unsigned DDRC_BASE, unsigned int ddr_size_mbyte,
 extern void save_snps_ddrc_training_result(uint32_t ddrc_base, ddr_training_info_t* training_info);
 extern void init_snps_ddrc_quick(uint32_t ddrc_base, ddr_part_type type,
 	ddr_training_info_t* training_info);
+
+extern const ddr_config_t* get_ddr_default_io_para(ddr_part_type type);
+extern void build_lpddr4x_io_para(const ddr_config_t* io_para);
 
 extern void load_lp5_quickboot_firmware(uint32_t dphy_base);
 extern void load_lp5_quickboot_dmem(uint32_t dphy_base);

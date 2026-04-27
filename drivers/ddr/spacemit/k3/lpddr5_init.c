@@ -5,13 +5,6 @@
 
 #include "k3_ddr.h"
 
-static const ddr_config_t lp5_ddr_io_para = {
-	// WDS     RX ODT   DQODT CAODT NTODT  SOCODT PDDS
-	PHY_R_30, PHY_R_60, R_60, R_80, R_OFF, R_OFF, R_40
-};
-
-ddr_phy_reg_config io_override_table[MAX_MODIFIED_IO_PARA_ITEMS];
-
 void lpddr_training_table_init(uint32_t ddrc_base, const phy_init_config* train_table[],
 	const ddr_phy_reg_config* override_table, ddr_phy_reg_config* io_table)
 {
@@ -95,10 +88,10 @@ void lpddr_training_table_init(uint32_t ddrc_base, const phy_init_config* train_
 	}
 }
 
-const uint32_t tx_impedance_array[] = { 0x10040, 0x10042, 0x10043, 0x10044, 0x10045 };
-const uint32_t tx_impedance_array1[] = { 0x30040, 0x30041, 0x30042, 0x30043 };
+static const uint32_t tx_impedance_array[] = { 0x10040, 0x10042, 0x10043, 0x10044, 0x10045 };
+static const uint32_t tx_impedance_array1[] = { 0x30040, 0x30041, 0x30042, 0x30043 };
 static int add_soc_phy_write_ds_config(ddr_phy_reg_config* reg_table,
-	uint32_t max_item, uint8_t phy_write_ds)
+	uint32_t max_item, uint32_t phy_write_ds)
 {
 	int i, j, k;
 
@@ -116,9 +109,9 @@ static int add_soc_phy_write_ds_config(ddr_phy_reg_config* reg_table,
 	}
 	return k;
 }
-const uint32_t odt_impedance_array[] = { 0x10048, 0x1004a, 0x1004b, 0x1004c, 0x1004d };
+static const uint32_t odt_impedance_array[] = { 0x10048, 0x1004a, 0x1004b, 0x1004c, 0x1004d };
 static int add_soc_phy_rx_odt_config(ddr_phy_reg_config* reg_table,
-	uint32_t max_item, uint8_t phy_rx_odt)
+	uint32_t max_item, uint32_t phy_rx_odt)
 {
 	int i, j, k;
 	for (i = 0, k = 0; i < 4; i++) {
@@ -132,7 +125,7 @@ static int add_soc_phy_rx_odt_config(ddr_phy_reg_config* reg_table,
 }
 
 static int add_ddr_pdds_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
-	uint8_t pdds)
+	uint32_t pdds)
 {
 	uint16_t value;
 
@@ -150,7 +143,7 @@ static int add_ddr_pdds_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
 }
 
 static int add_ddr_odt_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
-	uint8_t dq_odt, uint8_t ca_odt, uint8_t nt_odt)
+	uint32_t dq_odt, uint32_t ca_odt, uint32_t nt_odt)
 {
 	int enable = nt_odt == R_OFF ? 0 : 1;
 	uint16_t value;
@@ -171,7 +164,7 @@ static int add_ddr_odt_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
 }
 
 static int add_ddr_socodt_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
-	uint8_t soc_odt, bool x8_mode)
+	uint32_t soc_odt, uint32_t x8_mode)
 {
 	uint16_t value;
 
@@ -192,7 +185,7 @@ static int add_ddr_socodt_config(ddr_phy_reg_config* reg_table, uint32_t max_ite
 }
 
 static int add_ddr_ntodt_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
-	uint8_t nt_odt)
+	uint32_t nt_odt)
 {
 	uint16_t value;
 
@@ -209,6 +202,25 @@ static int add_ddr_ntodt_config(ddr_phy_reg_config* reg_table, uint32_t max_item
 	reg_table[1].value = value;
 
 	return 2;
+}
+
+static int add_ddr_2dtraining_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
+	uint32_t enable_2d_training)
+{
+	if (max_item < 1) {
+		pr_err("Must have at least 1 item for ddr 2d training config");
+		return 0;
+	}
+
+	reg_table[0].offset = 0x58067;
+	if (0 != enable_2d_training) {
+		// 0: enable 2D training; 1: disable 2D training
+		reg_table[0].value = 0;
+	} else {
+		reg_table[0].value = 1;
+	}
+
+	return 1;
 }
 
 static void build_lpddr5_io_para(const ddr_config_t* io_para)
@@ -230,6 +242,8 @@ static void build_lpddr5_io_para(const ddr_config_t* io_para)
 		io_para->soc_odt, part_info->x8_mode);
 	i += add_ddr_ntodt_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
 		io_para->nt_odt);
+	i += add_ddr_2dtraining_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->enable_2d_training);
 
 	pr_info("build %d ddr io parameters complete\n", i);
 }
@@ -833,12 +847,13 @@ void lpddr_init_prepare(ddr_part_info* part_info, ddr_boot_mode ddr_mode)
 {
 	// ddr para and training firmware need to be initialized before training
 	if (DDR_TYPE_LPDDR5 == part_info->type) {
-		build_lpddr5_io_para(&lp5_ddr_io_para);
+		build_lpddr5_io_para(get_ddr_default_io_para(DDR_TYPE_LPDDR5));
 		if (DDR_QUICKBOOT_MODE != ddr_mode) {
 			// during first boot, MUST do fully training
 			lp5_training_prepare();
 		}
 	} else if (DDR_TYPE_LPDDR4X == part_info->type) {
+		build_lpddr4x_io_para(get_ddr_default_io_para(DDR_TYPE_LPDDR4X));
 		if (DDR_QUICKBOOT_MODE != ddr_mode) {
 			// during first boot, MUST do fully training
 			lp4x_training_prepare();

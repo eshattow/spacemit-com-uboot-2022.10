@@ -20,7 +20,7 @@ static void phyinit_lp4x_pre_training(unsigned int ddrc_base, unsigned int ddr_s
 		pr_info("Use default pre-training table for DDR(%d MB)\n", ddr_size_mbyte);
 	}
 
-	lpddr_training_table_init(ddrc_base, lp4x_pre_train_table, override_table, NULL);
+	lpddr_training_table_init(ddrc_base, lp4x_pre_train_table, override_table, io_override_table);
 
 	for (offset = 0x582a6; offset < 0x60000; offset++)
 		dphy_reg[offset] = 0x0;
@@ -37,6 +37,124 @@ static void phyinit_lp4x_training(unsigned int ddrc_base, unsigned int ddr_size_
 	} else {
 		pr_err("Unsupported DDR size: %d MB\n", ddr_size_mbyte);
 	}
+}
+
+static const uint32_t tx_impedance_array[] = { 0x10040, 0x10042, 0x10043 };
+static const uint32_t tx_impedance_array1[] = { 0x30040, 0x30041, 0x30042, 0x30043 };
+static int add_soc_phy_write_ds_config(ddr_phy_reg_config* reg_table,
+	uint32_t max_item, uint32_t phy_write_ds)
+{
+	int i, j, k;
+
+	for (i = 0, k = 0; i < 4; i++) {
+		for (j = 0; (j < ARRAY_SIZE(tx_impedance_array)) && (k < max_item); j++, k++) {
+			reg_table[k].offset = tx_impedance_array[j] + i * 0x1000;
+			reg_table[k].value = phy_write_ds + (phy_write_ds << 8);
+		}
+	}
+	for (i = 0; i < 2; i++) {
+		for (j = 0; (j < ARRAY_SIZE(tx_impedance_array1)) && (k < max_item); j++, k++) {
+			reg_table[k].offset = tx_impedance_array1[j] + i * 0x1000;
+			reg_table[k].value = phy_write_ds + (phy_write_ds << 8);
+		}
+	}
+	return k;
+}
+
+static const uint32_t odt_impedance_array[] = { 0x10048, 0x1004a, 0x1004b };
+static int add_soc_phy_rx_odt_config(ddr_phy_reg_config* reg_table,
+	uint32_t max_item, uint32_t phy_rx_odt)
+{
+	int i, j, k;
+	for (i = 0, k = 0; i < 4; i++) {
+		for (j = 0; (j < ARRAY_SIZE(odt_impedance_array)) && (k < max_item); j++, k++) {
+			reg_table[k].offset = odt_impedance_array[j] + i * 0x1000;
+			reg_table[k].value = phy_rx_odt << 8;
+		}
+	}
+
+	return k;
+}
+
+static int add_ddr_tx_odt_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
+	uint32_t dq_odt, uint32_t ca_odt, uint32_t soc_odt, uint32_t pdds, uint32_t x8_mode)
+{
+	if (max_item < 12) {
+		pr_err("Must have at least 12 items for ddr tx odt config");
+		return 0;
+	}
+
+	dq_odt &= 0x07;
+	ca_odt &= 0x07;
+	soc_odt &= 0x07;
+	pdds &= 0x07;
+
+	reg_table[0].offset = 0x5801a;
+	reg_table[0].value = (0x83 ^ (x8_mode << 7)) | (pdds << 3);
+	reg_table[1].offset = 0x5801b;
+	reg_table[1].value = 0x1100 | (ca_odt << 4) | dq_odt;
+	reg_table[2].offset = 0x5801e;
+	reg_table[2].value = (x8_mode << 7) | 0x28 | soc_odt;
+	reg_table[3].offset = 0x58020;
+	reg_table[3].value = (0x83 ^ (x8_mode << 7)) | (pdds << 3);
+	reg_table[4].offset = 0x58021;
+	reg_table[4].value = 0x1100 | (ca_odt << 4) | dq_odt;
+	reg_table[5].offset = 0x58024;
+	reg_table[5].value = (x8_mode << 7) | soc_odt;
+	reg_table[6].offset = 0x58033;
+	reg_table[6].value = (0x833f ^ (x8_mode << 15)) | (pdds << 11);
+	reg_table[7].offset = 0x58034;
+	reg_table[7].value = (ca_odt << 12) | (dq_odt << 8);
+	reg_table[8].offset = 0x58037;
+	reg_table[8].value = ((x8_mode << 7) | 0x28 | soc_odt) << 8;
+	reg_table[9].offset = 0x58039;
+	reg_table[9].value = (0x833f ^ (x8_mode << 15)) | (pdds << 11);
+	reg_table[10].offset = 0x5803a;
+	reg_table[10].value = (ca_odt << 12) | (dq_odt << 8);
+	reg_table[11].offset = 0x5803d;
+	reg_table[11].value = ((x8_mode << 7) | soc_odt) << 8;
+
+	return 12;
+}
+
+static int add_ddr_2dtraining_config(ddr_phy_reg_config* reg_table, uint32_t max_item,
+	uint32_t enable_2d_training)
+{
+	if (max_item < 1) {
+		pr_err("Must have at least 1 item for ddr 2d training config");
+		return 0;
+	}
+
+	reg_table[0].offset = 0x58049;
+	// 0: enable 2D training; 1: disable 2D training
+	if (0 != enable_2d_training) {
+		// lower byte set LP4X mode, higher byte set 2D training mode
+		reg_table[0].value = 0x1;
+	} else {
+		reg_table[0].value = 0x101;
+	}
+
+	return 1;
+}
+
+void build_lpddr4x_io_para(const ddr_config_t* io_para)
+{
+	int i = 0;
+
+	memset(io_override_table, 0, sizeof(io_override_table));
+
+	// MUST NOT change function sequence below
+	i += add_soc_phy_write_ds_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->phy_write_ds);
+	i += add_soc_phy_rx_odt_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->phy_rx_odt);
+	i += add_ddr_tx_odt_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->dq_odt, io_para->ca_odt, io_para->soc_odt,
+		io_para->pdds, part_info->x8_mode);
+	i += add_ddr_2dtraining_config(&io_override_table[i], MAX_MODIFIED_IO_PARA_ITEMS - i,
+		io_para->enable_2d_training);
+
+	pr_info("build %d ddr io parameters complete\n", i);
 }
 
 void init_snps_lp4x_ddrc(unsigned DDRC_BASE, unsigned int ddr_size_mbyte,

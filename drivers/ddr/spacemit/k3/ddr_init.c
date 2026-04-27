@@ -18,6 +18,26 @@
 // place part_info in .data section to avoid it being cleared during bss clear
 __section(".data") ddr_part_info* part_info;
 
+static const ddr_config_t ddr_default_io_para[] = {
+	// type,              WDS     RX ODT   DQODT CAODT NTODT  SOCODT PDDS  2DTraining
+	{ DDR_TYPE_LPDDR5, PHY_R_30, PHY_R_60, R_60, R_80, R_OFF, R_OFF, R_40, 1 },
+	{ DDR_TYPE_LPDDR4X, PHY_R_40, PHY_R_40, R_60, R_40, R_OFF, R_40, R_40, 1 }
+};
+
+ddr_phy_reg_config io_override_table[MAX_MODIFIED_IO_PARA_ITEMS];
+
+const ddr_config_t* get_ddr_default_io_para(ddr_part_type type)
+{
+	for (int i = 0; i < ARRAY_SIZE(ddr_default_io_para); i++) {
+		if (ddr_default_io_para[i].ddr_type == type) {
+			return &ddr_default_io_para[i];
+		}
+	}
+
+	pr_err("NOT supported DDR type %d, using LPDDR5 as default\n", type);
+	return &ddr_default_io_para[0];
+}
+
 static int test_pattern(fdt_addr_t base, fdt_size_t size)
 {
 	fdt_addr_t addr;
