@@ -855,6 +855,153 @@ int cros_ec_flash_erase(struct udevice *dev, uint32_t offset, uint32_t size)
 			NULL, 0);
 }
 
+struct cros_ec_flash_write_cfg {
+	int write_version;
+	uint32_t write_block_size;
+	uint32_t write_ideal_size;
+	uint32_t max_data_size;
+};
+
+static int cros_ec_get_cmd_versions(struct udevice *dev, uint16_t cmd,
+				    uint32_t *version_mask)
+{
+	struct ec_params_get_cmd_versions p;
+	struct ec_response_get_cmd_versions r;
+	int ret;
+
+	p.cmd = cmd;
+	ret = ec_command(dev, EC_CMD_GET_CMD_VERSIONS, 0, &p, sizeof(p),
+			 &r, sizeof(r));
+	if (ret < 0)
+		return ret;
+	if (ret < sizeof(r))
+		return -EC_RES_INVALID_RESPONSE;
+
+	*version_mask = r.version_mask;
+	return 0;
+}
+
+static bool cros_ec_cmd_version_supported(struct udevice *dev, uint16_t cmd,
+					  int version)
+{
+	uint32_t version_mask;
+
+	if (version < 0 || version >= 32)
+		return false;
+	if (cros_ec_get_cmd_versions(dev, cmd, &version_mask))
+		return false;
+
+	return !!(version_mask & BIT(version));
+}
+
+static uint32_t cros_ec_get_max_request_param_size(struct udevice *dev)
+{
+	struct ec_response_get_protocol_info info;
+	int ret;
+
+	ret = ec_command(dev, EC_CMD_GET_PROTOCOL_INFO, 0, NULL, 0, &info,
+			 sizeof(info));
+	if (ret < (int)sizeof(info))
+		return EC_PROTO2_MAX_PARAM_SIZE;
+	if (!(info.protocol_versions & BIT(3)))
+		return EC_PROTO2_MAX_PARAM_SIZE;
+	if (info.max_request_packet_size <= sizeof(struct ec_host_request))
+		return EC_PROTO2_MAX_PARAM_SIZE;
+
+	return min_t(uint32_t,
+		     info.max_request_packet_size - sizeof(struct ec_host_request),
+		     EC_PROTO2_MAX_PARAM_SIZE);
+}
+
+static int cros_ec_get_flash_write_cfg(struct udevice *dev,
+				       struct cros_ec_flash_write_cfg *cfg)
+{
+	struct ec_response_flash_info info_v0;
+	struct ec_response_flash_info_1 info_v1;
+	struct {
+		struct ec_response_flash_info_2 info;
+		struct ec_flash_bank banks[1];
+	} info_v2;
+	struct ec_params_flash_info_2 info_params = {
+		.num_banks_desc = 1,
+	};
+	int ret;
+
+	memset(cfg, 0, sizeof(*cfg));
+
+	cfg->write_version = cros_ec_cmd_version_supported(dev, EC_CMD_FLASH_WRITE,
+							    EC_VER_FLASH_WRITE) ?
+				     EC_VER_FLASH_WRITE : 0;
+	if (cfg->write_version == EC_VER_FLASH_WRITE) {
+		cfg->max_data_size = cros_ec_get_max_request_param_size(dev);
+		if (cfg->max_data_size <= sizeof(struct ec_params_flash_write))
+			return -EINVAL;
+		cfg->max_data_size -= sizeof(struct ec_params_flash_write);
+	} else {
+		cfg->max_data_size = EC_FLASH_WRITE_VER0_SIZE;
+	}
+
+	if (cros_ec_cmd_version_supported(dev, EC_CMD_FLASH_INFO, 2)) {
+		ret = ec_command(dev, EC_CMD_FLASH_INFO, 2, &info_params,
+				 sizeof(info_params), &info_v2, sizeof(info_v2));
+		if (ret >= (int)sizeof(info_v2.info)) {
+			cfg->write_ideal_size = info_v2.info.write_ideal_size;
+			if (info_v2.info.num_banks_desc > 0 &&
+			    ret >= (int)sizeof(info_v2) &&
+			    info_v2.banks[0].write_size_exp < 32)
+				cfg->write_block_size =
+					1U << info_v2.banks[0].write_size_exp;
+		}
+	}
+
+	if (!cfg->write_block_size &&
+	    cros_ec_cmd_version_supported(dev, EC_CMD_FLASH_INFO, 1)) {
+		ret = ec_command(dev, EC_CMD_FLASH_INFO, 1, NULL, 0, &info_v1,
+				 sizeof(info_v1));
+		if (ret < 0)
+			return ret;
+		if (ret < sizeof(info_v1))
+			return -EC_RES_INVALID_RESPONSE;
+
+		cfg->write_block_size = info_v1.write_block_size;
+		if (!cfg->write_ideal_size)
+			cfg->write_ideal_size = info_v1.write_ideal_size;
+	}
+
+	if (!cfg->write_block_size) {
+		ret = ec_command(dev, EC_CMD_FLASH_INFO, 0, NULL, 0, &info_v0,
+				 sizeof(info_v0));
+		if (ret < 0)
+			return ret;
+		if (ret < sizeof(info_v0))
+			return -EC_RES_INVALID_RESPONSE;
+
+		cfg->write_block_size = info_v0.write_block_size;
+	}
+
+	return 0;
+}
+
+static uint32_t cros_ec_flash_write_step(const struct cros_ec_flash_write_cfg *cfg)
+{
+	uint32_t step;
+
+	if (!cfg->write_block_size || cfg->max_data_size < cfg->write_block_size)
+		return 0;
+
+	step = cfg->max_data_size - (cfg->max_data_size % cfg->write_block_size);
+	if (cfg->write_ideal_size) {
+		uint32_t ideal;
+
+		ideal = cfg->write_ideal_size -
+			(cfg->write_ideal_size % cfg->write_block_size);
+		if (ideal >= cfg->write_block_size)
+			step = min(step, ideal);
+	}
+
+	return step;
+}
+
 /**
  * Write a single block to the flash
  *
@@ -869,12 +1016,14 @@ int cros_ec_flash_erase(struct udevice *dev, uint32_t offset, uint32_t size)
  *
  * @param dev		CROS-EC device
  * @param data		Pointer to data buffer to write
+ * @param cmd_version	Command version to use
  * @param offset	Offset within flash to write to.
  * @param size		Number of bytes to write
  * Return: 0 if ok, -1 on error
  */
 static int cros_ec_flash_write_block(struct udevice *dev, const uint8_t *data,
-				     uint32_t offset, uint32_t size)
+				     int cmd_version, uint32_t offset,
+				     uint32_t size)
 {
 	struct ec_params_flash_write *p;
 	int ret;
@@ -885,10 +1034,10 @@ static int cros_ec_flash_write_block(struct udevice *dev, const uint8_t *data,
 
 	p->offset = offset;
 	p->size = size;
-	assert(data && p->size <= EC_FLASH_WRITE_VER0_SIZE);
+	assert(data);
 	memcpy(p + 1, data, p->size);
 
-	ret = ec_command_inptr(dev, EC_CMD_FLASH_WRITE, 0,
+	ret = ec_command_inptr(dev, EC_CMD_FLASH_WRITE, cmd_version,
 			  p, sizeof(*p) + size, NULL, 0) >= 0 ? 0 : -1;
 
 	free(p);
@@ -901,7 +1050,12 @@ static int cros_ec_flash_write_block(struct udevice *dev, const uint8_t *data,
  */
 static int cros_ec_flash_write_burst_size(struct udevice *dev)
 {
-	return EC_FLASH_WRITE_VER0_SIZE;
+	struct cros_ec_flash_write_cfg cfg;
+
+	if (cros_ec_get_flash_write_cfg(dev, &cfg))
+		return EC_FLASH_WRITE_VER0_SIZE;
+
+	return cros_ec_flash_write_step(&cfg);
 }
 
 /**
@@ -950,10 +1104,19 @@ int cros_ec_flash_write(struct udevice *dev, const uint8_t *data,
 			uint32_t offset, uint32_t size)
 {
 	struct cros_ec_dev *cdev = dev_get_uclass_priv(dev);
-	uint32_t burst = cros_ec_flash_write_burst_size(dev);
+	struct cros_ec_flash_write_cfg cfg;
+	uint32_t burst;
 	uint32_t end, off;
 	int ret;
 
+	ret = cros_ec_get_flash_write_cfg(dev, &cfg);
+	if (ret) {
+		memset(&cfg, 0, sizeof(cfg));
+		cfg.write_block_size = EC_FLASH_WRITE_VER0_SIZE;
+		cfg.max_data_size = EC_FLASH_WRITE_VER0_SIZE;
+	}
+
+	burst = cros_ec_flash_write_step(&cfg);
 	if (!burst)
 		return -EINVAL;
 
@@ -968,10 +1131,12 @@ int cros_ec_flash_write(struct udevice *dev, const uint8_t *data,
 		/* If the data is empty, there is no point in programming it */
 		todo = min(end - off, burst);
 		if (cdev->optimise_flash_write &&
+		    !(todo & 3) &&
 		    cros_ec_data_is_erased((uint32_t *)data, todo))
 			continue;
 
-		ret = cros_ec_flash_write_block(dev, data, off, todo);
+		ret = cros_ec_flash_write_block(dev, data, cfg.write_version,
+						off, todo);
 		if (ret)
 			return ret;
 	}

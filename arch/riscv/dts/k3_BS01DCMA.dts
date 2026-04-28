@@ -7,10 +7,9 @@
 
 #include "k3.dtsi"
 #include "k3-pinctrl.dtsi"
-#include <dt-bindings/usb/pd.h>
 
 / {
-	model = "spacemit k3 com260 kit v02 board";
+	model = "spacemit k3 bs01dcma board";
 };
 
 &cpus {
@@ -41,43 +40,8 @@
 	cluster3_frequency = <1800000000>;
 };
 
-&pinctrl {
-	gmac1_grp {
-		power-source = <1800>;
-	};
-};
-
 &uart0 {
 	status = "okay";
-};
-
-&i2c0 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c0_0>;
-	status = "okay";
-
-	tcpc@25 {
-		compatible = "fcs,fusb301";
-		reg = <0x25>;
-
-		connector {
-			compatible = "usb-c-connector";
-			label = "USB-C";
-			power-role = "dual";
-			data-role = "dual";
-			try-power-role = "sink";
-			source-pdos = <PDO_FIXED(5000, 2500, PDO_FIXED_USB_COMM)>;
-			sink-pdos = <PDO_FIXED(5000, 1400, PDO_FIXED_USB_COMM)>;
-			op-sink-microwatt = <15000000>;
-			self-powered;
-
-			port {
-				fusb301_sw_ep: endpoint {
-					remote-endpoint = <&typec_orient_sw>;
-				};
-			};
-		};
-	};
 };
 
 &i2c2 {
@@ -94,89 +58,8 @@
 	};
 };
 
-&sdhci0 {
-	pinctrl-names = "default","fast";
-	pinctrl-0 = <&pinctrl_mmc1>;
-	pinctrl-1 = <&pinctrl_mmc1_fast>;
-	bus-width = <4>;
-	cd-gpios = <&gpio 04 0>;
-	//vmmc-supply = <&dcdc_9>;
-	vqmmc-supply = <&ldo_1>;
-	clock-frequency = <204800000>;
-	spacemit,tx_delaycode = <0x1f>;
-	sdh-phy-module = <0>;
-	status = "okay";
-};
-
-&usb3_porta_u2phy {
-	status = "okay";
-};
-
-&usb3_porta_u3phy {
-	status = "okay";
-	orientation-switch;
-	port {
-		typec_orient_sw: endpoint {
-			remote-endpoint = <&fusb301_sw_ep>;
-		};
-	};
-};
-
-&usb3_porta {
-	status = "okay";
-	dwc3@cad00000 {
-		dr_mode = "peripheral";
-	};
-};
-
-&usb3_portb_u2phy {
-	status = "okay";
-};
-
-&usb3_portb_u3phy {
-	status = "okay";
-};
-
-&usb3_portb {
-	status = "okay";
-};
-
-&ufs {
-	status = "okay";
-};
-
-&eth1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_gmac1>;
-
-	phy-reset-pin = <37>;
-	max-speed = <1000>;
-	clk_tuning_enable;
-	clk-tuning-by-delayline;
-
-	tx-phase = <47>;
-	rx-phase = <53>;
-
-	phy-mode = "rgmii";
-	phy-handle = <&rgmii1>;
-
-	status = "okay";
-
-	mdio {
-		#address-cells = <0x1>;
-		#size-cells = <0x0>;
-		rgmii1: phy@1 {
-			compatible = "ethernet-phy-ieee802.3-c22";
-			device_type = "ethernet-phy";
-			reg = <0x1>;
-		};
-	};
-};
-
 &qspi {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_qspi>;
 
 	flash@0 {
 		compatible = "jedec,spi-nor";
@@ -188,47 +71,19 @@
 	};
 };
 
-&pinctrl {
-	pinctrl-single,gpio-range = <
-		&range GPIO_04  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_DS4)
-		&range GPIO_53  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_DS4)
-	>;
-
-	pcie0_1_grp {
-		pinctrl-single,pins =<
-			K3_PADCONF(GPIO_79, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeA_perstn */
-			K3_PADCONF(GPIO_80, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeA_waken */
-			K3_PADCONF(GPIO_81, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeA_clkreqn */
-		>;
-	};
-
-	pcie3_0_grp {
-		pinctrl-single,pins =<
-			K3_PADCONF(GPIO_03, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeD_perstn */
-			K3_PADCONF(GPIO_05, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeD_clkreqn */
-		>;
-	};
-
-	pcie4_1_grp {
-		pinctrl-single,pins =<
-			K3_PADCONF(GPIO_76, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeE_perstn */
-			K3_PADCONF(GPIO_78, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS15)) /* PCIeE_clkreqn */
-		>;
-	};
-};
-
-&gpio{
-	gpio-ranges = <
-		&pinctrl 04 GPIO_04 1
-		&pinctrl 53 GPIO_53 1
-	>;
-};
-
 &pcie_phy0 {
 	status = "okay";
 };
 
 &pcie_phy1 {
+	status = "okay";
+};
+
+&pcie_phy2 {
+	status = "okay";
+};
+
+&pcie_phy3 {
 	status = "okay";
 };
 
@@ -240,21 +95,26 @@
 	status = "okay";
 };
 
-&pcie0_rc {
+&pcie0_rc{
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pcie0_1>;
+	phys = <&pcie_phy0>, <&pcie_phy1>;
+	phy-names = "pcie-phy0", "pcie_phy1";
 
 	num-lanes = <4>;
-	phys = <&pcie_phy0>, <&pcie_phy1>;
+	status = "okay";
+};
+
+&pcie2_rc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie2_1>;
+	phys = <&pcie_phy2>, <&pcie_phy3>;
 	phy-names = "pcie-phy0", "pcie-phy1";
 
 	status = "okay";
 };
 
 &pcie3_rc {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pcie3_0>;
-
 	phys = <&pcie_phy4>;
 	phy-names = "pcie-phy0";
 
@@ -264,22 +124,26 @@
 &pcie4_rc {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pcie4_1>;
-
 	phys = <&pcie_phy5>;
 	phy-names = "pcie-phy0";
 
 	status = "okay";
 };
 
-&i2c6 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c6_0>;
+&usb3_porta_u2phy {
 	status = "okay";
+};
 
-	ctf2301: ctf2301@4c {
-		compatible = "sensylink,ctf2301";
-		reg = <0x4c>;
-		#cooling-cells = <2>;
+&usb3_porta_u3phy {
+	status = "okay";
+};
+
+&usb3_porta {
+	status = "okay";
+	u-boot,dm-spl;
+	dwc3@cad00000 {
+		dr_mode = "peripheral";
+		maximum-speed = "high-speed";
 	};
 };
 
@@ -354,7 +218,7 @@
 				regulator-name = "ldo1";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <3300000>;
-				/* regulator-init-microvolt = <3300000>; */
+				regulator-init-microvolt = <3300000>;
 				regulator-always-on;
 				regulator-boot-on;
 				u-boot,dm-spl;
@@ -411,6 +275,7 @@
 				regulator-name = "ldo8";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <1800000>;
+				regulator-always-on;
 				regulator-boot-on;
 			};
 
@@ -476,21 +341,37 @@
 		};
 	};
 
-	mpq8655: mpq8655@30 {
-		compatible = "spacemit,mpq8655";
-		reg = <0x30>;
+	au4562: au4562@75 {
+		compatible = "spacemit,au4562";
+		reg = <0x75>;
 		bus = <8>;
 		u-boot,dm-spl;
 
 		regulators {
-			edcdc_1: EDCDC_REG1 {
-				regulator-name = "edcdc1";
-				regulator-min-microvolt = <600000>;
+			u-boot,dm-spl;
+
+			au4562_adcdc_1: ADCDC_REG1 {
+				regulator-name = "adcdc1";
+				regulator-min-microvolt = <540000>;
 				regulator-max-microvolt = <1000000>;
-				regulator-init-microvolt = <880000>;
-				regulator-always-on;
+				regulator-init-microvolt = <950000>;
 				regulator-boot-on;
 				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
+			};
+
+			au4562_adcdc_2: ADCDC_REG2 {
+				regulator-name = "adcdc2";
+				regulator-min-microvolt = <540000>;
+				regulator-max-microvolt = <1000000>;
+				regulator-init-microvolt = <950000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
 			};
 		};
 	};

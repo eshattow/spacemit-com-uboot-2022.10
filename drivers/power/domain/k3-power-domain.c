@@ -13,6 +13,7 @@
 #define APMU_REGMAP_INDEX       0
 
 #define APMU_POWER_STATUS_REG   0xf0
+#define PMUA_PWR_BLK_TMR_REG	(0xd42828dc)
 
 enum pm_domain_id {
 	K3_PMU_VPU_PWR_DOMAIN,
@@ -270,6 +271,10 @@ static int spacemit_power_domain_probe(struct udevice *dev)
 		printf("%s:%d, error\n", __func__, __LINE__);
 		return ret;
 	}
+
+	/* set GPU/VPU/AUDIO power-on/off time */
+	/* power-on time <= 2.73ms */
+	writel(0xffffffff, (unsigned int *)PMUA_PWR_BLK_TMR_REG);
 
 	return 0;
 }
