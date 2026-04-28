@@ -242,7 +242,7 @@ static int spacemit_display_init(struct udevice *dev, ulong fbbase, ofnode ep_no
 
 		ret = display_enable(disp, 1 << VIDEO_BPP32, &timing);
 		if (ret) {
-			pr_info("%s: Failed to read timings\n", __func__);
+			pr_info("%s: Failed to enable display\n", __func__);
 			return ret;
 		}
 

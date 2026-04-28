@@ -234,6 +234,10 @@ static int dp_enable(struct udevice *dev, int panel_bpp,
 		priv->dp_dev.link.max_rate = SOC_DP_LINK_RATE_5_40;
 		priv->dp_dev.link.max_num_lanes = SOC_DP_LANE_2;
 		priv->dp_dev.link.enhanced_framing = 1;
+	} else {
+		// DVI, HDMI HUB or DP++
+		if (priv->dp_dev.dpcd[0x05] & 0x1)
+			return -1;
 	}
 
 	set_rate = clk_round_rate(&priv->pxclk, edid->pixelclock.typ);
