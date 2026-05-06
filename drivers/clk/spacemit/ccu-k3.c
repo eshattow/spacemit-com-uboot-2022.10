@@ -1646,7 +1646,7 @@ static const char * const qspi_parent_names[] = {
 	"pll1_d6_409p6", "pll2_d8", "pll1_d8_307p2", "pll1_d10_245p76",
 	"clk_dummy", "pll1_dx", "pll1_d5_491p52", "clk_dummy"
 };
-static SPACEMIT_CCU_DIV_MFC_MUX_GATE(qspi_clk, "qspi_clk", qspi_parent_names,
+static SPACEMIT_CCU_DIV_FC_MUX_GATE(qspi_clk, "qspi_clk", qspi_parent_names,
 	BASE_TYPE_APMU, APMU_QSPI_CLK_RES_CTRL,
 	9, 3, BIT(12),
 	6, 3, BIT(4), BIT(4), 0x0,
