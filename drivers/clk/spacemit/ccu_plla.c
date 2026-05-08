@@ -181,6 +181,9 @@ static ulong ccu_plla_set_rate(struct clk *clk, ulong rate)
 	bool found = false;
 	bool pll_enabled = false;
 
+	if (clk_get_rate(clk) == rate)
+		return 0;
+
 	if (ccu_plla_is_enabled(clk)) {
 		pll_enabled = true;
 		ccu_plla_disable(clk);
