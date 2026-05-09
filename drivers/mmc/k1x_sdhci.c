@@ -49,6 +49,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SPACEMIT_SDHC_DLINE_CFG_REG	0x134
 #define  SDHC_RX_DLINE_REG		GENMASK(7, 0)
 #define  SDHC_RX_DLINE_GAIN		BIT(8)
+#define  SDHC_SDR50_DLINE_GAIN_EN	BIT(6)
 #define  SDHC_TX_DLINE_REG		GENMASK(23, 16)
 
 #define SPACEMIT_SDHC_PHY_CTRL_REG	0x160
@@ -354,14 +355,13 @@ static void spacemit_sdhci_set_control_reg(struct sdhci_host *host)
 	}
 
 	sdhci_set_uhs_timing(host);
-	return;
 }
 
 static int spacemit_sdhci_set_ios_post(struct sdhci_host *host)
 {
 #if CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
 	if (host->mmc->selected_mode == MMC_HS_400)
-		spacemit_sdhci_post_select_hs400(host);
+		return spacemit_sdhci_post_select_hs400(host);
 #endif
 
 	return 0;
@@ -374,7 +374,7 @@ static void spacemit_sw_rx_tuning_prepare(struct sdhci_host *host, u8 dline_reg)
 	u32 reg;
 
 	reg = sdhci_readl(host, SPACEMIT_SDHC_DLINE_CFG_REG);
-	if ((mmc->selected_mode == UHS_SDR50) && (reg & 0x40))
+	if ((mmc->selected_mode == UHS_SDR50) && (reg & SDHC_SDR50_DLINE_GAIN_EN))
 		spacemit_sdhci_clrsetbits(host, SDHC_RX_DLINE_REG |
 					SDHC_RX_DLINE_GAIN,
 					FIELD_PREP(SDHC_RX_DLINE_REG, dline_reg) |
@@ -409,7 +409,7 @@ static void spacemit_sw_tx_tuning_prepare(struct sdhci_host *host)
 	struct rx_tuning *rxtuning = &priv->rxtuning;
 
 	/* set TX_DLINE_REG */
-	spacemit_sdhci_clrsetbits(host, SDHC_RX_DLINE_GAIN,
+	spacemit_sdhci_clrsetbits(host, SDHC_TX_DLINE_REG,
 				  FIELD_PREP(SDHC_TX_DLINE_REG, rxtuning->tx_dline_reg),
 				  SPACEMIT_SDHC_DLINE_CFG_REG);
 	/* set TX_DLINE_CODE */
@@ -427,7 +427,7 @@ static int spacemit_sw_rx_select_window(struct sdhci_host *host, u32 opcode)
 	struct spacemit_sdhci_priv *priv = dev_get_priv(mmc->dev);
 	struct rx_tuning *rxtuning = &priv->rxtuning;
 	struct tuning_window *window = &rxtuning->windows;
-	int min, max, start, ret;
+	int min = 0, max = 0, start, ret;
 	int cur_windows = 0;
 	int max_windows = 0;
 
@@ -537,8 +537,10 @@ static int spacemit_sdhci_phy_dll_init(struct sdhci_host *host)
 
 	ret = readl_poll_timeout(host->ioaddr + SPACEMIT_SDHC_PHY_DLLSTS, state,
 				 state & SDHC_DLL_LOCK_STATE, 100);
-	if (ret == -ETIMEDOUT)
-		dev_warn(mmc_dev(host->mmc), "fail to lock phy dll in 100us!\n");
+	if (ret == -ETIMEDOUT) {
+		dev_err(mmc_dev(host->mmc), "fail to lock phy dll in 100us!\n");
+		return ret;
+	}
 
 	return 0;
 }
@@ -719,9 +721,6 @@ static int spacemit_sdhci_of_to_plat(struct udevice *dev)
 	priv->rxtuning.tx_delaycode = dev_read_u32_default(dev, "spacemit,tx_delaycode", TX_TUNING_DELAYCODE);
 
 	ret = mmc_of_parse(dev, &plat->cfg);
-	if (ret)
-		return ret;
-
 	return ret;
 }
 
