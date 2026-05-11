@@ -16,7 +16,7 @@
 #define DDR_CHECK_CNT			(0x1000)
 
 // place part_info in .data section to avoid it being cleared during bss clear
-__section(".data") ddr_part_info* part_info;
+__section(".data") static ddr_part_info* part_info;
 
 static const ddr_config_t ddr_default_io_para[] = {
 	// type,              WDS     RX ODT   DQODT CAODT NTODT  SOCODT PDDS  2DTraining

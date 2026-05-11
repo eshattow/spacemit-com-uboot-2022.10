@@ -223,7 +223,7 @@ static int add_ddr_2dtraining_config(ddr_phy_reg_config* reg_table, uint32_t max
 	return 1;
 }
 
-static void build_lpddr5_io_para(const ddr_config_t* io_para)
+static void build_lpddr5_io_para(const ddr_config_t* io_para, ddr_part_info* part_info)
 {
 	int i = 0;
 
@@ -248,16 +248,18 @@ static void build_lpddr5_io_para(const ddr_config_t* io_para)
 	pr_info("build %d ddr io parameters complete\n", i);
 }
 
-static void phyinit_lp5_pre_training(uint32_t ddrc_base, uint32_t ddr_size_mbyte)
+static void phyinit_lp5_pre_training(uint32_t ddrc_base, ddr_part_info* part_info)
 {
 	uint32_t offset = 0;
 	unsigned long DPHY_BASE = ddrc_base + 0x800000;
 	volatile uint32_t* dphy_reg = (volatile uint32_t*)(size_t)DPHY_BASE;
 	const ddr_phy_reg_config* override_table;
 
-	if (4096 == ddr_size_mbyte) {
+	if (1 == part_info->ranks && 0 == part_info->x8_mode) {
+		// single rank, x16 DDR
 		override_table = phy_override_pre_seq_lp5_4g;
-	} else if (16384 == ddr_size_mbyte) {
+	} else if (part_info->ranks > 1 && 0 != part_info->x8_mode) {
+		// dual rank, x8 DDR
 		override_table = phy_override_pre_seq_lp5_16g;
 	} else {
 		override_table = NULL;
@@ -270,14 +272,16 @@ static void phyinit_lp5_pre_training(uint32_t ddrc_base, uint32_t ddr_size_mbyte
 		dphy_reg[offset] = 0x0;
 }
 
-static void phyinit_lp5_training(uint32_t ddrc_base, uint32_t ddr_size_mbyte)
+static void phyinit_lp5_training(uint32_t ddrc_base, ddr_part_info* part_info)
 {
 	const ddr_phy_reg_config* override_table;
 
-	if (4096 == ddr_size_mbyte) {
+	if (1 == part_info->ranks && 0 == part_info->x8_mode) {
+		// single rank, x16 DDR
 		lpddr_training_table_init(ddrc_base, lp5_4g_train_table, NULL, NULL);
 	} else {
-		if (16384 == ddr_size_mbyte) {
+		if (part_info->ranks > 1 && 0 != part_info->x8_mode) {
+			// dual rank, x8 DDR
 			override_table = phy_override_seq_lp5_16g;
 		} else {
 			override_table = NULL;
@@ -385,7 +389,136 @@ uint32_t major_message_all(uint32_t dphy_base)
 	return 0;
 }
 
-void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
+void config_lp5_addrmap(volatile uint32_t* ddrc_reg, ddr_part_info* part_info)
+{
+	uint32_t ba0_pos, ba1_pos, ba0_field, ba1_field, i, j, msb, ba_msb, region_blks;
+	// field value of col0~col9, row0~row17
+	uint8_t col_field[10], row_field[18];
+	uint32_t addrmap3, addrmap5, addrmap6;
+	uint32_t addrmap7, addrmap8, addrmap9, addrmap10, addrmap11;
+
+	memset(col_field, 0, sizeof(col_field));
+	memset(row_field, 0x1F, sizeof(row_field));
+
+	// convert MByte to Byte
+	msb = fls(part_info->size_mb) - 1 + 20;
+	ba_msb = msb;
+	pr_info("MSB: %d\n", msb);
+	if (part_info->ranks > 1) {
+		// MSB is reserved for CS bit
+		ba_msb--;
+	}
+
+	// address bit position
+	ba0_pos = 9;
+	ba1_pos = 16;
+
+	pr_info("Configuring LPDDR5 address map with BA0 position: %d, BA1 position: %d\n",
+		ba0_pos, ba1_pos);
+
+	// addrmap_bank_b0 Internal Base=3, addrmap_bank_b1 Internal Base=4
+	// field_value = HIF_bit - Internal_Base
+	// ba0 base=3, HIF=ba0_pos - 3, field=HIF-3
+	ba0_field = ba0_pos - 3 - 3;
+	// ba1 base=4, HIF=ba1_pos - 3, field=HIF-4
+	ba1_field = ba1_pos - 3 - 4;
+
+	// BA0/BA1/COLUMN4~9 use bit position BIT9~BIT16
+	// addrmap_col_bN Internal Base=N
+	for (i = 9, j = 4; (i <= ba_msb) && (j < ARRAY_SIZE(col_field)); i++) {
+		if (i == ba0_pos || i == ba1_pos || i == 8) {
+			continue;
+		}
+
+		col_field[j] = i - j - 3;
+		j++;
+	}
+
+	// BA0/BA1/ROW0~17
+	// addrmap_row_bN Internal Base=N+6
+	for (j = 0; (i <= ba_msb) && (j < ARRAY_SIZE(row_field)); i++) {
+		if (i == ba0_pos || i == ba1_pos) {
+			continue;
+		}
+
+		row_field[j] = i - j - 6 - 3;
+		j++;
+	}
+
+	// ADDRMAP3: [13:8]=addrmap_ba_b1, [5:0]=addrmap_ba_b0, ba2 is unused
+	addrmap3 = (0x3F << 16) | (ba1_field << 8) | ba0_field;
+	// ADDRMAP5: [28:24]=col10(unused=0x1f), [20:16]=col9, [12:8]=col8, [4:0]=col7
+	addrmap5 = (0x1f << 24) | ((uint32_t)col_field[9] << 16)
+		| ((uint32_t)col_field[8] << 8) | ((uint32_t)col_field[7] << 0);
+	// ADDRMAP6: [27:24]=col6, [19:16]=col5, [11:8]=col4, [3:0]=col3(fixed 0)
+	addrmap6 = ((uint32_t)col_field[6] << 24) | ((uint32_t)col_field[5] << 16)
+		| ((uint32_t)col_field[4] << 8) | 0;
+	// ADDRMAP7: [27:24]=row17, [20:16]=row16, [12:8]=row15, [4:0]=row14
+	addrmap7 = ((uint32_t)row_field[17] << 24) | ((uint32_t)row_field[16] << 16)
+		| ((uint32_t)row_field[15] << 8) | ((uint32_t)row_field[14] << 0);
+	// ADDRMAP8: [27:24]=row13, [20:16]=row12, [12:8]=row11, [4:0]=row10
+	addrmap8 = ((uint32_t)row_field[13] << 24) | ((uint32_t)row_field[12] << 16)
+		| ((uint32_t)row_field[11] << 8) | ((uint32_t)row_field[10] << 0);
+	// ADDRMAP9: [27:24]=row9, [20:16]=row8, [12:8]=row7, [4:0]=row6
+	addrmap9 = ((uint32_t)row_field[9] << 24) | ((uint32_t)row_field[8] << 16)
+		| ((uint32_t)row_field[7] << 8) | ((uint32_t)row_field[6] << 0);
+	// ADDRMAP10: [27:24]=row5, [20:16]=row4, [12:8]=row3, [4:0]=row2
+	addrmap10 = ((uint32_t)row_field[5] << 24) | ((uint32_t)row_field[4] << 16)
+		| ((uint32_t)row_field[3] << 8) | ((uint32_t)row_field[2] << 0);
+	// ADDRMAP11: [12:8]=row1, [4:0]=row0
+	addrmap11 = ((uint32_t)row_field[1] << 8) | ((uint32_t)row_field[0]);
+
+	// ---- SAR (System Address Region) and address mapping configuration ----
+	// split to 4 regions, each 256MB aligned (SARBASE unit: 256MB)
+	region_blks = part_info->size_mb / 4 / 256;
+	// SARBASE0: SAR Region0 base address = 8×256MB = 2GB
+	ddrc_reg[0x000200c0 / 4] = 8;
+	// SARSIZE0: SAR Region0 size = region_blks×256MB
+	ddrc_reg[0x000200c4 / 4] = region_blks - 1;
+	// SARBASE1: SAR Region1 base address
+	ddrc_reg[0x000200c8 / 4] = 8 + region_blks * 1;
+	// SARSIZE1: SAR Region1 size
+	ddrc_reg[0x000200cc / 4] = region_blks - 1;
+	// SARBASE2: SAR Region2 base address
+	ddrc_reg[0x000200d0 / 4] = 8 + region_blks * 2;
+	// SARSIZE2: SAR Region2 size
+	ddrc_reg[0x000200d4 / 4] = region_blks - 1;
+	// SARBASE3: SAR Region3 base address
+	ddrc_reg[0x000200d8 / 4] = 8 + region_blks * 3;
+	// SARSIZE3: SAR Region3 size
+	ddrc_reg[0x000200dc / 4] = region_blks - 1;
+
+	if (part_info->ranks > 1) {
+		// ADDRMAP1: addrmap_cs_bit0=msb, dual rank = msb - interal base(6) - offset(3)
+		ddrc_reg[0x00030004 / 4] = msb - 6 - 3;
+	} else {
+		// ADDRMAP1: addrmap_cs_bit0=0x3f, single rank, CS mapping disabled
+		ddrc_reg[0x00030004 / 4] = 0x0000003f;
+	}
+
+	// ADDRMAP3: bank address mapping (BA0/BA1/BA2)
+	ddrc_reg[0x0003000c / 4] = addrmap3;
+	// ADDRMAP4: bank group address mapping (BG0/BG1)
+	ddrc_reg[0x00030010 / 4] = 0x00000101;
+	// ADDRMAP5: column address mapping (col7~col10)
+	ddrc_reg[0x00030014 / 4] = addrmap5;
+	// ADDRMAP6: column address mapping (col3~col6)
+	ddrc_reg[0x00030018 / 4] = addrmap6;
+	// ADDRMAP7: row address mapping (row14~row17)
+	ddrc_reg[0x0003001c / 4] = addrmap7;
+	// ADDRMAP8: row address mapping (row10~row13)
+	ddrc_reg[0x00030020 / 4] = addrmap8;
+	// ADDRMAP9: row address mapping (row6~row9)
+	ddrc_reg[0x00030024 / 4] = addrmap9;
+	// ADDRMAP10: row address mapping (row2~row5)
+	ddrc_reg[0x00030028 / 4] = addrmap10;
+	// ADDRMAP11: row address mapping (row0~row1)
+	ddrc_reg[0x0003002c / 4] = addrmap11;
+	// ADDRMAP12: address mapping extension register, use default value
+	ddrc_reg[0x00030030 / 4] = 0x00000000;
+}
+
+void init_snps_lp5_ddrc(unsigned DDRC_BASE, ddr_part_info* part_info,
 	ddr_boot_mode ddr_mode, ddr_training_info_t* training_info)
 {
 	uint32_t read_data;
@@ -397,9 +530,11 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 	volatile uint32_t* cfg_reg = (volatile uint32_t*)(size_t)CFG_BASE;
 	volatile uint32_t* dphy_reg = (volatile uint32_t*)(size_t)DPHY_BASE;
 
-	if (8192 == ddr_size_mbyte || 16384 == ddr_size_mbyte) {
+	if (part_info->ranks > 1) {
+		// dual_rank_mode=1, active_ranks=2CS, burst_rdwr=BL16, lpddr5=1
 		ddrc_reg[0x00010000 / 4] = 0x03080008;
-	} else if (4096 == ddr_size_mbyte) {
+	} else {
+		// dual_rank_mode=0, active_ranks=1CS, burst_rdwr=BL16, lpddr5=1
 		ddrc_reg[0x00010000 / 4] = 0x01080008;
 	}
 	REG32(0xD4282CE8) &= 0x00ffffff;
@@ -409,9 +544,9 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 	ddrc_reg[0x00010510 / 4] = 0x00010005;
 	ddrc_reg[0x00010518 / 4] = 0x70000000;
 	ddrc_reg[0x00010208 / 4] = 0x00000000;
-	if (4096 == ddr_size_mbyte)
+	if (1 == part_info->ranks)
 		ddrc_reg[0x00010200 / 4] = 0x010003f3;
-	else // dsty_16GB
+	else
 		ddrc_reg[0x00010200 / 4] = 0x00000361;
 
 	ddrc_reg[0x00010280 / 4] = 0x00000000;
@@ -420,11 +555,10 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 	ddrc_reg[0x00010288 / 4] = 0x00000000;
 	ddrc_reg[0x00010380 / 4] = 0x80012014;
 	ddrc_reg[0x00010100 / 4] = 0x00000020;
-	if (16384 == ddr_size_mbyte) {
+	if (0 != part_info->x8_mode) {
 		ddrc_reg[0x00010104 / 4] = 0x0000000f;
 		ddrc_reg[0x00010108 / 4] = 0x0000000f;
 	} else {
-		// dsty_4GB || dsty_8GB
 		ddrc_reg[0x00010104 / 4] = 0x00000005;
 		ddrc_reg[0x00010108 / 4] = 0x00000005;
 	}
@@ -465,7 +599,7 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 	ddrc_reg[0x00000d00 / 4] = 0x00000001;
 	ddrc_reg[0x000005b4 / 4] = 0xe000012c;
 
-	if (16384 == ddr_size_mbyte) {
+	if (0 != part_info->x8_mode) {
 		ddrc_reg[0x00000000 / 4] = 0x29103622;
 		ddrc_reg[0x00000004 / 4] = 0x00100630;
 		ddrc_reg[0x00000008 / 4] = 0x09121219;
@@ -514,7 +648,6 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 		ddrc_reg[0x00000a80 / 4] = 0x00000070;
 		ddrc_reg[0x00000d08 / 4] = 0x0000160a;
 	} else {
-		// dsty_4GB || dsty_8GB
 		ddrc_reg[0x00000000 / 4] = 0x28103622;
 		ddrc_reg[0x00000004 / 4] = 0x00100630;
 		ddrc_reg[0x00000008 / 4] = 0x09111117;
@@ -563,6 +696,7 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 		ddrc_reg[0x00000a80 / 4] = 0x00000070;
 		ddrc_reg[0x00000d08 / 4] = 0x0000150b;
 	}
+
 	ddrc_reg[0x00000c80 / 4] = 0x0f000001;
 	ddrc_reg[0x00000c88 / 4] = 0x0f00007f;
 	ddrc_reg[0x00000650 / 4] = 0x00000098;
@@ -605,70 +739,9 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 	ddrc_reg[0x000230a0 / 4] = 0x00000000;
 	ddrc_reg[0x000240a0 / 4] = 0x00000000;
 
-	if (8192 == ddr_size_mbyte) {
-		ddrc_reg[0x000200c0 / 4] = 0x00000008; // SARBASE0
-		ddrc_reg[0x000200c4 / 4] = 0x00000007; // SARSIZE0
-		ddrc_reg[0x000200c8 / 4] = 0x00000010; // SARBASE1
-		ddrc_reg[0x000200cc / 4] = 0x00000007; // SARSIZE1
-		ddrc_reg[0x000200d0 / 4] = 0x00000018; // SARBASE2
-		ddrc_reg[0x000200d4 / 4] = 0x00000007; // SARSIZE2
-		ddrc_reg[0x000200d8 / 4] = 0x00000020; // SARBASE3
-		ddrc_reg[0x000200dc / 4] = 0x00000007; // SARSIZE3
+	// ---- SAR (System Address Region) and address mapping configuration ----
+	config_lp5_addrmap(ddrc_reg, part_info);
 
-		ddrc_reg[0x00030004 / 4] = 0x00000018; // ADDRMAPX
-		ddrc_reg[0x0003000c / 4] = 0x003f0903;
-		ddrc_reg[0x00030010 / 4] = 0x00000101;
-		ddrc_reg[0x00030014 / 4] = 0x1f030303;
-		ddrc_reg[0x00030018 / 4] = 0x03030300;
-		ddrc_reg[0x0003001c / 4] = 0x1f1f0808;
-		ddrc_reg[0x00030020 / 4] = 0x08080808;
-		ddrc_reg[0x00030024 / 4] = 0x08080808;
-		ddrc_reg[0x00030028 / 4] = 0x08080808;
-		ddrc_reg[0x0003002c / 4] = 0x00000808;
-	} else if (4096 == ddr_size_mbyte) {
-		ddrc_reg[0x000200c0 / 4] = 0x00000008; // SARBASE0
-		ddrc_reg[0x000200c4 / 4] = 0x00000003; // SARSIZE0
-		ddrc_reg[0x000200c8 / 4] = 0x0000000c; // SARBASE1
-		ddrc_reg[0x000200cc / 4] = 0x00000003; // SARSIZE1
-		ddrc_reg[0x000200d0 / 4] = 0x00000010; // SARBASE2
-		ddrc_reg[0x000200d4 / 4] = 0x00000003; // SARSIZE2
-		ddrc_reg[0x000200d8 / 4] = 0x00000014; // SARBASE3
-		ddrc_reg[0x000200dc / 4] = 0x00000003; // SARSIZE3
-
-		ddrc_reg[0x00030004 / 4] = 0x0000003f; // ADDRMAPX
-		ddrc_reg[0x0003000c / 4] = 0x003f0903;
-		ddrc_reg[0x00030010 / 4] = 0x00000101;
-		ddrc_reg[0x00030014 / 4] = 0x1f030303;
-		ddrc_reg[0x00030018 / 4] = 0x03030300;
-		ddrc_reg[0x0003001c / 4] = 0x1f1f0808;
-		ddrc_reg[0x00030020 / 4] = 0x08080808;
-		ddrc_reg[0x00030024 / 4] = 0x08080808;
-		ddrc_reg[0x00030028 / 4] = 0x08080808;
-		ddrc_reg[0x0003002c / 4] = 0x00000808;
-	} else {
-		// dsty_16GB
-		ddrc_reg[0x000200c0 / 4] = 0x00000008; // SARBASE0
-		ddrc_reg[0x000200c4 / 4] = 0x0000000f; // SARSIZE0
-		ddrc_reg[0x000200c8 / 4] = 0x00000018; // SARBASE1
-		ddrc_reg[0x000200cc / 4] = 0x0000000f; // SARSIZE1
-		ddrc_reg[0x000200d0 / 4] = 0x00000028; // SARBASE2
-		ddrc_reg[0x000200d4 / 4] = 0x0000000f; // SARSIZE2
-		ddrc_reg[0x000200d8 / 4] = 0x00000038; // SARBASE3
-		ddrc_reg[0x000200dc / 4] = 0x0000000f; // SARSIZE3
-
-		ddrc_reg[0x00030004 / 4] = 0x00000019; // ADDRMAPX
-		ddrc_reg[0x0003000c / 4] = 0x003f0903;
-		ddrc_reg[0x00030010 / 4] = 0x00000101;
-		ddrc_reg[0x00030014 / 4] = 0x1f030303;
-		ddrc_reg[0x00030018 / 4] = 0x03030300;
-		ddrc_reg[0x0003001c / 4] = 0x1f080808;
-		ddrc_reg[0x00030020 / 4] = 0x08080808;
-		ddrc_reg[0x00030024 / 4] = 0x08080808;
-		ddrc_reg[0x00030028 / 4] = 0x08080808;
-		ddrc_reg[0x0003002c / 4] = 0x00000808;
-	}
-
-	ddrc_reg[0x00030030 / 4] = 0x00000000;
 	ddrc_reg[0x00010b84 / 4] = 0x00000002;
 	ddrc_reg[0x00010d00 / 4] = 0xc0020002;
 	ddrc_reg[0x00010180 / 4] = 0x00000811;
@@ -695,7 +768,7 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 
 	ddrc_reg[0x00010208 / 4] = 0x00000000;
 	if (DDR_QUICKBOOT_MODE != ddr_mode) {
-		phyinit_lp5_pre_training(DDRC_BASE, ddr_size_mbyte);
+		phyinit_lp5_pre_training(DDRC_BASE, part_info);
 
 		ddrc_reg[0x00010180 / 4] |= (0x1 << 11);
 
@@ -711,7 +784,7 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 			;
 		dphy_reg[0xd0000] = 0x0;
 
-		phyinit_lp5_training(DDRC_BASE, ddr_size_mbyte);
+		phyinit_lp5_training(DDRC_BASE, part_info);
 
 		// save DDR training info
 		save_snps_ddrc_training_result(DDRC_BASE, training_info);
@@ -719,7 +792,7 @@ void init_snps_lp5_ddrc(unsigned DDRC_BASE, uint32_t ddr_size_mbyte,
 		init_snps_ddrc_quick(DDRC_BASE, DDR_TYPE_LPDDR5, training_info);
 	}
 
-	if (16384 != ddr_size_mbyte) {
+	if (0 == part_info->x8_mode) {
 		ddrc_reg[0x00010c80 / 4] = 0x00000000;
 		ddrc_reg[0x00000060 / 4] = 0x0010160e;
 		ddrc_reg[0x00000024 / 4] = 0x00020410;
@@ -785,12 +858,12 @@ static void init_ddr_clock(uint32_t DDRC_BASE, uint32_t data_rate_mtps)
 	uint32_t CFG_BASE = DDRC_BASE + 0x600000;
 	volatile uint32_t* cfg_reg = (volatile uint32_t*)(size_t)CFG_BASE;
 
-	if (5500 == part_info->data_rate_mtps) {
+	if (5500 == data_rate_mtps) {
 		/* DPLL 2750MHz*/
 		cfg_reg[0x8 / 4] = 0x0b3912aa;
 		cfg_reg[0x10 / 4] = 0xa0558b8b;
 		cfg_reg[0xc / 4] |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0xab << 8);
-	} else if (6000 == part_info->data_rate_mtps) {
+	} else if (6000 == data_rate_mtps) {
 		/* DPLL 3000MHz*/
 		cfg_reg[0x8 / 4] = 0x0b3e2000;
 		cfg_reg[0x10 / 4] = 0xa0558c8c;
@@ -807,12 +880,12 @@ static void init_ddr_clock(uint32_t DDRC_BASE, uint32_t data_rate_mtps)
 	// clear frequency divider
 	cfg_reg[0x18 / 4] &= ~(0x3f << 16);
 
-	if (1066 == part_info->data_rate_mtps) {
+	if (1066 == data_rate_mtps) {
 		cfg_reg[0x18 / 4] |= (0x1 << 19) | (0x7 << 16); // sel 2, div 8
-	} else if (4266 == part_info->data_rate_mtps) {
+	} else if (4266 == data_rate_mtps) {
 		cfg_reg[0x18 / 4] |= (0x1 << 19) | (0x1 << 16); // sel 2, div 2
 		// cfg_reg[0x18 / 4] |= (0x2 << 19) | (0x1 << 16); // sel 2, div 2 3200mbps
-	} else if (5120 == part_info->data_rate_mtps) {
+	} else if (5120 == data_rate_mtps) {
 		cfg_reg[0x18 / 4] |= (0x7 << 19) | (0x0 << 16); // sel 3, div 1 5120mbps
 	} else {
 		cfg_reg[0x18 / 4] |= (0x2 << 19) | (0x0 << 16); // sel 3, div 1 6400mbps
@@ -837,9 +910,9 @@ static void init_snps_lp45(unsigned DDRC_BASE, ddr_part_info* part_info,
 	init_ddr_clock(DDRC_BASE, part_info->data_rate_mtps);
 
 	if (DDR_TYPE_LPDDR5 == part_info->type) {
-		init_snps_lp5_ddrc(DDRC_BASE, part_info->size_mb, ddr_mode, training_info);
+		init_snps_lp5_ddrc(DDRC_BASE, part_info, ddr_mode, training_info);
 	} else if (DDR_TYPE_LPDDR4X == part_info->type) {
-		init_snps_lp4x_ddrc(DDRC_BASE, part_info->size_mb, ddr_mode, training_info);
+		init_snps_lp4x_ddrc(DDRC_BASE, part_info, ddr_mode, training_info);
 	}
 }
 
@@ -847,13 +920,13 @@ void lpddr_init_prepare(ddr_part_info* part_info, ddr_boot_mode ddr_mode)
 {
 	// ddr para and training firmware need to be initialized before training
 	if (DDR_TYPE_LPDDR5 == part_info->type) {
-		build_lpddr5_io_para(get_ddr_default_io_para(DDR_TYPE_LPDDR5));
+		build_lpddr5_io_para(get_ddr_default_io_para(DDR_TYPE_LPDDR5), part_info);
 		if (DDR_QUICKBOOT_MODE != ddr_mode) {
 			// during first boot, MUST do fully training
 			lp5_training_prepare();
 		}
 	} else if (DDR_TYPE_LPDDR4X == part_info->type) {
-		build_lpddr4x_io_para(get_ddr_default_io_para(DDR_TYPE_LPDDR4X));
+		build_lpddr4x_io_para(get_ddr_default_io_para(DDR_TYPE_LPDDR4X), part_info);
 		if (DDR_QUICKBOOT_MODE != ddr_mode) {
 			// during first boot, MUST do fully training
 			lp4x_training_prepare();
