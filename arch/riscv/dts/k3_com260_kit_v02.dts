@@ -15,30 +15,6 @@
 
 &cpus {
 	timebase-frequency = <24000000>;
-	clocks = <&ccu CLK_TOP_DCLK>,
-		 <&ccu CLK_AXICLK>,
-		 <&ccu CLK_CCI550>,
-		 <&ccu CLK_CPU_C0_CORE>,
-		 <&ccu CLK_CPU_C1_CORE>,
-		 <&ccu CLK_CPU_C2_CORE>,
-		 <&ccu CLK_CPU_C3_CORE>,
-		 <&ccu CLK_PLL3>,
-		 <&ccu CLK_PLL4>,
-		 <&ccu CLK_PLL5>,
-		 <&ccu CLK_PLL8>,
-		 <&ccu CLK_PLL3_D1>,
-		 <&ccu CLK_CPU_C1_PLL_SRC>,
-		 <&ccu CLK_PLL5_D1>,
-		 <&ccu CLK_CPU_C3_PLL_SRC>;
-	clock-names = "topd", "axi", "cci", "cluster0", "cluster1", "cluster2", "cluster3",
-		       "pll3", "pll4", "pll5", "pll8", "pll_src3", "clt1_pll_src", "pll_src5", "clt3_pll_src";
-	topd_frequency = <800000000>;
-	axi_frequency =  <307000000>;
-	cci_frequency =  <1000000000>;
-	cluster0_frequency = <2200000000>;
-	cluster1_frequency = <2200000000>;
-	cluster2_frequency = <1800000000>;
-	cluster3_frequency = <1800000000>;
 };
 
 &pinctrl {
@@ -95,9 +71,9 @@
 };
 
 &sdhci0 {
-	pinctrl-names = "default","fast";
+	pinctrl-names = "default","uhs";
 	pinctrl-0 = <&pinctrl_mmc1>;
-	pinctrl-1 = <&pinctrl_mmc1_fast>;
+	pinctrl-1 = <&pinctrl_mmc1_uhs>;
 	bus-width = <4>;
 	cd-gpios = <&gpio 04 0>;
 	//vmmc-supply = <&dcdc_9>;
@@ -302,10 +278,12 @@
 				regulator-name = "dcdc1";
 				regulator-min-microvolt = <1050000>;
 				regulator-max-microvolt = <1050000>;
-				/* regulator-init-microvolt = <1050000>; */
 				regulator-always-on;
 				regulator-boot-on;
 				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <1050000>;
+				};
 			};
 
 			dcdc_2: DCDC_REG2 {
@@ -314,6 +292,9 @@
 				regulator-max-microvolt = <1050000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <1050000>;
+				};
 			};
 
 			dcdc_3: DCDC_REG3 {
@@ -323,6 +304,9 @@
 				regulator-always-on;
 				regulator-boot-on;
 				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <800000>;
+				};
 			};
 
 			dcdc_4: DCDC_REG4 {
@@ -331,6 +315,9 @@
 				regulator-max-microvolt = <2100000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <2100000>;
+				};
 			};
 
 			dcdc_5: DCDC_REG5 {
@@ -339,6 +326,9 @@
 				regulator-max-microvolt = <1800000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <1800000>;
+				};
 			};
 
 			dcdc_6: DCDC_REG6 {
@@ -347,6 +337,9 @@
 				regulator-max-microvolt = <600000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			/* aldo */
@@ -354,10 +347,12 @@
 				regulator-name = "ldo1";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <3300000>;
-				/* regulator-init-microvolt = <3300000>; */
 				regulator-always-on;
 				regulator-boot-on;
 				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <1800000>;
+				};
 			};
 
 			ldo_2: LDO_REG2 {
@@ -366,12 +361,18 @@
 				regulator-max-microvolt = <1800000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <1800000>;
+				};
 			};
 
 			ldo_3: LDO_REG3 {
 				regulator-name = "ldo3";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <3300000>;
+				};
 			};
 
 			ldo_4: LDO_REG4 {
@@ -380,6 +381,9 @@
 				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <3300000>;
+				};
 			};
 
 			/* dldo */
@@ -389,6 +393,9 @@
 				regulator-max-microvolt = <1200000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <1200000>;
+				};
 			};
 
 			ldo_6: LDO_REG6 {
@@ -397,6 +404,9 @@
 				regulator-max-microvolt = <900000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <900000>;
+				};
 			};
 
 			ldo_7: LDO_REG7 {
@@ -405,6 +415,9 @@
 				regulator-max-microvolt = <800000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <800000>;
+				};
 			};
 
 			ldo_8: LDO_REG8 {
@@ -412,6 +425,9 @@
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <1800000>;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <1800000>;
+				};
 			};
 
 			ldo_9: LDO_REG9 {
@@ -420,6 +436,9 @@
 				regulator-max-microvolt = <1800000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <1800000>;
+				};
 			};
 
 			ldo_10: LDO_REG10 {
@@ -428,6 +447,9 @@
 				regulator-max-microvolt = <1800000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <1800000>;
+				};
 			};
 
 			ldo_11: LDO_REG11 {
@@ -436,6 +458,9 @@
 				regulator-max-microvolt = <1800000>;
 				regulator-always-on;
 				regulator-boot-on;
+				regulator-state-mem {
+					regulator-suspend-microvolt = <1800000>;
+				};
 			};
 
 			sw_2: SWITCH_REG1 {

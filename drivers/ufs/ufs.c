@@ -928,7 +928,7 @@ static int ufshcd_send_command(struct ufs_hba *hba, unsigned int task_tag,
 			return -ETIMEDOUT;
 		}
 
-		if (enabled_intr_status & UFSHCD_ERROR_MASK) {
+		if (enabled_intr_status & INT_FATAL_ERRORS) {
 			dev_err(hba->dev, "Error in status:%08x\n",
 				enabled_intr_status);
 

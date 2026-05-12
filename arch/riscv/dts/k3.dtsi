@@ -1285,8 +1285,9 @@
 		ufs: ufs@c0e00000 {
 			compatible = "spacemit,k3-ufshci";
 			reg = <0x0 0xc0e00000 0x0 0x30000>;
-			clocks = <&ccu CLK_UFS_ACLK>;
-			clock-names = "aclk";
+			clocks = <&ccu CLK_UFS_ACLK>,
+				 <&ccu CLK_UFS_REFCLK>;
+			clock-names = "aclk", "refclk";
 			resets = <&reset RESET_UFS_ACLK>;
 			reset-names = "aclk_reset";
 			clock-freq = <491520000>;

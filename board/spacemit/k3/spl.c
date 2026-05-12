@@ -25,6 +25,7 @@
 #include <dt-bindings/pinctrl/k3-pinctrl.h>
 #include <asm/sections.h>
 #include <u-boot/crc.h>
+#include <clk.h>
 
 #if defined(CONFIG_K3_BOARD_FPGA)
 #define GDB_DOWNLOAD_DEBUG
@@ -155,6 +156,141 @@ bool restore_ddr_training_info(void)
 	return true;
 }
 
+#define TURBO0_FREQUENCY		(1000000000)
+
+static int cpu_frequency_set(void)
+{
+	int ret;
+	unsigned int cluster0_frequency;
+	unsigned int cluster1_frequency;
+	unsigned int cluster2_frequency;
+	unsigned int cluster3_frequency;
+	unsigned int topd_frequency;
+	unsigned int axi_frequency;
+	unsigned int cci_frequency;
+	struct clk top_dclk, axi_clk, cci_clk, cluster0_clk, cluster1_clk, cluster2_clk, cluster3_clk, clk_pll3, clk_pll4, clk_pll5, clk_pll8, pll_src3, clt1_pll_src, pll_src5, clt3_pll_src;
+	ofnode cpu_node;
+
+	cpu_node = ofnode_path("/cpus");
+	if (!ofnode_valid(cpu_node)) {
+		debug("No cpus node found\n");
+		return -1;
+	}
+
+	ret = clk_get_by_name_nodev(cpu_node, "cluster0", &cluster0_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "cluster1", &cluster1_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "cluster2", &cluster2_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "cluster3", &cluster3_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "topd", &top_dclk);
+	ret |= clk_get_by_name_nodev(cpu_node, "axi", &axi_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "cci", &cci_clk);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll3", &clk_pll3);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll4", &clk_pll4);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll5", &clk_pll5);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll8", &clk_pll8);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll_src3", &pll_src3);
+	ret |= clk_get_by_name_nodev(cpu_node, "clt1_pll_src", &clt1_pll_src);
+	ret |= clk_get_by_name_nodev(cpu_node, "pll_src5", &pll_src5);
+	ret |= clk_get_by_name_nodev(cpu_node, "clt3_pll_src", &clt3_pll_src);
+	if (ret) {
+		pr_err("Get cluster clk error\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "cluster0_frequency",
+			      (u32 *)&cluster0_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "cluster1_frequency",
+			      (u32 *)&cluster1_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "cluster2_frequency",
+			      (u32 *)&cluster2_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "cluster3_frequency",
+			      (u32 *)&cluster3_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "cci_frequency",
+			      (u32 *)&cci_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "topd_frequency",
+			      (u32 *)&topd_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	ret = ofnode_read_u32(cpu_node, "axi_frequency",
+			      (u32 *)&axi_frequency);
+	if (ret) {
+		debug("Can't get cpufrequency\n");
+		return -1;
+	}
+
+	if ((cluster0_frequency != cluster1_frequency) ||
+			(cluster2_frequency != cluster3_frequency)) {
+		printk("Cluster0/2 should be same as Cluster1/3")	;
+		return -1;
+	}
+
+	clk_enable(&cluster0_clk);
+	clk_enable(&cluster1_clk);
+	clk_enable(&cluster2_clk);
+	clk_enable(&cluster3_clk);
+	clk_enable(&top_dclk);
+	clk_enable(&axi_clk);
+	clk_enable(&cci_clk);
+	clk_enable(&clk_pll3);
+	clk_enable(&clk_pll4);
+	clk_enable(&clk_pll5);
+	clk_enable(&clk_pll8);
+
+	clk_set_rate(&top_dclk, topd_frequency);
+	clk_set_rate(&axi_clk, axi_frequency);
+
+	if (cluster0_frequency > TURBO0_FREQUENCY) {
+		clk_set_rate(&clk_pll3, cluster0_frequency);
+		clk_set_rate(&clk_pll4, cluster0_frequency);
+	}
+
+	clk_set_rate(&cluster0_clk, cluster0_frequency);
+
+	clk_set_parent(&clt1_pll_src, &pll_src3);
+
+	clk_set_rate(&cluster1_clk, cluster1_frequency);
+
+	if (cluster2_frequency > TURBO0_FREQUENCY) {
+		clk_set_rate(&clk_pll5, cluster2_frequency);
+		clk_set_rate(&clk_pll8, cluster2_frequency);
+	}
+
+	clk_set_rate(&cluster2_clk, cluster2_frequency);
+	clk_set_parent(&clt3_pll_src, &pll_src5);
+	clk_set_rate(&cluster3_clk, cluster3_frequency);
+	clk_set_rate(&cci_clk, cci_frequency);
+
+	return 0;
+}
+
 int spl_board_init_f(void)
 {
 	int ret;
@@ -205,6 +341,8 @@ int spl_board_init_f(void)
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
 	board_pmic_init();
 #endif
+
+	cpu_frequency_set();
 
 #ifdef CONFIG_SPL_REMOTEPROC_K3_PROC
 	rproc_init();

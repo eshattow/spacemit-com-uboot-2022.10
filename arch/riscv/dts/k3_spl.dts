@@ -406,8 +406,9 @@
 		ufs: ufs@c0e00000 {
 			compatible = "spacemit,k3-ufshci";
 			reg = <0x0 0xc0e00000 0x0 0x30000>;
-			clocks = <&ccu CLK_UFS_ACLK>;
-			clock-names = "aclk";
+			clocks = <&ccu CLK_UFS_ACLK>,
+				 <&ccu CLK_UFS_REFCLK>;
+			clock-names = "aclk", "refclk";
 			resets = <&reset RESET_UFS_ACLK>;
 			reset-names = "aclk_reset";
 			ref-clk-freq = <19200000>;
@@ -665,7 +666,7 @@
 				regulator-name = "edcdc1";
 				regulator-min-microvolt = <534000>;
 				regulator-max-microvolt = <880000>;
-				regulator-init-microvolt = <850000>;
+				regulator-init-microvolt = <880000>;
 				regulator-boot-on;
 				u-boot,dm-spl;
 				regulator-state-mem {
@@ -801,4 +802,32 @@
 			};
 		};
 	};
+};
+
+&cpus {
+	timebase-frequency = <24000000>;
+	clocks = <&ccu CLK_TOP_DCLK>,
+		 <&ccu CLK_AXICLK>,
+		 <&ccu CLK_CCI550>,
+		 <&ccu CLK_CPU_C0_CORE>,
+		 <&ccu CLK_CPU_C1_CORE>,
+		 <&ccu CLK_CPU_C2_CORE>,
+		 <&ccu CLK_CPU_C3_CORE>,
+		 <&ccu CLK_PLL3>,
+		 <&ccu CLK_PLL4>,
+		 <&ccu CLK_PLL5>,
+		 <&ccu CLK_PLL8>,
+		 <&ccu CLK_PLL3_D1>,
+		 <&ccu CLK_CPU_C1_PLL_SRC>,
+		 <&ccu CLK_PLL5_D1>,
+		 <&ccu CLK_CPU_C3_PLL_SRC>;
+	clock-names = "topd", "axi", "cci", "cluster0", "cluster1", "cluster2", "cluster3",
+		       "pll3", "pll4", "pll5", "pll8", "pll_src3", "clt1_pll_src", "pll_src5", "clt3_pll_src";
+	topd_frequency = <800000000>;
+	axi_frequency =  <307000000>;
+	cci_frequency =  <1228000000>;
+	cluster0_frequency = <2200000000>;
+	cluster1_frequency = <2200000000>;
+	cluster2_frequency = <1800000000>;
+	cluster3_frequency = <1800000000>;
 };

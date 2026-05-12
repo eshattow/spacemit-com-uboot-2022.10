@@ -25,12 +25,13 @@
 
 struct spacemit_k3_ufs_priv {
 	struct clk aclk;
+	struct clk refclk;
 	struct reset_ctl reset;
 	u32 phy_mng_base;
 	u32 atop_base;
 	u32 ref_clk_freq;
 	u32 clock_freq_hz;
-	ulong aclk_rate_hz; 
+	ulong aclk_rate_hz;
 };
 
 static void spacemit_k3_ufs_config_scsi_scan_luns(struct udevice *dev);
@@ -312,10 +313,21 @@ static int spacemit_k3_ufs_clk_enable(struct udevice *dev)
 		goto err_assert_reset;
 	}
 
+	if (priv->refclk.dev) {
+		ret = clk_enable(&priv->refclk);
+		if (ret) {
+			dev_err(dev, "ufs: fail to enable ufs refclk, ret=%d\n",
+				ret);
+			goto err_disable_aclk;
+		}
+	}
+
 	/* HYNIX1 phone need delay */
 	mdelay(5);
 	return 0;
 
+err_disable_aclk:
+	clk_disable(&priv->aclk);
 err_assert_reset:
 	reset_assert(&priv->reset);
 	return ret;
@@ -323,6 +335,9 @@ err_assert_reset:
 
 static void spacemit_k3_ufs_clk_disable(struct spacemit_k3_ufs_priv *priv)
 {
+	if (priv->refclk.dev)
+		clk_disable(&priv->refclk);
+
 	/* Disable clock first */
 	clk_disable(&priv->aclk);
 
@@ -2386,6 +2401,14 @@ static int spacemit_k3_ufs_of_to_plat(struct udevice *dev)
 				ref_clk_freq);
 			return ret;
 		}
+	}
+
+	ret = clk_get_by_name(dev, "refclk", &priv->refclk);
+	if (ret == -ENODATA || ret == -ENOENT || ret == -ENOSYS) {
+		memset(&priv->refclk, 0, sizeof(priv->refclk));
+	} else if (ret) {
+		dev_err(dev, "ufs: failed to get refclk, ret=%d\n", ret);
+		return ret;
 	}
 
 	ret = dev_read_u32(dev, "clock-freq", &priv->clock_freq_hz);

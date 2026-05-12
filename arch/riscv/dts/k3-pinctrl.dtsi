@@ -1194,24 +1194,38 @@
 
 	pinctrl_mmc1: mmc1_grp {
 		pinctrl-single,pins = <
-			K3_PADCONF(MMC1_DAT3, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* mmc1_d3 */
-			K3_PADCONF(MMC1_DAT2, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* mmc1_d2 */
-			K3_PADCONF(MMC1_DAT1, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* mmc1_d1 */
-			K3_PADCONF(MMC1_DAT0, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* mmc1_d0 */
-			K3_PADCONF(MMC1_CMD, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* mmc1_cmd */
-			K3_PADCONF(MMC1_CLK, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_DS8)) /* mmc1_clk */
+			K3_PADCONF(MMC1_DAT3, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d3 */
+			K3_PADCONF(MMC1_DAT2, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d2 */
+			K3_PADCONF(MMC1_DAT1, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d1 */
+			K3_PADCONF(MMC1_DAT0, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d0 */
+			K3_PADCONF(MMC1_CMD, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_cmd */
+			K3_PADCONF(MMC1_CLK, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_DS3)) /* mmc1_clk */
 		>;
+		power-source = <3300>;
 	};
 
-	pinctrl_mmc1_fast: mmc1_fast_grp {
+	pinctrl_mmc1_uhs: mmc1_uhs_grp {
 		pinctrl-single,pins = <
-			K3_PADCONF(MMC1_DAT3, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS6)) /* mmc1_d3 */
-			K3_PADCONF(MMC1_DAT2, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS6)) /* mmc1_d2 */
-			K3_PADCONF(MMC1_DAT1, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS6)) /* mmc1_d1 */
-			K3_PADCONF(MMC1_DAT0, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS6)) /* mmc1_d0 */
-			K3_PADCONF(MMC1_CMD, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS6)) /* mmc1_cmd */
-			K3_PADCONF(MMC1_CLK, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_DS6)) /* mmc1_clk */
+			K3_PADCONF(MMC1_DAT3, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d3 */
+			K3_PADCONF(MMC1_DAT2, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d2 */
+			K3_PADCONF(MMC1_DAT1, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d1 */
+			K3_PADCONF(MMC1_DAT0, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d0 */
+			K3_PADCONF(MMC1_CMD, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_cmd */
+			K3_PADCONF(MMC1_CLK, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_DS2)) /* mmc1_clk */
 		>;
+		power-source = <1800>;
+	};
+
+	pinctrl_mmc1_debug: mmc1_debug_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(MMC1_DAT3, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d3 */
+			K3_PADCONF(MMC1_DAT2, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d2 */
+			K3_PADCONF(MMC1_DAT1, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d1 */
+			K3_PADCONF(MMC1_DAT0, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_d0 */
+			K3_PADCONF(MMC1_CMD, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS3)) /* mmc1_cmd */
+			K3_PADCONF(MMC1_CLK, MUX_MODE0, (EDGE_NONE | PULL_DOWN | PAD_DS3)) /* mmc1_clk */
+		>;
+		power-source = <3300>;
 	};
 
 	pinctrl_mmc2: mmc2_grp {

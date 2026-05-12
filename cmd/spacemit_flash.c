@@ -1049,17 +1049,6 @@ static int parse_flash_config(struct flash_dev *fdev)
 			return -1;
 	}
 
-	/*set partition to env*/
-	if (_clear_env_part(load_addr, 0, fdev)){
-		printf("update part info to env fail\n");
-		return -1;
-	}
-#if !defined(CONFIG_SPL_BUILD)
-	if (CONFIG_IS_ENABLED(CMD_SAVEENV)) {
-		if (env_save())
-			printf("save env fail\n");
-	}
-#endif
 	return 0;
 }
 
