@@ -10,6 +10,7 @@
 #include <u-boot/crc.h>
 #include <linux/delay.h>
 #include <linux/lzo.h>
+#include <linux/log2.h>
 
 #include "lpddr_msg_block.h"
 

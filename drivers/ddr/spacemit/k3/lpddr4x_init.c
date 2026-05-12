@@ -167,13 +167,18 @@ void config_lp4x_addrmap(volatile uint32_t* ddrc_reg, ddr_part_info* part_info)
 	// field value of col0~col9, row0~row17
 	uint8_t col_field[10], row_field[18];
 	uint32_t addrmap3, addrmap5, addrmap6;
-	uint32_t addrmap7, addrmap8, addrmap9, addrmap10, addrmap11;
+	uint32_t addrmap7, addrmap8, addrmap9, addrmap10, addrmap11, addrmap12;
+	bool non_binary_density = false;
 
 	memset(col_field, 0, sizeof(col_field));
 	memset(row_field, 0x1F, sizeof(row_field));
 
 	// convert MByte to Byte
 	msb = fls(part_info->size_mb) - 1 + 20;
+	if (!is_power_of_2(part_info->size_mb)) {
+		msb++;
+		non_binary_density = true;
+	}
 	ba_msb = msb;
 	pr_info("MSB: %d\n", msb);
 	if (part_info->ranks > 1) {
@@ -217,6 +222,14 @@ void config_lp4x_addrmap(volatile uint32_t* ddrc_reg, ddr_part_info* part_info)
 
 		row_field[j] = i - j - 6 - 3;
 		j++;
+	}
+
+	if (non_binary_density) {
+		// ADDRMAP12: [row_msb:row_msb-1]==0b11 is invalid
+		addrmap12 = j - 13;
+	} else {
+		// ADDRMAP12: address mapping extension register, use default value
+		addrmap12 = 0x00000000;
 	}
 
 	// ADDRMAP3: [21:16]=addrmap_ba_b1, [13:8]=addrmap_ba_b1, [5:0]=addrmap_ba_b0
@@ -288,8 +301,8 @@ void config_lp4x_addrmap(volatile uint32_t* ddrc_reg, ddr_part_info* part_info)
 	ddrc_reg[0x00030028 / 4] = addrmap10;
 	// ADDRMAP11: row address mapping (row0~row1)
 	ddrc_reg[0x0003002c / 4] = addrmap11;
-	// ADDRMAP12: address mapping extension register, use default value
-	ddrc_reg[0x00030030 / 4] = 0x00000000;
+	// ADDRMAP12: address mapping extension register
+	ddrc_reg[0x00030030 / 4] = addrmap12;
 }
 
 void init_snps_lp4x_ddrc(unsigned DDRC_BASE, ddr_part_info* part_info,
