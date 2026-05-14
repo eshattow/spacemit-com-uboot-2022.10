@@ -48,8 +48,6 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define SPACEMIT_SDHC_DLINE_CFG_REG	0x134
 #define  SDHC_RX_DLINE_REG		GENMASK(7, 0)
-#define  SDHC_RX_DLINE_GAIN		BIT(8)
-#define  SDHC_SDR50_DLINE_GAIN_EN	BIT(6)
 #define  SDHC_TX_DLINE_REG		GENMASK(23, 16)
 
 #define SPACEMIT_SDHC_PHY_CTRL_REG	0x160
@@ -135,7 +133,7 @@ struct spacemit_sdhci_priv {
  * in the start-up phase, use the 200KHz frequency
  */
 #define SDHC_DEFAULT_MAX_CLOCK (204800000)
-#define SDHC_MIN_CLOCK (200*1000)
+#define SDHC_MIN_CLOCK (200 * 1000)
 
 #if CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
 static int spacemit_sdhci_post_select_hs400(struct sdhci_host *host);
@@ -170,7 +168,7 @@ static void spacemit_mmc_phy_init(struct sdhci_host *host)
 		/* sd/sdio has no phy */
 		spacemit_sdhci_setbits(host, SDHC_TX_INT_CLK_SEL, SPACEMIT_SDHC_TX_CFG_REG);
 	} else {
-#if !defined(CONFIG_K1_X_BOARD_FPGA) && !defined(CONFIG_K3_X_BOARD_FPGA)
+#if !defined(CONFIG_K1_X_BOARD_FPGA) && !defined(CONFIG_K3_BOARD_FPGA)
 		/* use phy func mode */
 		spacemit_sdhci_setbits(host, SDHC_PHY_FUNC_EN | SDHC_PHY_PLL_LOCK,
 				       SPACEMIT_SDHC_PHY_CTRL_REG);
@@ -281,11 +279,12 @@ static int spacemit_sdhci_wait_dat0(struct udevice *dev, int state,
 	u32 tmp;
 	u32 cmd;
 
-	// readx_poll_timeout is unsuitable because sdhci_readl accepts
-	// two arguments
+	/* readx_poll_timeout is unsuitable because sdhci_readl accepts
+	 * two arguments
+	 */
 	do {
 		tmp = sdhci_readl(host, SDHCI_PRESENT_STATE);
-		if (!!(tmp & SDHCI_DATA_0_LVL_MASK) == !!state){
+		if (!!(tmp & SDHCI_DATA_0_LVL_MASK) == !!state) {
 			if (IS_SD(mmc)) {
 				cmd = SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND));
 				if ((cmd == SD_CMD_SWITCH_UHS18V) && (mmc->signal_voltage == MMC_SIGNAL_VOLTAGE_180)) {
@@ -371,20 +370,10 @@ static int spacemit_sdhci_set_ios_post(struct sdhci_host *host)
 static void spacemit_sw_rx_tuning_prepare(struct sdhci_host *host, u8 dline_reg)
 {
 	struct mmc *mmc = host->mmc;
-	u32 reg;
 
-	reg = sdhci_readl(host, SPACEMIT_SDHC_DLINE_CFG_REG);
-	if ((mmc->selected_mode == UHS_SDR50) && (reg & SDHC_SDR50_DLINE_GAIN_EN))
-		spacemit_sdhci_clrsetbits(host, SDHC_RX_DLINE_REG |
-					SDHC_RX_DLINE_GAIN,
-					FIELD_PREP(SDHC_RX_DLINE_REG, dline_reg) |
-					FIELD_PREP(SDHC_RX_DLINE_GAIN, 1),
-					SPACEMIT_SDHC_DLINE_CFG_REG);
-	else
-		spacemit_sdhci_clrsetbits(host, SDHC_RX_DLINE_REG |
-					SDHC_RX_DLINE_GAIN,
-					FIELD_PREP(SDHC_RX_DLINE_REG, dline_reg),
-					SPACEMIT_SDHC_DLINE_CFG_REG);
+	spacemit_sdhci_clrsetbits(host, SDHC_RX_DLINE_REG,
+				  FIELD_PREP(SDHC_RX_DLINE_REG, dline_reg),
+				  SPACEMIT_SDHC_DLINE_CFG_REG);
 
 	spacemit_sdhci_setbits(host, SDHC_DLINE_PU, SPACEMIT_SDHC_DLINE_CTRL_REG);
 	udelay(5);
@@ -463,11 +452,11 @@ static int spacemit_sw_rx_select_window(struct sdhci_host *host, u32 opcode)
 	window->max_delay = max;
 
 	if (rxtuning->window_type == LEFT_WINDOW)
-		rxtuning->select_delay = window->min_delay + max_windows/3;
+		rxtuning->select_delay = window->min_delay + max_windows / 3;
 	else if (rxtuning->window_type == RIGHT_WINDOW)
-		rxtuning->select_delay = window->min_delay + max_windows*2/3;
+		rxtuning->select_delay = window->min_delay + max_windows * 2 / 3;
 	else
-		rxtuning->select_delay = window->min_delay + max_windows/2;
+		rxtuning->select_delay = window->min_delay + max_windows / 2;
 
 	return 0;
 }
@@ -484,9 +473,9 @@ static int spacemit_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
 	 * if clock frequency is greater than 100MHz in these modes.
 	 */
 	if (mmc->clock < 100 * 1000 * 1000 ||
-		!((mmc->selected_mode == MMC_HS_200) ||
-		  (mmc->selected_mode == UHS_SDR50) ||
-		  (mmc->selected_mode == UHS_SDR104)))
+	    !((mmc->selected_mode == MMC_HS_200) ||
+	      (mmc->selected_mode == UHS_SDR50) ||
+	      (mmc->selected_mode == UHS_SDR104)))
 		return 0;
 
 	if (IS_SD(mmc) && !mmc_getcd(mmc)) {
