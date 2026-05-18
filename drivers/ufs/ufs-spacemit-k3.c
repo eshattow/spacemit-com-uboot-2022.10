@@ -192,6 +192,10 @@ static int spacemit_k3_ufs_parse_ref_clk_freq(u32 raw, u32 *ref_clk_freq)
  */
 static int spacemit_k3_ufs_set_power_mode(struct ufs_hba *hba)
 {
+	struct ufs_pa_layer_attr final_pwr;
+	struct ufs_pa_layer_attr auto_pwr;
+	bool need_fastauto;
+	int retry;
 	int ret;
 
 	ret = ufshcd_get_max_pwr_mode(hba);
@@ -207,8 +211,51 @@ static int spacemit_k3_ufs_set_power_mode(struct ufs_hba *hba)
 	 * ufshcd_get_max_pwr_mode() sets Rate A by default.
 	 */
 	hba->max_pwr_info.info.hs_rate = PA_HS_MODE_B;
+	memcpy(&final_pwr, &hba->max_pwr_info.info, sizeof(final_pwr));
 
-	ret = ufshcd_change_power_mode(hba, &hba->max_pwr_info.info);
+	/*
+	 * Some devices need a short settle time after the capability queries
+	 * before accepting the HS PA_PWRMODE transition reliably.
+	 */
+	mdelay(1);
+
+	need_fastauto = final_pwr.pwr_rx == FAST_MODE &&
+			final_pwr.pwr_tx == FAST_MODE;
+	if (need_fastauto) {
+		auto_pwr = final_pwr;
+		auto_pwr.pwr_rx = FASTAUTO_MODE;
+		auto_pwr.pwr_tx = FASTAUTO_MODE;
+	}
+
+	for (retry = 0; retry < 3; retry++) {
+		/*
+		 * Enter FASTAUTO first, let the link settle, then request FAST
+		 * mode. Some devices complete direct FAST transition but stop
+		 * responding to UTP queries immediately after it.
+		 */
+		if (need_fastauto) {
+			ret = ufshcd_change_power_mode(hba, &auto_pwr);
+			if (ret) {
+				dev_err(hba->dev,
+					"%s: Failed setting FASTAUTO mode, retry %d, err = %d\n",
+					__func__, retry + 1, ret);
+				mdelay(10);
+				continue;
+			}
+
+			mdelay(1);
+		}
+
+		ret = ufshcd_change_power_mode(hba, &final_pwr);
+		if (!ret)
+			break;
+
+		dev_err(hba->dev,
+			"%s: Failed setting power mode, retry %d, err = %d\n",
+			__func__, retry + 1, ret);
+		mdelay(10);
+	}
+
 	if (ret) {
 		dev_err(hba->dev, "%s: Failed setting power mode, err = %d\n",
 			__func__, ret);

@@ -405,6 +405,30 @@ static inline int ufshcd_get_lists_status(u32 reg)
 	return !((reg & UFSHCD_STATUS_READY) == UFSHCD_STATUS_READY);
 }
 
+static inline void ufshcd_utrl_clear(struct ufs_hba *hba, u32 mask)
+{
+	/*
+	 * UTRLCLR uses 0 to clear a request slot and 1 to leave a slot
+	 * unchanged.
+	 */
+	ufshcd_writel(hba, ~mask, REG_UTP_TRANSFER_REQ_LIST_CLEAR);
+}
+
+static int ufshcd_clear_cmd(struct ufs_hba *hba, unsigned int task_tag)
+{
+	u32 mask = BIT(task_tag);
+	int ret;
+
+	ufshcd_utrl_clear(hba, mask);
+
+	ret = ufshcd_wait_for_register(hba, REG_UTP_TRANSFER_REQ_DOOR_BELL,
+				       mask, 0, 1000);
+	if (ret)
+		dev_err(hba->dev, "Timedout clearing UTP tag %u\n", task_tag);
+
+	return ret;
+}
+
 /**
  * ufshcd_enable_run_stop_reg - Enable run-stop registers,
  *			When run-stop registers are set to 1, it indicates the
@@ -914,6 +938,8 @@ static int ufshcd_send_command(struct ufs_hba *hba, unsigned int task_tag,
 	/* Ensure descriptor writes are visible before ringing the doorbell. */
 	wmb();
 	ufshcd_writel(hba, 1 << task_tag, REG_UTP_TRANSFER_REQ_DOOR_BELL);
+	if (IS_ENABLED(CONFIG_SPACEMIT_K3_UFS))
+		ufshcd_readl(hba, REG_UTP_TRANSFER_REQ_DOOR_BELL);
 
 	start = get_timer(0);
 	do {
@@ -924,6 +950,7 @@ static int ufshcd_send_command(struct ufs_hba *hba, unsigned int task_tag,
 		if (get_timer(start) > timeout_ms) {
 			dev_err(hba->dev,
 				"Timedout waiting for UTP response\n");
+			ufshcd_clear_cmd(hba, task_tag);
 
 			return -ETIMEDOUT;
 		}
