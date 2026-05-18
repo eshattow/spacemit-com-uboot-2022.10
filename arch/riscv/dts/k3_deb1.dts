@@ -47,6 +47,14 @@
 		power-source = <1800>;
 	};
 
+	qspi_grp {
+		power-source = <1800>;
+	};
+
+	qspi_cs0_grp {
+		power-source = <1800>;
+	};
+
 	usb30_drd_dir_0_cfg: usb30_drd_dir-0-cfg {
 		pinctrl-single,pins =<
 			K3_PADCONF(GPIO_86, MUX_MODE6, (EDGE_NONE | PULL_UP | PAD_DS8)) /* usb30 drd dir */
@@ -206,7 +214,7 @@
 &qspi {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_qspi>;
+	pinctrl-0 = <&pinctrl_qspi &pinctrl_qspi_cs0>;
 
 	flash@0 {
 		compatible = "jedec,spi-nor";

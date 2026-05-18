@@ -1134,9 +1134,20 @@
 			K3_PADCONF(QSPI_DAT3, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d3 */
 			K3_PADCONF(QSPI_DAT2, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d2 */
 			K3_PADCONF(QSPI_DAT1, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d1 */
-			K3_PADCONF(QSPI_DAT0, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d1 */
+			K3_PADCONF(QSPI_DAT0, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d0 */
 			K3_PADCONF(QSPI_CLK, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_clk */
-			K3_PADCONF(QSPI_CS1, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* qspi_cs */
+		>;
+	};
+
+	pinctrl_qspi_cs0: qspi_cs0_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(QSPI_CS0, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* qspi_cs0 */
+		>;
+	};
+
+	pinctrl_qspi_cs1: qspi_cs1_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(QSPI_CS1, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* qspi_cs1 */
 		>;
 	};
 
@@ -1750,4 +1761,3 @@
 		>;
 	};
 };
-
