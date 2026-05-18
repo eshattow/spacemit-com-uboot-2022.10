@@ -50,11 +50,19 @@ static int test_pattern(fdt_addr_t base, fdt_size_t size)
 	err = 0;
 
 	check_size = (DDR_CHECK_SIZE / DDR_CHECK_STEP) * DDR_CHECK_CNT;
-	ddr_data = malloc(check_size);
-	if (!ddr_data) {
-		pr_err("test zone malloc fail size 0x%llx\n", check_size);
+	if (check_size > DDR_QUICKBOOT_FIRMWARE_FW_MAX_SIZE) {
+		pr_err("backup size exceeds reserved quickboot area, need 0x%lx (max 0x%lx)\n",
+		       (unsigned long)check_size,
+		       (unsigned long)DDR_QUICKBOOT_FIRMWARE_FW_MAX_SIZE);
 		return -1;
 	}
+
+	/*
+	 * DDR restore can consume most of SPL malloc_f before full
+	 * malloc is available. Reuse the quickboot firmware area after DDR
+	 * init, while keeping the training info header intact.
+	 */
+	ddr_data = (uint32_t *)DDR_QUICKBOOT_FIRMWARE_FW_ADDR;
 
 	save_data = ddr_data;
 	/* to avoid overlap important data as image or ramdump  */
@@ -109,8 +117,6 @@ ERR_HANDLE:
 		pr_info("memory verify pass\n");
 	else
 		printf("memory verify fail!\n");
-
-	free(ddr_data);
 
 	return err;
 }

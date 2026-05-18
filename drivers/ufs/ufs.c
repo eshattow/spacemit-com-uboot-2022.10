@@ -698,6 +698,13 @@ static void ufshcd_host_memory_configure(struct ufs_hba *hba)
  */
 static int ufshcd_memory_alloc(struct ufs_hba *hba)
 {
+	if (hba->utrdl && hba->ucdl && hba->utmrdl) {
+		memset(hba->utrdl, 0, sizeof(struct utp_transfer_req_desc));
+		memset(hba->ucdl, 0, sizeof(struct utp_transfer_cmd_desc));
+		memset(hba->utmrdl, 0, sizeof(struct utp_task_req_desc));
+		return 0;
+	}
+
 	/* Allocate one Transfer Request Descriptor
 	 * Should be aligned to 1k boundary.
 	 */
