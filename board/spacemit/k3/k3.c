@@ -47,6 +47,8 @@ extern int set_tlvinfo(int tcode, char* val);
 extern int flush_tlvinfo(void);
 extern int update_tlvinfo(void);
 
+int get_chipid_from_efuse(uint64_t *chipid);
+
 bool is_video_connected = false;
 static char found_partition[64] = {0};
 static uint32_t reboot_config;
@@ -1732,6 +1734,40 @@ int board_fit_config_name_match(const char *name)
 }
 #endif
 
+static int ft_board_cpu_fixup(void *blob, struct bd_info *bd)
+{
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+	int node, ret;
+	uint32_t product_id, wafer_tid;
+	uint32_t dro = SVT_DRO_DEFAULT_VALUE;
+
+	node = fdt_path_offset(blob, "/");
+	if (node < 0) {
+		pr_err("Can't find root node!\n");
+		return -EINVAL;
+	}
+
+	get_chipinfo_from_efuse(&product_id, &wafer_tid);
+	product_id = cpu_to_fdt32(product_id);
+	wafer_tid = cpu_to_fdt32(wafer_tid);
+	fdt_setprop(blob, node, "product-id", &product_id, sizeof(product_id));
+	fdt_setprop(blob, node, "wafer-id", &wafer_tid, sizeof(wafer_tid));
+
+	node = fdt_path_offset(blob, "/cpus");
+	if (node < 0) {
+		pr_err("Can't find cpus node!\n");
+		return -EINVAL;
+	}
+
+	get_dro_from_efuse(&dro);
+	dro = cpu_to_fdt32(dro);
+	ret = fdt_setprop(blob, node, "svt-dro", &dro, sizeof(dro));
+	if (ret < 0)
+		return ret;
+#endif
+	return 0;
+}
+
 static int ft_board_info_fixup(void *blob, struct bd_info *bd)
 {
 	int node;
@@ -1787,6 +1823,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 		fdtdec_add_reserved_memory(blob, "framebuffer", &mem, NULL, 0, NULL, 0);
 	}
 
+	ft_board_cpu_fixup(blob, bd);
 	ft_board_info_fixup(blob, bd);
 	ft_board_mac_addr_fixup(blob, bd);
 	return 0;

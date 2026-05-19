@@ -106,7 +106,7 @@
 #define BOOTFS_NAME			("bootfs")
 
 // for those has NOT been through test procedure(ATE)
-#define SVT_DRO_DEFAULT_VALUE		(120)
+#define SVT_DRO_DEFAULT_VALUE		(205)
 
 // non-volatile register in P1
 #define P1_NON_VOLATILE_REG		(0xab)
