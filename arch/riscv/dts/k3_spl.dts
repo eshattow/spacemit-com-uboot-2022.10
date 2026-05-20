@@ -176,9 +176,21 @@
 					K3_PADCONF(QSPI_DAT3, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d3 */
 					K3_PADCONF(QSPI_DAT2, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d2 */
 					K3_PADCONF(QSPI_DAT1, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d1 */
-					K3_PADCONF(QSPI_DAT0, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d1 */
+					K3_PADCONF(QSPI_DAT0, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_d0 */
 					K3_PADCONF(QSPI_CLK, MUX_MODE0, (EDGE_NONE | PULL_DIS | PAD_DS8)) /* qspi_clk */
-					K3_PADCONF(QSPI_CS1, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* qspi_cs */
+				>;
+			};
+			pinctrl_qspi_cs0: qspi_cs0_grp {
+				u-boot,dm-spl;
+				power-source = <1800>;
+				pinctrl-single,pins = <
+					K3_PADCONF(QSPI_CS0, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* qspi_cs0 */
+				>;
+			};
+			pinctrl_qspi_cs1: qspi_cs1_grp {
+				u-boot,dm-spl;
+				pinctrl-single,pins = <
+					K3_PADCONF(QSPI_CS1, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_DS8)) /* qspi_cs1 */
 				>;
 			};
 		};
@@ -210,9 +222,9 @@
 			reg = <0 0 0 0>;
 			remoteproc-name = "rcpu1";
 			coreid = <1>;
-			mem_heap_start = <0x1 0xB04000>;
+			mem_heap_start = <0x1 0xB00000>;
 			mem_heap_size = <0x200000>;
-			fw_boot_entry = <0x1 0x804000>;
+			fw_boot_entry = <0x1 0x800000>;
 			status = "okay";
 		};
 
@@ -232,7 +244,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_qspi>;
+			pinctrl-0 = <&pinctrl_qspi &pinctrl_qspi_cs0>;
 			reg = <0x0 0xd420c000 0x0 0x1000>,
 			      <0x0 0xb8000000 0x0 0x4100000>;
 			reg-names = "qspi-base", "qspi-mmap";

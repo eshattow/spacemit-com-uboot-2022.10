@@ -34,6 +34,7 @@
 #include "nfs_env.h"
 #include <power/pmic.h>
 #include <u-boot/crc.h>
+#include <linux/log2.h>
 #include <spi_flash.h>
 
 #ifdef CONFIG_ESPI
@@ -45,6 +46,8 @@ extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);
 extern int set_tlvinfo(int tcode, char* val);
 extern int flush_tlvinfo(void);
 extern int update_tlvinfo(void);
+
+int get_chipid_from_efuse(uint64_t *chipid);
 
 bool is_video_connected = false;
 static char found_partition[64] = {0};
@@ -999,7 +1002,7 @@ int misc_init_r(void)
 u64 read_memory_size_from_dtb(void)
 {
 	ofnode node, subnode;
-	u64 dram_size = 6UL * 1024 * 1024 * 1024; /* default 6GB */
+	u64 dram_size = 0;
 	fdt_size_t size;
 	const void *fdt = gd->fdt_blob;
 	const char *prop;
@@ -1016,9 +1019,8 @@ u64 read_memory_size_from_dtb(void)
 		if (prop && !strcmp(prop, "memory")) {
 			size = ofnode_get_size(subnode);
 			if (FDT_SIZE_T_NONE != size) {
-				dram_size = size;
+				dram_size += size;
 				pr_debug("Found memory node, size: 0x%llx\n", dram_size);
-				break;
 			}
 		}
 	}
@@ -1055,25 +1057,48 @@ int dram_init(void)
 
 int dram_init_banksize(void)
 {
+	u64 dram_size;
+
 	if (0 == gd->ram_size)
 		dram_init();
 
 	memset(gd->bd->bi_dram, 0, sizeof(gd->bd->bi_dram));
+
+	dram_size = gd->ram_base + gd->ram_size - (CONFIG_SYS_SDRAM_BASE - SEC_IMG_SIZE);
 	gd->bd->bi_dram[0].start = gd->ram_base;
 	gd->bd->bi_dram[0].size = gd->ram_size;
+
+	if (!is_power_of_2(dram_size)) {
+		// skip memory address gap when DDR density is not power of 2
+		gd->bd->bi_dram[0].size -= dram_size / 2;
+
+		gd->bd->bi_dram[1].start = CONFIG_SYS_SDRAM_BASE - SEC_IMG_SIZE + roundup_pow_of_two(dram_size / 2);
+		gd->bd->bi_dram[1].size = dram_size / 2;
+	}
 
 	return 0;
 }
 
 ulong board_get_usable_ram_top(ulong total_size)
 {
+	u64 dram_size, memory_top;
+
+	memory_top = gd->ram_base + gd->ram_size;
+	dram_size = memory_top - (CONFIG_SYS_SDRAM_BASE - SEC_IMG_SIZE);
+
+	if (!is_power_of_2(dram_size)) {
+		// only use half memory when DDR density is not power of 2
+		memory_top -= dram_size / 2;
+	}
+
 	// DPU can only access 34bit address space
-	if ((gd->ram_base + gd->ram_size) > 0x400000000) {
+	if (memory_top > 0x400000000) {
 		return 0x400000000;
 	} else {
-		return gd->ram_base + gd->ram_size;
+		return memory_top;
 	}
 }
+
 void *board_fdt_blob_setup(int *err)
 {
 	*err = 0;
@@ -1709,6 +1734,40 @@ int board_fit_config_name_match(const char *name)
 }
 #endif
 
+static int ft_board_cpu_fixup(void *blob, struct bd_info *bd)
+{
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+	int node, ret;
+	uint32_t product_id, wafer_tid;
+	uint32_t dro = SVT_DRO_DEFAULT_VALUE;
+
+	node = fdt_path_offset(blob, "/");
+	if (node < 0) {
+		pr_err("Can't find root node!\n");
+		return -EINVAL;
+	}
+
+	get_chipinfo_from_efuse(&product_id, &wafer_tid);
+	product_id = cpu_to_fdt32(product_id);
+	wafer_tid = cpu_to_fdt32(wafer_tid);
+	fdt_setprop(blob, node, "product-id", &product_id, sizeof(product_id));
+	fdt_setprop(blob, node, "wafer-id", &wafer_tid, sizeof(wafer_tid));
+
+	node = fdt_path_offset(blob, "/cpus");
+	if (node < 0) {
+		pr_err("Can't find cpus node!\n");
+		return -EINVAL;
+	}
+
+	get_dro_from_efuse(&dro);
+	dro = cpu_to_fdt32(dro);
+	ret = fdt_setprop(blob, node, "svt-dro", &dro, sizeof(dro));
+	if (ret < 0)
+		return ret;
+#endif
+	return 0;
+}
+
 static int ft_board_info_fixup(void *blob, struct bd_info *bd)
 {
 	int node;
@@ -1764,6 +1823,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 		fdtdec_add_reserved_memory(blob, "framebuffer", &mem, NULL, 0, NULL, 0);
 	}
 
+	ft_board_cpu_fixup(blob, bd);
 	ft_board_info_fixup(blob, bd);
 	ft_board_mac_addr_fixup(blob, bd);
 	return 0;

@@ -106,7 +106,7 @@
 #define BOOTFS_NAME			("bootfs")
 
 // for those has NOT been through test procedure(ATE)
-#define SVT_DRO_DEFAULT_VALUE		(120)
+#define SVT_DRO_DEFAULT_VALUE		(205)
 
 // non-volatile register in P1
 #define P1_NON_VOLATILE_REG		(0xab)
@@ -198,5 +198,7 @@ const struct k3_nor_boot_target *k3_nor_get_boot_prio(unsigned int *count);
 	"splashimage=" __stringify(CONFIG_FASTBOOT_BUF_ADDR) "\0" \
 	"splashpos=m,m\0" \
 	"splashfile=bianbu.bmp\0"
+
+#define CONFIG_ENV_FLAGS_LIST_STATIC "serial#:sa"
 
 #endif /* __SPACEMIT_K3_CONFIG_H */

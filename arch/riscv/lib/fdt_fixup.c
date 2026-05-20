@@ -217,7 +217,7 @@ int arch_fixup_fdt(void *blob)
 			continue;
 
 		memset(memstart, 0, 32);
-		sprintf(memstart, "memory@%llx", gd->bd->bi_dram[bank_index].start);
+		sprintf(memstart, "memory@%lx", (unsigned long)gd->bd->bi_dram[bank_index].start);
 
 		ram_base[0] = gd->bd->bi_dram[bank_index].start;
 		ram_size[0] = gd->bd->bi_dram[bank_index].size;

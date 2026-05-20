@@ -52,6 +52,10 @@
 		power-source = <1800>;
 	};
 
+	qspi_cs0_grp {
+		power-source = <1800>;
+	};
+
 };
 
 &uart0 {
@@ -191,7 +195,7 @@
 	status = "okay";
 
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_qspi>;
+	pinctrl-0 = <&pinctrl_qspi &pinctrl_qspi_cs0>;
 
 	flash@0 {
 		compatible = "jedec,spi-nor";
@@ -568,4 +572,8 @@
 			};
 		};
 	};
+};
+
+&efuse {
+	status = "okay";
 };

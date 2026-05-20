@@ -16,7 +16,7 @@
 #define DDR_CHECK_CNT			(0x1000)
 
 // place part_info in .data section to avoid it being cleared during bss clear
-__section(".data") ddr_part_info* part_info;
+__section(".data") static ddr_part_info* part_info;
 
 static const ddr_config_t ddr_default_io_para[] = {
 	// type,              WDS     RX ODT   DQODT CAODT NTODT  SOCODT PDDS  2DTraining
@@ -50,11 +50,19 @@ static int test_pattern(fdt_addr_t base, fdt_size_t size)
 	err = 0;
 
 	check_size = (DDR_CHECK_SIZE / DDR_CHECK_STEP) * DDR_CHECK_CNT;
-	ddr_data = malloc(check_size);
-	if (!ddr_data) {
-		pr_err("test zone malloc fail size 0x%llx\n", check_size);
+	if (check_size > DDR_QUICKBOOT_FIRMWARE_FW_MAX_SIZE) {
+		pr_err("backup size exceeds reserved quickboot area, need 0x%lx (max 0x%lx)\n",
+		       (unsigned long)check_size,
+		       (unsigned long)DDR_QUICKBOOT_FIRMWARE_FW_MAX_SIZE);
 		return -1;
 	}
+
+	/*
+	 * DDR restore can consume most of SPL malloc_f before full
+	 * malloc is available. Reuse the quickboot firmware area after DDR
+	 * init, while keeping the training info header intact.
+	 */
+	ddr_data = (uint32_t *)DDR_QUICKBOOT_FIRMWARE_FW_ADDR;
 
 	save_data = ddr_data;
 	/* to avoid overlap important data as image or ramdump  */
@@ -110,14 +118,13 @@ ERR_HANDLE:
 	else
 		printf("memory verify fail!\n");
 
-	free(ddr_data);
-
 	return err;
 }
 
 const ddr_part_info ddr_parts_info[] = {
 	{ "MT62F1G32D2DS", 0x0FD38DD9, DDR_TYPE_LPDDR5, 1, 0, 4096, CONFIG_DDR_DATARATE },
 	{ "MT62F2G32D4DS", 0x85D1F688, DDR_TYPE_LPDDR5, 2, 0, 8192, CONFIG_DDR_DATARATE },
+	{ "RS3G32LG5D8FDB", 0xF74C6BFC, DDR_TYPE_LPDDR5, 2, 1, 12288, CONFIG_DDR_DATARATE },
 	{ "MT62F4G32D8DV", 0x3ACEF2E4, DDR_TYPE_LPDDR5, 2, 1, 16384, CONFIG_DDR_DATARATE },
 	{ "MT53E1G32D2FW", 0x75251AB8, DDR_TYPE_LPDDR4X, 1, 0, 4096, 4266 },
 	{ "MT53E2G32D4DE", 0x3EA87223, DDR_TYPE_LPDDR4X, 2, 0, 8192, 4266 },

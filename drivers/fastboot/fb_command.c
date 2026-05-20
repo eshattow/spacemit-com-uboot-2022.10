@@ -15,11 +15,14 @@
 #include <stdlib.h>
 #include <spl.h>
 #include <image.h>
+#include <mapmem.h>
 #include <fb_spacemit.h>
 #include <fb_mtd.h>
 #include <fb_blk.h>
 #include <search.h>
 #include <dm.h>
+#include <malloc.h>
+#include <linux/errno.h>
 
 /**
  * image_size - final fastboot image size
@@ -61,6 +64,14 @@ static int import_downloaded_env(void)
 
 	return -EINVAL;
 }
+
+#if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
+static void oem_ec(char *cmd_parameter, char *response)
+{
+	fastboot_oem_flash_ec(cmd_parameter, fastboot_buf_addr, image_size,
+			      response);
+}
+#endif
 #endif
 
 #if !defined(CONFIG_SPL_BUILD)
@@ -131,6 +142,10 @@ static const struct {
 	[FASTBOOT_COMMAND_ERASE] =  {
 		.command = "erase",
 		.dispatch = erase
+	},
+	[FASTBOOT_COMMAND_OEM_EC] = {
+		.command = "oem ec",
+		.dispatch = oem_ec,
 	},
 #endif
 	[FASTBOOT_COMMAND_BOOT] =  {
@@ -860,6 +875,7 @@ static void oem_bootbus(char *cmd_parameter, char *response)
 #endif
 
 #if CONFIG_IS_ENABLED(FASTBOOT_CMD_OEM_READ)
+#if !CONFIG_IS_ENABLED(FIT_SIGNATURE)
 /**
  * read_console_log() - Read data from console log buffer
  *
@@ -891,6 +907,7 @@ static u32 read_console_log(char *fb_buf) {
 
 	return read_size;
 }
+#endif
 
 /**
  * oem_read() - Execute the OEM read command
@@ -900,6 +917,11 @@ static u32 read_console_log(char *fb_buf) {
  */
 static void oem_read(char *cmd_parameter, char *response)
 {
+#if CONFIG_IS_ENABLED(FIT_SIGNATURE)
+	(void)cmd_parameter;
+	fastboot_fail("oem read disabled", response);
+	return;
+#else
 	char *part, *offset_str, *cmd_str;
 	u32 off, boot_mode;
 
@@ -917,6 +939,43 @@ static void oem_read(char *cmd_parameter, char *response)
 
 		fastboot_bytes_expected = read_size;
 		fastboot_response("OKAY", response, "%08x", read_size);
+		return;
+	}
+
+	if (strcmp(part, "mem") == 0) {
+		char *addr_str = strsep(&cmd_str, " ");
+		char *size_str = strsep(&cmd_str, " ");
+		char *endp;
+		phys_addr_t addr;
+		u64 size64;
+		u32 size;
+		void *src;
+
+		if (!addr_str || !size_str) {
+			fastboot_fail("usage: fastboot oem read:mem <addr> <size>", response);
+			return;
+		}
+
+		addr = simple_strtoull(addr_str, &endp, 0);
+		if (*endp) {
+			fastboot_fail("invalid memory address", response);
+			return;
+		}
+
+		size64 = simple_strtoull(size_str, &endp, 0);
+		if (*endp || !size64 || size64 > fastboot_buf_size ||
+		    addr + size64 < addr) {
+			fastboot_fail("invalid memory size", response);
+			return;
+		}
+		size = size64;
+
+		src = map_sysmem(addr, size);
+		memmove(fastboot_buf_addr, src, size);
+		unmap_sysmem(src);
+
+		fastboot_bytes_expected = size;
+		fastboot_response("OKAY", response, "%08x", size);
 		return;
 	}
 
@@ -959,6 +1018,7 @@ static void oem_read(char *cmd_parameter, char *response)
 	}
 
 	fastboot_okay(NULL, response);
+#endif
 }
 #endif
 
