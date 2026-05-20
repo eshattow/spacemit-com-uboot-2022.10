@@ -1470,37 +1470,6 @@ static int write_config_info_to_eeprom(uint32_t id, char *value)
 		return -1;
 }
 
-#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
-static int write_config_info_to_efuse(uint32_t id, char *value)
-{
-	struct udevice *dev;
-	uint8_t fuses[2];
-	int ret;
-
-	/* retrieve the device */
-	ret = uclass_get_device_by_driver(UCLASS_MISC,
-					  DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
-	if (ret) {
-		return ret;
-	}
-
-	memset(fuses, 0, sizeof(fuses));
-	if (TLV_CODE_PMIC_TYPE == id)
-		fuses[1] |= dectoul(value, NULL) & 0x0F;
-	else if (TLV_CODE_EEPROM_I2C_INDEX == id)
-		fuses[0] |= dectoul(value, NULL) & 0x0F;
-	else if (TLV_CODE_EEPROM_PIN_GROUP == id)
-		fuses[0] |= (dectoul(value, NULL) & 0x03) << 4;
-	else {
-		pr_err("NOT support efuse ID %d\n", id);
-		return EFAULT;
-	}
-
-	// write to efuse, each bank has 32byte efuse data
-	return misc_write(dev, K1_EFUSE_USER_BANK0 * 32, fuses, sizeof(fuses));
-}
-#endif
-
 static struct oem_config_info* get_config_info(char *key)
 {
 	int i;
@@ -1553,10 +1522,6 @@ static void write_oem_configuration(char *config, char *response)
 
 	if (0 == strcmp(dest, "eeprom"))
 		config_write = write_config_info_to_eeprom;
-#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
-	else if (0 == strcmp(dest, "efuse"))
-		config_write = write_config_info_to_efuse;
-#endif
 	else {
 		fastboot_fail("NOT support destination", response);
 		return;
