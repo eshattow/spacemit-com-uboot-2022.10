@@ -47,7 +47,7 @@ static int check_for_keys(struct udevice *dev, struct key_matrix_key *keys,
 	struct key_matrix_key *key;
 	static struct mbkp_keyscan last_scan;
 	static bool last_scan_valid;
-	struct ec_response_get_next_event event;
+	struct ec_response_get_next_event_v1 event;
 	struct mbkp_keyscan *scan = (struct mbkp_keyscan *)
 				    &event.data.key_matrix;
 	unsigned int row, col, bit, data;
@@ -56,7 +56,7 @@ static int check_for_keys(struct udevice *dev, struct key_matrix_key *keys,
 
 	/* Get pending MKBP event. It may not be a key matrix event. */
 	do {
-		ret = cros_ec_get_next_event(dev->parent, &event);
+		ret = cros_ec_get_next_event_v1(dev->parent, &event);
 		/* The EC has no events for us at this time. */
 		if (ret == -EC_RES_UNAVAILABLE)
 			return -EIO;

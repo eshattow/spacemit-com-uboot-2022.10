@@ -435,6 +435,21 @@ int cros_ec_get_next_event(struct udevice *dev,
 	return 0;
 }
 
+int cros_ec_get_next_event_v1(struct udevice *dev,
+			   struct ec_response_get_next_event_v1 *event)
+{
+	int ret;
+
+	ret = ec_command(dev, EC_CMD_GET_NEXT_EVENT, 1, NULL, 0,
+			 event, sizeof(*event));
+	if (ret < 0)
+		return ret;
+	else if (ret != sizeof(*event))
+		return -EC_RES_INVALID_RESPONSE;
+
+	return 0;
+}
+
 int cros_ec_read_id(struct udevice *dev, char *id, int maxlen)
 {
 	struct ec_response_get_version *r;

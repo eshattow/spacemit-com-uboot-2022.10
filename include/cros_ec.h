@@ -41,7 +41,7 @@ struct cros_ec_dev {
  * would be more correct to call cros_ec_info() at startup and determine the
  * actual number of keyboard cols from there.
  */
-#define CROS_EC_KEYSCAN_COLS 13
+#define CROS_EC_KEYSCAN_COLS 16
 
 /* Information returned by a key scan */
 struct mbkp_keyscan {
@@ -92,6 +92,10 @@ int cros_ec_scan_keyboard(struct udevice *dev, struct mbkp_keyscan *scan);
  */
 int cros_ec_get_next_event(struct udevice *dev,
 			   struct ec_response_get_next_event *event);
+
+
+int cros_ec_get_next_event_v1(struct udevice *dev,
+			   struct ec_response_get_next_event_v1 *event);
 
 /**
  * Read which image is currently running on the CROS-EC device.
