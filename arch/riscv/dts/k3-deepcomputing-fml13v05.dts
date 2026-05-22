@@ -11,7 +11,8 @@
 #include <dt-bindings/usb/pd.h>
 
 / {
-	model = "spacemit k3 dc board";
+	model = "DeepComputing FML13V05";
+	compatible = "deepcomputing,fml13v05", "spacemit,k3";
 
 	vcc_pcie4: regulator-vcc-pcie4 {
 		compatible = "regulator-fixed";
@@ -550,9 +551,14 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		dpu_out_edp0: endpoint@1 {
+		dpu_out_edp0: endpoint@0 {
 			reg = <1>;
 			remote-endpoint = <&edp0_in_dpu>;
+		};
+
+		dpu_out_dp1: endpoint@1 {
+			reg = <1>;
+			remote-endpoint = <&dp1_in_dpu>;
 		};
 	};
 };
@@ -566,12 +572,29 @@
 	status = "okay";
 
 	ports {
-		dp1_in: port {
+		edp0_in: port {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			edp0_in_dpu: endpoint@0 {
 				reg = <0>;
 				remote-endpoint = <&dpu_out_edp0>;
+			};
+		};
+	};
+};
+
+&dp1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_dp1_1>;
+	status = "okay";
+
+	ports {
+		dp1_in: port {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			dp1_in_dpu: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&dpu_out_dp1>;
 			};
 		};
 	};
