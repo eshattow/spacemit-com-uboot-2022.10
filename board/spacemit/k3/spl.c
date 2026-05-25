@@ -726,10 +726,29 @@ void board_boot_order(u32* spl_boot_list)
 #endif
 }
 
+static void spl_fixup_model(void *fdt)
+{
+	char product_name[64];
+	char model[80];
+	int root;
+
+	root = fdt_path_offset(fdt, "/");
+	if (root < 0)
+		return;
+
+	if (fdt_getprop(fdt, root, "model", NULL))
+		return;
+
+	get_product_name(product_name, sizeof(product_name));
+	snprintf(model, sizeof(model), "spacemit %s board", product_name);
+	fdt_setprop_string(fdt, root, "model", model);
+}
+
 void spl_perform_fixups(struct spl_image_info *spl_image)
 {
 	if ((NULL != spl_image) && (NULL != spl_image->fdt_addr)) {
 		dram_init_banksize();
+		spl_fixup_model(spl_image->fdt_addr);
 		spl_fixup_fdt(spl_image->fdt_addr);
 	}
 }
