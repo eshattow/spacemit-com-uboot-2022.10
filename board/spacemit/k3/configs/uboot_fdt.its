@@ -147,6 +147,26 @@
 				algo = "crc32";
 			};
 		};
+
+		fdt_14 {
+			description = "k3_com260_tq.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3_com260_tq.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
+
+		fdt_15 {
+			description = "k3_com260_ifx2.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3_com260_ifx2.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -227,6 +247,18 @@
 			description = "k3_com260_ifx";
 			loadables = "uboot";
 			fdt = "fdt_13";
+		};
+
+		conf_14 {
+			description = "k3_com260_tq";
+			loadables = "uboot";
+			fdt = "fdt_14";
+		};
+
+		conf_15 {
+			description = "k3_com260_ifx2";
+			loadables = "uboot";
+			fdt = "fdt_15";
 		};
 	};
 };
