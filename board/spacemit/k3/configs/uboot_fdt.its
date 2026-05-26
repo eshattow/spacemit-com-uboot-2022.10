@@ -59,10 +59,10 @@
 		};
 
 		fdt_5 {
-			description = "k3_dc_board.dtb";
+			description = "k3-deepcomputing-fml13v05.dtb";
 			type = "flat_dt";
 			compression = "none";
-			data = /incbin/("../dtb/k3_dc_board.dtb");
+			data = /incbin/("../dtb/k3-deepcomputing-fml13v05.dtb");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -176,7 +176,7 @@
 		};
 
 		conf_5 {
-			description = "k3_dc_board";
+			description = "k3-deepcomputing-fml13v05";
 			loadables = "uboot";
 			fdt = "fdt_5";
 		};
