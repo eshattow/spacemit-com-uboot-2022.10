@@ -634,31 +634,37 @@ uint32_t get_serial_number(char *sn, uint32_t max_size)
 	uint64_t chipid = 0;
 	uint32_t i, seed;
 	int ret = -1;
+	int len;
 	char temp[32], *serial;
 
 	memset(temp, 0, sizeof(temp));
 	memset(sn, 0, max_size);
 
-	serial = env_get("serial#");
-	if (NULL != serial) {
-		strlcpy(temp, serial, sizeof(temp));
-	}
-	else if (get_tlvinfo(TLV_CODE_SERIAL_NUMBER, temp, sizeof(temp)) <= 0) {
-#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
-		// use chipid in efuse as serial number
-		ret = get_chipid_from_efuse(&chipid);
-#endif
-		// check if chipid is valid
-		if ((0 != ret) || (0 == chipid)) {
-			seed = get_ticks();
-			for (i = 0; i < sizeof(chipid); i++) {
-				((uint8_t*)&chipid)[i] = rand_r(&seed);
-			}
+	// eeprom(TLV) is prior than env "serial#"
+	len = get_tlvinfo(TLV_CODE_SERIAL_NUMBER, temp, sizeof(temp) - 1);
+	if (len <= 0) {
+		serial = env_get("serial#");
+		if (NULL != serial) {
+			strlcpy(temp, serial, sizeof(temp));
 		}
-		snprintf(temp, sizeof(temp), "%016llx", chipid);
+		else {
+#if CONFIG_IS_ENABLED(SPACEMIT_K1X_EFUSE)
+			// use chipid in efuse as serial number
+			ret = get_chipid_from_efuse(&chipid);
+#endif
+			// check if chipid is valid
+			if ((0 != ret) || (0 == chipid)) {
+				seed = get_ticks();
+				for (i = 0; i < sizeof(chipid); i++) {
+					((uint8_t*)&chipid)[i] = rand_r(&seed);
+				}
+			}
+			snprintf(temp, sizeof(temp), "%016llx", chipid);
+		}
+		len = strlen(temp);
 	}
 
-	i = min(max_size, (uint32_t)strlen(temp));
+	i = min(max_size, (uint32_t)len);
 	memcpy(sn, temp, i);
 	return i;
 }
