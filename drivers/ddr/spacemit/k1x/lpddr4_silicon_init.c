@@ -138,7 +138,7 @@ void ddr_dfc(unsigned freqNo)
 		break;
 
 	case 1:
-		LogMsg(0, "change to 1600 \n");
+		LogMsg(0, "change to 1066 \n");
 		REG32(0xd4282800 + 0x3b4) = 0x00003B04;
 		REG32(0xd4282800 + 0x0b0) =
 			(1 << TOP_DDRPHY0_EN_OFFSET) |
@@ -158,7 +158,7 @@ void ddr_dfc(unsigned freqNo)
 		break;
 
 	case 3:
-		LogMsg(0, "change to 3200 \n");
+		LogMsg(0, "change to 2133 \n");
 		REG32(0xd4282800 + 0x3b4) = 0x00003b00;
 		REG32(0xd4282800 + 0x0b0) =
 			(1 << TOP_DDRPHY0_EN_OFFSET) |
@@ -203,7 +203,7 @@ void mck6_sw_fc_top(unsigned freqNo)
 		break;
 
 	case 1:
-		/* 1600MT */
+		/* 1066MT */
 		REG32(0xd4282800 + 0x3b4) = 0x00003B04;
 		break;
 
@@ -213,7 +213,7 @@ void mck6_sw_fc_top(unsigned freqNo)
 		break;
 
 	case 3:
-		/* 3200MT */
+		/* 2133MT */
 		REG32(0xd4282800 + 0x3b4) = 0x00003B00;
 		break;
 
@@ -240,6 +240,7 @@ void fp_timing_init(unsigned DDRC_BASE)
 {
 	unsigned int read_data=0;
 
+	// 2133
 	REG32(DDRC_BASE+MC_CH0_BASE+0x0104)= 0xF0800400;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x0100)= 0x00000E20;
 	REG32(DDRC_BASE+MC_CH0_BASE+0x010c)= 0x19194314;
@@ -1170,6 +1171,10 @@ void top_Common_config(uint32_t ddr_data_rate)
 		REG32(0xd4282800 + 0x39c) |= (0x3B << 8);
 	}
 
+	/*config DDR PLL2=2133mhz*/
+	REG32(0xd4282800 + 0x3a8) = 0x20238000;
+	REG32(0xd4282800 + 0x3ac) = 0x50dd632c;
+
 	enable_PLL();
 	mck6_sw_fc_top(BOOT_PP);
 	REG32(0xd42828e8) &= 0xFFFFFFFC;
@@ -1459,13 +1464,22 @@ uint32_t lpddr4_silicon_init(u32 ddr_base, const char *ddr_type, u32 data_rate)
 	fp=2;
 	ddr_dfc(fp);
 	top_training_fp_all(ddr_base, cs_num, fp, info->para);
+
+	fp=3;
+	ddr_dfc(fp);
+	top_training_fp_all(ddr_base, cs_num, fp, info->para);
+
 	if (16384 == size_mb)
 		REG32(ddr_base + 0x24) = (0x10020095 | (3 << 24)); //bit7 MR21 RFU
 
 	/* change dram frequency */
 	switch(data_rate) {
-	case 1600:
+	case 1066:
 		ddr_dfc(1);
+		break;
+
+	case 2133:
+		ddr_dfc(3);
 		break;
 
 	case 2400:
