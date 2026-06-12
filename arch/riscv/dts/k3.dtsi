@@ -984,7 +984,7 @@
 			reset-names = "aes_reset";
 			clocks = <&ccu CLK_AES_WTM>;
 			clock-names = "aes_core_wtm";
-			status = "disabled";
+			status = "okay";
 		};
 
 		dpu: dpu@c0340000 {
