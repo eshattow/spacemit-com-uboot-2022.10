@@ -1,0 +1,134 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * k3 com260 tq board device tree (U-Boot).
+ *
+ * Copyright (C) 2025 SPACEMIT Micro Limited
+ */
+
+#include "k3_com260.dtsi"
+
+/ {
+	model = "spacemit k3 com260 ifx tq board";
+};
+
+&i2c3 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c3_1>;
+
+	raspits-panel@45 {
+		compatible = "raspberrypi,7inch-touchscreen-panel";
+		reg = <0x45>;
+		status = "okay";
+
+		port {
+			panel_in_dsi1: endpoint {
+				remote-endpoint = <&dsi_out>;
+			};
+		};
+	};
+};
+
+&i2c8 {
+	tda38740_1: tda38740@42 {
+		compatible = "spacemit,tda38740";
+		reg = <0x42>;
+		bus = <8>;
+		u-boot,dm-spl;
+
+		regulators {
+			u-boot,dm-spl;
+
+			tda38740_tdcdc_1: TDCDC_REG1 {
+				regulator-name = "tdcdc1";
+				regulator-min-microvolt = <534000>;
+				regulator-max-microvolt = <1100000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
+			};
+		};
+	};
+
+	tda38740_2: tda38740@4f {
+		compatible = "spacemit,tda38740";
+		reg = <0x4f>;
+		bus = <8>;
+		u-boot,dm-spl;
+
+		regulators {
+			u-boot,dm-spl;
+
+			tda38740_tdcdc_2: TDCDC_REG2 {
+				regulator-name = "tdcdc2";
+				regulator-min-microvolt = <534000>;
+				regulator-max-microvolt = <1100000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
+			};
+		};
+	};
+};
+
+&pcie4_rc {
+	status = "disabled";
+};
+
+&dpu {
+	status = "okay";
+
+	dpu_out: port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		dpu_out_dp1: endpoint@1 {
+			reg = <1>;
+			remote-endpoint = <&dp1_in_dpu>;
+		};
+	};
+
+};
+
+&mipi_dsi {
+	bit-clk = <700000000>;
+	pix-clk = <24000000>;
+	status = "okay";
+
+	ports {
+		mipi_in: port {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			dsi_out: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&panel_in_dsi1>;
+			};
+		};
+	};
+};
+
+&panel {
+	force-attached = "lcd_tc358762xbg_dpi_800x480";
+	status = "okay";
+};
+
+&dp1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_dp1_3>;
+	status = "okay";
+
+	ports {
+		dp1_in: port {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			dp1_in_dpu: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&dpu_out_dp1>;
+			};
+		};
+	};
+};
