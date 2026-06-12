@@ -291,6 +291,106 @@ static int cpu_frequency_set(void)
 	return 0;
 }
 
+
+#if CONFIG_IS_ENABLED(SPACEMIT_POWER)
+/*
+ * SVT-DRO is stored in efuse bank7 bits 173~181 (bytes 21~22).
+ *
+ * Voltage table (x100 = 2.2G/dcdc1, a100 = dcdc2):
+ *   201 < DRO <= 207        : x100=0.96V  a100=1.00V
+ *   207 < DRO <= 211        : x100=0.95V  a100=1.00V
+ *   DRO > 211               : x100=0.94V  a100=0.95V
+ */
+#define DRO_VOLT_1000MV		1000000
+#define DRO_VOLT_960MV		960000
+#define DRO_VOLT_950MV		950000
+#define DRO_VOLT_940MV		940000
+
+#define DRO_THRESHOLD_LOW	201
+#define DRO_THRESHOLD_MID	207
+#define DRO_THRESHOLD_HIGH	211
+
+struct dro_rail {
+	const char * const *names;
+	int		    nnames;
+	uint32_t	    uv;
+};
+
+/* dcdc1 = x100 (2.2G), dcdc2 = a100 (base) */
+static const char * const dro_dcdc1_names[] = { "tdcdc1", "idcdc1", "adcdc1" };
+static const char * const dro_dcdc2_names[] = { "tdcdc2", "idcdc2", "adcdc2" };
+
+static int get_dro_from_efuse(uint32_t *dro)
+{
+	struct udevice *dev;
+	uint8_t fuses[2];
+	int ret;
+
+	if (NULL == dro)
+		return EACCES;
+
+	*dro = SVT_DRO_DEFAULT_VALUE;
+
+	/* retrieve the device */
+	ret = uclass_get_device_by_driver(UCLASS_MISC,
+			DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
+	if (ret)
+		return ENODEV;
+
+	/* read from efuse, each bank has 32byte efuse data */
+	/* SVT-DRO in bank7 bit173~bit181 */
+	ret = misc_read(dev, 7 * 32 + 21, fuses, sizeof(fuses));
+	if (0 == ret) {
+		/* (byte1 bit0~bit5) << 3 | (byte0 bit5~7) >> 5 */
+		*dro = (fuses[0] >> 5) & 0x07;
+		*dro |= (fuses[1] & 0x3F) << 3;
+	}
+
+	return 0;
+}
+
+static void fixup_regulator_uv(void *fdt, const char *name, uint32_t uv)
+{
+	uint32_t val = cpu_to_fdt32(uv);
+	int node = fdt_node_offset_by_prop_value(fdt, -1, "regulator-name",
+						 name, strlen(name) + 1);
+	if (node < 0)
+		return;
+	fdt_setprop_inplace(fdt, node, "regulator-init-microvolt", &val, sizeof(val));
+}
+
+static void spl_fixup_pmic_voltage_by_dro(void)
+{
+	void *fdt = (void *)gd->fdt_blob;
+	uint32_t dro;
+	struct dro_rail rails[2] = {
+		{ dro_dcdc1_names, ARRAY_SIZE(dro_dcdc1_names), 0 },
+		{ dro_dcdc2_names, ARRAY_SIZE(dro_dcdc2_names), 0 },
+	};
+	int i, j;
+
+	if (get_dro_from_efuse(&dro))
+		dro = SVT_DRO_DEFAULT_VALUE;
+
+	if (dro > DRO_THRESHOLD_HIGH) {
+		rails[0].uv = DRO_VOLT_940MV;
+		rails[1].uv = DRO_VOLT_950MV;
+	} else if (dro > DRO_THRESHOLD_MID) {
+		rails[0].uv = DRO_VOLT_950MV;
+		rails[1].uv = DRO_VOLT_1000MV;
+	} else {
+		rails[0].uv = DRO_VOLT_960MV;
+		rails[1].uv = DRO_VOLT_1000MV;
+	}
+
+	printf("SPL: DRO=%u, x100=%uuV, a100=%uuV\n", dro, rails[0].uv, rails[1].uv);
+
+	for (i = 0; i < ARRAY_SIZE(rails); i++)
+		for (j = 0; j < rails[i].nnames; j++)
+			fixup_regulator_uv(fdt, rails[i].names[j], rails[i].uv);
+}
+#endif /* CONFIG_IS_ENABLED(SPACEMIT_POWER) */
+
 int spl_board_init_f(void)
 {
 	int ret;
@@ -339,6 +439,7 @@ int spl_board_init_f(void)
 #endif
 
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
+	spl_fixup_pmic_voltage_by_dro();
 	board_pmic_init();
 #endif
 
