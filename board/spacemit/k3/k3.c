@@ -1623,11 +1623,7 @@ int read_mac_from_tlv(void)
 			macbase[0], macbase[1], macbase[2],
 			macbase[3], macbase[4], macbase[5]);
 		sprintf(enetvar, i ? "eth%daddr" : "ethaddr", i);
-		/* Only initialize environment variables that are blank
-			* (i.e. have not yet been set)
-			*/
-		if (!env_get(enetvar))
-			env_set(enetvar, ethaddr);
+		env_set(enetvar, ethaddr);
 
 		increase_eth_addr(macbase);
 	}
