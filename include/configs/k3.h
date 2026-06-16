@@ -213,6 +213,4 @@ const struct k3_nor_boot_target *k3_nor_get_boot_prio(unsigned int *count);
 	"splashpos=m,m\0" \
 	"splashfile=bianbu.bmp\0"
 
-#define CONFIG_ENV_FLAGS_LIST_STATIC "serial#:sa"
-
 #endif /* __SPACEMIT_K3_CONFIG_H */
