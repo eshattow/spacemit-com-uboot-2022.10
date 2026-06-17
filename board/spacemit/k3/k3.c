@@ -1600,10 +1600,10 @@ static void increase_eth_addr(uint8_t *mac_addr)
 
 int read_mac_from_tlv(void)
 {
-	unsigned int i;
+	unsigned int i, j;
 	uint32_t mac_size;
 	u8 macbase[6];
-	int maccount;
+	int maccount, eth_off;
 
 	maccount = 1;
 	if (get_tlvinfo(TLV_CODE_MAC_SIZE, (char*)&mac_size, 2) > 0) {
@@ -1615,20 +1615,38 @@ int read_mac_from_tlv(void)
 		return 0;
 	}
 
-	for (i = 0; i < maccount; i++) {
+	eth_off = 0;
+	// 4 ethernet max
+	for (i = 0, j = 0; i < 4 && j < maccount; i++) {
 		char ethaddr[18];
 		char enetvar[11];
+		const char* status;
+
+		sprintf(enetvar, i ? "eth%daddr" : "ethaddr", i);
+
+		if (eth_off >= 0) {
+			eth_off = fdt_node_offset_by_compatible(gd->fdt_blob, eth_off,
+				"spacemit,k3-dwmac-eqos");
+			if (eth_off >= 0) {
+				status = fdt_getprop(gd->fdt_blob, eth_off, "status", NULL);
+				if (status && !strcmp(status, "disabled")) {
+					// clear disabled ethernet node
+					env_set(enetvar, NULL);
+					continue;
+				}
+			}
+		}
 
 		sprintf(ethaddr, "%02X:%02X:%02X:%02X:%02X:%02X",
 			macbase[0], macbase[1], macbase[2],
 			macbase[3], macbase[4], macbase[5]);
-		sprintf(enetvar, i ? "eth%daddr" : "ethaddr", i);
 		env_set(enetvar, ethaddr);
 
 		increase_eth_addr(macbase);
+		j++;
 	}
 
-	return maccount;
+	return j;
 }
 
 void set_env_ethaddr(void)
