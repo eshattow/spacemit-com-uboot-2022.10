@@ -75,6 +75,10 @@
 	};
 };
 
+&usb3_porta_u3phy {
+	lfps-iset-lvl = <3>;
+};
+
 &pcie4_rc {
 	status = "disabled";
 };
