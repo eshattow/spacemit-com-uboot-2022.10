@@ -139,6 +139,33 @@ static void k3_nor_update_prio_from_dtb(void)
 		k3_nor_set_highest_prio(prior_target);
 }
 
+static void check_pxe_second_boot(void)
+{
+	char buf[64] = {0};
+	const char *ip;
+	struct in_addr addr;
+
+	if (get_tlvinfo(TLV_CODE_SECOND_BOOT_DEV, buf, sizeof(buf) - 1) <= 0)
+		return;
+
+	// when match pxe or pxe@<ip>, means pxe boot mode
+	if ( 0 == strcasecmp(buf, "pxe")) {
+		ip = env_get("serverip");
+	} else if (0 == strncasecmp(buf, "pxe@", 4) && buf[4] != '\0') {
+		ip = buf + 4;
+		addr = string_to_ip(ip);
+		if (!addr.s_addr) {
+			pr_warn("PXE: invalid server IP address: %s\n", ip);
+			return;
+		}
+	} else {
+		return;
+	}
+
+	env_set("boot_device", "pxe");
+	env_set("pxe_server", ip);
+	pr_info("PXE boot configured, server: %s\n", ip);
+}
 
 /*
  * Returns if check dtb is needed
@@ -971,6 +998,7 @@ int board_late_init(void)
 	import_env_from_bootfs();
 
 	setenv_boot_mode();
+	check_pxe_second_boot();
 
 	/* Defaults for NOR boot fallback scripting */
 	if (!env_get("usb_devnum"))
