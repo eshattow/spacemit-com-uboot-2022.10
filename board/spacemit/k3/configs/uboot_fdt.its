@@ -177,6 +177,16 @@
 				algo = "crc32";
 			};
 		};
+
+		fdt_17 {
+			description = "k3-firefly-aibox-k3.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3-firefly-aibox-k3.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -276,5 +286,11 @@
 			loadables = "uboot";
 			fdt = "fdt_16";
 		};
+
+		conf_17 {
+			description = "k3-firefly-aibox-k3";
+			loadables = "uboot";
+			fdt = "fdt_17";
+        };
 	};
 };
