@@ -297,6 +297,9 @@ static int cpu_frequency_set(void)
 
 
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
+
+/* #define ADJUST_VOL_BY_DRO */
+
 /*
  * SVT-DRO is stored in efuse bank7 bits 173~181 (bytes 21~22).
  *
@@ -320,6 +323,7 @@ struct dro_rail {
 	uint32_t	    uv;
 };
 
+#ifdef ADJUST_VOL_BY_DRO
 /* dcdc1 = x100 (2.2G), dcdc2 = a100 (base) */
 static const char * const dro_dcdc1_names[] = { "tdcdc1", "idcdc1", "adcdc1" };
 static const char * const dro_dcdc2_names[] = { "tdcdc2", "idcdc2", "adcdc2" };
@@ -393,6 +397,7 @@ static void spl_fixup_pmic_voltage_by_dro(void)
 		for (j = 0; j < rails[i].nnames; j++)
 			fixup_regulator_uv(fdt, rails[i].names[j], rails[i].uv);
 }
+#endif
 #endif /* CONFIG_IS_ENABLED(SPACEMIT_POWER) */
 
 static bool should_jump_to_brom(void)
@@ -513,7 +518,9 @@ int spl_board_init_f(void)
 #endif
 
 #if CONFIG_IS_ENABLED(SPACEMIT_POWER)
+#ifdef ADJUST_VOL_BY_DRO
 	spl_fixup_pmic_voltage_by_dro();
+#endif
 	board_pmic_init();
 #endif
 
