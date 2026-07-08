@@ -260,13 +260,14 @@ static int spacemit_power_domain_off(struct power_domain *pd)
 
 static int spacemit_power_domain_probe(struct udevice *dev)
 {
-	int ret;
+	int ret, i, count;
+	u32 domain_id;
 	struct spacemit_k3_pd_platdata *priv = dev_get_priv(dev);
 	ulong driver_data = dev_get_driver_data(dev);
+	ofnode node = dev_ofnode(dev);
 
 	priv->desc = (struct pm_domain_desc *)driver_data;
-	ret = regmap_init_mem_index(dev_ofnode(dev),
-			&priv->regmap[APMU_REGMAP_INDEX], 0);
+	ret = regmap_init_mem_index(node, &priv->regmap[APMU_REGMAP_INDEX], 0);
 	if (ret) {
 		printf("%s:%d, error\n", __func__, __LINE__);
 		return ret;
@@ -275,6 +276,27 @@ static int spacemit_power_domain_probe(struct udevice *dev)
 	/* set GPU/VPU/AUDIO power-on/off time */
 	/* power-on time <= 2.73ms */
 	writel(0xffffffff, (unsigned int *)PMUA_PWR_BLK_TMR_REG);
+
+	/*
+	 * Power on domains listed in "spacemit,default-on" DT property.
+	 * Boards that don't need any domain on at boot simply omit the property.
+	 */
+	count = ofnode_read_size(node, "spacemit,default-on");
+	if (count > 0) {
+		count /= sizeof(u32);
+		for (i = 0; i < count; i++) {
+			ret = ofnode_read_u32_index(node, "spacemit,default-on", i, &domain_id);
+			if (ret) {
+				printf("%s:%d, error reading domain index %d\n", __func__, __LINE__, i);
+				return ret;
+			}
+			ret = k3_pd_power_on(priv, &priv->desc[domain_id]);
+			if (ret) {
+				printf("%s:%d, domain %u error\n", __func__, __LINE__, domain_id);
+				return ret;
+			}
+		}
+	}
 
 	return 0;
 }
