@@ -270,6 +270,9 @@
 			compatible = "spacemit,k3-pm-domain";
 			reg = <0x0 0xd4282800 0x0 0x400>;
 			#power-domain-cells = <1>;
+			spacemit,default-on = <K3_PMU_GPU_PWR_DOMAIN
+					       K3_PMU_LCD0_PWR_DOMAIN
+					       K3_PMU_LCD1_PWR_DOMAIN>;
                 };
 
 		uart0: uart@d4017000 {
