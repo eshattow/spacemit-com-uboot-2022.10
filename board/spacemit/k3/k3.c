@@ -65,7 +65,7 @@ struct boot_storage_op
 };
 
 static struct k3_nor_boot_target k3_nor_boot_prio[] = {
-#ifdef CONFIG_SCSI
+#if CONFIG_IS_ENABLED(SCSI)
 	{ K3_NOR_BOOT_TARGET_SCSI, "scsi", "ufs_devnum",
 	  K3_NOR_UFS_DEVNUM_DEFAULT },
 #endif
@@ -73,7 +73,7 @@ static struct k3_nor_boot_target k3_nor_boot_prio[] = {
 	{ K3_NOR_BOOT_TARGET_NVME, "nvme", "ssd_devnum",
 	  K3_NOR_SSD_DEVNUM_DEFAULT },
 #endif
-#ifdef CONFIG_MMC
+#if CONFIG_IS_ENABLED(MMC)
 	{ K3_NOR_BOOT_TARGET_MMC, "mmc", "emmc_devnum",
 	  K3_NOR_EMMC_DEVNUM_DEFAULT },
 #endif
@@ -259,7 +259,7 @@ static struct blk_desc *k3_nor_get_nvme_desc(u32 devnum)
 }
 #endif
 
-#ifdef CONFIG_SCSI
+#if CONFIG_IS_ENABLED(SCSI)
 int board_scsi_scan_once(bool verbose)
 {
 	static bool scsi_scanned;
@@ -287,7 +287,7 @@ int k3_prepare_scsi_flash_target(u32 devnum)
 	if (scsi_flash_target_prepared)
 		return 0;
 
-#ifdef CONFIG_UFS
+#if CONFIG_IS_ENABLED(UFS)
 	ret = ufs_prepare_dev_for_flash(devnum);
 	if (ret) {
 		pr_err("failed to prepare UFS device %u for flashing: %d\n",
@@ -315,7 +315,7 @@ static struct blk_desc *k3_nor_get_scsi_desc(u32 devnum)
 }
 #endif
 
-#ifdef CONFIG_MMC
+#if CONFIG_IS_ENABLED(MMC)
 static struct blk_desc *k3_nor_get_mmc_desc(u32 devnum)
 {
 	struct mmc *mmc = find_mmc_device(devnum);
@@ -339,11 +339,11 @@ static struct blk_desc *k3_nor_get_desc_by_target(const struct k3_nor_boot_targe
 	case K3_NOR_BOOT_TARGET_NVME:
 		return k3_nor_get_nvme_desc(devnum);
 #endif
-#ifdef CONFIG_SCSI
+#if CONFIG_IS_ENABLED(SCSI)
 	case K3_NOR_BOOT_TARGET_SCSI:
 		return k3_nor_get_scsi_desc(devnum);
 #endif
-#ifdef CONFIG_MMC
+#if CONFIG_IS_ENABLED(MMC)
 	case K3_NOR_BOOT_TARGET_MMC:
 		return k3_nor_get_mmc_desc(devnum);
 #endif
@@ -362,7 +362,7 @@ static bool k3_nor_has_bootfs(struct blk_desc *desc)
 	return part_get_info_by_name(desc, BOOTFS_NAME, &info) >= 0;
 }
 
-#if defined(CONFIG_MMC) || defined(CONFIG_SCSI)
+#if CONFIG_IS_ENABLED(MMC) || CONFIG_IS_ENABLED(SCSI)
 static ulong read_block_device(struct blk_desc *dev_desc, ulong byte_addr, ulong byte_size, void *buff)
 {
 	ulong ret, tail_bytes, total_bytes;
@@ -389,7 +389,7 @@ static ulong read_block_device(struct blk_desc *dev_desc, ulong byte_addr, ulong
 }
 #endif
 
-#ifdef CONFIG_MMC
+#if CONFIG_IS_ENABLED(MMC)
 static ulong read_boot_storage_emmc(ulong byte_addr, ulong byte_size, void* buff)
 {
 	return read_block_device(blk_get_dev("mmc", MMC_DEV_EMMC),
@@ -411,7 +411,7 @@ static ulong read_boot_storage_spinor(ulong byte_addr, ulong byte_size, void* bu
 	}
 }
 
-#ifdef CONFIG_SCSI
+#if CONFIG_IS_ENABLED(SCSI)
 static ulong read_boot_storage_ufs(ulong byte_addr, ulong byte_size, void* buff)
 {
 	return read_block_device(k3_nor_get_scsi_desc(K3_NOR_UFS_DEVNUM_DEFAULT),
@@ -423,18 +423,18 @@ static ulong read_boot_storage_ufs(ulong byte_addr, ulong byte_size, void* buff)
 
 // NOT support write operation in SPL stage
 static const struct boot_storage_op storage_op[] = {
-#ifdef CONFIG_MMC
+#if CONFIG_IS_ENABLED(MMC)
 	{ BOOT_MODE_EMMC, 0x140000, read_boot_storage_emmc, NULL },
 #endif
 	{ BOOT_MODE_NOR, 0x10000, read_boot_storage_spinor, NULL },
-#ifdef CONFIG_SCSI
+#if CONFIG_IS_ENABLED(SCSI)
 	{ BOOT_MODE_UFS, 0x140000, read_boot_storage_ufs, NULL },
 #endif
 };
 
 #else
 
-#if defined(CONFIG_MMC) || defined(CONFIG_SCSI)
+#if CONFIG_IS_ENABLED(MMC) || CONFIG_IS_ENABLED(SCSI)
 static bool write_block_device(struct blk_desc *dev_desc, ulong byte_addr, ulong byte_size, void *buff)
 {
 	if (!dev_desc || dev_desc->type == DEV_TYPE_UNKNOWN) {
@@ -450,7 +450,7 @@ static bool write_block_device(struct blk_desc *dev_desc, ulong byte_addr, ulong
 }
 #endif
 
-#ifdef CONFIG_MMC
+#if CONFIG_IS_ENABLED(MMC)
 static bool write_boot_storage_emmc(ulong byte_addr, ulong byte_size, void* buff)
 {
 	return write_block_device(blk_get_dev("mmc", MMC_DEV_EMMC),
@@ -474,7 +474,7 @@ static bool write_boot_storage_spinor(ulong byte_addr, ulong byte_size, void* bu
 		return false;
 }
 
-#ifdef CONFIG_SCSI
+#if CONFIG_IS_ENABLED(SCSI)
 static bool write_boot_storage_ufs(ulong byte_addr, ulong byte_size, void* buff)
 {
 	return write_block_device(k3_nor_get_scsi_desc(K3_NOR_UFS_DEVNUM_DEFAULT),
@@ -483,11 +483,11 @@ static bool write_boot_storage_ufs(ulong byte_addr, ulong byte_size, void* buff)
 #endif
 
 static const struct boot_storage_op storage_op[] = {
-#ifdef CONFIG_MMC
+#if CONFIG_IS_ENABLED(MMC)
 	{ BOOT_MODE_EMMC, 0x140000, read_boot_storage_emmc, write_boot_storage_emmc },
 #endif
 	{ BOOT_MODE_NOR, 0x10000, read_boot_storage_spinor, write_boot_storage_spinor },
-#ifdef CONFIG_SCSI
+#if CONFIG_IS_ENABLED(SCSI)
 	{ BOOT_MODE_UFS, 0x140000, read_boot_storage_ufs, write_boot_storage_ufs },
 #endif
 };
@@ -818,7 +818,7 @@ void run_fastboot_command(void)
 
 void try_flash_image_from_card(void)
 {
-#ifdef CONFIG_MMC
+#if CONFIG_IS_ENABLED(MMC)
 	struct mmc *mmc;
 	struct disk_partition info;
 	int part;
@@ -1582,7 +1582,7 @@ void import_env_from_bootfs(void)
 	}
 	case BOOT_MODE_EMMC:
 	case BOOT_MODE_SD:
-#ifdef CONFIG_MMC
+#if CONFIG_IS_ENABLED(MMC)
 		int dev;
 		struct mmc *mmc;
 
@@ -1600,7 +1600,7 @@ void import_env_from_bootfs(void)
 		break;
 #endif
 	case BOOT_MODE_UFS:
-#ifdef CONFIG_SCSI
+#if CONFIG_IS_ENABLED(SCSI)
 		struct blk_desc *ufs_dev_desc;
 
 		board_scsi_scan_once(false);
