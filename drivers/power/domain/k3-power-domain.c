@@ -15,6 +15,8 @@
 #define APMU_POWER_STATUS_REG   0xf0
 #define PMUA_PWR_BLK_TMR_REG	(0xd42828dc)
 
+#define CIU_LCD_CONFIG_REG_BASE	(0xd4282d2c)
+
 enum pm_domain_id {
 	K3_PMU_VPU_PWR_DOMAIN,
 	K3_PMU_GPU_PWR_DOMAIN,
@@ -261,7 +263,7 @@ static int spacemit_power_domain_off(struct power_domain *pd)
 static int spacemit_power_domain_probe(struct udevice *dev)
 {
 	int ret, i, count;
-	u32 domain_id;
+	u32 domain_id, value;
 	struct spacemit_k3_pd_platdata *priv = dev_get_priv(dev);
 	ulong driver_data = dev_get_driver_data(dev);
 	ofnode node = dev_ofnode(dev);
@@ -276,6 +278,11 @@ static int spacemit_power_domain_probe(struct udevice *dev)
 	/* set GPU/VPU/AUDIO power-on/off time */
 	/* power-on time <= 2.73ms */
 	writel(0xffffffff, (unsigned int *)PMUA_PWR_BLK_TMR_REG);
+
+	/* enable lcd_edp mux by default */
+	value = readl((unsigned int *)CIU_LCD_CONFIG_REG_BASE);
+	value |= (1 << 8);
+	writel(value, (unsigned int *)CIU_LCD_CONFIG_REG_BASE);
 
 	/*
 	 * Power on domains listed in "spacemit,default-on" DT property.
