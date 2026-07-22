@@ -210,7 +210,7 @@ static void init_ddr_clock(uint32_t DDRC_BASE, uint32_t data_rate_mtps)
 		cfg_reg[0x8 / 4] = 0x0b3912aa;
 		cfg_reg[0x10 / 4] = 0xa0558b8b;
 		cfg_reg[0xc / 4] |= (0x1 << 22) | (0x1 << 16) | (0xff) | (0xab << 8);
-	} else if (6000 == data_rate_mtps) {
+	} else if (4800 == data_rate_mtps) {
 		/* DPLL 3000MHz*/
 		cfg_reg[0x8 / 4] = 0x0b3e2000;
 		cfg_reg[0x10 / 4] = 0xa0558c8c;
@@ -232,7 +232,7 @@ static void init_ddr_clock(uint32_t DDRC_BASE, uint32_t data_rate_mtps)
 	} else if (4266 == data_rate_mtps) {
 		cfg_reg[0x18 / 4] |= (0x1 << 19) | (0x1 << 16); // sel 2, div 2
 		// cfg_reg[0x18 / 4] |= (0x2 << 19) | (0x1 << 16); // sel 2, div 2 3200mbps
-	} else if (5120 == data_rate_mtps) {
+	} else if (4800 == data_rate_mtps) {
 		cfg_reg[0x18 / 4] |= (0x7 << 19) | (0x0 << 16); // sel 3, div 1 5120mbps
 	} else {
 		cfg_reg[0x18 / 4] |= (0x2 << 19) | (0x0 << 16); // sel 3, div 1 6400mbps
