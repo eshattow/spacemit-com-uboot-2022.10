@@ -140,6 +140,7 @@ int lcd_mipi_probe(void);
 
 int lcd_icnl9911c_mipi_init(void);
 int lcd_icnl9951r_mipi_init(void);
+int lcd_icnl9951c_mipi_init(void);
 int lcd_gx09inx101_mipi_init(void);
 int lcd_jd9365dah3_mipi_init(void);
 int lcd_jd9366tc_mipi_init(void);

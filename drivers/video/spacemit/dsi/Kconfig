@@ -24,6 +24,12 @@ config LCD_ICNL9951R_MIPI
 	help
 	  support lcd_icnl9951r_mipi panel
 
+config LCD_ICNL9951C_MIPI
+	bool "Add lcd icnl9951c mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_icnl9951c_mipi panel
+
 config LCD_ICNL9911C_MIPI
 	bool "Add lcd icnl9911c mipi panel"
 	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
