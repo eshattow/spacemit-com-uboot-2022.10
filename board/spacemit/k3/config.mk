@@ -10,7 +10,8 @@ cmd_build_spl_platform = \
 		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/ && \
 	python3 $(srctree)/tools/build_binary_file.py \
 		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/fsbl.json \
-		-o $(srctree)/FSBL.bin; \
+		-o $(srctree)/FSBL.bin \
+		$(if $(KEY_DIR),--key-dir $(KEY_DIR)); \
 	python3 $(srctree)/tools/build_binary_file.py \
 		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_spinor.json \
 		-o $(srctree)/bootinfo_spinor.bin; \
@@ -52,7 +53,11 @@ ifeq ($(CONFIG_RSA_VERIFY),)
 its := $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/uboot_fdt.its
 else
 its := $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/uboot_fdt_sign.its
+ifdef KEY_DIR
+key_para := -k $(KEY_DIR)
+else
 key_para := -k $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/key
+endif
 endif
 
 u-boot.itb: u-boot-nodtb.bin u-boot-dtb.bin u-boot.dtb FORCE
