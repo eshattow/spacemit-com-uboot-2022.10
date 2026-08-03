@@ -59,7 +59,8 @@ static struct pm_domain_desc k3_pm_domain_desc[] = {
 		.bit_sleep2 = 3,
 		.bit_sleep1 = 2,
 		.bit_isolation = 1,
-		.bit_pwr_stat = 0,
+		.bit_pwr_stat = 8,
+		.use_hw = 1,
 		.pm_index = K3_PMU_GPU_PWR_DOMAIN,
 	},
 
