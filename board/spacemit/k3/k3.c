@@ -1771,6 +1771,7 @@ int board_fit_config_name_match(const char *name)
 
 	if (NULL == product_name) {
 		product_name = DEFAULT_PRODUCT_NAME;
+		env_set("product_name", DEFAULT_PRODUCT_NAME);
 	}
 
 	if (0 == strcmp(product_name, name)) {
