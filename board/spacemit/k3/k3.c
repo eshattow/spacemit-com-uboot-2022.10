@@ -1236,6 +1236,7 @@ void setenv_boot_mode(void)
 	 * doesn't "stick" across boots unless explicitly set again.
 	 */
 	const char *boot_override = env_get("boot_override");
+	char cmd[64];
 
 	if (boot_override) {
 		env_set("boot_device", boot_override);
@@ -1289,7 +1290,8 @@ void setenv_boot_mode(void)
 		break;
 	case BOOT_MODE_USB:
 		// for fastboot image download and run test
-		env_set("bootcmd", USB_BOOT_COMMAND);
+		sprintf(cmd, "bootm 0x%lx", CONFIG_FASTBOOT_BUF_ADDR);
+		env_set("bootcmd", cmd);
 		break;
 	default:
 		env_set("boot_device", "");
