@@ -75,7 +75,7 @@ struct io_para_info {
 
 const struct io_para_info ddr_io_para_table[] = {
 	{DDR_MID_SK_HYNIX, LPDDR4X, 0x9D, R_40, R_40, R_80, 0x19, R_60, VOH_0P6, R_60, R_60, 0x55},
-	{DDR_MID_SK_HYNIX, LPDDR4, 0xB2, R_40, R_40, R_120, 0xA7, R_60, VOH_0P6, R_80, R_80, 0x33},
+	{DDR_MID_SK_HYNIX, LPDDR4, 0xB2, R_48, R_60, R_120, 0xA7, R_60, VOH_0P6, R_120, R_80, 0x33},
 	// {DDR_MID_SK_HYNIX, LPDDR4, 0xB2, R_40, R_40, R_60, 0xA7, R_48, VOH_0P6, R_48, R_48, 0x00},
 };
 
