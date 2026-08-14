@@ -20,13 +20,15 @@ void lpddr_training_table_init(uint32_t ddrc_base, const phy_init_config* train_
 		sub_table = train_table[i];
 		reg_base = sub_table->base;
 
-		if ((NULL != override_table) && ((override_table[k0].offset & ~0x7FFF) == reg_base)) {
+		if ((NULL != override_table)
+			&& ((override_table[k0].offset & ~0x7FFF) == (reg_base & ~0x7FFF))) {
 			need_table_check = true;
 		} else {
 			need_table_check = false;
 		}
 
-		if ((NULL != io_table) && ((io_table[k1].offset & ~0x7FFF) == reg_base)) {
+		if ((NULL != io_table)
+			&& ((io_table[k1].offset & ~0x7FFF) == (reg_base & ~0x7FFF))) {
 			need_io_check = true;
 		} else {
 			need_io_check = false;
@@ -44,17 +46,21 @@ void lpddr_training_table_init(uint32_t ddrc_base, const phy_init_config* train_
 					if (DDR_CONFIG_BYPASS_MAGIC == phy_value) {
 						continue;
 					}
-					if ((override_table[k0].offset & ~0x7FFF) != reg_base) {
+					if ((override_table[k0].offset & ~0x7FFF) != (reg_base & ~0x7FFF)) {
 						need_table_check = false;
 					}
+					pr_debug("Overriding PHY register 0x%x with value 0x%x @%d\n",
+						reg_offset, phy_value, k0);
 				}
 
 				// configuration in IO table has higher priority
 				if (need_io_check && (io_table[k1].offset == reg_offset)) {
 					phy_value = io_table[k1++].value;
-					if ((io_table[k1].offset & ~0x7FFF) != reg_base) {
+					if ((io_table[k1].offset & ~0x7FFF) != (reg_base & ~0x7FFF)) {
 						need_io_check = false;
 					}
+					pr_debug("Overriding CSR 0x%x with value 0x%x @%d\n",
+						reg_offset, phy_value, k1);
 				}
 
 				phy_reg[reg_offset] = phy_value;
@@ -65,21 +71,25 @@ void lpddr_training_table_init(uint32_t ddrc_base, const phy_init_config* train_
 				phy_value = sub_table->sequence[j].a.value;
 				if (need_table_check && (override_table[k0].offset == reg_offset)) {
 					phy_value = override_table[k0++].value;
-					if ((override_table[k0].offset & ~0x7FFF) != reg_base) {
+					if ((override_table[k0].offset & ~0x7FFF) != (reg_base & ~0x7FFF)) {
 						need_table_check = false;
 					}
 					// skip the PHY setting when value is 0xdeadbeef
 					if (DDR_CONFIG_BYPASS_MAGIC == phy_value) {
 						continue;
 					}
+					pr_debug("Overriding PHY register 0x%x with value 0x%x @%d\n",
+						reg_offset, phy_value, k0);
 				}
 
 				// configuration in IO table has higher priority
 				if (need_io_check && (io_table[k1].offset == reg_offset)) {
 					phy_value = io_table[k1++].value;
-					if ((io_table[k1].offset & ~0x7FFF) != reg_base) {
+					if ((io_table[k1].offset & ~0x7FFF) != (reg_base & ~0x7FFF)) {
 						need_io_check = false;
 					}
+					pr_debug("Overriding CSR 0x%x with value 0x%x @%d\n",
+						reg_offset, phy_value, k1);
 				}
 
 				phy_reg[reg_offset] = phy_value;
@@ -109,6 +119,7 @@ static int add_soc_phy_write_ds_config(ddr_phy_reg_config* reg_table,
 	}
 	return k;
 }
+
 static const uint32_t odt_impedance_array[] = { 0x10048, 0x1004a, 0x1004b, 0x1004c, 0x1004d };
 static int add_soc_phy_rx_odt_config(ddr_phy_reg_config* reg_table,
 	uint32_t max_item, uint32_t phy_rx_odt)

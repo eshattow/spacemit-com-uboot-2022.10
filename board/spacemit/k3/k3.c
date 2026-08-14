@@ -1236,6 +1236,7 @@ void setenv_boot_mode(void)
 	 * doesn't "stick" across boots unless explicitly set again.
 	 */
 	const char *boot_override = env_get("boot_override");
+	char cmd[64];
 
 	if (boot_override) {
 		env_set("boot_device", boot_override);
@@ -1289,7 +1290,8 @@ void setenv_boot_mode(void)
 		break;
 	case BOOT_MODE_USB:
 		// for fastboot image download and run test
-		env_set("bootcmd", USB_BOOT_COMMAND);
+		sprintf(cmd, "bootm 0x%lx", CONFIG_FASTBOOT_BUF_ADDR);
+		env_set("bootcmd", cmd);
 		break;
 	default:
 		env_set("boot_device", "");
@@ -1771,6 +1773,7 @@ int board_fit_config_name_match(const char *name)
 
 	if (NULL == product_name) {
 		product_name = DEFAULT_PRODUCT_NAME;
+		env_set("product_name", DEFAULT_PRODUCT_NAME);
 	}
 
 	if (0 == strcmp(product_name, name)) {
@@ -1813,6 +1816,25 @@ static int ft_board_cpu_fixup(void *blob, struct bd_info *bd)
 	if (ret < 0)
 		return ret;
 #endif
+
+	{
+		char pmic_type[64] = {0};
+		int cpus_node, len, ret;
+
+		len = get_tlvinfo(TLV_CODE_PMIC_TYPE, pmic_type, sizeof(pmic_type) - 1);
+		if (len > 0) {
+			cpus_node = fdt_path_offset(blob, "/cpus");
+			if (cpus_node >= 0) {
+				ret = fdt_setprop_string(blob, cpus_node, "pmic-compatible", pmic_type);
+				if (ret < 0)
+					pr_err("Spacemit K3: failed to set pmic-compatible: %s\n",
+					       fdt_strerror(ret));
+			}
+		} else {
+			pr_warn("Spacemit K3: TLV_CODE_PMIC_TYPE not found, defaulting to OPP table0 (0.95V)\n");
+		}
+	}
+
 	return 0;
 }
 

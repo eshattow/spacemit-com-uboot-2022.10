@@ -16,8 +16,10 @@
 
 #define DDR_CONFIG_BYPASS_MAGIC	(0xdeadbeef)
 
-// support 4266MT/s, 5500MT/s, 6000MT/s, 6400MT/s
-#define CONFIG_DDR_DATARATE	(6400)
+// only support 6400MT/s, 4800MT/s for LP5
+#define CONFIG_LPDDR5_DATARATE	(6400)
+
+#define CONFIG_LPDDR4X_DATARATE	(4266)
 
 // 2D training configuration
 #define DISABLE_DDR_2D_TRAINING	(0)
@@ -29,9 +31,8 @@
 #define DDR_QUICKBOOT_FIRMWARE_FW_ADDR		(DDR_TRAINING_INFO_BUFF + sizeof(struct ddr_info_t))
 #define DDR_QUICKBOOT_FIRMWARE_FW_MAX_SIZE	(0x10000 - sizeof(struct ddr_info_t))
 
-#if (CONFIG_DDR_DATARATE != 6400) && (CONFIG_DDR_DATARATE != 6000) \
-	&& (CONFIG_DDR_DATARATE != 5500) && (CONFIG_DDR_DATARATE != 4266)
-#error "Unsupported DDR datarate"
+#if (CONFIG_LPDDR5_DATARATE != 6400) && (CONFIG_LPDDR5_DATARATE != 4800)
+#error "Unsupported LPDDR5 datarate"
 #endif
 
 #ifndef REG32

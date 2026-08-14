@@ -230,7 +230,7 @@ int _fb_mtd_write(struct mtd_info *mtd, void *buffer, u32 offset,
 }
 
 
-int _fb_mtd_read(struct mtd_info *mtd, void *buffer, u32 offset,
+int _fb_mtd_read(struct mtd_info *mtd, void *buffer, u64 offset,
 			  size_t length, size_t *written)
 {
 	int ret;
@@ -533,13 +533,14 @@ void fastboot_mtd_flash_erase(const char *cmd, char *response)
  * @part_name: Named partition to read
  * @response: Pointer to fastboot response buffer
  */
-u32 fastboot_mtd_flash_read(const char *part_name, u32 offset,
+u32 fastboot_mtd_flash_read(const char *part_name, u64 offset,
 					void *download_buffer, char *response)
 {
 	struct part_info *part;
 	struct mtd_info *mtd = NULL;
 	int ret;
-	u32 hdr_size, hdr_off;
+	u32 hdr_size;
+	u64 hdr_off;
 
 	if (fb_mtd_lookup(part_name, &mtd, &part)) {
 		/*can not find mtd part, try to read raw data*/
