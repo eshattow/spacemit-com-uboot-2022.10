@@ -34,6 +34,7 @@ static const __maybe_unused struct panel_config panel_configs[] = {
 	{"lcd_lt8911_edp_1920x1080", LCD_EDP, lcd_lt8911_edp_1920x1080_init},
 	{"lcd_tc358762xbg_dpi_800x480", LCD_DPI, lcd_tc358762xbg_dpi_800x480_init},
 	{"lcd_icnl9951r_mipi", LCD_MIPI, lcd_icnl9951r_mipi_init},
+	{"lcd_icnl9951c_mipi", LCD_MIPI, lcd_icnl9951c_mipi_init},
 	{"lcd_icnl9911c_mipi", LCD_MIPI, lcd_icnl9911c_mipi_init},
 	{"lcd_jd9365dah3_mipi", LCD_MIPI, lcd_jd9365dah3_mipi_init},
 	{"lcd_jd9366tc_mipi", LCD_MIPI, lcd_jd9366tc_mipi_init},
@@ -491,6 +492,12 @@ int lcd_mipi_probe(void)
 			tx_device_client.panel_type = LCD_MIPI;
 			tx_device.panel_type = tx_device_client.panel_type;
 			lcd_icnl9951r_mipi_init();
+	#endif
+
+	#if defined(CONFIG_LCD_ICNL9951C_MIPI)
+			tx_device_client.panel_type = LCD_MIPI;
+			tx_device.panel_type = tx_device_client.panel_type;
+			lcd_icnl9951c_mipi_init();
 	#endif
 
 	#if defined(CONFIG_LCD_ICNL9911C_MIPI)

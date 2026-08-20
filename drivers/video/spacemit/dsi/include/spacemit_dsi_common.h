@@ -40,6 +40,8 @@ enum spacemit_dsi_cmd_type {
 	SPACEMIT_DSI_DCS_SWRITE1 = 0x15,
 	SPACEMIT_DSI_DCS_LWRITE = 0x39,
 	SPACEMIT_DSI_DCS_READ = 0x6,
+	SPACEMIT_DSI_GENERIC_SWRITE1 = 0x13,
+	SPACEMIT_DSI_GENERIC_SWRITE2 = 0x23,
 	SPACEMIT_DSI_GENERIC_LWRITE = 0x29,
 	SPACEMIT_DSI_GENERIC_READ1 = 0x14,
 	SPACEMIT_DSI_SET_MAX_PKT_SIZE = 0x37,
@@ -140,6 +142,7 @@ int lcd_mipi_probe(void);
 
 int lcd_icnl9911c_mipi_init(void);
 int lcd_icnl9951r_mipi_init(void);
+int lcd_icnl9951c_mipi_init(void);
 int lcd_gx09inx101_mipi_init(void);
 int lcd_jd9365dah3_mipi_init(void);
 int lcd_jd9366tc_mipi_init(void);
