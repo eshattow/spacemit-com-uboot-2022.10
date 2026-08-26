@@ -190,8 +190,8 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	ddr_part_number[ret] = '\0';
 
 	part_info = find_ddr_info((const char*)ddr_part_number);
-	printf("DDR Part Number: %s, Size: %dMB, Data Rate: %dMT/s\n",
-		part_info->part_number, part_info->size_mb, part_info->data_rate_mtps);
+	printf("DDR total size: %d GB, data rate: %d MT/s\n",
+		part_info->size_mb * 2 / 1024, part_info->data_rate_mtps);
 	if ((DDR_TYPE_LPDDR5 != part_info->type) && (DDR_TYPE_LPDDR4X != part_info->type)) {
 		pr_err("unsupported ddr type %d\n", part_info->type);
 		return 1;
