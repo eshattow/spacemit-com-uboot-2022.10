@@ -8,17 +8,17 @@ quiet_cmd_build_spl_platform = BUILD   $2
 cmd_build_spl_platform = \
 	cp $(srctree)/$3 \
 		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/ && \
-	python3 $(srctree)/tools/build_binary_file.py \
+	$(srctree)/tools/build_binary_file.py \
 		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/fsbl.json \
 		-o $(srctree)/FSBL.bin \
 		$(if $(KEY_DIR),--key-dir $(KEY_DIR)); \
-	python3 $(srctree)/tools/build_binary_file.py \
+	$(srctree)/tools/build_binary_file.py \
 		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_spinor.json \
 		-o $(srctree)/bootinfo_spinor.bin; \
-	python3 $(srctree)/tools/build_binary_file.py \
+	$(srctree)/tools/build_binary_file.py \
 		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_spinand.json \
 		-o $(srctree)/bootinfo_spinand.bin; \
-	python3 $(srctree)/tools/build_binary_file.py \
+	$(srctree)/tools/build_binary_file.py \
 		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/bootinfo_block.json \
 		-o $(srctree)/bootinfo_block.bin; \
 	rm -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-spl.bin
