@@ -173,7 +173,7 @@
         {
           "file": {
             "name": "fsbl",
-            "source": "../u-boot-spl.bin",
+            "source": "u-boot-spl.bin",
             "align": 32
           }
         },
