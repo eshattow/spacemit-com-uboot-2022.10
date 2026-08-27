@@ -89,12 +89,13 @@ u-boot.itb: u-boot-nodtb.bin u-boot-dtb.bin u-boot.dtb dtbs $(its-deps) FORCE
 	@lzop -f9 -o $@ $*
 
 ifneq ($(CONFIG_SPL_BUILD),)
-INPUTS-y += FSBL.bin
+INPUTS-y += FSBL.bin bootinfo_spinor.bin bootinfo_spinand.bin bootinfo_block.bin
 
-FSBL.bin: spl/u-boot-spl.bin FORCE
-	$(call if_changed,build_spl_platform,$@,$<)
+FSBL.bin: $(obj)/u-boot-spl.bin FORCE
+	$(Q)$(srctree)/tools/build_binary_file.py -o $@ -i $(obj) $(if $(KEY_DIR),--key-dir $(KEY_DIR)) \
+	-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/fsbl.json
 else
 INPUTS-y += u-boot-env-default.bin
-u-boot-env-default.bin: u-boot-nodtb.bin FORCE
-	$(call if_changed,build_default_env,$@)
+u-boot-env-default.bin: u-boot-env-default.txt
+	$(Q)tools/mkenvimage -o $@ -s $(CONFIG_ENV_SIZE) $(obj)/u-boot-env-default.txt
 endif
