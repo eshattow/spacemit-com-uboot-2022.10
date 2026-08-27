@@ -14,6 +14,20 @@ import subprocess
 import json
 import ctypes as ct
 
+# Get the absolute path to this file at run-time
+our_path = os.path.dirname(os.path.realpath(__file__))
+our1_path = os.path.dirname(our_path)
+
+# Extract $(srctree) from Kbuild environment, or use relative paths below
+srctree = os.environ.get('srctree', our1_path)
+
+#
+# Do not pollute source tree with cache files:
+# https://stackoverflow.com/a/60024195/2511795
+# https://bugs.python.org/issue33499
+#
+sys.pycache_prefix = os.path.relpath(our_path, srctree)
+
 # private module
 import common_decorator
 
