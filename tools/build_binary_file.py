@@ -609,7 +609,7 @@ class ImageBinary(object):
         self.LOG.set_debug_level()
         return True
 
-    def build_iamge(self, config_dict, output_file):
+    def build_image(self, config_dict, output_file):
         with open(output_file, 'wb') as f:
             image_list = config_dict[self.image_key]
             # build data in case some data used before it's build
@@ -648,7 +648,7 @@ def main(argv):
         image.key_dir = os.path.abspath(args.key_dir)
     config_info_dict = image.extract_config(json_file)
     if config_info_dict and image.verify_config(config_info_dict):
-        image.build_iamge(config_info_dict, output_file)
+        image.build_image(config_info_dict, output_file)
 
 
 if __name__ == '__main__':
