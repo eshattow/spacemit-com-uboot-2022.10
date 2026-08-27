@@ -45,6 +45,9 @@ int eth_env_set_enetaddr_by_index(const char *base_name, int index,
 void eth_common_init(void)
 {
 	bootstage_mark(BOOTSTAGE_ID_NET_ETH_START);
+#ifdef CONFIG_PHYLIB
+    phy_init();
+#endif
 }
 
 int eth_mac_skip(int index)
