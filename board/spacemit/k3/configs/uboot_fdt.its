@@ -291,6 +291,6 @@
 			description = "k3-firefly-aibox-k3";
 			loadables = "uboot";
 			fdt = "fdt_17";
-        };
+		};
 	};
 };
