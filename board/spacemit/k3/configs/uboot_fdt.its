@@ -292,5 +292,5 @@
 			loadables = "uboot";
 			fdt = "fdt_17";
         };
-	};
+    };
 };
