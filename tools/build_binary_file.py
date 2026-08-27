@@ -39,7 +39,7 @@ class ImageBinary(object):
     def __init__(self, log):
         super().__init__()
         self.LOG = log
-        self.input_path = '.'
+        self.input_path = ['.']
         self.key_dir = None    # overrides key/ subdirectory when --key-dir is set
         self.arch = 2
         self.info_key_str = 'info'
@@ -346,12 +346,16 @@ class ImageBinary(object):
                 self.LOG.error(f"Illegal input source {source_file}")
                 continue
 
-            input_file = os.path.join(self.input_path, source_file)
+            input_file = [
+                os.path.join(f, source_file)
+                for f in self.input_path
+                if os.path.isfile(os.path.join(f, source_file))
+            ]
             if source_file in self.build_info_dict:
                 # Get prevous processed binary data
                 binary_data += self.build_info_dict[source_file][0]
-            elif os.path.isfile(input_file):
-                with open(input_file, 'rb') as f:
+            elif len(input_file) > 0:
+                with open(input_file[0], 'rb') as f:
                     binary_data += f.read()
             else:
                 self.LOG.info(f"Fail to find source data {source_file}")
@@ -361,7 +365,7 @@ class ImageBinary(object):
     def __generate_key_filename(self, key_name):
         """Generate public/private key file name with the key folder.
         """
-        key_folder = os.path.join(self.input_path, 'key')
+        key_folder = os.path.join(self.input_path[0], 'key')
         if not os.path.isdir(key_folder):
             os.mkdir(key_folder)
 
@@ -432,7 +436,7 @@ class ImageBinary(object):
         if self.key_dir and key_source.startswith('key/'):
             key_file_name = os.path.join(self.key_dir, key_source[len('key/'):])
         else:
-            key_file_name = os.path.join(self.input_path, key_source)
+            key_file_name = os.path.join(self.input_path[0], key_source)
         self.LOG.debug(key_file_name)
 
         prvkey_filename, pubkey_filename = '', ''
@@ -556,7 +560,7 @@ class ImageBinary(object):
         with open(yaml_file, 'r', encoding = 'utf-8') as f:
             config_info_dict = yaml.load(f, Loader = yaml.FullLoader)
         # self.LOG.debug(json.dumps(config_info_dict, indent = 2))
-        self.input_path = os.path.dirname(yaml_file)
+        self.input_path[0] = os.path.dirname(yaml_file)
         return config_info_dict
 
     def extract_config(self, json_file):
@@ -571,7 +575,7 @@ class ImageBinary(object):
         # self.LOG.debug(json.dumps(config_info_dict, indent = 2))
         if "_comment" in config_info_dict:
             config_info_dict.pop("_comment")
-        self.input_path = os.path.dirname(json_file)
+        self.input_path[0] = os.path.dirname(json_file)
         return config_info_dict
 
     def verify_config(self, config_dict):
@@ -648,6 +652,7 @@ def main(argv):
         description='Parse JSON config file, collect related files, and build image file.',
     )
     parser.add_argument('-c',   dest = 'json_file',     required = True,    help = 'configuration json file')
+    parser.add_argument('-i',   dest = 'input_path',    action = 'append',  help = 'source data input path')
     parser.add_argument('-o',   dest = 'output_file',   default = 'img.bin', help = 'output file')
     parser.add_argument('--key-dir', dest = 'key_dir',  default = None,
                         help = 'Override key/ subdirectory for signing keys (e.g. external KEY_DIR)')
@@ -659,6 +664,8 @@ def main(argv):
     log = common_decorator.Logger()
     # log = common_decorator.Logger('debug')
     image = ImageBinary(log)
+    if args.input_path:
+        image.input_path.extend(args.input_path)
     if args.key_dir:
         image.key_dir = os.path.abspath(args.key_dir)
     config_info_dict = image.extract_config(json_file)
