@@ -13,6 +13,20 @@ import tempfile
 import subprocess
 import json
 import ctypes as ct
+from pathlib import Path as PathPyc
+
+# Get the absolute path to this file at run-time
+our_path = PathPyc(__file__)
+
+# Extract $(srctree) from Kbuild environment, or use relative paths below
+srctree = os.environ.get('srctree', our_path.parents[1])
+
+#
+# Do not pollute source tree with cache files:
+# https://stackoverflow.com/a/60024195/2511795
+# https://bugs.python.org/issue33499
+#
+sys.pycache_prefix = str(our_path.relative_to(srctree).parent)
 
 # private module
 import common_decorator
