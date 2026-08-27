@@ -301,7 +301,7 @@
 			description = "k3-firefly-aibox-k3";
 			loadables = "uboot";
 			fdt = "fdt_17";
-        };
+		};
 
 		conf_18 {
 			description = "k3-ai-book";
