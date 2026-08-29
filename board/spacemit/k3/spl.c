@@ -419,10 +419,12 @@ static bool should_jump_to_brom(void)
 		should_jump = true;
 
 	/* Clear related P1 register's value */
-	value &= ~P1_NON_VOLATILE_REG_MASK;
-	ret = i2c_write(P1_I2C_SLAVE_ADDR, P1_NON_VOLATILE_REG, 1, &value, 1);
-	if (ret) {
-		printf("reboot fastboot: PMIC write failed\n");
+	if (should_jump) {
+		value &= ~P1_NON_VOLATILE_REG_MASK;
+		ret = i2c_write(P1_I2C_SLAVE_ADDR, P1_NON_VOLATILE_REG, 1, &value, 1);
+		if (ret) {
+			printf("reboot fastboot: PMIC write failed\n");
+		}
 	}
 
 	return should_jump;
