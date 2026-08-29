@@ -400,6 +400,15 @@ static int init_snps_lp5_ddrc_dfi(volatile uint32_t* ddrc_reg, ddr_part_info* pa
 	ddrc_reg[0x10510 / 4] = 0x00010005; /* dfimisc */
 	ddrc_reg[0x10518 / 4] = 0x70000000; /* dfiphymstr */
 
+	if (2 == part_info->ranks) {
+		ddrc_reg[0x10200 / 4] = 0x00000361; /* rfshmod0 */
+	} else {
+		ddrc_reg[0x10200 / 4] = 0x010003f3; /* rfshmod0 */
+	}
+
+	// disable page close
+	ddrc_reg[0x10380 / 4] = 0x80012010; /* sched0 */
+
 	/* deratectl1 (0x10104) */
 	reg_val = 0;
 	if (x8_mode) {
@@ -697,14 +706,14 @@ static int init_snps_lp5_ddrc_dfi(volatile uint32_t* ddrc_reg, ddr_part_info* pa
 
 	/* rfshset1tmg0 (0x00600) */
 	reg_val = 0;
-	reg_val |= (0x0 << 31); // t_refi_x1_sel [31]
-	reg_val |= (0x0 << 30); // refresh_to_x1_sel [30]
-	reg_val |= (0x2 << 24); // refresh_margin [27:24]
-	reg_val |= (0x10 << 16); // refresh_to_x1_x32 [21:16]
+	reg_val |= (0x1 << 31); // t_refi_x1_sel [31]
+	reg_val |= (0x1 << 30); // refresh_to_x1_sel [30]
+	reg_val |= (0x0 << 24); // refresh_margin [27:24]
+	reg_val |= (0x3F << 16); // refresh_to_x1_x32 [21:16]
 	if (6400 == rate) {
-		reg_val |= (0x61 << 0); // t_refi_x1_x32 [13:0]
+		reg_val |= (0xC34 << 0); // t_refi_x1_x32 [13:0]
 	} else if (4800 == rate) {
-		reg_val |= (0x49 << 0); // t_refi_x1_x32 [13:0]
+		reg_val |= (0x92C << 0); // t_refi_x1_x32 [13:0]
 	}
 	ddrc_reg[0x00600 / 4] = reg_val;
 
@@ -712,10 +721,10 @@ static int init_snps_lp5_ddrc_dfi(volatile uint32_t* ddrc_reg, ddr_part_info* pa
 	reg_val = 0;
 	if (6400 == rate) {
 		reg_val |= (0xe0 << 16); // t_rfc_min_ab [27:16]
-		reg_val |= (0xe0 << 0); // t_rfc_min [11:0]
+		reg_val |= (0xe0 / 2 << 0); // t_rfc_min [11:0]
 	} else if (4800 == rate) {
 		reg_val |= (0xa8 << 16); // t_rfc_min_ab [27:16]
-		reg_val |= (0xa8 << 0); // t_rfc_min [11:0]
+		reg_val |= (0xa8 / 2 << 0); // t_rfc_min [11:0]
 	}
 	ddrc_reg[0x00604 / 4] = reg_val;
 
