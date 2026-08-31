@@ -190,12 +190,14 @@ static int spacemit_ddr_probe(struct udevice *dev)
 	ddr_part_number[ret] = '\0';
 
 	part_info = find_ddr_info((const char*)ddr_part_number);
-	printf("DDR total size: %d GB, data rate: %d MT/s\n",
-		part_info->size_mb * 2 / 1024, part_info->data_rate_mtps);
 	if ((DDR_TYPE_LPDDR5 != part_info->type) && (DDR_TYPE_LPDDR4X != part_info->type)) {
 		pr_err("unsupported ddr type %d\n", part_info->type);
 		return 1;
 	}
+	printf("%s total size: %d GB, data rate: %d MT/s\n",
+		DDR_TYPE_LPDDR5 == part_info->type ? "LPDDR5" : "LPDDR4X",
+		part_info->size_mb * 2 / 1024, part_info->data_rate_mtps
+	);
 
 	/* DDR training info may save and restore from differents space:
 	1. write to private partition during uboot stage, restore it during spl stage
