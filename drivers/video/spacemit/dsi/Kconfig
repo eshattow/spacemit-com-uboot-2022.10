@@ -77,3 +77,9 @@ config LCD_JD9366TCYH1095_MIPI
 	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
 	help
 	  support lcd_jd9366tcyh1095_mipi panel
+
+config LCD_101W01_MIPI
+	bool "Add lcd 101w01 mipi panel"
+	depends on DISPLAY_SPACEMIT_MULTIPLE_MIPI_PANELS
+	help
+	  support lcd_101w01_mipi panel
