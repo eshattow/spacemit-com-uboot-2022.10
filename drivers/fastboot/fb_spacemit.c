@@ -56,6 +56,7 @@ static struct flash_dev *fastboot_flash_fdev;
 static const char *const ec_update_board_models[] = {
 	"spacemit k3 pico itx board",
 	"spacemit k3 deb1 board",
+	"SpacemiT K3 Pico-ITX",
 };
 
 #if CONFIG_IS_ENABLED(MD5)
