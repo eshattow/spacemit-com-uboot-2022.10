@@ -906,9 +906,16 @@ int _parse_flash_config(struct flash_dev *fdev, void *load_flash_addr)
 							env_set("extra_esos_partition", "esos");
 					} else if (!strcmp(node_part, "uboot")) {
 						env_set_hex("uboot_offset",
-							    (ulong)fdev->parts_info[part_index].part_offset);
+						    (ulong)fdev->parts_info[part_index].part_offset);
 						if (parse_mtd_partition)
 							env_set("extra_uboot_partition", "uboot");
+#ifdef CONFIG_SPACEMIT_SECURE_BOARD
+					} else if (!strcmp(node_part, "optee")) {
+						env_set_hex("optee_offset",
+						    (ulong)fdev->parts_info[part_index].part_offset);
+						if (parse_mtd_partition)
+							env_set("extra_optee_partition", "optee");
+#endif
 					}
 				}
 			}
