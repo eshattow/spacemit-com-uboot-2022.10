@@ -485,6 +485,16 @@ static int spacemit_pcie_probe(struct udevice *dev)
 	int ret;
 	u32 reg;
 
+	reg = spacemit_pcie_readl(pcie, PCIECTRL_SPACEMIT_CONF_DEVICE_CMD);
+	reg &= ~LTSSM_EN;
+	spacemit_pcie_writel(pcie, PCIECTRL_SPACEMIT_CONF_DEVICE_CMD, reg);
+
+	/* set Perst# (fundamental reset) gpio low state*/
+	reg = spacemit_pcie_readl(pcie, PCIE_CTRL_LOGIC);
+	reg |= PCIE_PERSTN_OE;
+	reg &= ~PCIE_PERSTN_OUT;
+	spacemit_pcie_writel(pcie, PCIE_CTRL_LOGIC, reg);
+
 	/* enable pcie clk */
 	clk_enable(&pcie->clock);
 	reset_deassert(&pcie->reset);
@@ -498,21 +508,7 @@ static int spacemit_pcie_probe(struct udevice *dev)
 		return ret;
 	}
 
-	reg = spacemit_pcie_readl(pcie, PCIECTRL_SPACEMIT_CONF_DEVICE_CMD);
-	reg &= ~LTSSM_EN;
-	spacemit_pcie_writel(pcie, PCIECTRL_SPACEMIT_CONF_DEVICE_CMD, reg);
-
 	pcie_set_mode(pcie, DW_PCIE_RC_TYPE);
-
-	/* set Perst# (fundamental reset) gpio low state*/
-	reg = spacemit_pcie_readl(pcie, PCIE_CTRL_LOGIC);
-	reg |= PCIE_PERSTN_OE;
-	reg |= PCIE_PERSTN_OUT;
-	spacemit_pcie_writel(pcie, PCIE_CTRL_LOGIC, reg);
-
-	reg = spacemit_pcie_readl(pcie, PCIE_CTRL_LOGIC);
-	reg &= ~PCIE_PERSTN_OUT;
-	spacemit_pcie_writel(pcie, PCIE_CTRL_LOGIC, reg);
 
 	spacemit_pcie_host_init(pcie);
 	pcie_eq_preset(pcie);
