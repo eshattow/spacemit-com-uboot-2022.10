@@ -432,7 +432,7 @@ static int spacemit_efuse_of_to_plat(struct udevice *dev)
 	struct spacemit_efuse_plat *plat = dev_get_plat(dev);
 
 	plat->reg_base = dev_read_addr_ptr(dev);
-	plat->efuse_need_reload = 1;
+	plat->efuse_need_reload = 0;
 
 	ret = clk_get_bulk(dev, &plat->clks);
 	if (ret) {
@@ -450,6 +450,13 @@ static int spacemit_efuse_of_to_plat(struct udevice *dev)
 	return 0;
 }
 
+static int spacemit_efuse_probe(struct udevice *dev)
+{
+	/* Boot has populated the shadow registers; only fill the RAM cache. */
+	efuse_load_all(dev);
+	return 0;
+}
+
 static const struct udevice_id spacemit_efuse_ids[] = {
 	{ .compatible = "spacemit,k1x-efuse" },
 	{ .compatible = "spacemit,k3-efuse" },
@@ -461,6 +468,7 @@ U_BOOT_DRIVER(spacemit_k1x_efuse) = {
 	.id = UCLASS_MISC,
 	.of_match = spacemit_efuse_ids,
 	.of_to_plat = spacemit_efuse_of_to_plat,
+	.probe = spacemit_efuse_probe,
 	.plat_auto = sizeof(struct spacemit_efuse_plat),
 	.ops = &spacemit_efuse_ops,
 };
