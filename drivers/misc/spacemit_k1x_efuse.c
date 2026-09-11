@@ -405,7 +405,7 @@ static struct udevice* find_efuse_regulator(void)
 
 	name = fdt_get_alias(gd->fdt_blob, "efuse_power");
 	if (NULL == name) {
-		pr_err("fail to get alias node efuse_power\n");
+		pr_debug("fail to get alias node efuse_power\n");
 		return NULL;
 	}
 
