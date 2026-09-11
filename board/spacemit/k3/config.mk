@@ -31,10 +31,20 @@ cmd_build_itb = \
 		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb/ && \
 	cp $(srctree)/u-boot-nodtb.bin \
 		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/ && \
+	if test -z "$(CONFIG_RSA_VERIFY)"; then \
+		test "$(CONFIG_SPL_LZO)" = "y" || { \
+			echo "K3 compressed FIT requires CONFIG_SPL_LZO=y" >&2; exit 1; }; \
+		for dtb in $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb/*.dtb; do \
+			lzop -9 -c < "$$dtb" > "$$dtb.lzo" || exit $$?; \
+		done; \
+		lzop -9 -c < $(srctree)/u-boot-nodtb.bin > \
+			$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin.lzo || exit $$?; \
+	fi && \
 	$(srctree)/tools/mkimage -f $3 $4 \
-		-r $(srctree)/$2; \
+		-r $(srctree)/$2 && \
 	rm -rf $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb && \
-	rm -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin
+	rm -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin \
+		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin.lzo
 
 quiet_cmd_build_default_env = BUILD   $2
 cmd_build_default_env = \
@@ -43,6 +53,7 @@ cmd_build_default_env = \
 		$(srctree)/u-boot-env-default.txt
 
 MRPROPER_FILES += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin
+MRPROPER_FILES += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin.lzo
 MRPROPER_FILES += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-spl.bin
 MRPROPER_FILES += u-boot.itb FSBL.bin u-boot-env-default.*
 MRPROPER_FILES += bootinfo_spinor.bin bootinfo_spinand.bin bootinfo_block.bin
