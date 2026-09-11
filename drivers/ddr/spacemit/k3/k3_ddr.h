@@ -35,6 +35,13 @@
 #error "Unsupported LPDDR5 datarate"
 #endif
 
+// disabling both leaves lpddr_init_prepare()/init_snps_lp45() as empty stubs,
+// which links fine but hangs at boot without a single error message
+#if defined(CONFIG_K3_BOARD_ASIC) && !defined(CONFIG_K3_DDR_LPDDR5) && \
+	!defined(CONFIG_K3_DDR_LPDDR4X)
+#error "K3 ASIC needs CONFIG_K3_DDR_LPDDR5 and/or CONFIG_K3_DDR_LPDDR4X"
+#endif
+
 #ifndef REG32
 #define REG32(x) (*((volatile uint32_t*)((uintptr_t)(x))))
 #endif
@@ -153,12 +160,15 @@ typedef struct {
 	uint16_t acsm[DDR_TRAINING_ACSMSRAM_HWORDS];
 } ddr_training_info_t;
 
-extern const uint8_t lp5_training_fw[], lp4x_training_fw[];
+/* LPDDR5 only */
+extern const uint8_t lp5_training_fw[];
 extern const phy_init_config *lp5_pre_train_table[];
 extern const phy_init_config *lp5_4g_train_table[], *lp5_train_table[];
 extern const ddr_phy_reg_config phy_override_pre_seq_lp5_4g[], phy_override_pre_seq_lp5_16g[];
 extern const ddr_phy_reg_config phy_override_seq_lp5_16g[];
 
+/* LPDDR4X only */
+extern const uint8_t lp4x_training_fw[];
 extern const phy_init_config *lp4x_pre_train_table[];
 extern const phy_init_config *lp4x_4g_train_table[], *lp4x_8g_train_table[], *lp4x_16g_train_table[];
 extern const ddr_phy_reg_config phy_override_seq_lp4x_8g[], phy_override_seq_lp4x_16g[];
@@ -179,6 +189,8 @@ extern void lpddr_training_table_init(unsigned int ddrc_base, const phy_init_con
 	const ddr_phy_reg_config* override_table, ddr_phy_reg_config* io_table);
 extern void init_snps_lp4x_ddrc(unsigned DDRC_BASE, ddr_part_info* part_info,
 	ddr_boot_mode ddr_mode, ddr_training_info_t* training_info);
+extern void init_snps_lp5_ddrc(unsigned DDRC_BASE, ddr_part_info* part_info,
+	ddr_boot_mode ddr_mode, ddr_training_info_t* training_info);
 
 extern void save_snps_ddrc_training_result(uint32_t ddrc_base, ddr_training_info_t* training_info);
 extern void init_snps_ddrc_quick(uint32_t ddrc_base, ddr_part_type type,
@@ -186,6 +198,7 @@ extern void init_snps_ddrc_quick(uint32_t ddrc_base, ddr_part_type type,
 
 extern const ddr_config_t* get_ddr_default_io_para(ddr_part_type type);
 extern void build_lpddr4x_io_para(const ddr_config_t* io_para, ddr_part_info* part_info);
+extern void build_lpddr5_io_para(const ddr_config_t* io_para, ddr_part_info* part_info);
 
 extern void load_lp5_quickboot_firmware(uint32_t dphy_base);
 extern void load_lp5_quickboot_dmem(uint32_t dphy_base);
