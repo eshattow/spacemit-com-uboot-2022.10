@@ -82,6 +82,7 @@ int _fb_mtd_erase(struct mtd_info *mtd, u32 erase_size)
 	bool scrub = false;
 	u64 len = 0;
 	struct erase_info erase_op = {};
+	u32 chunk;
 	int ret = 0;
 
 	if (IS_ERR_OR_NULL(mtd))
@@ -111,10 +112,27 @@ int _fb_mtd_erase(struct mtd_info *mtd, u32 erase_size)
 	scrub = false;
 	erase_op.mtd = mtd;
 	erase_op.addr = 0;
-	erase_op.len = mtd->erasesize;
 	erase_op.scrub = scrub;
 
+	/*
+	 * A NOR run may span many erasesize units so the SPI-NOR core sees
+	 * a whole native block and can pick the block opcode; it must be a
+	 * multiple of the erasesize or the erase layer rejects it.
+	 *
+	 * The run has to reach the native block size of the part, or
+	 * spi_nor_erase() never sees len >= block and keeps issuing the 4K
+	 * opcode. 64K is that size for every 4K-sector part in
+	 * spi-nor-ids.c but is25wx256 (128K), which keeps the 4K path
+	 * rather than making all the other parts pay for it.
+	 */
+	if (mtd->type == MTD_NORFLASH)
+		chunk = roundup(max_t(u32, mtd->erasesize, SZ_64K),
+				mtd->erasesize);
+	else
+		chunk = mtd->erasesize;
 	while (len) {
+		erase_op.len = min_t(u64, len, (u64)chunk);
+
 		ret = mtd_erase(mtd, &erase_op);
 		if (ret) {
 			/* Abort if its not a bad block error */
@@ -122,10 +140,15 @@ int _fb_mtd_erase(struct mtd_info *mtd, u32 erase_size)
 				break;
 			printf("Skipping bad block at 0x%08llx\n",
 			       erase_op.addr);
+			/*
+			 * Skip a single erasesize, not the whole run, so a
+			 * bad block does not take the following ones with it.
+			 */
+			erase_op.len = mtd->erasesize;
 		}
 
-		len -= mtd->erasesize;
-		erase_op.addr += mtd->erasesize;
+		len -= erase_op.len;
+		erase_op.addr += erase_op.len;
 	}
 
 	if (ret && ret != -EIO)
