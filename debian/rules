@@ -2,12 +2,10 @@
 
 export ARCH=riscv
 
-# Only set CROSS_COMPILE when cross-compiling
-DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
-DEB_BUILD_ARCH ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
-ifneq ($(DEB_HOST_ARCH),$(DEB_BUILD_ARCH))
-export CROSS_COMPILE=riscv64-unknown-linux-gnu-
-endif
+# The package is riscv64-only, so always default to the riscv64 cross
+# toolchain. ?= keeps it overridable from the environment: scripts/build.sh
+# passes the SpacemiT vendor toolchain (riscv64-unknown-linux-gnu-) instead.
+export CROSS_COMPILE ?= riscv64-linux-gnu-
 
 # Check whether inside a Git repository and get the commit ID
 GIT_INSIDE := $(shell git rev-parse --is-inside-work-tree 2>/dev/null)
