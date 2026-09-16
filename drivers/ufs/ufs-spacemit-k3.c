@@ -2372,11 +2372,45 @@ static int spacemit_k3_ufs_silent_reset(struct ufs_hba *hba)
 	return 0;
 }
 
+/* Match Linux: only send a dummy frame for a stuck legacy RX lane. */
+static int spacemit_k3_ufs_fixup_rx1(struct ufs_hba *hba)
+{
+	u32 rx1_fsm, remote_version;
+	int ret;
+
+	ret = ufshcd_dme_get(hba,
+			     UIC_ARG_MIB_SEL(0xC1, UIC_ARG_MPHY_RX_GEN_SEL_INDEX(1)),
+			     &rx1_fsm);
+	if (ret)
+		return ret;
+
+	ret = ufshcd_dme_get(hba, UIC_ARG_MIB(PA_REMOTEVERINFO),
+			     &remote_version);
+	if (ret)
+		return ret;
+
+	if (rx1_fsm != 0xe || remote_version >= UFS_UNIPRO_VER_1_8)
+		return 0;
+
+	ret = ufshcd_dme_set(hba,
+			     UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)), 0x97);
+	if (ret)
+		return ret;
+	ret = ufshcd_dme_set(hba,
+			     UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)), 0xd7);
+	if (ret)
+		return ret;
+
+	return ufshcd_dme_set(hba,
+			      UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)), 0x17);
+}
+
 static int
 spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 				    enum ufs_notify_change_status status)
 {
 	uint32_t reg_val;
+	int ret;
 
 	pr_debug("ufs: spacemit_k3_ufs_link_startup_notify, status:%d\n",
 		 status);
@@ -2414,22 +2448,9 @@ spacemit_k3_ufs_link_startup_notify(struct ufs_hba *hba,
 			"ufs: REG_UIC_ERROR_CODE_PHY_ADAPTER_LAYER(0x%x):0x%x\n",
 			REG_UIC_ERROR_CODE_PHY_ADAPTER_LAYER, reg_val);
 
-		/* add 0xe8 make UFS2.1 run GEAR3+2Lane@409M*/
-		mdelay(5);
-		ufshcd_dme_set(
-			hba,
-			UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
-			0x97);
-		mdelay(1);
-		ufshcd_dme_set(
-			hba,
-			UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
-			0xd7);
-		mdelay(1);
-		ufshcd_dme_set(
-			hba,
-			UIC_ARG_MIB_SEL(0xe8, UIC_ARG_MPHY_TX_GEN_SEL_INDEX(0)),
-			0x17);
+		ret = spacemit_k3_ufs_fixup_rx1(hba);
+		if (ret)
+			return ret;
 
 		/* DL_AFC0REQTIMEOUTVAL_MAX */
 		ufshcd_dme_set(hba, UIC_ARG_MIB(DL_AFC0REQTIMEOUTVAL),
