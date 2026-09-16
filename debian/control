@@ -1,7 +1,7 @@
 Source: u-boot-spacemit
 Section: admin
 Priority: optional
-Maintainer: 李伟智  <weizhi.li@spacemit.com>
+Maintainer: weizhi.li <weizhi.li@spacemit.com>
 Build-Depends: bc,
  bison,
  debhelper-compat (= 13),
