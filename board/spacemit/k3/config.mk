@@ -52,14 +52,6 @@ cmd_build_default_env = \
 	$(srctree)/tools/mkenvimage -s $(CONFIG_ENV_SIZE) -o $(srctree)/u-boot-env-default.bin \
 		$(srctree)/u-boot-env-default.txt
 
-MRPROPER_FILES += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin
-MRPROPER_FILES += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin.lzo
-MRPROPER_FILES += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-spl.bin
-MRPROPER_FILES += u-boot.itb FSBL.bin u-boot-env-default.*
-MRPROPER_FILES += bootinfo_spinor.bin bootinfo_spinand.bin bootinfo_block.bin
-MRPROPER_FILES += k3_fpga_1x1.dtb
-MRPROPER_DIRS += $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb
-
 ifeq ($(CONFIG_RSA_VERIFY),)
 its := $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/uboot_fdt.its
 else
