@@ -2,7 +2,6 @@
 #
 # Copyright (c) 2022-2024 Spacemit, Inc
 
-
 # Add 4KB header for u-boot-spl.bin
 quiet_cmd_build_spl_platform = BUILD   $2
 cmd_build_spl_platform = \
@@ -10,6 +9,7 @@ cmd_build_spl_platform = \
 		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/ && \
 	python3 $(srctree)/tools/build_binary_file.py \
 		-c $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs/fsbl.json \
+		-i $(obj) \
 		-o $(srctree)/FSBL.bin \
 		$(if $(KEY_DIR),--key-dir $(KEY_DIR)); \
 	python3 $(srctree)/tools/build_binary_file.py \

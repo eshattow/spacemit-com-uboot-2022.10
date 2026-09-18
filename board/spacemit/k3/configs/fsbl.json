@@ -19,7 +19,7 @@
           "pubkey": {
             "name": "root_key",
             "algorithm": "RSA2048",
-            "source": "key/root_key_prv.key",
+            "source": "root_key_prv.key",
             "align": 256
           }
         }
@@ -108,7 +108,7 @@
               "pubkey": {
                 "name": "spl_key",
                 "algorithm": "RSA2048",
-                "source": "key/spl_key_prv.key",
+                "source": "spl_key_prv.key",
                 "align": 256
               }
             },
@@ -116,7 +116,7 @@
               "pubkey": {
                 "name": "uboot_pubkey",
                 "algorithm": "RSA2048",
-                "source": "key/uboot_key_pub.key",
+                "source": "uboot_key_pub.key",
                 "align": 256
               }
             },
@@ -173,7 +173,7 @@
         {
           "file": {
             "name": "fsbl",
-            "source": "../u-boot-spl.bin",
+            "source": "u-boot-spl.bin",
             "align": 32
           }
         },
