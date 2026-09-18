@@ -25,26 +25,13 @@ cmd_build_spl_platform = \
 
 quiet_cmd_build_itb = BUILD   $2
 cmd_build_itb = \
-	mkdir -p $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb && \
-	cp $(srctree)/arch/$(ARCH)/dts/*.dtb $(srctree)/ && \
-	cp $(srctree)/arch/$(ARCH)/dts/*.dtb \
-		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb/ && \
-	cp $(srctree)/u-boot-nodtb.bin \
-		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/ && \
 	if test -z "$(CONFIG_RSA_VERIFY)"; then \
 		test "$(CONFIG_SPL_LZO)" = "y" || { \
 			echo "K3 compressed FIT requires CONFIG_SPL_LZO=y" >&2; exit 1; }; \
-		for dtb in $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb/*.dtb; do \
-			lzop -9 -c < "$$dtb" > "$$dtb.lzo" || exit $$?; \
-		done; \
-		lzop -9 -c < $(srctree)/u-boot-nodtb.bin > \
-			$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin.lzo || exit $$?; \
 	fi && \
 	$(srctree)/tools/mkimage -f $3 $4 \
-		-r $(srctree)/$2 && \
-	rm -rf $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/dtb && \
-	rm -f $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin \
-		$(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/u-boot-nodtb.bin.lzo
+		-r $(srctree)/$2 \
+		-D "-I dts -O dtb $(foreach i,$(5),$(join -i,$(i)))"
 
 quiet_cmd_build_default_env = BUILD   $2
 cmd_build_default_env = \
@@ -71,8 +58,28 @@ key_para := -k $(srctree)/board/$(CONFIG_SYS_VENDOR)/$(CONFIG_SYS_BOARD)/configs
 endif
 endif
 
-u-boot.itb: u-boot-nodtb.bin u-boot-dtb.bin u-boot.dtb FORCE
-	$(call if_changed,build_itb,$@,$(its),$(key_para))
+its-incbin := $(shell grep -Po '(?<=/incbin/\(").*(?="\);)' $(its))
+its-deps :=
+its-y :=
+its-i :=
+
+its-y-subset := $(filter %.dtb %.dtb.lzo,$(its-incbin))
+its-y-prefix := $(obj)/arch/$(ARCH)/dts/
+its-deps += $(addprefix $(its-y-prefix),$(its-y-subset))
+its-y += $(its-y-subset)
+its-i += $(if $(its-y-subset),$(its-y-prefix))
+
+its-y-subset := $(filter-out $(its-y),$(its-incbin))
+its-y-prefix := $(obj)/
+its-deps += $(addprefix $(its-y-prefix),$(its-y-subset))
+its-y += $(its-y-subset)
+its-i += $(if $(its-y-subset),$(its-y-prefix))
+
+u-boot.itb: u-boot-nodtb.bin u-boot-dtb.bin u-boot.dtb dtbs $(its-deps) FORCE
+	$(call if_changed,build_itb,$@,$(its),$(key_para),$(its-i))
+
+%.lzo: $(basename $@)
+	@lzop -f9 -o $@ $*
 
 ifneq ($(CONFIG_SPL_BUILD),)
 INPUTS-y += FSBL.bin

@@ -12,7 +12,7 @@
 			arch = "riscv";
 			compression = "lzo";
 			load = <0x1 0x02000000>;
-			data = /incbin/("../u-boot-nodtb.bin.lzo");
+			data = /incbin/("u-boot-nodtb.bin.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -22,7 +22,7 @@
 			description = "k3_fpga.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_fpga_1x1.dtb.lzo");
+			data = /incbin/("k3_fpga_1x1.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -32,7 +32,7 @@
 			description = "k3_evb.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_evb.dtb.lzo");
+			data = /incbin/("k3_evb.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -42,7 +42,7 @@
 			description = "k3_deb1.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_deb1.dtb.lzo");
+			data = /incbin/("k3_deb1.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -52,7 +52,7 @@
 			description = "k3_com260.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_com260.dtb.lzo");
+			data = /incbin/("k3_com260.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -62,7 +62,7 @@
 			description = "k3-deepcomputing-fml13v05.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3-deepcomputing-fml13v05.dtb.lzo");
+			data = /incbin/("k3-deepcomputing-fml13v05.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -72,7 +72,7 @@
 			description = "k3_com260_kit_v02.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_com260_kit_v02.dtb.lzo");
+			data = /incbin/("k3_com260_kit_v02.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -82,7 +82,7 @@
 			description = "k3_gemini_c0.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_gemini_c0.dtb.lzo");
+			data = /incbin/("k3_gemini_c0.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -92,7 +92,7 @@
 			description = "k3_gemini_c1.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_gemini_c1.dtb.lzo");
+			data = /incbin/("k3_gemini_c1.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -102,7 +102,7 @@
 			description = "k3_evb2-1.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_evb2-1.dtb.lzo");
+			data = /incbin/("k3_evb2-1.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -112,7 +112,7 @@
 			description = "k3_evb2-2.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_evb2-2.dtb.lzo");
+			data = /incbin/("k3_evb2-2.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -122,7 +122,7 @@
 			description = "k3-pico-itx.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3-pico-itx.dtb.lzo");
+			data = /incbin/("k3-pico-itx.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -132,7 +132,7 @@
 			description = "k3_BS01DCMA.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_BS01DCMA.dtb.lzo");
+			data = /incbin/("k3_BS01DCMA.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -142,7 +142,7 @@
 			description = "k3_com260_ifx.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_com260_ifx.dtb.lzo");
+			data = /incbin/("k3_com260_ifx.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -152,7 +152,7 @@
 			description = "k3_com260_tq.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_com260_tq.dtb.lzo");
+			data = /incbin/("k3_com260_tq.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -162,7 +162,7 @@
 			description = "k3_com260_ifx2.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_com260_ifx2.dtb.lzo");
+			data = /incbin/("k3_com260_ifx2.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -172,7 +172,7 @@
 			description = "k3_com260_ifx_tq.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3_com260_ifx_tq.dtb.lzo");
+			data = /incbin/("k3_com260_ifx_tq.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
@@ -182,7 +182,7 @@
 			description = "k3-firefly-aibox-k3.dtb";
 			type = "flat_dt";
 			compression = "lzo";
-			data = /incbin/("../dtb/k3-firefly-aibox-k3.dtb.lzo");
+			data = /incbin/("k3-firefly-aibox-k3.dtb.lzo");
 			hash-1 {
 				algo = "crc32";
 			};
