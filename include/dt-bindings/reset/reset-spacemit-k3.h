@@ -174,10 +174,64 @@
 #define RESET_SEC_TIMERS         160
 #define RESET_SEC_JTAG           161
 #define RESET_SEC_GPIO           162
-//RCPU
-#define RESET_RCPU5_RT24_CORE0   163
-#define RESET_RCPU5_RT24_CORE1   164
+//RCPU SYSCTRL
+#define RESET_RCPU_RCAN0                 163
+#define RESET_RCPU_RCAN1                 164
+#define RESET_RCPU_RCAN2                 165
+#define RESET_RCPU_RCAN3                 166
+#define RESET_RCPU_RCAN4                 167
+#define RESET_RCPU_RIRC0                 168
+#define RESET_RCPU_RIRC1                 169
+#define RESET_RCPU_RGMAC                 170
+#define RESET_RCPU_RESPI                 171
+#define RESET_RCPU_RI2S0_SYSCLK          172
+#define RESET_RCPU_RI2S1_SYSCLK          173
+//RCPU UARTCTRL
+#define RESET_RCPU_RUART0                174
+#define RESET_RCPU_RUART1                175
+#define RESET_RCPU_RUART2                176
+#define RESET_RCPU_RUART3                177
+#define RESET_RCPU_RUART4                178
+#define RESET_RCPU_RUART5                179
+//RCPU I2SCTRL
+#define RESET_RCPU_RI2S0                 180
+#define RESET_RCPU_RI2S1                 181
+#define RESET_RCPU_RI2S2                 182
+#define RESET_RCPU_RI2S3                 183
+#define RESET_RCPU_RI2S2_SYSCLK          184
+#define RESET_RCPU_RI2S3_SYSCLK          185
+//RCPU SPICTRL
+#define RESET_RCPU_RSPI0                 186
+#define RESET_RCPU_RSPI1                 187
+#define RESET_RCPU_RSPI2                 188
+//RCPU I2CCTRL
+#define RESET_RCPU_RI2C0                 189
+#define RESET_RCPU_RI2C1                 190
+#define RESET_RCPU_RI2C2                 191
+//RPMU
+#define RESET_RPMU_RTIMER1               192
+#define RESET_RPMU_RTIMER2               193
+#define RESET_RPMU_RTIMER3               194
+#define RESET_RPMU_RTIMER4               195
+#define RESET_RPMU_IPC2AP                196
+#define RESET_RPMU_IPC2CP                197
+#define RESET_RPMU_IPC2MSA               198
+#define RESET_RPMU_RT24_CORE0            199
+#define RESET_RPMU_RT24_CORE1            200
+#define RESET_RPMU_GPIO                  201
+#define RESET_RPMU_GPIO_EDGE             202
+//RCPU PWMCTRL
+#define RESET_RCPU_PWM0                  203
+#define RESET_RCPU_PWM1                  204
+#define RESET_RCPU_PWM2                  205
+#define RESET_RCPU_PWM3                  206
+#define RESET_RCPU_PWM4                  207
+#define RESET_RCPU_PWM5                  208
+#define RESET_RCPU_PWM6                  209
+#define RESET_RCPU_PWM7                  210
+#define RESET_RCPU_PWM8                  211
+#define RESET_RCPU_PWM9                  212
 
-#define RESET_NUMBER             165
+#define RESET_NUMBER                     213
 
 #endif /* __DT_BINDINGS_RESET_SAPCEMIT_K3_H__ */
