@@ -30,6 +30,12 @@ enum ccu_base_type{
 	BASE_TYPE_AUDC       = 7,
 	BASE_TYPE_APBC2      = 8,
 	BASE_TYPE_RCPU       = 9,
+	BASE_TYPE_RCPU1      = 10,
+	BASE_TYPE_RCPU2      = 11,
+	BASE_TYPE_RCPU3      = 12,
+	BASE_TYPE_RCPU4      = 13,
+	BASE_TYPE_RCPU5      = 14,
+	BASE_TYPE_RCPU6      = 15,
 };
 
 enum {

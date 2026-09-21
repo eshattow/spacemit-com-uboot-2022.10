@@ -288,6 +288,23 @@ struct ccu_mix {
 		},							\
 	}
 
+#define SPACEMIT_CCU_DIV_FC(_struct, _name, _parent, _base_type, _reg_ctrl,	\
+			    _mshift, _mwidth, _fc, _flags)		\
+	struct ccu_mix _struct = {					\
+		.div	= CCU_DIV_INIT(_mshift, _mwidth, NULL, 0),	\
+		.common = {						\
+			.reg_type	= CLK_DIV_TYPE_1REG_FC_V2,	\
+			.reg_ctrl	= _reg_ctrl,			\
+			.fc		= _fc,				\
+			.base_type	= _base_type,			\
+			.name		= _name,			\
+			.parent_name	= _parent,			\
+			.num_parents	= 1,				\
+			.driver_name	= CCU_CLK_MIX,			\
+			.flags		= _flags,			\
+		},							\
+	}
+
 #define SPACEMIT_CCU_DIV_FC_WITH_GATE(_struct, _name, _parent, _base_type, _reg_ctrl,		\
 					  _mshift, _mwidth, _fc, _gate_mask, _val_enable, _val_disable,			\
 					  _flags)					\
