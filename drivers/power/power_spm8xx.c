@@ -30,6 +30,7 @@ MPQ8655_BUCK_LINER_RANGE;MPQ8655_REGULATOR_DESC;
 TDA38740_BUCK_LINER_RANGE;TDA38740_REGULATOR_DESC;
 IS6615A_BUCK_LINER_RANGE;IS6615A_REGULATOR_DESC;
 AU4562_BUCK_LINER_RANGE;AU4562_REGULATOR_DESC;
+MP2973_BUCK_LINER_RANGE;MP2973_REGULATOR_DESC;
 
 static const char *global_compatible[] = {
 	"spacemit,spm8821",
@@ -69,6 +70,12 @@ static const struct tlv_pmic_info tlv_pmic_infos[] = {
 		.name = "au4562",
 		.compatibles = {
 			"spacemit,au4562",
+		},
+	},
+	{
+		.name = "mp2973",
+		.compatibles = {
+			"spacemit,mp2973",
 		},
 	},
 };
@@ -115,10 +122,22 @@ static const struct tlv_pmic_info *board_pmic_tlv_info(void)
 #define TDA38740_COMPAT_PREFIX	"spacemit,tda38740"
 #define IS6615A_COMPAT_PREFIX	"spacemit,is6615a"
 #define AU4562_COMPAT_PREFIX	"spacemit,au4562"
+#define MP2973_COMPAT_PREFIX	"spacemit,mp2973"
 
 static bool pmic_name_match(const char *name, const char *prefix)
 {
 	return !strncmp(name, prefix, strlen(prefix));
+}
+
+/* MP2973 accessors for the shared helpers in mp2973.h (ctx = slave address) */
+static int mp2973_i2c_read(void *ctx, u8 reg, u8 *buf, int len)
+{
+	return i2c_read(*(int *)ctx, reg, 1, buf, len);
+}
+
+static int mp2973_i2c_write(void *ctx, u8 reg, u8 *buf, int len)
+{
+	return i2c_write(*(int *)ctx, reg, 1, buf, len);
 }
 
 void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck_desc,
@@ -147,6 +166,11 @@ void __regulator_desc_find(const char *name, const struct pm8xx_buck_desc **buck
 	} else if (pmic_name_match(name, AU4562_COMPAT_PREFIX)) {
 		*buck_desc = au4562_buck_desc;
 		*num_buck = sizeof(au4562_buck_desc) / sizeof(au4562_buck_desc[0]);
+		*ldo_desc = NULL;
+		*num_ldo = 0;
+	} else if (pmic_name_match(name, MP2973_COMPAT_PREFIX)) {
+		*buck_desc = mp2973_buck_desc;
+		*num_buck = sizeof(mp2973_buck_desc) / sizeof(mp2973_buck_desc[0]);
 		*ldo_desc = NULL;
 		*num_ldo = 0;
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
@@ -398,6 +422,27 @@ static int __board_pmic_init(const char *name)
 							regvals[1] = (value >> 8) & 0xff;
 							i2c_write(saddr, buck_desc[i].vsel_reg, 1, regvals, 2);
 						}
+					}
+					break;
+				}
+			}
+		} else if (pmic_name_match(name, MP2973_COMPAT_PREFIX)) {
+			if (strncmp(s, "EDCDC_REG", 9) == 0) {
+				for (i = 0; i < num_buck; ++i) {
+					if (strcmp(buck_desc[i].name, s) != 0)
+						continue;
+
+					/* set the regulator */
+					if (value) {
+						struct mp2973_io io = {
+							.read = mp2973_i2c_read,
+							.write = mp2973_i2c_write,
+							.ctx = &saddr,
+						};
+
+						if (mp2973_set_vout(&io, value, min, max))
+							printf("mp2973: set %umV failed (range %u-%umV), skip %s\n",
+							       value / 1000, min / 1000, max / 1000, s);
 					}
 					break;
 				}

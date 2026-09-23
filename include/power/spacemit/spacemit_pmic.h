@@ -77,6 +77,7 @@ struct regulator_match_data {
 #include "tda38740.h"
 #include "is6615a.h"
 #include "au4562.h"
+#include "mp2973.h"
 #include <tlv_eeprom.h>
 
 extern int get_tlvinfo(uint8_t id, uint8_t *buffer, int max_size);

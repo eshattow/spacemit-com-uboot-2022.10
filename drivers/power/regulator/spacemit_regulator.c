@@ -15,6 +15,17 @@
 #include "regulator_common.h"
 #include <power/spacemit/spacemit_pmic.h>
 
+/* MP2973 accessors for the shared helpers in mp2973.h (ctx = pmic udevice) */
+static int mp2973_pmic_read(void *ctx, u8 reg, u8 *buf, int len)
+{
+	return pmic_read((struct udevice *)ctx, reg, buf, len);
+}
+
+static int mp2973_pmic_write(void *ctx, u8 reg, u8 *buf, int len)
+{
+	return pmic_write((struct udevice *)ctx, reg, buf, len);
+}
+
 SPM8821_BUCK_LINER_RANGE; SPM8821_LDO_LINER_RANGE; SPM8821_SWITCH_LINER_RANGE;
 SPM8821_REGULATOR_BUCK_DESC; SPM8821_REGULATOR_LDO_DESC; SPM8821_REGULATOR_SWITCH_DESC;
 SPM8821_REGULATOR_MATCH_DATA;
@@ -23,6 +34,7 @@ MPQ8655_BUCK_LINER_RANGE; MPQ8655_REGULATOR_DESC; MPQ8655_REGULATOR_MATCH_DATA;
 TDA38740_BUCK_LINER_RANGE; TDA38740_REGULATOR_DESC; TDA38740_REGULATOR_MATCH_DATA;
 IS6615A_BUCK_LINER_RANGE; IS6615A_REGULATOR_DESC; IS6615A_REGULATOR_MATCH_DATA;
 AU4562_BUCK_LINER_RANGE; AU4562_REGULATOR_DESC; AU4562_REGULATOR_MATCH_DATA;
+MP2973_BUCK_LINER_RANGE; MP2973_REGULATOR_DESC; MP2973_REGULATOR_MATCH_DATA;
 
 #ifdef CONFIG_TARGET_SPACEMIT_K1X
 PM853_BUCK_LINER_RANGE1; PM853_BUCK_LINER_RANGE2; PM853_LDO_LINER_RANGE1; PM853_LDO_LINER_RANGE2;
@@ -292,12 +304,25 @@ static int buck_get_value(struct udevice *dev)
 	int buck = get_buck_reg_index(dev);
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
 	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
-	int mask = info->vsel_msk;
+	int mask;
 	int ret;
 	unsigned int val;
 
 	if (info == NULL)
 		return -ENOSYS;
+	mask = info->vsel_msk;
+
+	/* MP2973: decode with the rail's actual encoding */
+	if (!strcmp(priv->match->name, "mp2973")) {
+		struct mp2973_io io = {
+			.read = mp2973_pmic_read,
+			.write = mp2973_pmic_write,
+			.ctx = dev->parent,
+		};
+		int uvolt = 0;
+
+		return mp2973_get_vout(&io, &uvolt) ? -EINVAL : uvolt;
+	}
 
 	if (strcmp(priv->match->name, "spm8821") != 0) {
 		unsigned char vals[2];
@@ -339,6 +364,21 @@ static int buck_set_value(struct udevice *dev, int uvolt)
 
 	if (info == NULL)
 		return -ENOSYS;
+
+	/* MP2973: VOUT_COMMAND is page- and encoding-dependent (see mp2973.h) */
+	if (!strcmp(priv->match->name, "mp2973")) {
+		struct dm_regulator_uclass_plat *uc_pdata = dev_get_uclass_plat(dev);
+		struct mp2973_io io = {
+			.read = mp2973_pmic_read,
+			.write = mp2973_pmic_write,
+			.ctx = dev->parent,
+		};
+		/* -ENODATA = absent bound; helper wants 0 = unbounded */
+		u32 min_uv = uc_pdata->min_uV < 0 ? 0 : (u32)uc_pdata->min_uV;
+		u32 max_uv = uc_pdata->max_uV < 0 ? 0 : (u32)uc_pdata->max_uV;
+
+		return mp2973_set_vout(&io, (u32)uvolt, min_uv, max_uv) ? -EINVAL : 0;
+	}
 
 	sel = regulator_map_voltage_linear_range(info, uvolt, uvolt);
 	if (sel >=0) {
@@ -406,13 +446,14 @@ static int buck_get_suspend_value(struct udevice *dev)
 	/* the hardware has already support the function */
 	int buck = get_buck_reg_index(dev);
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
-	int mask = info->vsel_sleep_msk;
+	int mask;
 	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
 	int ret;
 	unsigned int val;
 
 	if (info == NULL)
 		return -ENOSYS;
+	mask = info->vsel_sleep_msk;
 
 	if (strcmp(priv->match->name, "spm8821") != 0)
 		return -ENOSYS;
@@ -433,10 +474,11 @@ static int buck_get_enable(struct udevice *dev)
 	int buck = get_buck_reg_index(dev);
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
 	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
-	int mask = info->enable_msk;
+	int mask;
 
 	if (info == NULL)
 		return -ENOSYS;
+	mask = info->enable_msk;
 
 	/* enabled by default, controled by p1 */
 	if (strcmp(priv->match->name, "spm8821") != 0)
@@ -460,7 +502,12 @@ static int buck_set_enable(struct udevice *dev, bool enable)
 	int buck = get_buck_reg_index(dev);
 	const struct pm8xx_buck_desc *info = get_buck_reg(dev->parent, buck);
 	struct pm8xx_priv *priv = dev_get_priv(dev->parent);
-	int mask = info->enable_msk;
+	int mask;
+
+	if (info == NULL)
+		return -ENOSYS;
+
+	mask = info->enable_msk;
 
 	/* uboot can't disable it */
 	if (strcmp(priv->match->name, "spm8821") != 0) {
@@ -546,12 +593,13 @@ static int ldo_get_value(struct udevice *dev)
 {
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_ldo_reg(dev->parent, buck);
-	int mask = info->vsel_msk;
+	int mask;
 	int ret;
 	unsigned int val;
 
 	if (info == NULL)
 		return -ENOSYS;
+	mask = info->vsel_msk;
 
 	ret = pmic_reg_read(dev->parent, info->vsel_reg);
 	if (ret < 0)
@@ -606,12 +654,13 @@ static int ldo_get_suspend_value(struct udevice *dev)
 
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_ldo_reg(dev->parent, buck);
-	int mask = info->vsel_sleep_msk;
+	int mask;
 	int ret;
 	unsigned int val;
 
 	if (info == NULL)
 		return -ENOSYS;
+	mask = info->vsel_sleep_msk;
 
 	ret = pmic_reg_read(dev->parent, info->vsel_sleep_reg);
 	if (ret < 0)
@@ -629,10 +678,11 @@ static int ldo_get_enable(struct udevice *dev)
 	unsigned int val;
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_ldo_reg(dev->parent, buck);
-	int mask = info->enable_msk;
+	int mask;
 
 	if (info == NULL)
 		return -ENOSYS;
+	mask = info->enable_msk;
 
 	ret = pmic_reg_read(dev->parent, info->enable_reg);
 	if (ret < 0)
@@ -651,7 +701,12 @@ static int ldo_set_enable(struct udevice *dev, bool enable)
 	unsigned int val = 0;
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_ldo_reg(dev->parent, buck);
-	int mask = info->enable_msk;
+	int mask;
+
+	if (info == NULL)
+		return -ENOSYS;
+
+	mask = info->enable_msk;
 
 	ret = pmic_reg_read(dev->parent, info->enable_reg);
 	if (ret < 0)
@@ -731,10 +786,11 @@ static int switch_get_value(struct udevice *dev)
 	unsigned int val;
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_switch_reg(dev->parent, buck);
-	int mask = info->enable_msk;
+	int mask;
 
 	if (info == NULL)
 		return -ENOSYS;
+	mask = info->enable_msk;
 
 	ret = pmic_reg_read(dev->parent, info->enable_reg);
 	if (ret < 0)
@@ -753,7 +809,12 @@ static int switch_set_value(struct udevice *dev, int uvolt)
 	unsigned int val = 0;
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_switch_reg(dev->parent, buck);
-	int mask = info->enable_msk;
+	int mask;
+
+	if (info == NULL)
+		return -ENOSYS;
+
+	mask = info->enable_msk;
 
 	ret = pmic_reg_read(dev->parent, info->enable_reg);
 	if (ret < 0)
@@ -781,10 +842,11 @@ static int switch_get_enable(struct udevice *dev)
 	unsigned int val;
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_switch_reg(dev->parent, buck);
-	int mask = info->enable_msk;
+	int mask;
 
 	if (info == NULL)
 		return -ENOSYS;
+	mask = info->enable_msk;
 
 	ret = pmic_reg_read(dev->parent, info->enable_reg);
 	if (ret < 0)
@@ -803,7 +865,12 @@ static int switch_set_enable(struct udevice *dev, bool enable)
 	unsigned int val = 0;
 	int buck = dev->driver_data - 1;
 	const struct pm8xx_buck_desc *info = get_switch_reg(dev->parent, buck);
-	int mask = info->enable_msk;
+	int mask;
+
+	if (info == NULL)
+		return -ENOSYS;
+
+	mask = info->enable_msk;
 
 	ret = pmic_reg_read(dev->parent, info->enable_reg);
 	if (ret < 0)
