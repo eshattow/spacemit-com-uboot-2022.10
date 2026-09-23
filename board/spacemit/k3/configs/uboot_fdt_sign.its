@@ -44,6 +44,16 @@
 				algo = "sha256";
 			};
 		};
+
+		fdt_18 {
+			description = "k3-ai-book.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3-ai-book.dtb");
+			hash {
+				algo = "sha256";
+			};
+		};
 	};
 	configurations {
 		default = "conf_1";
@@ -71,6 +81,17 @@
 			description = "k3-pico-itx";
 			loadables = "uboot";
 			fdt = "fdt_11";
+			signature {
+				algo = "sha256,rsa2048";
+				key-name-hint = "uboot_key_prv";
+				sign-images = "loadables", "fdt";
+			};
+		};
+
+		conf_18 {
+			description = "k3-ai-book";
+			loadables = "uboot";
+			fdt = "fdt_18";
 			signature {
 				algo = "sha256,rsa2048";
 				key-name-hint = "uboot_key_prv";

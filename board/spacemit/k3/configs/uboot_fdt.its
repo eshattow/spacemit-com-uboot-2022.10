@@ -187,6 +187,16 @@
 				algo = "crc32";
 			};
 		};
+
+		fdt_18 {
+			description = "k3-ai-book.dtb";
+			type = "flat_dt";
+			compression = "none";
+			data = /incbin/("../dtb/k3-ai-book.dtb");
+			hash-1 {
+				algo = "crc32";
+			};
+		};
 	};
 
 	configurations {
@@ -292,5 +302,11 @@
 			loadables = "uboot";
 			fdt = "fdt_17";
         };
+
+		conf_18 {
+			description = "k3-ai-book";
+			loadables = "uboot";
+			fdt = "fdt_18";
+		};
 	};
 };
