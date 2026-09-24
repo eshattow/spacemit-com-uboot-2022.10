@@ -421,6 +421,63 @@
 		>;
 	};
 
+	/* RCPU (R-domain) i2c pin groups, mirroring the K3 pin-mux table. */
+	pinctrl_ri2c0_0: ri2c0_0_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_27, MUX_MODE6, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c0_scl */
+			K3_PADCONF(GPIO_28, MUX_MODE6, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c0_sda */
+		>;
+	};
+
+	pinctrl_ri2c0_1: ri2c0_1_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_57, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c0_scl */
+			K3_PADCONF(GPIO_58, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c0_sda */
+		>;
+	};
+
+	pinctrl_ri2c0_2: ri2c0_2_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_74, MUX_MODE6, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c0_scl */
+			K3_PADCONF(GPIO_75, MUX_MODE6, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c0_sda */
+		>;
+	};
+
+	pinctrl_ri2c0_3: ri2c0_3_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_115, MUX_MODE6, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c0_scl */
+			K3_PADCONF(GPIO_116, MUX_MODE6, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c0_sda */
+		>;
+	};
+
+	pinctrl_ri2c1_0: ri2c1_0_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_33, MUX_MODE6, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c1_scl */
+			K3_PADCONF(GPIO_34, MUX_MODE6, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c1_sda */
+		>;
+	};
+
+	pinctrl_ri2c1_1: ri2c1_1_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_39, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c1_scl */
+			K3_PADCONF(GPIO_40, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c1_sda */
+		>;
+	};
+
+	pinctrl_ri2c1_2: ri2c1_2_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_59, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c1_scl */
+			K3_PADCONF(GPIO_60, MUX_MODE5, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c1_sda */
+		>;
+	};
+
+	pinctrl_ri2c1_3: ri2c1_3_grp {
+		pinctrl-single,pins = <
+			K3_PADCONF(GPIO_105, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c1_scl */
+			K3_PADCONF(GPIO_106, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS0)) /* ri2c1_sda */
+		>;
+	};
+
 	pinctrl_pwm0_0: pwm0_0_grp {
 		pinctrl-single,pins = <
 			K3_PADCONF(GPIO_00, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_DS8)) /* pwm0 */

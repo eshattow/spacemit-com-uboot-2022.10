@@ -40,6 +40,8 @@
 		i2c5 = &i2c5;
 		i2c6 = &i2c6;
 		i2c8 = &i2c8;
+		i2c9 = &ri2c0;
+		i2c10 = &ri2c1;
 	};
 
 	clocks {
@@ -467,6 +469,106 @@
 			#pwm-cells = <2>;
 			clocks = <&ccu CLK_PWM18>;
 			resets = <&reset RESET_PWM18>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		rpwm0: rpwm@c088d100 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc088d100 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_RCPU_PWM0>;
+			resets = <&reset RESET_RCPU_PWM0>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		rpwm1: rpwm@c088d200 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc088d200 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_RCPU_PWM1>;
+			resets = <&reset RESET_RCPU_PWM1>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		rpwm2: rpwm@c088d300 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc088d300 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_RCPU_PWM2>;
+			resets = <&reset RESET_RCPU_PWM2>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		rpwm3: rpwm@c088d400 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc088d400 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_RCPU_PWM3>;
+			resets = <&reset RESET_RCPU_PWM3>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		rpwm4: rpwm@c088d500 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc088d500 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_RCPU_PWM4>;
+			resets = <&reset RESET_RCPU_PWM4>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		rpwm5: rpwm@c088d600 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc088d600 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_RCPU_PWM5>;
+			resets = <&reset RESET_RCPU_PWM5>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		rpwm6: rpwm@c088d700 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc088d700 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_RCPU_PWM6>;
+			resets = <&reset RESET_RCPU_PWM6>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		rpwm7: rpwm@c088d800 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc088d800 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_RCPU_PWM7>;
+			resets = <&reset RESET_RCPU_PWM7>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		rpwm8: rpwm@c088d900 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc088d900 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_RCPU_PWM8>;
+			resets = <&reset RESET_RCPU_PWM8>;
+			k1x,pwm-disable-fd;
+			status = "disabled";
+		};
+
+		rpwm9: rpwm@c088da00 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc088da00 0x0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&ccu CLK_RCPU_PWM9>;
+			resets = <&reset RESET_RCPU_PWM9>;
 			k1x,pwm-disable-fd;
 			status = "disabled";
 		};
@@ -1205,6 +1307,28 @@
 			reg = <0x0 0xd401d800 0x0 0x38>;
 			clocks = <&ccu CLK_TWSI8>;
 			resets = <&reset RESET_TWSI8>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <100000>;
+			status = "disabled";
+		};
+
+		ri2c0: ri2c@c0886000 {
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xc0886000 0x0 0x38>;
+			clocks = <&ccu CLK_RCPU_I2C0>;
+			resets = <&reset RESET_RCPU_RI2C0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <100000>;
+			status = "disabled";
+		};
+
+		ri2c1: ri2c@c0886100 {
+			compatible = "spacemit,i2c";
+			reg = <0x0 0xc0886100 0x0 0x38>;
+			clocks = <&ccu CLK_RCPU_I2C1>;
+			resets = <&reset RESET_RCPU_RI2C1>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			clock-frequency = <100000>;
