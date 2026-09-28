@@ -92,20 +92,43 @@ static bool k3_nor_set_highest_prio(const char *target_name)
 	int count = ARRAY_SIZE(k3_nor_boot_prio);
 	const char *mapped_name = target_name;
 	struct k3_nor_boot_target temp;
+	char base[32];
+	bool change_devnum = false;
+	ulong devnum = 0;
 	int i, j;
+	size_t len;
 
 	if (!target_name || !strlen(target_name))
 		return false;
 
+	// "SSD1"/"NVME1" select the second drive: strip the trailing number into
+	// a devnum env override and match the remaining base name below
+	len = strlen(target_name);
+	while (len > 1 && target_name[len - 1] >= '0' &&
+	       target_name[len - 1] <= '9')
+		len--;
+	if (len < strlen(target_name)) {
+		change_devnum = true;
+		devnum = simple_strtoul(target_name + len, NULL, 10);
+		strlcpy(base, target_name, min((size_t)(len + 1), sizeof(base)));
+		mapped_name = base;
+	}
+
 	// for ease of use, string substitution is provided
-	if (strcasecmp(target_name, "UFS") == 0) {
+	if (strcasecmp(mapped_name, "UFS") == 0) {
 		mapped_name = "scsi";
-	} else if (strcasecmp(target_name, "SSD") == 0) {
+	} else if (strcasecmp(mapped_name, "SSD") == 0) {
 		mapped_name = "nvme";
 	}
 
 	for (i = 0; i < count; i++) {
 		if (strcasecmp(k3_nor_boot_prio[i].blk_name, mapped_name) == 0) {
+			if (change_devnum) {
+				change_devnum = false;
+				k3_nor_boot_prio[i].devnum_default = devnum;
+				env_set_ulong(k3_nor_boot_prio[i].devnum_env, devnum);
+			}
+
 			if (i == 0)
 				return true;
 
