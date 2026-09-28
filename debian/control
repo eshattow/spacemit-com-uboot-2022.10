@@ -18,7 +18,7 @@ Build-Depends: bc,
  libncurses-dev,
  libncurses-dev:native,
  libssl-dev:native,
- lzop:native,
+ lzop,
  uuid-dev,
 Rules-Requires-Root: no
 Standards-Version: 4.6.2
