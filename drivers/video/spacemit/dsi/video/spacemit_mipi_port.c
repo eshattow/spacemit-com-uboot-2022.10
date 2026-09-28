@@ -42,6 +42,7 @@ static const __maybe_unused struct panel_config panel_configs[] = {
 	{"lcd_hxdm101_mipi", LCD_MIPI, lcd_hxdm101_mipi_init},
 	{"lcd_co5300_mipi", LCD_MIPI, lcd_co5300_mipi_init},
 	{"lcd_jd9366tcyh1095_mipi", LCD_MIPI, lcd_jd9366tcyh1095_mipi_init},
+	{"lcd_101w01_mipi", LCD_MIPI, lcd_101w01_mipi_init},
 };
 
 static const __maybe_unused struct panel_config default_panel = {
@@ -546,6 +547,12 @@ int lcd_mipi_probe(void)
 			tx_device_client.panel_type = LCD_MIPI;
 			tx_device.panel_type = tx_device_client.panel_type;
 			lcd_jd9366tcyh1095_mipi_init();
+	#endif
+
+	#if defined(CONFIG_LCD_101W01_MIPI)
+			tx_device_client.panel_type = LCD_MIPI;
+			tx_device.panel_type = tx_device_client.panel_type;
+			lcd_101w01_mipi_init();
 	#endif
 
 #else

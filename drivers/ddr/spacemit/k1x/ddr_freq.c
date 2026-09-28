@@ -8,6 +8,7 @@
 #include <asm/io.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
+#include <dm/ofnode.h>
 #include "ddr_freq.h"
 
 #define AP_ALLOW_FREQ_CHG			BIT(18)
@@ -106,6 +107,7 @@ __section(".data") u32 ddr_size, ddr_datarate;
 __section(".data") const char *ddr_type;
 __section(".data") static bool ddr_freq_init_flag = false;
 
+#ifdef CONFIG_SPL_BUILD
 static u32 mode_register_read(u32 MR, u32 CH, u32 CS)
 {
 	u32 read_data;
@@ -129,7 +131,6 @@ u32 ddr_get_mr8(void)
 	return (mr8&0xff);
 }
 
-#ifdef CONFIG_SPL_BUILD
 static u32 format_size(u32 density, u32 io_width)
 {
 	u32 size = 0;
@@ -165,7 +166,7 @@ static u32 format_size(u32 density, u32 io_width)
 
 	return size;
 }
-#else
+
 static inline u32 map_format_size(u32 val)
 {
 	u32 tmp;
@@ -197,7 +198,6 @@ static inline u32 map_format_size(u32 val)
 		break;
 	}
 }
-#endif
 
 u32 ddr_get_density(void)
 {
@@ -208,35 +208,35 @@ u32 ddr_get_density(void)
 	if (ddr_size)
 		return ddr_size;
 
-#ifdef CONFIG_SPL_BUILD
-	u32 mr8_cs00, mr8_cs01, mr8_cs10, mr8_cs11;
-	u32 io_width_cs00, io_width_cs01, io_width_cs10, io_width_cs11;
+    if (0 != strcasecmp(ddr_type, "LPDDR3")) {
+		u32 mr8_cs00, mr8_cs01, mr8_cs10, mr8_cs11;
+		u32 io_width_cs00, io_width_cs01, io_width_cs10, io_width_cs11;
 
-	mr8_cs00 = mode_register_read(8, 0, 0);
-	mr8_cs01 = mode_register_read(8, 1, 0);
+		mr8_cs00 = mode_register_read(8, 0, 0);
+		mr8_cs01 = mode_register_read(8, 1, 0);
 
-	io_width_cs00 = mr8_cs00 ? mr8_cs00 >> 6 : 0;
-	io_width_cs01 = mr8_cs01 ? mr8_cs01 >> 6 : 0;
+		io_width_cs00 = mr8_cs00 ? mr8_cs00 >> 6 : 0;
+		io_width_cs01 = mr8_cs01 ? mr8_cs01 >> 6 : 0;
 
-	cs0_size = (mr8_cs00 != 0xFF) ? format_size(((mr8_cs00 >> 2) & 0xf), io_width_cs00) : 0;
-	cs0_size += (mr8_cs01 != 0xFF) ? format_size(((mr8_cs01 >> 2) & 0xf), io_width_cs01) : 0;
+		cs0_size = (mr8_cs00 != 0xFF) ? format_size(((mr8_cs00 >> 2) & 0xf), io_width_cs00) : 0;
+		cs0_size += (mr8_cs01 != 0xFF) ? format_size(((mr8_cs01 >> 2) & 0xf), io_width_cs01) : 0;
 
-	if (ddr_cs_num > 1) {
-		mr8_cs10 = mode_register_read(8, 0, 1);
-		mr8_cs11 = mode_register_read(8, 1, 1);
+		if (ddr_cs_num > 1) {
+			mr8_cs10 = mode_register_read(8, 0, 1);
+			mr8_cs11 = mode_register_read(8, 1, 1);
 
-		io_width_cs10 = mr8_cs10 ? mr8_cs10 >> 6 : 0;
-		io_width_cs11 = mr8_cs11 ? mr8_cs11 >> 6 : 0;
+			io_width_cs10 = mr8_cs10 ? mr8_cs10 >> 6 : 0;
+			io_width_cs11 = mr8_cs11 ? mr8_cs11 >> 6 : 0;
 
-		cs1_size = (mr8_cs10 != 0xFF) ? format_size(((mr8_cs10 >> 2) & 0xf), io_width_cs10) : 0;
-		cs1_size += (mr8_cs11 != 0xFF) ? format_size(((mr8_cs11 >> 2) & 0xf), io_width_cs11) : 0;
+			cs1_size = (mr8_cs10 != 0xFF) ? format_size(((mr8_cs10 >> 2) & 0xf), io_width_cs10) : 0;
+			cs1_size += (mr8_cs11 != 0xFF) ? format_size(((mr8_cs11 >> 2) & 0xf), io_width_cs11) : 0;
+		}
+	} else {
+		cs0_size = map_format_size(readl((void*)0xc0000000 + 0x200));
+		if (ddr_cs_num > 1) {
+			cs1_size = map_format_size(readl((void*)0xc0000000 + 0x208));
+		}
 	}
-#else
-	cs0_size = map_format_size(readl((void*)0xc0000000 + 0x200));
-	if (ddr_cs_num > 1) {
-		cs1_size = map_format_size(readl((void*)0xc0000000 + 0x208));
-	}
-#endif
 
 	ddr_size = cs0_size + cs1_size;
 	pr_info("DDR size = %d MB\n", ddr_size);
@@ -261,6 +261,43 @@ uint32_t get_ddr_rev_id(void)
 	return (mr6&0xff);
 }
 
+#else
+
+u32 ddr_get_density(void)
+{
+	ofnode node, subnode;
+	u64 dram_size = 0;
+	fdt_size_t size;
+	const void *fdt = gd->fdt_blob;
+	const char *prop;
+
+	if (ddr_size)
+		return ddr_size;
+
+	if (fdt_check_header(fdt)) {
+		pr_err("Invalid uboot DTB\n");
+		return 0;
+	}
+
+	node = ofnode_path("/");
+	ofnode_for_each_subnode(subnode, node) {
+		pr_debug("subnode name: %s\n", ofnode_get_name(subnode));
+		prop = ofnode_get_property(subnode, "device_type", NULL);
+		if (prop && !strncmp(prop, "memory", 6)) {
+			size = ofnode_get_size(subnode);
+			if (FDT_SIZE_T_NONE != size) {
+				pr_debug("Found memory node, size: 0x%llx\n", size);
+				dram_size += size;
+			}
+		}
+	}
+
+	pr_debug("Get memory size 0x%llx from dtb\n", dram_size);
+	ddr_size = dram_size / SZ_1MB;
+
+	return ddr_size;
+}
+#endif
 
 /* adjust ddr frequency to the max value */
 int ddr_freq_max(void)
