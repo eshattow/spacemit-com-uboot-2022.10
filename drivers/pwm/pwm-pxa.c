@@ -112,7 +112,7 @@ static int pxa_pwm_probe(struct udevice *dev)
 	struct pxa_pwm_priv *priv = dev_get_priv(dev);
 	int ret = 0;
 
-	priv->dcr_fd = dev_read_u32_default(dev, "k1x,pwm-disable-fd", 0);
+	priv->dcr_fd = dev_read_bool(dev, "k1x,pwm-disable-fd");
 
 	ret = clk_get_by_index(dev,0,&priv->clk);
 	if(ret)
