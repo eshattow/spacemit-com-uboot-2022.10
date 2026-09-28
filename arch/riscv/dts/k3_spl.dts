@@ -530,10 +530,15 @@
 
 			ldo_9: LDO_REG9 {
 				regulator-name = "ldo9";
-				regulator-min-microvolt = <500000>;
-				regulator-max-microvolt = <3400000>;
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				/*
+				 * AVDD18_FUSE rail (SPM8821 DLDO5). Deliberately neither
+				 * always-on nor boot-on: the efuse driver owns this rail and
+				 * enables it only around a burn. A permanently biased rail
+				 * shortens fuse lifetime.
+				 */
 				regulator-suspend-microvolt = <1800000>;
-				regulator-boot-on;
 				u-boot,dm-spl;
 			};
 

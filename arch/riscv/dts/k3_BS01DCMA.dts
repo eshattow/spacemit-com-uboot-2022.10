@@ -10,6 +10,14 @@
 
 / {
 	model = "spacemit k3 bs01dcma board";
+
+	aliases {
+		/* SPM8821 DLDO5 supplies AVDD18_FUSE; the efuse driver
+		 * looks this up by the last path segment, which is the
+		 * node name "LDO_REG9", not regulator-name "ldo9".
+		 */
+		efuse_power = &ldo_9;
+	};
 };
 
 &cpus {
@@ -310,8 +318,12 @@
 				regulator-name = "ldo9";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <1800000>;
-				regulator-always-on;
-				regulator-boot-on;
+				/*
+				 * AVDD18_FUSE rail (SPM8821 DLDO5). Deliberately neither
+				 * always-on nor boot-on: the efuse driver owns this rail and
+				 * enables it only around a burn. A permanently biased rail
+				 * shortens fuse lifetime.
+				 */
 				regulator-state-mem {
 					regulator-suspend-microvolt = <1800000>;
 				};
