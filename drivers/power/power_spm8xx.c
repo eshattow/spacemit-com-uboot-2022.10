@@ -432,18 +432,32 @@ static int __board_pmic_init(const char *name)
 					if (strcmp(buck_desc[i].name, s) != 0)
 						continue;
 
+					/* boot-on without init value: rail stays on NVM/VBOOT, so report it */
+					if (!value)
+						printf("mp2973: %s: regulator-boot-on without regulator-init-microvolt, not programmed\n",
+						       s);
+
 					/* set the regulator */
 					if (value) {
 						struct mp2973_io io = {
 							.read = mp2973_i2c_read,
 							.write = mp2973_i2c_write,
 							.ctx = &saddr,
+							.page = MP2973_RAIL,
 						};
 
 						if (mp2973_set_vout(&io, value, min, max))
 							printf("mp2973: set %umV failed (range %u-%umV), skip %s\n",
 							       value / 1000, min / 1000, max / 1000, s);
+						else
+							printf("mp2973: rail%u set %umV\n",
+							       MP2973_RAIL + 1, value / 1000);
 					}
+
+					/* no sleep register in this path: report instead of skipping */
+					if (sleep_value)
+						printf("mp2973: %s: regulator-suspend-microvolt %uV unsupported, ignored\n",
+						       s, sleep_value);
 					break;
 				}
 			}

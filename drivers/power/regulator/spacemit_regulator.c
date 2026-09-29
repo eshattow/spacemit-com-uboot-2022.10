@@ -318,6 +318,7 @@ static int buck_get_value(struct udevice *dev)
 			.read = mp2973_pmic_read,
 			.write = mp2973_pmic_write,
 			.ctx = dev->parent,
+			.page = MP2973_RAIL,
 		};
 		int uvolt = 0;
 
@@ -372,6 +373,7 @@ static int buck_set_value(struct udevice *dev, int uvolt)
 			.read = mp2973_pmic_read,
 			.write = mp2973_pmic_write,
 			.ctx = dev->parent,
+			.page = MP2973_RAIL,
 		};
 		/* -ENODATA = absent bound; helper wants 0 = unbounded */
 		u32 min_uv = uc_pdata->min_uV < 0 ? 0 : (u32)uc_pdata->min_uV;
