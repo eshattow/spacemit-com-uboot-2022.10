@@ -530,10 +530,15 @@
 
 			ldo_9: LDO_REG9 {
 				regulator-name = "ldo9";
-				regulator-min-microvolt = <500000>;
-				regulator-max-microvolt = <3400000>;
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				/*
+				 * AVDD18_FUSE rail (SPM8821 DLDO5). Deliberately neither
+				 * always-on nor boot-on: the efuse driver owns this rail and
+				 * enables it only around a burn. A permanently biased rail
+				 * shortens fuse lifetime.
+				 */
 				regulator-suspend-microvolt = <1800000>;
-				regulator-boot-on;
 				u-boot,dm-spl;
 			};
 
@@ -742,6 +747,30 @@
 			};
 		};
 	};
+	/* rail1 (page 0) = edcdc1 = the CPU rail; rail2 has no power stage. Some
+	 * boards share address 0x75, so the EEPROM TLV PMIC type must name the chip.
+	 */
+	mp2973: mp2973@75 {
+		compatible = "spacemit,mp2973";
+		reg = <0x75>;
+		bus = <8>;
+		u-boot,dm-spl;
+
+		regulators {
+			u-boot,dm-spl;
+
+			mp2973_edcdc_1: EDCDC_REG1 {
+				regulator-name = "edcdc1";
+				regulator-min-microvolt = <534000>;
+				regulator-max-microvolt = <1000000>;
+				/* inherited, unverified for rail1: confirm on the bench */
+				regulator-init-microvolt = <880000>;
+				regulator-boot-on;
+				u-boot,dm-spl;
+			};
+		};
+	};
+
 };
 
 &cpus {
