@@ -32,7 +32,7 @@
 #define TX_ENDPOINT_MAXIMUM_PACKET_SIZE      (0x0040)
 
 #if defined(CONFIG_K3_BOARD_ASIC)
-#define EP_BUFFER_SIZE			512 * 1024
+#define EP_BUFFER_SIZE			1024 * 1024
 #else
 #define EP_BUFFER_SIZE			4096
 #endif

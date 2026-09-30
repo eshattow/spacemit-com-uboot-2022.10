@@ -7351,21 +7351,22 @@ static const phy_init_config lp5_training_fw_table = {
 };
 #endif
 
-static const phy_init_config training_lpddr5_table_0 = {
+/* dual rank, x8, 6400MTS */
+static const phy_init_config training_table_0 = {
 	0x00020000, 2, false,
 	{
 		{{0x0060, 0x0002}}, {{0x00a5, 0x0001}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_1 = {
+static const phy_init_config training_table_1 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0036, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_2 = {
+static const phy_init_config training_table_2 = {
 	0x00020000, 7, false,
 	{
 		{{0x00bd, 0x00ff}}, {{0x0300, 0x0808}}, {{0x0303, 0x0009}}, {{0x0302, 0x0026}},
@@ -7373,7 +7374,7 @@ static const phy_init_config training_lpddr5_table_2 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_3 = {
+static const phy_init_config training_table_3 = {
 	0x00030000, 8, false,
 	{
 		{{0x00a7, 0x0000}}, {{0x10a7, 0x0000}}, {{0x00ae, 0x0080}}, {{0x00ad, 0x0080}},
@@ -7381,21 +7382,28 @@ static const phy_init_config training_lpddr5_table_3 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_4 = {
+static const phy_init_config training_table_4 = {
 	0x000c0000, 1, false,
 	{
-		{{0x0086, 0x0000}},
+		{{0x0086, 0x0001}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_5 = {
+static const phy_init_config training_table_5 = {
+	0x00020000, 1, false,
+	{
+		{{0x011b, 0x0000}},
+	}
+};
+
+static const phy_init_config training_table_6 = {
 	0x00010000, 4, false,
 	{
-		{{0x00a3, 0x0b33}}, {{0x10a3, 0x0b3f}}, {{0x20a3, 0x0b33}}, {{0x30a3, 0x0b3f}},
+		{{0x00a3, 0x0b33}}, {{0x10a3, 0x0b33}}, {{0x20a3, 0x0b33}}, {{0x30a3, 0x0b33}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_6 = {
+static const phy_init_config training_table_7 = {
 	0x000c0000, 12, false,
 	{
 		{{0x00f1, 0x6000}}, {{0x00f2, 0x00a9}}, {{0x00f3, 0x8000}}, {{0x00f4, 0x0005}},
@@ -7404,49 +7412,49 @@ static const phy_init_config training_lpddr5_table_6 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_7 = {
+static const phy_init_config training_table_8 = {
 	0x00090000, 1, false,
 	{
 		{{0x08ff, 0x000f}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_8 = {
+static const phy_init_config training_table_9 = {
 	0x00010000, 4, false,
 	{
 		{{0x0093, 0x0000}}, {{0x1093, 0x0000}}, {{0x2093, 0x0000}}, {{0x3093, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_9 = {
+static const phy_init_config training_table_10 = {
 	0x00020000, 1, false,
 	{
 		{{0x0051, 0x0003}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_10 = {
+static const phy_init_config training_table_12 = {
 	0x00090000, 1, false,
 	{
 		{{0x0802, 0x0001}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_11 = {
+static const phy_init_config training_table_13 = {
 	0x00020000, 4, false,
 	{
 		{{0x004c, 0x2e8f}}, {{0x004d, 0x0000}}, {{0x0002, 0x0002}}, {{0x0000, 0x0002}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_12 = {
+static const phy_init_config training_table_14 = {
 	0x00090000, 2, false,
 	{
 		{{0x0801, 0x004d}}, {{0x0809, 0x7000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_13 = {
+static const phy_init_config training_table_15 = {
 	0x00010000, 40, false,
 	{
 		{{0x005e, 0x0366}}, {{0x0060, 0x0366}}, {{0x0062, 0x0366}}, {{0x0064, 0x0366}},
@@ -7462,14 +7470,14 @@ static const phy_init_config training_lpddr5_table_13 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_14 = {
+static const phy_init_config training_table_16 = {
 	0x00020000, 2, false,
 	{
 		{{0x0007, 0x0000}}, {{0x0013, 0x002c}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_15 = {
+static const phy_init_config training_table_17 = {
 	0x00030000, 6, false,
 	{
 		{{0x0038, 0x0003}}, {{0x0039, 0x0003}}, {{0x003a, 0x0003}}, {{0x1038, 0x0003}},
@@ -7477,7 +7485,7 @@ static const phy_init_config training_lpddr5_table_15 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_16 = {
+static const phy_init_config training_table_18 = {
 	0x00010000, 28, false,
 	{
 		{{0x0038, 0x0003}}, {{0x003a, 0x0003}}, {{0x1038, 0x0003}}, {{0x103a, 0x0003}},
@@ -7490,14 +7498,14 @@ static const phy_init_config training_lpddr5_table_16 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_17 = {
+static const phy_init_config training_table_19 = {
 	0x00020000, 1, false,
 	{
 		{{0x0004, 0x0320}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_18 = {
+static const phy_init_config training_table_20 = {
 	0x00030000, 8, false,
 	{
 		{{0x0050, 0x0035}}, {{0x0051, 0x0035}}, {{0x0052, 0x0035}}, {{0x0053, 0x0035}},
@@ -7505,7 +7513,7 @@ static const phy_init_config training_lpddr5_table_18 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_19 = {
+static const phy_init_config training_table_21 = {
 	0x00010000, 144, false,
 	{
 		{{0x004e, 0x0035}}, {{0x004f, 0x0035}}, {{0x0050, 0x0035}}, {{0x0051, 0x0035}},
@@ -7547,7 +7555,7 @@ static const phy_init_config training_lpddr5_table_19 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_20 = {
+static const phy_init_config training_table_22 = {
 	0x00030000, 6, false,
 	{
 		{{0x0030, 0x0000}}, {{0x0031, 0x0000}}, {{0x0035, 0x0000}}, {{0x1030, 0x0000}},
@@ -7555,7 +7563,7 @@ static const phy_init_config training_lpddr5_table_20 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_21 = {
+static const phy_init_config training_table_23 = {
 	0x00010000, 12, false,
 	{
 		{{0x0030, 0x0000}}, {{0x0035, 0x0000}}, {{0x0036, 0x0000}}, {{0x1030, 0x0000}},
@@ -7564,14 +7572,14 @@ static const phy_init_config training_lpddr5_table_21 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_22 = {
+static const phy_init_config training_table_24 = {
 	0x00030000, 2, false,
 	{
 		{{0x003c, 0x0005}}, {{0x103c, 0x0005}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_23 = {
+static const phy_init_config training_table_25 = {
 	0x00010000, 12, false,
 	{
 		{{0x003c, 0x0005}}, {{0x003d, 0x0005}}, {{0x003e, 0x0005}}, {{0x103c, 0x0005}},
@@ -7580,7 +7588,7 @@ static const phy_init_config training_lpddr5_table_23 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_24 = {
+static const phy_init_config training_table_26 = {
 	0x00020000, 5, false,
 	{
 		{{0x0003, 0x0001}}, {{0x0001, 0x1122}}, {{0x0009, 0x0000}}, {{0x0008, 0x0000}},
@@ -7588,94 +7596,94 @@ static const phy_init_config training_lpddr5_table_24 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_25 = {
+static const phy_init_config training_table_27 = {
 	0x00030000, 2, false,
 	{
 		{{0x0eef, 0x0000}}, {{0x1eef, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_26 = {
+static const phy_init_config training_table_28 = {
 	0x00020000, 1, false,
 	{
 		{{0x0014, 0x1300}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_27 = {
+static const phy_init_config training_table_29 = {
 	0x00090000, 1, false,
 	{
 		{{0x080a, 0x1300}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_28 = {
+static const phy_init_config training_table_30 = {
 	0x00010000, 2, false,
 	{
-		{{0x0040, 0x0e0e}}, {{0x0042, 0x0e0e}},
+		{{0x0040, 0x0c0c}}, {{0x0042, 0x0c0c}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_29 = {
+static const phy_init_config training_table_31 = {
 	0x00090000, 1, false,
 	{
 		{{0x080d, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_30 = {
+static const phy_init_config training_table_32 = {
 	0x00010000, 5, false,
 	{
-		{{0x0043, 0x0000}}, {{0x0044, 0x0e0e}}, {{0x0045, 0x0e0e}}, {{0x1040, 0x0e0e}},
-		{{0x1042, 0x0e0e}},
+		{{0x0043, 0x0000}}, {{0x0044, 0x0c0c}}, {{0x0045, 0x0c0c}}, {{0x1040, 0x0c0c}},
+		{{0x1042, 0x0c0c}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_31 = {
+static const phy_init_config training_table_33 = {
 	0x00090000, 1, false,
 	{
 		{{0x080d, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_32 = {
+static const phy_init_config training_table_34 = {
 	0x00010000, 5, false,
 	{
-		{{0x1043, 0x0000}}, {{0x1044, 0x0e0e}}, {{0x1045, 0x0e0e}}, {{0x2040, 0x0e0e}},
-		{{0x2042, 0x0e0e}},
+		{{0x1043, 0x0000}}, {{0x1044, 0x0c0c}}, {{0x1045, 0x0c0c}}, {{0x2040, 0x0c0c}},
+		{{0x2042, 0x0c0c}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_33 = {
+static const phy_init_config training_table_35 = {
 	0x00090000, 1, false,
 	{
 		{{0x080d, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_34 = {
+static const phy_init_config training_table_36 = {
 	0x00010000, 5, false,
 	{
-		{{0x2043, 0x0000}}, {{0x2044, 0x0e0e}}, {{0x2045, 0x0e0e}}, {{0x3040, 0x0e0e}},
-		{{0x3042, 0x0e0e}},
+		{{0x2043, 0x0000}}, {{0x2044, 0x0c0c}}, {{0x2045, 0x0c0c}}, {{0x3040, 0x0c0c}},
+		{{0x3042, 0x0c0c}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_35 = {
+static const phy_init_config training_table_37 = {
 	0x00090000, 1, false,
 	{
 		{{0x080d, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_36 = {
+static const phy_init_config training_table_38 = {
 	0x00010000, 3, false,
 	{
-		{{0x3043, 0x0000}}, {{0x3044, 0x0e0e}}, {{0x3045, 0x0e0e}},
+		{{0x3043, 0x0000}}, {{0x3044, 0x0c0c}}, {{0x3045, 0x0c0c}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_37 = {
+static const phy_init_config training_table_39 = {
 	0x00030000, 10, false,
 	{
 		{{0x0040, 0x0e0e}}, {{0x0041, 0x0e0e}}, {{0x0042, 0x0e0e}}, {{0x0043, 0x0e0e}},
@@ -7684,25 +7692,25 @@ static const phy_init_config training_lpddr5_table_37 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_38 = {
+static const phy_init_config training_table_40 = {
 	0x00020000, 1, false,
 	{
 		{{0x0331, 0x0033}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_39 = {
+static const phy_init_config training_table_41 = {
 	0x00010000, 20, false,
 	{
-		{{0x0048, 0x0e00}}, {{0x004a, 0x0e00}}, {{0x004b, 0x0e00}}, {{0x004c, 0x0e00}},
-		{{0x004d, 0x0e00}}, {{0x1048, 0x0e00}}, {{0x104a, 0x0e00}}, {{0x104b, 0x0e00}},
-		{{0x104c, 0x0e00}}, {{0x104d, 0x0e00}}, {{0x2048, 0x0e00}}, {{0x204a, 0x0e00}},
-		{{0x204b, 0x0e00}}, {{0x204c, 0x0e00}}, {{0x204d, 0x0e00}}, {{0x3048, 0x0e00}},
-		{{0x304a, 0x0e00}}, {{0x304b, 0x0e00}}, {{0x304c, 0x0e00}}, {{0x304d, 0x0e00}},
+		{{0x0048, 0x0c00}}, {{0x004a, 0x0c00}}, {{0x004b, 0x0c00}}, {{0x004c, 0x0c00}},
+		{{0x004d, 0x0c00}}, {{0x1048, 0x0c00}}, {{0x104a, 0x0c00}}, {{0x104b, 0x0c00}},
+		{{0x104c, 0x0c00}}, {{0x104d, 0x0c00}}, {{0x2048, 0x0c00}}, {{0x204a, 0x0c00}},
+		{{0x204b, 0x0c00}}, {{0x204c, 0x0c00}}, {{0x204d, 0x0c00}}, {{0x3048, 0x0c00}},
+		{{0x304a, 0x0c00}}, {{0x304b, 0x0c00}}, {{0x304c, 0x0c00}}, {{0x304d, 0x0c00}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_40 = {
+static const phy_init_config training_table_42 = {
 	0x00030000, 14, false,
 	{
 		{{0x0048, 0x0c00}}, {{0x0049, 0x0c00}}, {{0x004a, 0x0c00}}, {{0x004b, 0x0c00}},
@@ -7712,7 +7720,7 @@ static const phy_init_config training_lpddr5_table_40 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_41 = {
+static const phy_init_config training_table_43 = {
 	0x00010000, 12, false,
 	{
 		{{0x0033, 0x0000}}, {{0x002e, 0x0000}}, {{0x002f, 0x0000}}, {{0x1033, 0x0000}},
@@ -7721,21 +7729,21 @@ static const phy_init_config training_lpddr5_table_41 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_42 = {
+static const phy_init_config training_table_44 = {
 	0x00020000, 1, false,
 	{
 		{{0x0015, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_43 = {
+static const phy_init_config training_table_45 = {
 	0x00090000, 1, false,
 	{
 		{{0x0806, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_44 = {
+static const phy_init_config training_table_46 = {
 	0x00010000, 12, false,
 	{
 		{{0x00e8, 0x0000}}, {{0x00e9, 0x0035}}, {{0x10e8, 0x0000}}, {{0x10e9, 0x0035}},
@@ -7744,22 +7752,22 @@ static const phy_init_config training_lpddr5_table_44 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_45 = {
+static const phy_init_config training_table_47 = {
 	0x00020000, 7, false,
 	{
 		{{0x0012, 0xa1a1}}, {{0x0017, 0x0040}}, {{0x000a, 0x0040}}, {{0x0186, 0x00a1}},
-		{{0x0187, 0x0040}}, {{0x0010, 0x005a}}, {{0x0011, 0x000f}},
+		{{0x0187, 0x0040}}, {{0x0010, 0x005a}}, {{0x0011, 0x006f}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_46 = {
+static const phy_init_config training_table_48 = {
 	0x00090000, 2, false,
 	{
-		{{0x080b, 0x000f}}, {{0x080c, 0x000f}},
+		{{0x080b, 0x002f}}, {{0x080c, 0x006f}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_47 = {
+static const phy_init_config training_table_49 = {
 	0x00010000, 12, false,
 	{
 		{{0x00a5, 0x0001}}, {{0x10a5, 0x0001}}, {{0x20a5, 0x0001}}, {{0x30a5, 0x0001}},
@@ -7768,58 +7776,58 @@ static const phy_init_config training_lpddr5_table_47 = {
 	}
 };
 
-static const phy_init_config training_lpddr5_table_48 = {
+static const phy_init_config training_table_50 = {
 	0x00020000, 20, false,
 	{
 		{{0x0035, 0x100c}}, {{0x0036, 0x100c}}, {{0x0037, 0x041c}}, {{0x0037, 0x045c}},
-		{{0x0038, 0x1b20}}, {{0x0039, 0x1018}}, {{0x003a, 0x1018}}, {{0x003b, 0x0428}},
-		{{0x003c, 0x2f2c}}, {{0x003d, 0x1004}}, {{0x003e, 0x1004}}, {{0x003f, 0x0414}},
-		{{0x0040, 0x1318}}, {{0x002c, 0x083f}}, {{0x002d, 0x083f}}, {{0x0030, 0x083f}},
+		{{0x0038, 0x1b20}}, {{0x0039, 0x101c}}, {{0x003a, 0x101c}}, {{0x003b, 0x042c}},
+		{{0x003c, 0x2f30}}, {{0x003d, 0x1004}}, {{0x003e, 0x1004}}, {{0x003f, 0x0414}},
+		{{0x0040, 0x1318}}, {{0x002c, 0x0843}}, {{0x002d, 0x0843}}, {{0x0030, 0x0843}},
 		{{0x002e, 0x081f}}, {{0x002f, 0x081f}}, {{0x000c, 0x0000}}, {{0x001b, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_49 = {
+static const phy_init_config training_table_51 = {
 	0x00010000, 4, false,
 	{
 		{{0x0007, 0x0000}}, {{0x1007, 0x0000}}, {{0x2007, 0x0000}}, {{0x3007, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_50 = {
+static const phy_init_config training_table_52 = {
 	0x000c0000, 1, false,
 	{
 		{{0x0080, 0x0003}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_51 = {
+static const phy_init_config training_table_53 = {
 	0x000d0000, 1, false,
 	{
 		{{0x0000, 0x0000}},
 	}
 };
 
-static const phy_init_config training_lpddr5_table_52 = {
+static const phy_init_config training_table_54 = {
 	0x00058000, 1234, true,
 	{
 		{{0x0100, 0x0000}}, {{0x0030, 0x1900}}, {{0x0004, 0x0004}}, {{0x0000, 0x0000}},
-		{{0x125f, 0x0004}}, {{0x0000, 0x0001}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
+		{{0x125f, 0x0004}}, {{0x0000, 0x0001}}, {{0x0000, 0x8b00}}, {{0x000f, 0x0000}},
 		{{0x0000, 0x0000}}, {{0x0310, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
 		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x1000}},
 		{{0x0003, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
 		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0xb0b0}}, {{0xb0b0, 0xbbbb}},
-		{{0xbbbb, 0x0101}}, {{0x0101, 0x5858}}, {{0x5858, 0x6363}}, {{0x6363, 0x2727}},
+		{{0xbbbb, 0x0606}}, {{0x0606, 0x5858}}, {{0x5858, 0x3434}}, {{0x3434, 0x2727}},
 		{{0x2727, 0x0000}}, {{0x0000, 0x2828}}, {{0x2828, 0x2828}}, {{0x2828, 0x0000}},
-		{{0x0000, 0x062e}}, {{0x062e, 0x0d0d}}, {{0x0d0d, 0x1010}}, {{0x1010, 0x0202}},
+		{{0x0000, 0x2e2e}}, {{0x2e2e, 0x0d0d}}, {{0x0d0d, 0x0000}}, {{0x0000, 0x0202}},
 		{{0x0202, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
-		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0404}}, {{0x0404, 0x0000}},
 		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
-		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x2020}}, {{0x2020, DISABLE_DDR_2D_TRAINING}},
+		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
+		{{0x0000, 0x4040}}, {{0x4040, 0x4040}}, {{0x4040, 0x0000}}, {{0x0000, 0x0000}},
 		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
 		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x002e, 0x0050}}, {{0x0000, 0x0000}},
 		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
-		{{0x0001, 0x4300}}, {{0x003f, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
+		{{0x0001, 0x4b00}}, {{0x0043, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
 		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
 		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
 		{{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}}, {{0x0000, 0x0000}},
@@ -7962,69 +7970,108 @@ static const phy_init_config training_lpddr5_table_52 = {
 };
 
 const phy_init_config* lp5_pre_train_table[] = {
-	&training_lpddr5_table_0,
-	&training_lpddr5_table_1,
-	&training_lpddr5_table_2,
-	&training_lpddr5_table_3,
-	&training_lpddr5_table_4,
-	&training_lpddr5_table_5,
-	&training_lpddr5_table_6,
-	&training_lpddr5_table_7,
-	&training_lpddr5_table_8,
-	&training_lpddr5_table_9,
+	&training_table_0,
+	&training_table_1,
+	&training_table_2,
+	&training_table_3,
+	&training_table_4,
+	&training_table_5,
+	&training_table_6,
+	&training_table_7,
+	&training_table_8,
+	&training_table_9,
+	&training_table_10,
 #if defined(CONFIG_K3_DDR_LPDDR4X)
 	// training firmware will be decompressed to audio buffer
 	(const phy_init_config*)DDR_TRAINING_FIRMWARE_TABLE_ADDR,
 #else
 	&lp5_training_fw_table,
 #endif
-	&training_lpddr5_table_10,
-	&training_lpddr5_table_11,
-	&training_lpddr5_table_12,
-	&training_lpddr5_table_13,
-	&training_lpddr5_table_14,
-	&training_lpddr5_table_15,
-	&training_lpddr5_table_16,
-	&training_lpddr5_table_17,
-	&training_lpddr5_table_18,
-	&training_lpddr5_table_19,
-	&training_lpddr5_table_20,
-	&training_lpddr5_table_21,
-	&training_lpddr5_table_22,
-	&training_lpddr5_table_23,
-	&training_lpddr5_table_24,
-	&training_lpddr5_table_25,
-	&training_lpddr5_table_26,
-	&training_lpddr5_table_27,
-	&training_lpddr5_table_28,
-	&training_lpddr5_table_29,
-	&training_lpddr5_table_30,
-	&training_lpddr5_table_31,
-	&training_lpddr5_table_32,
-	&training_lpddr5_table_33,
-	&training_lpddr5_table_34,
-	&training_lpddr5_table_35,
-	&training_lpddr5_table_36,
-	&training_lpddr5_table_37,
-	&training_lpddr5_table_38,
-	&training_lpddr5_table_39,
-	&training_lpddr5_table_40,
-	&training_lpddr5_table_41,
-	&training_lpddr5_table_42,
-	&training_lpddr5_table_43,
-	&training_lpddr5_table_44,
-	&training_lpddr5_table_45,
-	&training_lpddr5_table_46,
-	&training_lpddr5_table_47,
-	&training_lpddr5_table_48,
-	&training_lpddr5_table_49,
-	&training_lpddr5_table_50,
-	&training_lpddr5_table_51,
-	&training_lpddr5_table_52,
+	&training_table_12,
+	&training_table_13,
+	&training_table_14,
+	&training_table_15,
+	&training_table_16,
+	&training_table_17,
+	&training_table_18,
+	&training_table_19,
+	&training_table_20,
+	&training_table_21,
+	&training_table_22,
+	&training_table_23,
+	&training_table_24,
+	&training_table_25,
+	&training_table_26,
+	&training_table_27,
+	&training_table_28,
+	&training_table_29,
+	&training_table_30,
+	&training_table_31,
+	&training_table_32,
+	&training_table_33,
+	&training_table_34,
+	&training_table_35,
+	&training_table_36,
+	&training_table_37,
+	&training_table_38,
+	&training_table_39,
+	&training_table_40,
+	&training_table_41,
+	&training_table_42,
+	&training_table_43,
+	&training_table_44,
+	&training_table_45,
+	&training_table_46,
+	&training_table_47,
+	&training_table_48,
+	&training_table_49,
+	&training_table_50,
+	&training_table_51,
+	&training_table_52,
+	&training_table_53,
+	&training_table_54,
 	NULL,
 };
 
-const ddr_phy_reg_config phy_override_pre_seq_lp5_4g[] = {
+/* dual rank, x8, 4800MTS (diff against dual rank, x8, 6400MTS) */
+const ddr_phy_reg_config phy_override_pre_seq_lp5_drank_x8_4800[] = {
+	{0x2004c, 0xa8f},
+	{0x90801, 0x3a},
+	{0x20004, 0x258},
+	{0x1000f, 0xc86},
+	{0x1100f, 0xc86},
+	{0x1200f, 0xc86},
+	{0x1300f, 0xc86},
+	{0x20035, 0xc08},
+	{0x20036, 0xc08},
+	{0x20037, 0x414},
+	{0x20037, 0x454},
+	{0x20038, 0x1b18},
+	{0x20039, 0xc14},
+	{0x2003a, 0xc14},
+	{0x2003b, 0x420},
+	{0x2003c, 0x2b24},
+	{0x2003d, 0xc04},
+	{0x2003e, 0xc04},
+	{0x2003f, 0x410},
+	{0x20040, 0x1314},
+	{0x2002c, 0x833},
+	{0x2002d, 0x833},
+	{0x20030, 0x833},
+	{0x2002e, 0x817},
+	{0x2002f, 0x817},
+	{0x58003, 0x12c0},
+	{0x5802d, 0x8080},
+	{0x5802e, 0x8080},
+	{0x5802f, 0x8888},
+	{0x58030, 0x8888},
+	{0x58081, 0x3700},
+	{0x58082, 0x33},
+	{0, 0}  // End marker
+};
+
+/* single rank, x16, 6400MTS (diff against dual rank, x8, 6400MTS) */
+const ddr_phy_reg_config phy_override_pre_seq_lp5_srank_x16_6400[] = {
 	{0x300ae, 0x280},
 	{0x300ad, 0x280},
 	{0x300ac, 0x280},
@@ -8051,31 +8098,142 @@ const ddr_phy_reg_config phy_override_pre_seq_lp5_4g[] = {
 	{0x13061, DDR_CONFIG_BYPASS_MAGIC},
 	{0x13063, DDR_CONFIG_BYPASS_MAGIC},
 	{0x13065, DDR_CONFIG_BYPASS_MAGIC},
+	{0x20039, 0x1018},
+	{0x2003a, 0x1018},
+	{0x2003b, 0x428},
+	{0x2003c, 0x2f2c},
+	{0x2002c, 0x83f},
+	{0x2002d, 0x83f},
+	{0x20030, 0x83f},
+	{0x5800e, 0x0},
 	{0x58012, 0x110},
 	{0x58020, 0x1},
-	{0, 0}
+	{0x58081, 0x4300},
+	{0x58082, 0x3f},
+	{0, 0}  // End marker
 };
 
-const ddr_phy_reg_config phy_override_pre_seq_lp5_16g[] = {
-	{0x110a3, 0xb33},
-	{0x130a3, 0xb33},
-	{0x10043, 0xe0e},
-	{0x11043, 0xe0e},
-	{0x12043, 0xe0e},
-	{0x13043, 0xe0e},
-	{0x20039, 0x101c},
-	{0x2003a, 0x101c},
-	{0x2003b, 0x42c},
-	{0x2003c, 0x2f30},
-	{0x2002c, 0x843},
-	{0x2002d, 0x843},
-	{0x20030, 0x843},
-	{0x5800e, 0xf},
-	{0x58041, 0x86ae},
-	{0x58042, 0x86ae},
-	{0x58081, 0x4b00},
-	{0x58082, 0x43},
-	{0, 0}
+/* single rank, x16, 4800MTS (diff against dual rank, x8, 6400MTS) */
+const ddr_phy_reg_config phy_override_pre_seq_lp5_srank_x16_4800[] = {
+	{0x300ae, 0x280},
+	{0x300ad, 0x280},
+	{0x300ac, 0x280},
+	{0x310ae, 0x280},
+	{0x310ad, 0x280},
+	{0x310ac, 0x280},
+	{0x100a3, 0x911},
+	{0x110a3, 0x91d},
+	{0x120a3, 0x911},
+	{0x130a3, 0x91d},
+	{0x2004c, 0xa8f},
+	{0x90801, 0x3a},
+	{0x1005f, DDR_CONFIG_BYPASS_MAGIC},
+	{0x10061, DDR_CONFIG_BYPASS_MAGIC},
+	{0x10063, DDR_CONFIG_BYPASS_MAGIC},
+	{0x10065, DDR_CONFIG_BYPASS_MAGIC},
+	{0x1105f, DDR_CONFIG_BYPASS_MAGIC},
+	{0x11061, DDR_CONFIG_BYPASS_MAGIC},
+	{0x11063, DDR_CONFIG_BYPASS_MAGIC},
+	{0x11065, DDR_CONFIG_BYPASS_MAGIC},
+	{0x1205f, DDR_CONFIG_BYPASS_MAGIC},
+	{0x12061, DDR_CONFIG_BYPASS_MAGIC},
+	{0x12063, DDR_CONFIG_BYPASS_MAGIC},
+	{0x12065, DDR_CONFIG_BYPASS_MAGIC},
+	{0x1305f, DDR_CONFIG_BYPASS_MAGIC},
+	{0x13061, DDR_CONFIG_BYPASS_MAGIC},
+	{0x13063, DDR_CONFIG_BYPASS_MAGIC},
+	{0x13065, DDR_CONFIG_BYPASS_MAGIC},
+	{0x20004, 0x258},
+	{0x1000f, 0xc86},
+	{0x1100f, 0xc86},
+	{0x1200f, 0xc86},
+	{0x1300f, 0xc86},
+	{0x20035, 0xc08},
+	{0x20036, 0xc08},
+	{0x20037, 0x414},
+	{0x20037, 0x454},
+	{0x20038, 0x1b18},
+	{0x20039, 0xc10},
+	{0x2003a, 0xc10},
+	{0x2003b, 0x41c},
+	{0x2003c, 0x2b20},
+	{0x2003d, 0xc04},
+	{0x2003e, 0xc04},
+	{0x2003f, 0x410},
+	{0x20040, 0x1314},
+	{0x2002c, 0x82f},
+	{0x2002d, 0x82f},
+	{0x20030, 0x82f},
+	{0x2002e, 0x817},
+	{0x2002f, 0x817},
+	{0x58003, 0x12c0},
+	{0x5800e, 0x0},
+	{0x58012, 0x110},
+	{0x58020, 0x1},
+	{0x5802d, 0x8080},
+	{0x5802e, 0x8080},
+	{0x5802f, 0x8888},
+	{0x58030, 0x8888},
+	{0x58081, 0x3300},
+	{0x58082, 0x2f},
+	{0, 0}  // End marker
+};
+
+/* dual rank, x16, 6400MTS (diff against dual rank, x8, 6400MTS) */
+const ddr_phy_reg_config phy_override_pre_seq_lp5_drank_x16_6400[] = {
+	{0x110a3, 0xb3f},
+	{0x130a3, 0xb3f},
+	{0x20039, 0x1018},
+	{0x2003a, 0x1018},
+	{0x2003b, 0x428},
+	{0x2003c, 0x2f2c},
+	{0x2002c, 0x83f},
+	{0x2002d, 0x83f},
+	{0x20030, 0x83f},
+	{0x5800e, 0x0},
+	{0x58081, 0x4300},
+	{0x58082, 0x3f},
+	{0, 0}  // End marker
+};
+
+/* dual rank, x16, 4800MTS (diff against dual rank, x8, 6400MTS) */
+const ddr_phy_reg_config phy_override_pre_seq_lp5_drank_x16_4800[] = {
+	{0x110a3, 0xb3f},
+	{0x130a3, 0xb3f},
+	{0x2004c, 0xa8f},
+	{0x90801, 0x3a},
+	{0x20004, 0x258},
+	{0x1000f, 0xc86},
+	{0x1100f, 0xc86},
+	{0x1200f, 0xc86},
+	{0x1300f, 0xc86},
+	{0x20035, 0xc08},
+	{0x20036, 0xc08},
+	{0x20037, 0x414},
+	{0x20037, 0x454},
+	{0x20038, 0x1b18},
+	{0x20039, 0xc10},
+	{0x2003a, 0xc10},
+	{0x2003b, 0x41c},
+	{0x2003c, 0x2b20},
+	{0x2003d, 0xc04},
+	{0x2003e, 0xc04},
+	{0x2003f, 0x410},
+	{0x20040, 0x1314},
+	{0x2002c, 0x82f},
+	{0x2002d, 0x82f},
+	{0x20030, 0x82f},
+	{0x2002e, 0x817},
+	{0x2002f, 0x817},
+	{0x58003, 0x12c0},
+	{0x5800e, 0x0},
+	{0x5802d, 0x8080},
+	{0x5802e, 0x8080},
+	{0x5802f, 0x8888},
+	{0x58030, 0x8888},
+	{0x58081, 0x3300},
+	{0x58082, 0x2f},
+	{0, 0}  // End marker
 };
 
 int lp5_training_prepare(void)

@@ -4,6 +4,7 @@
  */
 
 #include <dm.h>
+#include <dm/ofnode.h>
 #include <init.h>
 #include <spl.h>
 #include <misc.h>
@@ -26,6 +27,7 @@
 #include <asm/sections.h>
 #include <u-boot/crc.h>
 #include <clk.h>
+#include <reset.h>
 #include <cpu_func.h>
 
 #define __STR(X)	#X
@@ -474,6 +476,9 @@ int spl_board_init_f(void)
 {
 	int ret;
 	struct udevice *dev;
+	ofnode node;
+	struct clk clk;
+	struct reset_ctl rst;
 
 	/* Clear the BSS. */
 	memset(__bss_start, 0, (char *)&__bss_end - __bss_start);
@@ -532,18 +537,19 @@ int spl_board_init_f(void)
 	rproc_init();
 #endif
 
-#ifdef CONFIG_SPL_ESPI
-	/* Probe eSPI device */
-	ret = uclass_first_device(UCLASS_ESPI, &dev);
-	if (ret) {
-		pr_debug("eSPI: Init failed (ret=%d)\n", ret);
-		return 0;
+	/*
+	 * Hand off the WTM block (efuse/RNG/TE200) clocked and out of reset:
+	 * all SPL efuse consumers are done above (DRO fixup). Enable the
+	 * clock and deassert the reset once here and never touch them again;
+	 * later stages must not gate or assert, OP-TEE owns the runtime state.
+	 */
+	node = ofnode_by_compatible(ofnode_null(), "spacemit,k3-efuse");
+	if (ofnode_valid(node)) {
+		if (!clk_get_by_index_nodev(node, 0, &clk))
+			clk_enable(&clk);
+		if (!reset_get_by_index_nodev(node, 0, &rst))
+			reset_deassert(&rst);
 	}
-	if (!dev) {
-		pr_debug("eSPI: No device found\n");
-		return 0;
-	}
-#endif
 
 	return 0;
 }

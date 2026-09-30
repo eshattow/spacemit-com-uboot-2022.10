@@ -164,8 +164,12 @@ typedef struct {
 extern const uint8_t lp5_training_fw[];
 extern const phy_init_config *lp5_pre_train_table[];
 extern const phy_init_config *lp5_4g_train_table[], *lp5_train_table[];
-extern const ddr_phy_reg_config phy_override_pre_seq_lp5_4g[], phy_override_pre_seq_lp5_16g[];
-extern const ddr_phy_reg_config phy_override_seq_lp5_16g[];
+extern const ddr_phy_reg_config phy_override_pre_seq_lp5_srank_x16_4800[], phy_override_pre_seq_lp5_srank_x16_6400[];
+extern const ddr_phy_reg_config phy_override_pre_seq_lp5_drank_x16_4800[], phy_override_pre_seq_lp5_drank_x16_6400[];
+extern const ddr_phy_reg_config phy_override_pre_seq_lp5_drank_x8_4800[];
+extern const ddr_phy_reg_config phy_override_seq_lp5_srank_x16_4800[], phy_override_seq_lp5_srank_x16_6400[];
+extern const ddr_phy_reg_config phy_override_seq_lp5_drank_x16_4800[], phy_override_seq_lp5_drank_x16_6400[];
+extern const ddr_phy_reg_config phy_override_seq_lp5_drank_x8_4800[];
 
 /* LPDDR4X only */
 extern const uint8_t lp4x_training_fw[];

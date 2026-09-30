@@ -182,7 +182,7 @@ static int fastboot_cros_ec_update_rw(struct udevice *dev,
 	pr_info("Calculating incoming EC RW firmware MD5...\n");
 	md5_wd(image, image_size, image_md5, 0x10000);
 
-	pr_info("Calculating current EC RW firmware MD5...\n");
+	pr_notice("Calculating current EC RW firmware MD5...\n");
 	ret = fastboot_cros_ec_read_rw_md5(dev, rw_offset, image_size, chunk,
 					   read_buf, current_md5);
 	if (ret)
@@ -190,7 +190,7 @@ static int fastboot_cros_ec_update_rw(struct udevice *dev,
 
 	if (!memcmp(current_md5, image_md5, MD5_SUM_LEN)) {
 		fastboot_ec_print_md5("Current EC RW MD5:  ", current_md5);
-		pr_info("EC RW firmware is unchanged, skip update\n");
+		pr_notice("EC RW firmware is unchanged, skip update\n");
 		ret = 0;
 		goto out;
 	}
@@ -205,7 +205,7 @@ static int fastboot_cros_ec_update_rw(struct udevice *dev,
 		goto out;
 	}
 
-	pr_info("Erasing RW region...\n");
+	pr_notice("Erasing RW region...\n");
 	WATCHDOG_RESET();
 	ret = cros_ec_flash_erase(dev, rw_offset, rw_size);
 	if (ret) {
@@ -213,7 +213,7 @@ static int fastboot_cros_ec_update_rw(struct udevice *dev,
 		goto out;
 	}
 
-	pr_info("Writing RW firmware...\n");
+	pr_notice("Writing RW firmware...\n");
 	for (off = 0; off < image_size; off += todo) {
 		todo = min(image_size - off, chunk);
 		ret = cros_ec_flash_write(dev, image + off, rw_offset + off, todo);
@@ -231,7 +231,7 @@ static int fastboot_cros_ec_update_rw(struct udevice *dev,
 		goto reboot_rw;
 
 #if CONFIG_IS_ENABLED(MD5)
-	pr_info("Calculating written EC RW firmware MD5...\n");
+	pr_notice("Calculating written EC RW firmware MD5...\n");
 	ret = fastboot_cros_ec_read_rw_md5(dev, rw_offset, image_size, chunk,
 					   read_buf, readback_md5);
 	if (ret) {
@@ -250,7 +250,7 @@ static int fastboot_cros_ec_update_rw(struct udevice *dev,
 		goto out;
 	}
 #else
-	pr_info("Verifying RW firmware...\n");
+	pr_notice("Verifying RW firmware...\n");
 	for (off = 0; off < image_size; off += todo) {
 		todo = min(image_size - off, chunk);
 		ret = cros_ec_flash_read(dev, read_buf, rw_offset + off, todo);
@@ -278,7 +278,7 @@ static int fastboot_cros_ec_update_rw(struct udevice *dev,
 #endif
 
 reboot_rw:
-	pr_info("Rebooting EC to RW...\n");
+	pr_notice("Rebooting EC to RW...\n");
 	ret = cros_ec_reboot(dev, EC_REBOOT_JUMP_RW, 0);
 	if (ret)
 		pr_err("EC reboot to RW failed (ret=%d)\n", ret);
@@ -306,7 +306,7 @@ void fastboot_oem_flash_ec(const char *cmd_parameter,
 		download_buffer, download_bytes);
 
 	if (!fastboot_should_update_ec()) {
-		pr_info("Skip EC update on this board\n");
+		pr_notice("Skip EC update on this board\n");
 		fastboot_okay("EC update skipped", response);
 		return;
 	}
@@ -329,6 +329,7 @@ void fastboot_oem_flash_ec(const char *cmd_parameter,
 		return;
 	}
 
+	pr_notice("EC update done\n");
 	fastboot_okay("EC update done", response);
 }
 #else
