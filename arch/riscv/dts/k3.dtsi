@@ -42,6 +42,9 @@
 		i2c8 = &i2c8;
 		i2c9 = &ri2c0;
 		i2c10 = &ri2c1;
+		ethernet0 = &eth0;
+		ethernet1 = &eth1;
+		ethernet2 = &eth2;
 	};
 
 	clocks {
