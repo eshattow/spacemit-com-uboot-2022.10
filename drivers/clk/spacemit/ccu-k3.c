@@ -200,12 +200,80 @@
 #define DCIU_C3_TCM_PIPE_CLK		0x248
 /* end of DCIU register offset */
 
-/* RCPU register offset */
-//0xc088c000
-#define RCPU5_CLK_RST_OFFSET		0xC000
-#define RCPU5_RT24_CORE0_CLK_CTRL	(0xC4 + RCPU5_CLK_RST_OFFSET)
-#define RCPU5_RT24_CORE1_CLK_CTRL	(0xC8 + RCPU5_CLK_RST_OFFSET)
-/* end of RCPU register offset */
+/* RCPU sub-block offsets */
+#define RCPU_UARTCTRL_BASE_OFFSET	0x1f00
+#define RCPU_I2SCTRL_BASE_OFFSET	0x2000
+#define RCPU_SPICTRL_BASE_OFFSET	0x5f00
+#define RCPU_I2CCTRL_BASE_OFFSET	0x6f00
+#define RCPU_RPMU_BASE_OFFSET		0xc000
+#define RCPU_PWMCTRL_BASE_OFFSET	0xd000
+
+/* RCPU SYSCTRL register offsets */
+#define RCPU_CAN_CLK_RST		0x4c
+#define RCPU_CAN1_CLK_RST		0xF0
+#define RCPU_CAN2_CLK_RST		0xF4
+#define RCPU_CAN3_CLK_RST		0xF8
+#define RCPU_CAN4_CLK_RST		0xFC
+#define RCPU_IRC_CLK_RST		0x48
+#define RCPU_IRC1_CLK_RST		0xEC
+#define RCPU_GMAC_CLK_RST		0xE4
+#define RCPU_ESPI_CLK_RST		0xDC
+#define RCPU_AUDIO_I2S0_SYS_CLK_CTRL	0x70
+#define RCPU_AUDIO_I2S1_SYS_CLK_CTRL	0x44
+#define RCPU_UART_NM_CLK_14M_CTRL	0x3C
+#define RCPU_UART_NM_CLK_58M_CTRL	0xD8
+
+/* RCPU UARTCTRL register offsets */
+#define RCPU1_UART0_CLK_RST		0x00
+#define RCPU1_UART1_CLK_RST		0x04
+#define RCPU1_UART2_CLK_RST		0x08
+#define RCPU1_UART3_CLK_RST		0x0c
+#define RCPU1_UART4_CLK_RST		0x10
+#define RCPU1_UART5_CLK_RST		0x14
+
+/* RCPU I2SCTRL register offsets */
+#define RCPU2_AUDIO_I2S0_TX_RX_CLK_CTRL	0x60
+#define RCPU2_AUDIO_I2S1_TX_RX_CLK_CTRL	0x64
+#define RCPU2_AUDIO_I2S2_TX_RX_CLK_CTRL	0x68
+#define RCPU2_AUDIO_I2S3_TX_RX_CLK_CTRL	0x6C
+
+#define RCPU2_AUDIO_I2S2_SYS_CLK_CTRL	0x44
+#define RCPU2_AUDIO_I2S3_SYS_CLK_CTRL	0x54
+
+/* RCPU SPICTRL register offsets */
+#define RCPU3_SSP0_CLK_RST		0x00
+#define RCPU3_SSP1_CLK_RST		0x04
+#define RCPU3_PWR_SSP_CLK_RST		0x08
+
+/* RCPU I2CCTRL register offsets */
+#define RCPU4_I2C0_CLK_RST		0x00
+#define RCPU4_I2C1_CLK_RST		0x04
+#define RCPU4_PWR_I2C_CLK_RST		0x08
+
+/* RPMU register offsets */
+#define RCPU5_AON_PER_CLK_RST_CTRL	0x2C
+#define RCPU5_TIMER1_CLK_RST		0x4C
+#define RCPU5_TIMER2_CLK_RST		0x70
+#define RCPU5_TIMER3_CLK_RST		0x78
+#define RCPU5_TIMER4_CLK_RST		0x7C
+#define RCPU5_GPIO_AND_EDGE_CLK_RST	0x74
+#define RCPU5_RCPU_BUS_CLK_CTRL		0xC0
+#define RCPU5_RT24_CORE0_CLK_CTRL	0xC4
+#define RCPU5_RT24_CORE1_CLK_CTRL	0xC8
+#define RCPU5_RT24_CORE0_SW_RESET	0xCC
+#define RCPU5_RT24_CORE1_SW_RESET	0xD0
+
+/* RCPU PWMCTRL register offsets */
+#define RCPU6_PWM0_CLK_RST		0x00
+#define RCPU6_PWM1_CLK_RST		0x04
+#define RCPU6_PWM2_CLK_RST		0x08
+#define RCPU6_PWM3_CLK_RST		0x0c
+#define RCPU6_PWM4_CLK_RST		0x10
+#define RCPU6_PWM5_CLK_RST		0x14
+#define RCPU6_PWM6_CLK_RST		0x18
+#define RCPU6_PWM7_CLK_RST		0x1c
+#define RCPU6_PWM8_CLK_RST		0x20
+#define RCPU6_PWM9_CLK_RST		0x24
 
 /* APBC2 register offset */
 #define APBC2_UART1_CLK_RST		0x00
@@ -2316,19 +2384,373 @@ static SPACEMIT_CCU_GATE(c3_tcm_pipe_clk, "c3_tcm_pipe_clk", "axi_clk",
 	BIT(0), BIT(0), 0x0,
 	0);
 
-//rcpu
+//rcpu5
+static SPACEMIT_CCU_DIV_FC(rcpu_axi_clk, "rcpu_axi_clk", "rcpu_clk",
+	BASE_TYPE_RCPU5, RCPU5_RCPU_BUS_CLK_CTRL,
+	3, 3, BIT(8), 0);
+static SPACEMIT_CCU_DIV_FC(rcpu_apb_clk, "rcpu_apb_clk", "rcpu_axi_clk",
+	BASE_TYPE_RCPU5, RCPU5_RCPU_BUS_CLK_CTRL,
+	0, 3, BIT(8), 0);
+
+static SPACEMIT_CCU_GATE(ripc2msa_clk, "ripc2msa_clk", "rcpu_clk",
+	BASE_TYPE_RCPU5, RCPU5_AON_PER_CLK_RST_CTRL,
+	BIT(5), BIT(5), 0x0,
+	0);
+static SPACEMIT_CCU_GATE(ripc2cp_clk, "ripc2cp_clk", "rcpu_clk",
+	BASE_TYPE_RCPU5, RCPU5_AON_PER_CLK_RST_CTRL,
+	BIT(3), BIT(3), 0x0,
+	0);
+static SPACEMIT_CCU_GATE(ripc2ap_clk, "ripc2ap_clk", "rcpu_clk",
+	BASE_TYPE_RCPU5, RCPU5_AON_PER_CLK_RST_CTRL,
+	BIT(1), BIT(1), 0x0,
+	0);
+
+static const char * const rtimer_parents[] = {
+	"pll1_d96_25p6", "pll1_d192_12p8", "pll1_d768_3p2"
+};
+
+static SPACEMIT_CCU_DIV_MUX_GATE(rtimer1_clk, "rtimer1_clk", rtimer_parents,
+	BASE_TYPE_RCPU5, RCPU5_TIMER1_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(2), BIT(1) | BIT(2), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rtimer2_clk, "rtimer2_clk", rtimer_parents,
+	BASE_TYPE_RCPU5, RCPU5_TIMER2_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(2), BIT(1) | BIT(2), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rtimer3_clk, "rtimer3_clk", rtimer_parents,
+	BASE_TYPE_RCPU5, RCPU5_TIMER3_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(2), BIT(1) | BIT(2), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rtimer4_clk, "rtimer4_clk", rtimer_parents,
+	BASE_TYPE_RCPU5, RCPU5_TIMER4_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(2), BIT(1) | BIT(2), 0x0,
+	0);
+
 static const char * const rt24_core_parents[] = {
 	"rcpu_clk", "pll1_d4_614p4", "pll1_d5_491p52"
 };
 static SPACEMIT_CCU_DIV_FC_MUX(rt24_core0_clk, "rt24_core0_clk", rt24_core_parents,
-	BASE_TYPE_RCPU, RCPU5_RT24_CORE0_CLK_CTRL,
+	BASE_TYPE_RCPU5, RCPU5_RT24_CORE0_CLK_CTRL,
 	0, 2, BIT(8),
 	4, 2,
 	0);
 static SPACEMIT_CCU_DIV_FC_MUX(rt24_core1_clk, "rt24_core1_clk", rt24_core_parents,
-	BASE_TYPE_RCPU, RCPU5_RT24_CORE1_CLK_CTRL,
+	BASE_TYPE_RCPU5, RCPU5_RT24_CORE1_CLK_CTRL,
 	0, 2, BIT(8),
 	4, 2,
+	0);
+
+static SPACEMIT_CCU_GATE(rgpio_clk, "rgpio_clk", "rcpu_apb_clk",
+	BASE_TYPE_RCPU5, RCPU5_GPIO_AND_EDGE_CLK_RST,
+	BIT(1), BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_GATE(rgpio_edge_clk, "rgpio_edge_clk", "rcpu_apb_clk",
+	BASE_TYPE_RCPU5, RCPU5_GPIO_AND_EDGE_CLK_RST,
+	BIT(3), BIT(3), 0x0,
+	0);
+static SPACEMIT_CCU_GATE(rgpio_lp_clk, "rgpio_lp_clk", "rcpu_apb_clk",
+	BASE_TYPE_RCPU5, RCPU5_GPIO_AND_EDGE_CLK_RST,
+	BIT(4), BIT(4), 0x0,
+	0);
+
+//rcpu
+static const char * const rcan_parents[] = {
+	"pll6_20", "pll6_40", "pll6_80"
+};
+
+static SPACEMIT_CCU_MUX_GATE(rcan0_clk, "rcan0_clk", rcan_parents,
+	BASE_TYPE_RCPU, RCPU_CAN_CLK_RST,
+	4, 2,
+	BIT(1) | BIT(2), BIT(1) | BIT(2), 0x0,
+	0);
+static SPACEMIT_CCU_MUX_GATE(rcan1_clk, "rcan1_clk", rcan_parents,
+	BASE_TYPE_RCPU, RCPU_CAN1_CLK_RST,
+	4, 2,
+	BIT(1) | BIT(2), BIT(1) | BIT(2), 0x0,
+	0);
+static SPACEMIT_CCU_MUX_GATE(rcan2_clk, "rcan2_clk", rcan_parents,
+	BASE_TYPE_RCPU, RCPU_CAN2_CLK_RST,
+	4, 2,
+	BIT(1) | BIT(2), BIT(1) | BIT(2), 0x0,
+	0);
+static SPACEMIT_CCU_MUX_GATE(rcan3_clk, "rcan3_clk", rcan_parents,
+	BASE_TYPE_RCPU, RCPU_CAN3_CLK_RST,
+	4, 2,
+	BIT(1) | BIT(2), BIT(1) | BIT(2), 0x0,
+	0);
+static SPACEMIT_CCU_MUX_GATE(rcan4_clk, "rcan4_clk", rcan_parents,
+	BASE_TYPE_RCPU, RCPU_CAN4_CLK_RST,
+	4, 2,
+	BIT(1) | BIT(2), BIT(1) | BIT(2), 0x0,
+	0);
+
+static SPACEMIT_CCU_GATE(rirc0_clk, "rirc0_clk", "rcpu_apb_clk",
+	BASE_TYPE_RCPU, RCPU_IRC_CLK_RST,
+	BIT(2), BIT(2), 0x0,
+	0);
+static SPACEMIT_CCU_GATE(rirc1_clk, "rirc1_clk", "rcpu_apb_clk",
+	BASE_TYPE_RCPU, RCPU_IRC1_CLK_RST,
+	BIT(2), BIT(2), 0x0,
+	0);
+
+static const char * const respi_sclk_src_parents[] = {
+	"pll2_20", "pll2_25", "pll2_33", "pll2_50", "pll2_66"
+};
+
+static SPACEMIT_CCU_MUX(respi_sclk_src, "respi_sclk_src", respi_sclk_src_parents,
+	BASE_TYPE_RCPU, RCPU_ESPI_CLK_RST,
+	4, 3,
+	0);
+static const char * const respi_sclk_parents[] = {
+	"clk_dummy", "respi_sclk_src"
+};
+
+static SPACEMIT_CCU_MUX_GATE(respi_sclk, "respi_sclk", respi_sclk_parents,
+	BASE_TYPE_RCPU, RCPU_ESPI_CLK_RST,
+	8, 1,
+	BIT(1), BIT(1), 0x0,
+	0);
+
+static SPACEMIT_CCU_GATE(remac_bus_clk, "remac_bus_clk", "rcpu_axi_clk",
+	BASE_TYPE_RCPU, RCPU_GMAC_CLK_RST,
+	BIT(0), BIT(0), 0x0,
+	0);
+static SPACEMIT_CCU_GATE(remac_ref_clk, "remac_ref_clk", "pll2_d120_25",
+	BASE_TYPE_RCPU, RCPU_GMAC_CLK_RST,
+	BIT(14), 0x0, BIT(14),
+	0);
+static const char * const remac_1588_parents[] = {
+	"vctcxo_24", "pll2_d24_125"
+};
+
+static SPACEMIT_CCU_MUX(remac_1588_clk, "remac_1588_clk", remac_1588_parents,
+	BASE_TYPE_RCPU, RCPU_GMAC_CLK_RST,
+	15, 1,
+	0);
+static SPACEMIT_CCU_GATE(remac_rgmii_tx_clk, "remac_rgmii_tx_clk", "pll2_d24_125",
+	BASE_TYPE_RCPU, RCPU_GMAC_CLK_RST,
+	BIT(8), BIT(8), 0x0,
+	0);
+
+static const char * const ri2s01_sysclk_parents[] = {
+	"pll1_aud_24p5", "pll1_aud_245p7", "pll1_d96_25p6", "pll1_d768_3p2"
+};
+
+static SPACEMIT_CCU_DIV_MUX_GATE(ri2s0_sysclk, "ri2s0_sysclk", ri2s01_sysclk_parents,
+	BASE_TYPE_RCPU, RCPU_AUDIO_I2S0_SYS_CLK_CTRL,
+	8, 11, 4, 2,
+	BIT(2) | BIT(1), BIT(2) | BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(ri2s1_sysclk, "ri2s1_sysclk", ri2s01_sysclk_parents,
+	BASE_TYPE_RCPU, RCPU_AUDIO_I2S1_SYS_CLK_CTRL,
+	8, 11, 4, 2,
+	BIT(2) | BIT(1), BIT(2) | BIT(1), 0x0,
+	0);
+
+static struct ccu_ddn_info ruart_ddn_mask_info = {
+	.factor = 2,
+	.num_mask = 0x1fff,
+	.den_mask = 0x1fff,
+	.num_shift = 0,
+	.den_shift = 16,
+};
+
+static struct ccu_ddn_tbl ruart_14_tbl[] = {
+	{.num = 0x6a1, .den = 0x64}, /* rate = parent_rate*0x64/0x6a1/2) */
+};
+
+static SPACEMIT_CCU_DDN_GATE(ruart_14, "ruart_14", "pll1_d5_491p52",
+	&ruart_ddn_mask_info, &ruart_14_tbl, ARRAY_SIZE(ruart_14_tbl),
+	BASE_TYPE_RCPU, RCPU_UART_NM_CLK_14M_CTRL, RCPU_UART_NM_CLK_14M_CTRL, BIT(31),
+	0);
+
+static struct ccu_ddn_tbl ruart_58_tbl[] = {
+	{.num = 0x1065, .den = 0x3e8}, /* rate = parent_rate*0x3e8/0x1065/2) */
+};
+
+static SPACEMIT_CCU_DDN_GATE(ruart_58, "ruart_58", "pll1_d5_491p52",
+	&ruart_ddn_mask_info, &ruart_58_tbl, ARRAY_SIZE(ruart_58_tbl),
+	BASE_TYPE_RCPU, RCPU_UART_NM_CLK_58M_CTRL, RCPU_UART_NM_CLK_58M_CTRL, BIT(31),
+	0);
+
+//rcpu1
+static const char * const ruart_clk_parents[] = {
+	"ruart_14", "pll1_aud_245p7", "pll1_d96_25p6", "ruart_58"
+};
+
+static SPACEMIT_CCU_DIV_MUX_GATE(ruart0_clk, "ruart0_clk", ruart_clk_parents,
+	BASE_TYPE_RCPU1, RCPU1_UART0_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(ruart1_clk, "ruart1_clk", ruart_clk_parents,
+	BASE_TYPE_RCPU1, RCPU1_UART1_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(ruart2_clk, "ruart2_clk", ruart_clk_parents,
+	BASE_TYPE_RCPU1, RCPU1_UART2_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(ruart3_clk, "ruart3_clk", ruart_clk_parents,
+	BASE_TYPE_RCPU1, RCPU1_UART3_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(ruart4_clk, "ruart4_clk", ruart_clk_parents,
+	BASE_TYPE_RCPU1, RCPU1_UART4_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(ruart5_clk, "ruart5_clk", ruart_clk_parents,
+	BASE_TYPE_RCPU1, RCPU1_UART5_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+
+//rcpu2
+static const char * const ri2s_clk_parents[] = {
+	"pll1_aud_24p5", "pll1_aud_245p7"
+};
+
+static SPACEMIT_CCU_DIV_MUX_GATE(ri2s0_clk, "ri2s0_clk", ri2s_clk_parents,
+	BASE_TYPE_RCPU2, RCPU2_AUDIO_I2S0_TX_RX_CLK_CTRL,
+	4, 11, 16, 2,
+	BIT(2) | BIT(1), BIT(2) | BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(ri2s1_clk, "ri2s1_clk", ri2s_clk_parents,
+	BASE_TYPE_RCPU2, RCPU2_AUDIO_I2S1_TX_RX_CLK_CTRL,
+	4, 11, 16, 2,
+	BIT(2) | BIT(1), BIT(2) | BIT(1), 0x0,
+	0);
+
+static const char * const ri2s23_sysclk_parents[] = {
+	"pll1_aud_24p5", "pll1_aud_245p7"
+};
+
+static SPACEMIT_CCU_DIV_MUX_GATE(ri2s2_sysclk, "ri2s2_sysclk", ri2s23_sysclk_parents,
+	BASE_TYPE_RCPU2, RCPU2_AUDIO_I2S2_SYS_CLK_CTRL,
+	4, 11, 16, 2,
+	BIT(2) | BIT(1), BIT(2) | BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(ri2s3_sysclk, "ri2s3_sysclk", ri2s23_sysclk_parents,
+	BASE_TYPE_RCPU2, RCPU2_AUDIO_I2S3_SYS_CLK_CTRL,
+	4, 11, 16, 2,
+	BIT(2) | BIT(1), BIT(2) | BIT(1), 0x0,
+	0);
+
+static SPACEMIT_CCU_DIV_GATE(ri2s2_clk, "ri2s2_clk", "ri2s2_sysclk",
+	BASE_TYPE_RCPU2, RCPU2_AUDIO_I2S2_TX_RX_CLK_CTRL,
+	4, 11,
+	BIT(2) | BIT(1), BIT(2) | BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_GATE(ri2s3_clk, "ri2s3_clk", "ri2s3_sysclk",
+	BASE_TYPE_RCPU2, RCPU2_AUDIO_I2S3_TX_RX_CLK_CTRL,
+	4, 11,
+	BIT(2) | BIT(1), BIT(2) | BIT(1), 0x0,
+	0);
+
+//rcpu3
+static const char * const rspi_parent_names[] = {
+	"pll1_aud_24p5", "pll1_aud_245p7", "pll1_d96_25p6"
+};
+
+static SPACEMIT_CCU_DIV_MUX_GATE(rspi0_clk, "rspi0_clk", rspi_parent_names,
+	BASE_TYPE_RCPU3, RCPU3_SSP0_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rspi1_clk, "rspi1_clk", rspi_parent_names,
+	BASE_TYPE_RCPU3, RCPU3_SSP1_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rspi2_clk, "rspi2_clk", rspi_parent_names,
+	BASE_TYPE_RCPU3, RCPU3_PWR_SSP_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+
+//rcpu4
+static const char * const ri2c_parent_names[] = {
+	"pll1_aud_24p5", "pll1_aud_245p7", "pll1_d96_25p6"
+};
+
+static SPACEMIT_CCU_DIV_MUX_GATE(ri2c0_clk, "ri2c0_clk", ri2c_parent_names,
+	BASE_TYPE_RCPU4, RCPU4_I2C0_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(ri2c1_clk, "ri2c1_clk", ri2c_parent_names,
+	BASE_TYPE_RCPU4, RCPU4_I2C1_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(ri2c2_clk, "ri2c2_clk", ri2c_parent_names,
+	BASE_TYPE_RCPU4, RCPU4_PWR_I2C_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1) | BIT(0), BIT(1) | BIT(0), 0x0,
+	0);
+
+//rcpu6
+static const char * const rpwm_parent_names[] = {
+	"pll1_aud_245p7", "pll1_aud_24p5"
+};
+
+static SPACEMIT_CCU_DIV_MUX_GATE(rpwm0_clk, "rpwm0_clk", rpwm_parent_names,
+	BASE_TYPE_RCPU6, RCPU6_PWM0_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1), BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rpwm1_clk, "rpwm1_clk", rpwm_parent_names,
+	BASE_TYPE_RCPU6, RCPU6_PWM1_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1), BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rpwm2_clk, "rpwm2_clk", rpwm_parent_names,
+	BASE_TYPE_RCPU6, RCPU6_PWM2_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1), BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rpwm3_clk, "rpwm3_clk", rpwm_parent_names,
+	BASE_TYPE_RCPU6, RCPU6_PWM3_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1), BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rpwm4_clk, "rpwm4_clk", rpwm_parent_names,
+	BASE_TYPE_RCPU6, RCPU6_PWM4_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1), BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rpwm5_clk, "rpwm5_clk", rpwm_parent_names,
+	BASE_TYPE_RCPU6, RCPU6_PWM5_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1), BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rpwm6_clk, "rpwm6_clk", rpwm_parent_names,
+	BASE_TYPE_RCPU6, RCPU6_PWM6_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1), BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rpwm7_clk, "rpwm7_clk", rpwm_parent_names,
+	BASE_TYPE_RCPU6, RCPU6_PWM7_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1), BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rpwm8_clk, "rpwm8_clk", rpwm_parent_names,
+	BASE_TYPE_RCPU6, RCPU6_PWM8_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1), BIT(1), 0x0,
+	0);
+static SPACEMIT_CCU_DIV_MUX_GATE(rpwm9_clk, "rpwm9_clk", rpwm_parent_names,
+	BASE_TYPE_RCPU6, RCPU6_PWM9_CLK_RST,
+	8, 11, 4, 2,
+	BIT(1), BIT(1), 0x0,
 	0);
 
 //apbc2
@@ -2656,8 +3078,72 @@ static struct spacemit_clk_table spacemit_k3_clks = {
 		[CLK_C2_TCM_PIPE]	= &c2_tcm_pipe_clk.common.clk,
 		[CLK_C3_TCM_PIPE]	= &c3_tcm_pipe_clk.common.clk,
 		//RCPU
+		//rcpu5
+		[CLK_RCPU_AXI]		= &rcpu_axi_clk.common.clk,
+		[CLK_RCPU_APB]		= &rcpu_apb_clk.common.clk,
+		[CLK_RCPU_IPC2MSA]	= &ripc2msa_clk.common.clk,
+		[CLK_RCPU_IPC2CP]	= &ripc2cp_clk.common.clk,
+		[CLK_RCPU_IPC2AP]	= &ripc2ap_clk.common.clk,
+		[CLK_RCPU_TIMER1]	= &rtimer1_clk.common.clk,
+		[CLK_RCPU_TIMER2]	= &rtimer2_clk.common.clk,
+		[CLK_RCPU_TIMER3]	= &rtimer3_clk.common.clk,
+		[CLK_RCPU_TIMER4]	= &rtimer4_clk.common.clk,
 		[CLK_RCPU_RT24_CORE0]	= &rt24_core0_clk.common.clk,
 		[CLK_RCPU_RT24_CORE1]	= &rt24_core1_clk.common.clk,
+		[CLK_RCPU_GPIO]		= &rgpio_clk.common.clk,
+		[CLK_RCPU_GPIO_EDGE]	= &rgpio_edge_clk.common.clk,
+		[CLK_RCPU_GPIO_LP]	= &rgpio_lp_clk.common.clk,
+		//rcpu
+		[CLK_RCPU_CAN0]		= &rcan0_clk.common.clk,
+		[CLK_RCPU_CAN1]		= &rcan1_clk.common.clk,
+		[CLK_RCPU_CAN2]		= &rcan2_clk.common.clk,
+		[CLK_RCPU_CAN3]		= &rcan3_clk.common.clk,
+		[CLK_RCPU_CAN4]		= &rcan4_clk.common.clk,
+		[CLK_RCPU_IRC0]		= &rirc0_clk.common.clk,
+		[CLK_RCPU_IRC1]		= &rirc1_clk.common.clk,
+		[CLK_RCPU_ESPI_SCLK_SRC]	= &respi_sclk_src.common.clk,
+		[CLK_RCPU_ESPI_SCLK]		= &respi_sclk.common.clk,
+		[CLK_RCPU_EMAC_BUS]		= &remac_bus_clk.common.clk,
+		[CLK_RCPU_EMAC_REF]		= &remac_ref_clk.common.clk,
+		[CLK_RCPU_EMAC_1588]		= &remac_1588_clk.common.clk,
+		[CLK_RCPU_EMAC_RGMII_TX]	= &remac_rgmii_tx_clk.common.clk,
+		[CLK_RCPU_I2S0_SYS]		= &ri2s0_sysclk.common.clk,
+		[CLK_RCPU_I2S1_SYS]		= &ri2s1_sysclk.common.clk,
+		[CLK_RCPU_UART_SRC_14]		= &ruart_14.common.clk,
+		[CLK_RCPU_UART_SRC_58]		= &ruart_58.common.clk,
+		//rcpu1
+		[CLK_RCPU_UART0]	= &ruart0_clk.common.clk,
+		[CLK_RCPU_UART1]	= &ruart1_clk.common.clk,
+		[CLK_RCPU_UART2]	= &ruart2_clk.common.clk,
+		[CLK_RCPU_UART3]	= &ruart3_clk.common.clk,
+		[CLK_RCPU_UART4]	= &ruart4_clk.common.clk,
+		[CLK_RCPU_UART5]	= &ruart5_clk.common.clk,
+		//rcpu2
+		[CLK_RCPU_I2S0]		= &ri2s0_clk.common.clk,
+		[CLK_RCPU_I2S1]		= &ri2s1_clk.common.clk,
+		[CLK_RCPU_I2S2_SYS]	= &ri2s2_sysclk.common.clk,
+		[CLK_RCPU_I2S3_SYS]	= &ri2s3_sysclk.common.clk,
+		[CLK_RCPU_I2S2]		= &ri2s2_clk.common.clk,
+		[CLK_RCPU_I2S3]		= &ri2s3_clk.common.clk,
+		//rcpu3
+		[CLK_RCPU_SPI0]		= &rspi0_clk.common.clk,
+		[CLK_RCPU_SPI1]		= &rspi1_clk.common.clk,
+		[CLK_RCPU_SPI2]		= &rspi2_clk.common.clk,
+		//rcpu4
+		[CLK_RCPU_I2C0]		= &ri2c0_clk.common.clk,
+		[CLK_RCPU_I2C1]		= &ri2c1_clk.common.clk,
+		[CLK_RCPU_I2C2]		= &ri2c2_clk.common.clk,
+		//rcpu6
+		[CLK_RCPU_PWM0]		= &rpwm0_clk.common.clk,
+		[CLK_RCPU_PWM1]		= &rpwm1_clk.common.clk,
+		[CLK_RCPU_PWM2]		= &rpwm2_clk.common.clk,
+		[CLK_RCPU_PWM3]		= &rpwm3_clk.common.clk,
+		[CLK_RCPU_PWM4]		= &rpwm4_clk.common.clk,
+		[CLK_RCPU_PWM5]		= &rpwm5_clk.common.clk,
+		[CLK_RCPU_PWM6]		= &rpwm6_clk.common.clk,
+		[CLK_RCPU_PWM7]		= &rpwm7_clk.common.clk,
+		[CLK_RCPU_PWM8]		= &rpwm8_clk.common.clk,
+		[CLK_RCPU_PWM9]		= &rpwm9_clk.common.clk,
 		//APBC2
 		[CLK_SEC_UART1]		= &uart1_sec_clk.common.clk,
 		[CLK_SEC_SSP2]		= &ssp2_sec_clk.common.clk,
@@ -2810,6 +3296,24 @@ int ccu_common_init(struct clk * clk, struct spacemit_ccu_clk *clk_info, struct 
 		break;
 	case BASE_TYPE_RCPU:
 		common->base = clk_info->rcpu_base;
+		break;
+	case BASE_TYPE_RCPU1:
+		common->base = clk_info->rcpu_base + RCPU_UARTCTRL_BASE_OFFSET;
+		break;
+	case BASE_TYPE_RCPU2:
+		common->base = clk_info->rcpu_base + RCPU_I2SCTRL_BASE_OFFSET;
+		break;
+	case BASE_TYPE_RCPU3:
+		common->base = clk_info->rcpu_base + RCPU_SPICTRL_BASE_OFFSET;
+		break;
+	case BASE_TYPE_RCPU4:
+		common->base = clk_info->rcpu_base + RCPU_I2CCTRL_BASE_OFFSET;
+		break;
+	case BASE_TYPE_RCPU5:
+		common->base = clk_info->rcpu_base + RCPU_RPMU_BASE_OFFSET;
+		break;
+	case BASE_TYPE_RCPU6:
+		common->base = clk_info->rcpu_base + RCPU_PWMCTRL_BASE_OFFSET;
 		break;
 	default:
 		common->base = clk_info->apbc_base;

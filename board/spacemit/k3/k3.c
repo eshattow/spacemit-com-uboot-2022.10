@@ -859,7 +859,7 @@ void try_flash_image_from_card(void)
 	}
 
 	/*check if flash config file is in sd card*/
-	sprintf(cmd, "fatsize mmc %d:%d %s", MMC_DEV_SD, part, FLASH_CONFIG_FILE_NAME);
+	sprintf(cmd, "fatsize mmc %x:%x %s", MMC_DEV_SD, part, FLASH_CONFIG_FILE_NAME);
 	pr_debug("cmd: %s\n", cmd);
 	if (0 != run_command(cmd, 0)) {
 		pr_err("Can NOT find partition table %s in card\n", FLASH_CONFIG_FILE_NAME);
@@ -909,7 +909,7 @@ static void try_boot_from_udisk(void)
 		pr_info("udisk boot: Found 'bootfs' at usb %d, partition %d %s %s\n",
 			udisk_dev_num, part_num, dev_desc->vendor, dev_desc->product);
 
-		sprintf(bootfs_part, "%d:%d", udisk_dev_num, part_num);
+		sprintf(bootfs_part, "%x:%x", udisk_dev_num, part_num);
 		if (fs_set_blk_dev("usb", bootfs_part, FS_TYPE_ANY) != 0) {
 			pr_info("udisk boot: set blk dev fail on usb %d\n", udisk_dev_num);
 			continue;
@@ -1429,11 +1429,12 @@ static int _load_env_from_blk(struct blk_desc *dev_desc, const char *dev_name, i
 	if (part > MAX_SEARCH_PARTITIONS)
 		return -1;
 
-	env_set("bootfs_part", simple_itoa(part));
+	/* "<dev>:<part>" is parsed as hexadecimal (see blk_get_device_part_str) */
+	env_set_hex("bootfs_part", part);
 
 	/*load env.txt and import to uboot*/
 	memset((void *)CONFIG_FASTBOOT_BUF_ADDR, 0, CONFIG_ENV_SIZE);
-	sprintf(cmd, "load %s %d:%d 0x%lx env_%s.txt", dev_name,
+	sprintf(cmd, "load %s %x:%x 0x%lx env_%s.txt", dev_name,
 			dev, part, CONFIG_FASTBOOT_BUF_ADDR, CONFIG_SYS_CONFIG_NAME);
 	pr_debug("cmd:%s\n", cmd);
 	if (run_command(cmd, 0))
@@ -1550,7 +1551,7 @@ void import_env_from_bootfs(void)
 
 	if (boot_device && !strncmp(boot_device, "udisk", 5)) {
 		memset(cmd, 0, 128);
-		sprintf(cmd, "load usb %d:%d ${kernel_addr_r} env_k3.txt",
+		sprintf(cmd, "load usb %x:%x ${kernel_addr_r} env_k3.txt",
 			udisk_dev_num, part_num);
 		if (run_command(cmd, 0)) {
 			pr_info("run command: %s failed\n", cmd);
