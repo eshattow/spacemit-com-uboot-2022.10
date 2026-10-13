@@ -102,7 +102,6 @@ struct spacemit_efuse_plat {
 	struct efuse_data efuse;
 	int efuse_need_reload;
 	int efuse_power_flag;
-	int owns_block;
 	struct udevice *regulator;
 };
 
@@ -234,9 +233,7 @@ int efuse_read_bank(struct udevice *dev, int offset, void *buf, int size)
 	}
 
 	if (plat->efuse_need_reload) {
-		/* only the owner stage (SPL) may pulse the shared WTM block */
-		if (plat->owns_block)
-			efuse_reload(dev);
+		efuse_reload(dev);
 		efuse_load_all(dev);
 		plat->efuse_need_reload = 0;
 	}
@@ -383,11 +380,6 @@ static int spacemit_efuse_read(struct udevice *dev, int offset, void *buf, int s
 static __maybe_unused int spacemit_efuse_program(struct udevice *dev, int offset, const void *buf, int size)
 {
 	int ret;
-	struct spacemit_efuse_plat *plat = dev_get_plat(dev);
-
-	/* burning writes the shared WTM block: allowed in the owner stage only */
-	if (!plat->owns_block)
-		return -EPERM;
 
 	ret = efuse_power_on(dev);
 	if (0 == ret){
@@ -443,22 +435,13 @@ static int spacemit_efuse_of_to_plat(struct udevice *dev)
 	plat->efuse_need_reload = 0;
 
 	ret = clk_get_bulk(dev, &plat->clks);
-	if (ret == -ENOENT) {
-		/* no clocks property: SPL owns the WTM block, we only read it */
-		plat->clks.count = 0;
-		plat->owns_block = 0;
-	} else if (ret) {
+	if (ret) {
 		pr_err("Can't get clk: %d\n", ret);
 		return ret;
-	} else {
-		plat->owns_block = 1;
 	}
 
 	ret = reset_get_bulk(dev, &plat->resets);
-	if (ret == -ENOENT) {
-		/* no resets property: never assert, RNG/TE200 state must survive */
-		plat->resets.count = 0;
-	} else if (ret) {
+	if (ret) {
 		pr_err("Can't get reset: %d\n", ret);
 		return ret;
 	}
