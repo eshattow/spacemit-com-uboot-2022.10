@@ -182,7 +182,6 @@ void efuse_load_all(struct udevice *dev)
 			buffer[n++] = readl(reg_base + reg_offset + i * 4);
 		}
 	}
-	se_clock_off(dev);
 }
 
 int efuse_reload(struct udevice *dev)
