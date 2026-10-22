@@ -35,6 +35,7 @@
 #include <power/pmic.h>
 #include <dm/device.h>
 #include <dm/device-internal.h>
+#include <dt-bindings/soc/spacemit-k1x.h>
 #include <g_dnl.h>
 #include <fdt_simplefb.h>
 #include <mtd_node.h>
@@ -980,6 +981,46 @@ int board_init(void)
 	return 0;
 }
 
+static void set_bg_trim_from_efuse(void)
+{
+	struct udevice *dev;
+	uint8_t fuse;
+	uint32_t bg_trim = BG_TRIM_DEFAULT_VALUE;
+	uint32_t reg_val;
+	void __iomem *reg_base = (void __iomem *)K1X_APB_SPARE_BASE;
+	int ret;
+
+	/* retrieve the device */
+	ret = uclass_get_device_by_driver(UCLASS_MISC,
+			DM_DRIVER_GET(spacemit_k1x_efuse), &dev);
+	if (ret) {
+		pr_err("Failed to get efuse device for BG_trim: %d\n", ret);
+		goto write_default;
+	}
+
+	// read from efuse, each bank has 32byte efuse data
+	// BG_trim in bank7 bit92~bit95 (4 bits), all in byte 11 bit4~bit7
+	ret = misc_read(dev, 7 * 32 + 11, &fuse, sizeof(fuse));
+	if (ret != 0) {
+		pr_err("Failed to read BG_trim from efuse: %d\n", ret);
+		goto write_default;
+	}
+
+	bg_trim = (fuse >> 4) & 0x0F;
+	if (bg_trim == 0)
+		bg_trim = BG_TRIM_DEFAULT_VALUE;
+
+write_default:
+	// Write to register K1X_APB_SPARE_BASE + 0x104, bit24~bit27
+	reg_val = readl(reg_base + 0x104);
+	reg_val &= ~(0x0F << 24);  // Clear bit24~27
+	reg_val |= (bg_trim << 24); // Set bit24~27
+	writel(reg_val, reg_base + 0x104);
+
+	pr_debug("BG_trim: efuse=0x%x, written to 0x%08lx\n",
+		bg_trim, (unsigned long)(reg_base + 0x104));
+}
+
 int board_late_init(void)
 {
 	ulong kernel_start;
@@ -999,6 +1040,8 @@ int board_late_init(void)
 	set_data_buffer_env();
 
 	set_serialnumber_based_on_boot_mode();
+
+	set_bg_trim_from_efuse();
 
 #ifdef CONFIG_VIDEO_SPACEMIT
 	ret = uclass_probe_all(UCLASS_VIDEO);
@@ -1296,6 +1339,7 @@ static int ft_board_cpu_fixup(void *blob, struct bd_info *bd)
 	ret = fdt_setprop(blob, node, "svt-dro", &dro, sizeof(dro));
 	if (ret < 0)
 		return ret;
+
 	return 0;
 }
 
