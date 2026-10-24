@@ -348,9 +348,19 @@ class ImageBinary(object):
         """
         key_folder = os.path.join(self.input_path, 'key')
         if not os.path.isdir(key_folder):
-            os.mkdir(key_folder)
+            pass
 
-        key_filename = os.path.join(key_folder, f"{key_name}.key")
+        input_path_compat = (
+          self.input_path[0] if isinstance(self.input_path, list) else
+          self.input_path
+        )
+        from pathlib import Path as PathGKF
+        srcdir_gkf = PathGKF(__file__).parents[1]
+        outdir_gkf = PathGKF(input_path_compat).relative_to(srcdir_gkf).parent
+        key_folder = outdir_gkf / 'key'
+        if not key_folder.is_dir():
+            key_folder.mkdir(exist_ok=True, parents=True)
+        key_filename = key_folder / f"{key_name}.key"
         # key_file = open(key_filename, 'w+b')
         # self.key_file_list.append(key_file)
         return key_filename
