@@ -152,5 +152,6 @@ int lcd_tc358762xbg_dpi_800x480_init(void);
 int lcd_hxdm101_mipi_init(void);
 int lcd_co5300_mipi_init(void);
 int lcd_jd9366tcyh1095_mipi_init(void);
+int lcd_101w01_mipi_init(void);
 
 #endif /*_SPACEMIT_DSI_COMMON_H_*/

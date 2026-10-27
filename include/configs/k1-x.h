@@ -115,6 +115,7 @@
 
 // for those has NOT been through test procedure(ATE)
 #define SVT_DRO_DEFAULT_VALUE	(120)
+#define BG_TRIM_DEFAULT_VALUE	(8)
 
 #ifndef __ASSEMBLY__
 #include "linux/types.h"
